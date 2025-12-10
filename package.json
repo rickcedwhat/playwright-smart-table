@@ -1,0 +1,23 @@
+{
+  "name": "playwright-smart-table",
+  "version": "1.0.0",
+  "description": "A smart table utility for Playwright with built-in pagination strategies.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "npx playwright test"
+  },
+  "keywords": ["playwright", "testing", "table", "automation"],
+  "author": "",
+  "license": "ISC",
+  "peerDependencies": {
+    "@playwright/test": "^1.30.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.30.0",
+    "@types/node": "^20.0.0",
+    "ts-node": "^10.9.0",
+    "typescript": "^5.0.0"
+  }
+}
