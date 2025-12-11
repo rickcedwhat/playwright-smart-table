@@ -1,5 +1,5 @@
 {
-  "name": "playwright-smart-table",
+  "name": "@rickcedwhat/playwright-smart-table",
   "version": "1.0.0",
   "description": "A smart table utility for Playwright with built-in pagination strategies.",
   "main": "dist/index.js",
