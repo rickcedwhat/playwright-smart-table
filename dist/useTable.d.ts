@@ -9,9 +9,7 @@ export declare const useTable: (rootLocator: Locator, configOptions?: TableConfi
     getByCell: (rowFilters: Record<string, string | RegExp | number>, targetColumn: string) => Promise<Locator>;
     getRows: () => Promise<Record<string, string>[]>;
     getRowAsJSON: (filters: Record<string, string | RegExp | number>) => Promise<Record<string, string>>;
-    /**
-    * 🛠️ DEV TOOL: Prints a prompt to the console.
-    * Copy the output and paste it into Gemini/ChatGPT to generate your config.
-    */
+    setColumnName: (colIndex: number, newNameOrFn: string | ((current: string) => string)) => Promise<void>;
     generateConfigPrompt: () => Promise<void>;
+    generateStrategyPrompt: () => Promise<void>;
 };
