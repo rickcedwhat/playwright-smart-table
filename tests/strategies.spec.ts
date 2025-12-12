@@ -1,5 +1,5 @@
 // tests/strategies.spec.ts
-import { test, expect } from '@playwright/test';
+import { test, expect, Locator } from '@playwright/test';
 import { useTable } from '../src/useTable';
 import { TableStrategies } from '../src/strategies';
 
@@ -14,8 +14,7 @@ test.describe('Real World Strategy Tests', () => {
       rowSelector: 'tbody tr',
       headerSelector: 'thead th',
       cellSelector: 'td',
-      // Strategy: Standard "Next" Button
-      pagination: TableStrategies.clickNext('#example_next'),
+      pagination: TableStrategies.clickNext((root) => (root as Locator).page().getByRole('link', { name: 'Next' })),
       maxPages: 3
     });
 
@@ -23,9 +22,9 @@ test.describe('Real World Strategy Tests', () => {
     await expect(await table.getByRow({ Name: "Airi Satou" })).toBeVisible();
     
     // Verify Page 2 (Triggers Click Next)
-    // "Bradley Greer" is usually on Page 2
-    console.log("🔎 Searching for Bradley Greer (Page 2)...");
-    await expect(await table.getByRow({ Name: "Bradley Greer" })).toBeVisible();
+    // "Colleen Hurst" is usually on Page 2
+    console.log("🔎 Searching for Colleen Hurst (Page 2)...");
+    await expect(await table.getByRow({ Name: "Colleen Hurst" })).toBeVisible();
     console.log("✅ Found row on Page 2!");
   });
 

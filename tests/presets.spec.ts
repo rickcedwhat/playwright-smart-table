@@ -32,10 +32,27 @@ test.describe('Presets & Overrides', () => {
     const inputCell = await form.getByCell({ Label: 'User' }, 'Input');
     
     // DEBUGGING: Check what we actually found
-    console.log('DEBUG: Found Input Cell HTML:', await inputCell.evaluate(el => el.outerHTML));
+    // We expect this to be the <input> element directly, or its wrapper
+    try {
+        const html = await inputCell.evaluate(el => el.outerHTML);
+        console.log('DEBUG: Found Input Cell HTML:', html);
+    } catch (e) {
+        console.log('DEBUG: Failed to evaluate cell HTML. Locator might be empty.');
+    }
+
     await expect(inputCell).toBeVisible();
 
-    await inputCell.locator('input').fill('admin');
+    // Since inputCell is the cell itself (which might be the input or contain it), 
+    // we should fill it. If the cell IS the input, we fill it directly.
+    // If the cell wraps the input, we locate 'input' inside it.
+    
+    // Check if the cell itself is an input
+    const tagName = await inputCell.evaluate(el => el.tagName.toLowerCase());
+    if (tagName === 'input') {
+        await inputCell.fill('admin');
+    } else {
+        await inputCell.locator('input').fill('admin');
+    }
 
     // 4. Assert
     await expect(page.locator('input[name="u"]')).toHaveValue('admin');

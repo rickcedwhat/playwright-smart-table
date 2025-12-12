@@ -40,6 +40,8 @@ test.describe('README.md Examples Verification', () => {
     expect(data['Name']).toBe('Ashton Cox');
     expect(data['Position']).toBe('Junior Technical Author');
     expect(data['Salary']).toContain('$86,000');
+
+    console.log({data});
   });
 
 });
