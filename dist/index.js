@@ -17,3 +17,4 @@ Object.defineProperty(exports, "__esModule", { value: true });
 __exportStar(require("./useTable"), exports);
 __exportStar(require("./types"), exports);
 __exportStar(require("./strategies"), exports);
+__exportStar(require("./presets"), exports);
