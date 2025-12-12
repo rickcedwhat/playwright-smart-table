@@ -1,11 +1,9 @@
-// src/types.ts
 import { Locator, Page } from '@playwright/test';
 
 /**
- * A selector can be a CSS string or a function.
- * We allow 'parent' to be Locator OR Page to match your working logic.
+ * A selector can be a CSS string, a function, or null (to disable/skip).
  */
-export type Selector = string | ((parent: Locator | Page) => Locator);
+export type Selector = string | ((parent: Locator | Page) => Locator) | null;
 
 export interface TableConfig {
   rowSelector?: Selector;
@@ -13,6 +11,13 @@ export interface TableConfig {
   cellSelector?: Selector;
   pagination?: PaginationStrategy;
   maxPages?: number;
+  /**
+   * Statically override specific column names.
+   * Use 'undefined' to keep the detected name for that index.
+   * Use this to name columns for Menus or Forms that have no headers.
+   * Example: ['MenuItem'] or [undefined, "Actions"]
+   */
+  columnNames?: (string | undefined)[]; 
 }
 
 export interface TableContext {

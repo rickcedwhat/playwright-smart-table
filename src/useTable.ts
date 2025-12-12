@@ -1,4 +1,3 @@
-// src/useTable.ts
 import { Locator, Page, expect } from '@playwright/test';
 import { TableConfig, TableContext, Selector } from './types';
 
@@ -9,28 +8,42 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}) 
         cellSelector: "td",
         pagination: undefined as any,
         maxPages: 1,
+        columnNames: [], 
         ...configOptions,
     };
 
-    // ✅ UPDATE: Accept Locator OR Page (to match your work logic)
     const resolve = (item: Selector, parent: Locator | Page): Locator => {
         if (typeof item === 'string') return parent.locator(item);
         if (typeof item === 'function') return item(parent);
-        return item;
+        throw new Error("Cannot resolve a null selector. Ensure your config defines selectors correctly.");
     };
 
     let _headerMap: Map<string, number> | null = null;
 
     const _getMap = async () => {
         if (_headerMap) return _headerMap;
-        // Headers are still resolved relative to the table root (safer)
-        const headerLoc = resolve(config.headerSelector, rootLocator);
-        try {
-            await headerLoc.first().waitFor({ state: 'visible', timeout: 3000 });
-        } catch (e) { /* Ignore hydration */ }
 
-        const texts = await headerLoc.allInnerTexts();
-        _headerMap = new Map(texts.map((t, i) => [t.trim() || `__col_${i}`, i]));
+        // 1. Scrape DOM (Only if headerSelector is NOT null)
+        let texts: string[] = [];
+        if (config.headerSelector) {
+            const headerLoc = resolve(config.headerSelector, rootLocator);
+            try {
+                await headerLoc.first().waitFor({ state: 'visible', timeout: 3000 });
+                texts = await headerLoc.allInnerTexts();
+            } catch (e) { /* Ignore hydration/empty/timeout */ }
+        }
+
+        // 2. Merge Scraped Data with Config Overrides
+        _headerMap = new Map();
+        const overrides = config.columnNames || [];
+        const colCount = Math.max(texts.length, overrides.length);
+
+        for (let i = 0; i < colCount; i++) {
+            const scrapedText = (texts[i] || "").trim() || `__col_${i}`;
+            const overrideText = overrides[i];
+            const finalName = (overrideText !== undefined) ? overrideText : scrapedText;
+            _headerMap.set(finalName, i);
+        }
         return _headerMap;
     };
 
@@ -41,44 +54,71 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}) 
         let currentPage = 1;
 
         while (true) {
-            // 1. Row Locator uses ROOT (Matches your snippet)
+            if (!config.rowSelector) throw new Error("rowSelector cannot be null");
             let rowLocator = resolve(config.rowSelector, rootLocator);
 
             for (const [colName, value] of Object.entries(filters)) {
                 const colIndex = map.get(colName);
-                if (colIndex === undefined) throw new Error(`Column '${colName}' not found.`);
+                if (colIndex === undefined) throw new Error(`Column '${colName}' not found. Available: ${Array.from(map.keys())}`);
 
                 const exact = options.exact || false;
                 const filterVal = typeof value === 'number' ? String(value) : value;
 
-                // ✅ MATCHING YOUR WORK LOGIC EXACTLY
-                // 2. Cell Template uses PAGE (Matches your snippet)
-                const cellTemplate = resolve(config.cellSelector, page);
-
-                // 3. Filter using .nth(colIndex)
-                rowLocator = rowLocator.filter({
-                    has: cellTemplate.nth(colIndex).getByText(filterVal, { exact }),
-                });
+                // Case 1: No Cell Selector (Menu) - Filter the Row Itself
+                if (!config.cellSelector) {
+                     if (exact) {
+                         rowLocator = rowLocator.filter({ hasText: new RegExp(`^${escapeRegExp(String(filterVal))}$`) });
+                     } else {
+                         rowLocator = rowLocator.filter({ hasText: filterVal });
+                     }
+                } 
+                // Case 2: String Cell Selector - Standard Table Logic (Restored)
+                else if (typeof config.cellSelector === 'string') {
+                    // RESTORED: This logic worked for standard tables. 
+                    // We resolve against the PAGE to create a generic locator template.
+                    // Playwright handles the relative filtering correctly for standard tables.
+                    const cellTemplate = resolve(config.cellSelector, page);
+                    
+                    rowLocator = rowLocator.filter({
+                        has: cellTemplate.nth(colIndex).getByText(filterVal, { exact }),
+                    });
+                }
+                // Case 3: Function Cell Selector - Forms (Iterative Fallback)
+                else {
+                    const count = await rowLocator.count();
+                    let matchFound = false;
+                    
+                    for (let i = 0; i < count; i++) {
+                        const specificRow = rowLocator.nth(i);
+                        // Resolve cell relative to this specific row
+                        const specificCell = config.cellSelector(specificRow).nth(colIndex);
+                        
+                        if (await specificCell.getByText(filterVal, { exact }).count() > 0) {
+                            if (matchFound) {
+                                throw new Error(`Strict Mode Violation: Found multiple rows matching ${JSON.stringify(filters)}.`);
+                            }
+                            rowLocator = specificRow; 
+                            matchFound = true;
+                            // Break inner loop to proceed to next filter or return
+                            break; 
+                        }
+                    }
+                    
+                    if (!matchFound) {
+                        // Return empty locator to fail gracefully
+                        return resolve(config.rowSelector as Selector, rootLocator).filter({ hasText: "NON_EXISTENT_ROW_" + Date.now() });
+                    }
+                }
             }
 
             const count = await rowLocator.count();
-            if (count > 1) {
-                throw new Error(`Strict Mode Violation: Found ${count} rows matching ${JSON.stringify(filters)}.`);
-            }
-
+            if (count > 1) throw new Error(`Strict Mode Violation: Found ${count} rows matching ${JSON.stringify(filters)}.`);
             if (count === 1) return rowLocator.first();
 
-            // --- PAGINATION LOGIC ---
+            // --- PAGINATION ---
             if (config.pagination && currentPage < effectiveMaxPages) {
-                const context: TableContext = {
-                    root: rootLocator,
-                    config: config,
-                    page: page,
-                    resolve: resolve
-                };
-
-                const didLoadMore = await config.pagination(context);
-                if (didLoadMore) {
+                const context: TableContext = { root: rootLocator, config: config, page: page, resolve: resolve };
+                if (await config.pagination(context)) {
                     currentPage++;
                     continue;
                 }
@@ -92,20 +132,23 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}) 
 
         getByRow: async (filters: Record<string, string | RegExp | number>, options: { exact?: boolean, maxPages?: number } = {}) => {
             const row = await _findRowLocator(filters, options);
-            if (!row) return resolve(config.rowSelector, rootLocator).filter({ hasText: "NON_EXISTENT_ROW_SENTINEL_" + Date.now() });
+            if (!row) return resolve(config.rowSelector as Selector, rootLocator).filter({ hasText: "NON_EXISTENT_ROW_SENTINEL_" + Date.now() });
             return row;
         },
 
         getByCell: async (rowFilters: Record<string, string | RegExp | number>, targetColumn: string) => {
             const row = await _findRowLocator(rowFilters);
             if (!row) throw new Error(`Row not found: ${JSON.stringify(rowFilters)}`);
+            
+            // Guard: getByCell makes no sense for Menus (no cells)
+            if (!config.cellSelector) {
+                throw new Error("getByCell is not supported when 'cellSelector' is null (e.g. Menus). Use getByRow instead.");
+            }
 
             const map = await _getMap();
             const colIndex = map.get(targetColumn);
             if (colIndex === undefined) throw new Error(`Column '${targetColumn}' not found.`);
 
-            // Return the specific cell
-            // We scope this to the found ROW to ensure we get the right cell
             if (typeof config.cellSelector === 'string') {
                 return row.locator(config.cellSelector).nth(colIndex);
             } else {
@@ -121,13 +164,18 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}) 
 
             for (let i = 0; i < rowCount; i++) {
                 const row = rowLocator.nth(i);
-                let cells: Locator;
-                if (typeof config.cellSelector === 'string') {
-                    cells = row.locator(config.cellSelector);
+                let cellTexts: string[] = [];
+                
+                if (!config.cellSelector) {
+                   cellTexts = [await row.innerText()];
+                } else if (typeof config.cellSelector === 'string') {
+                    // For string selectors, we query all matching cells in the row
+                    cellTexts = await row.locator(config.cellSelector).allInnerTexts();
                 } else {
-                    cells = resolve(config.cellSelector, row);
+                    // For function selectors, we resolve against the row
+                    cellTexts = await resolve(config.cellSelector, row).allInnerTexts();
                 }
-                const cellTexts = await cells.allInnerTexts();
+                
                 const rowData: Record<string, string> = {};
                 for (const [colName, colIdx] of map.entries()) {
                     rowData[colName] = (cellTexts[colIdx] || "").trim();
@@ -141,13 +189,15 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}) 
             const row = await _findRowLocator(filters);
             if (!row) throw new Error(`Row not found: ${JSON.stringify(filters)}`);
 
-            let cells: Locator;
-            if (typeof config.cellSelector === 'string') {
-                cells = row.locator(config.cellSelector);
+            let cellTexts: string[] = [];
+            if (!config.cellSelector) {
+                 cellTexts = [await row.innerText()];
+            } else if (typeof config.cellSelector === 'string') {
+                cellTexts = await row.locator(config.cellSelector).allInnerTexts();
             } else {
-                cells = resolve(config.cellSelector, row);
+                cellTexts = await resolve(config.cellSelector, row).allInnerTexts();
             }
-            const cellTexts = await cells.allInnerTexts();
+
             const map = await _getMap();
             const result: Record<string, string> = {};
             for (const [colName, colIndex] of map.entries()) {
@@ -156,82 +206,30 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}) 
             return result;
         },
 
-        /**
-        * 🛠️ DEV TOOL: Prints a prompt to the console.
-        * Copy the output and paste it into Gemini/ChatGPT to generate your config.
-        */
+        setColumnName: async (colIndex: number, newNameOrFn: string | ((current: string) => string)) => {
+            const map = await _getMap();
+            let oldName = "";
+            for (const [name, idx] of map.entries()) {
+                if (idx === colIndex) { oldName = name; break; }
+            }
+            if (!oldName) oldName = `__col_${colIndex}`;
+            const newName = typeof newNameOrFn === 'function' ? newNameOrFn(oldName) : newNameOrFn;
+            if (map.has(oldName)) map.delete(oldName);
+            map.set(newName, colIndex);
+        },
+
         generateConfigPrompt: async () => {
             const html = await rootLocator.evaluate((el) => el.outerHTML);
-            const separator = "=".repeat(50);
-            const prompt = `
-${separator}
-🤖 COPY THE TEXT BELOW INTO GEMINI/ChatGPT 🤖
-${separator}
-
-I am using a Playwright helper factory called 'useTable'. 
-I need you to generate the configuration object based on the HTML structure below.
-
-Here is the table HTML:
-\`\`\`html
-${html}
-\`\`\`
-
-Based on this HTML, generate the configuration object matching this signature:
-const table = useTable(page.locator('...'), {
-    // Find the rows (exclude headers and empty spacer rows if possible)
-    rowSelector: "...", // OR (root) => root.locator(...)
-    
-    // Find the column headers
-    headerSelector: "...", // OR (root) => root.locator(...)
-    
-    // Find the cell (relative to a specific row)
-    cellSelector: "...", // OR (row) => row.locator(...)
-    
-    // Find the "Next Page" button (if it exists in the HTML)
-    paginationNextSelector: (root) => root.locator(...)
-});
-
-**Requirements:**
-1. Prefer \`getByRole\` or \`getByTestId\` over CSS classes where possible.
-2. If the table uses \`div\` structures (like React Table), ensure the \`rowSelector\` does not accidentally select the header row.
-3. If there are "padding" or "loading" rows, use \`.filter()\` to exclude them.
-
-${separator}
-`;
-            console.log(prompt);
+            console.log(`\n=== CONFIG PROMPT ===\nI have this HTML:\n\`\`\`html\n${html}\n\`\`\`\nGenerate a 'useTable' config for it.`);
+        },
+        generateStrategyPrompt: async () => {
+            const container = rootLocator.locator('xpath=..'); 
+            const html = await container.evaluate((el) => el.outerHTML);
+            console.log(`\n=== STRATEGY PROMPT ===\nI have this Container HTML:\n\`\`\`html\n${html.substring(0, 2000)}\n\`\`\`\nWrite a pagination strategy.`);
         }
-
     };
-
-    /**
-     * 🛠️ DEV TOOL: Prints a prompt to help write a custom Pagination Strategy.
-     * It snapshots the HTML *surrounding* the table to find buttons/scroll containers.
-     */
-    generateStrategyPrompt: async () => {
-      // 1. Get the parent container (often holds the pagination controls)
-      const container = rootLocator.locator('xpath=..'); 
-      const html = await container.evaluate((el) => el.outerHTML);
-      
-      const prompt = `
-==================================================
-🤖 COPY INTO GEMINI/ChatGPT TO WRITE A STRATEGY 🤖
-==================================================
-
-I am using 'playwright-smart-table'. I need a custom Pagination Strategy.
-The table is inside this container HTML:
-
-\`\`\`html
-${html.substring(0, 5000)} ... (truncated)
-\`\`\`
-
-Write a strategy that implements this interface:
-type PaginationStrategy = (context: TableContext) => Promise<boolean>;
-
-Requirements:
-1. Identify the "Next" button OR the scroll container.
-2. Return 'true' if data loaded, 'false' if end of data.
-3. Use context.resolve() to find elements.
-`;
-      console.log(prompt);
-    }
 };
+
+function escapeRegExp(string: string) {
+  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
