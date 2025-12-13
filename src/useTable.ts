@@ -1,235 +1,169 @@
 import { Locator, Page, expect } from '@playwright/test';
-import { TableConfig, TableContext, Selector } from './types';
+import { TableConfig, TableContext, Selector, TableResult, SmartRow } from './types';
 
-export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}) => {
-    const config: Required<TableConfig> = {
-        rowSelector: "tbody tr",
-        headerSelector: "th",
-        cellSelector: "td",
-        pagination: undefined as any,
-        maxPages: 1,
-        columnNames: [], 
-        ...configOptions,
+export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}): TableResult => {
+  const config: Required<TableConfig> = {
+    rowSelector: "tbody tr",
+    headerSelector: "th",
+    cellSelector: "td",
+    pagination: undefined as any,
+    maxPages: 1,
+    headerTransformer: undefined as any,
+    ...configOptions,
+  };
+
+  const resolve = (item: Selector, parent: Locator | Page): Locator => {
+    if (typeof item === 'string') return parent.locator(item);
+    if (typeof item === 'function') return item(parent);
+    return item; 
+  };
+
+  let _headerMap: Map<string, number> | null = null;
+
+  const _getMap = async () => {
+    if (_headerMap) return _headerMap;
+    const headerLoc = resolve(config.headerSelector, rootLocator);
+    try {
+      await headerLoc.first().waitFor({ state: 'visible', timeout: 3000 });
+    } catch (e) { /* Ignore hydration */ }
+    
+    const texts = await headerLoc.allInnerTexts();
+    _headerMap = new Map(texts.map((t, i) => {
+      let text = t.trim() || `__col_${i}`;
+      if (config.headerTransformer) text = config.headerTransformer(text, i);
+      return [text, i];
+    }));
+    return _headerMap;
+  };
+
+  const _makeSmart = (rowLocator: Locator, map: Map<string, number>): SmartRow => {
+    const smart = rowLocator as SmartRow;
+
+    smart.getCell = (colName: string) => {
+      const idx = map.get(colName);
+      if (idx === undefined) throw new Error(`Column '${colName}' not found.`);
+      
+      if (typeof config.cellSelector === 'string') {
+          return rowLocator.locator(config.cellSelector).nth(idx);
+      } else {
+          return resolve(config.cellSelector, rowLocator).nth(idx);
+      }
     };
 
-    const resolve = (item: Selector, parent: Locator | Page): Locator => {
-        if (typeof item === 'string') return parent.locator(item);
-        if (typeof item === 'function') return item(parent);
-        throw new Error("Cannot resolve a null selector. Ensure your config defines selectors correctly.");
+    smart.toJSON = async () => {
+      const result: Record<string, string> = {};
+      const cells = typeof config.cellSelector === 'string' 
+        ? rowLocator.locator(config.cellSelector)
+        : resolve(config.cellSelector, rowLocator);
+      
+      const texts = await cells.allInnerTexts();
+      for (const [col, idx] of map.entries()) {
+        result[col] = (texts[idx] || '').trim();
+      }
+      return result;
     };
 
-    let _headerMap: Map<string, number> | null = null;
+    return smart;
+  };
 
-    const _getMap = async () => {
-        if (_headerMap) return _headerMap;
+  const _findRowLocator = async (filters: Record<string, string | RegExp | number>, options: { exact?: boolean, maxPages?: number } = {}) => {
+    const map = await _getMap();
+    const page = rootLocator.page();
+    const effectiveMaxPages = options.maxPages ?? config.maxPages;
+    let currentPage = 1;
 
-        // 1. Scrape DOM (Only if headerSelector is NOT null)
-        let texts: string[] = [];
-        if (config.headerSelector) {
-            const headerLoc = resolve(config.headerSelector, rootLocator);
-            try {
-                await headerLoc.first().waitFor({ state: 'visible', timeout: 3000 });
-                texts = await headerLoc.allInnerTexts();
-            } catch (e) { /* Ignore hydration/empty/timeout */ }
+    while (true) {
+      let rowLocator = resolve(config.rowSelector, rootLocator);
+
+      for (const [colName, value] of Object.entries(filters)) {
+        const colIndex = map.get(colName);
+        if (colIndex === undefined) throw new Error(`Column '${colName}' not found. Available: ${[...map.keys()].join(', ')}`);
+        
+        const exact = options.exact || false;
+        const filterVal = typeof value === 'number' ? String(value) : value;
+        const cellTemplate = resolve(config.cellSelector, page);
+        
+        rowLocator = rowLocator.filter({
+          has: cellTemplate.nth(colIndex).getByText(filterVal, { exact }),
+        });
+      }
+
+      const count = await rowLocator.count();
+      if (count > 1) throw new Error(`Strict Mode Violation: Found ${count} rows matching ${JSON.stringify(filters)}.`);
+      if (count === 1) return rowLocator.first();
+
+      if (config.pagination && currentPage < effectiveMaxPages) {
+        const context: TableContext = {
+          root: rootLocator,
+          config: config,
+          page: page,
+          resolve: resolve
+        };
+
+        const didLoadMore = await config.pagination(context);
+        if (didLoadMore) {
+          currentPage++;
+          continue; 
         }
+      }
+      return null; 
+    }
+  };
 
-        // 2. Merge Scraped Data with Config Overrides
-        _headerMap = new Map();
-        const overrides = config.columnNames || [];
-        const colCount = Math.max(texts.length, overrides.length);
+  return {
+    getHeaders: async () => Array.from((await _getMap()).keys()),
 
-        for (let i = 0; i < colCount; i++) {
-            const scrapedText = (texts[i] || "").trim() || `__col_${i}`;
-            const overrideText = overrides[i];
-            const finalName = (overrideText !== undefined) ? overrideText : scrapedText;
-            _headerMap.set(finalName, i);
-        }
-        return _headerMap;
-    };
+    getHeaderCell: async (columnName: string) => {
+      const map = await _getMap();
+      const idx = map.get(columnName);
+      if (idx === undefined) throw new Error(`Column '${columnName}' not found.`);
+      return resolve(config.headerSelector, rootLocator).nth(idx);
+    },
 
-    const _findRowLocator = async (filters: Record<string, string | RegExp | number>, options: { exact?: boolean, maxPages?: number } = {}) => {
-        const map = await _getMap();
-        const page = rootLocator.page();
-        const effectiveMaxPages = options.maxPages ?? config.maxPages;
-        let currentPage = 1;
+    getByRow: async <T extends { asJSON?: boolean }>(
+      filters: Record<string, string | RegExp | number>, 
+      options?: { exact?: boolean, maxPages?: number } & T
+    ): Promise<T['asJSON'] extends true ? Record<string, string> : SmartRow> => {
+      let row = await _findRowLocator(filters, options);
+      
+      // ✅ FIX: Sentinel Logic for negative assertions (expect(row).not.toBeVisible())
+      if (!row) {
+        row = resolve(config.rowSelector, rootLocator).filter({ hasText: "___SENTINEL_ROW_NOT_FOUND___" + Date.now() });
+      }
+      
+      const smartRow = _makeSmart(row, await _getMap());
+      
+      if (options?.asJSON) {
+        // If row doesn't exist, toJSON() returns empty object or throws? 
+        // For safety, let's let it run naturally (it will likely return empty strings)
+        return smartRow.toJSON() as any;
+      }
+      return smartRow as any;
+    },
 
-        while (true) {
-            if (!config.rowSelector) throw new Error("rowSelector cannot be null");
-            let rowLocator = resolve(config.rowSelector, rootLocator);
+    getAllRows: async <T extends { asJSON?: boolean }>(options?: T): Promise<any> => {
+      const map = await _getMap();
+      const rowLocators = await resolve(config.rowSelector, rootLocator).all();
+      const smartRows = rowLocators.map(loc => _makeSmart(loc, map));
 
-            for (const [colName, value] of Object.entries(filters)) {
-                const colIndex = map.get(colName);
-                if (colIndex === undefined) throw new Error(`Column '${colName}' not found. Available: ${Array.from(map.keys())}`);
+      if (options?.asJSON) {
+        return Promise.all(smartRows.map(r => r.toJSON()));
+      }
+      return smartRows;
+    },
+    
+    generateConfigPrompt: async () => {
+      const html = await rootLocator.evaluate((el) => el.outerHTML);
+      const separator = "=".repeat(50);
+      const prompt = `\n${separator}\n🤖 COPY INTO GEMINI/ChatGPT 🤖\n${separator}\nI am using 'playwright-smart-table'. Generate config for:\n\`\`\`html\n${html.substring(0, 5000)} ...\n\`\`\`\n${separator}\n`;
+      console.log(prompt);
+    },
 
-                const exact = options.exact || false;
-                const filterVal = typeof value === 'number' ? String(value) : value;
-
-                // Case 1: No Cell Selector (Menu) - Filter the Row Itself
-                if (!config.cellSelector) {
-                     if (exact) {
-                         rowLocator = rowLocator.filter({ hasText: new RegExp(`^${escapeRegExp(String(filterVal))}$`) });
-                     } else {
-                         rowLocator = rowLocator.filter({ hasText: filterVal });
-                     }
-                } 
-                // Case 2: String Cell Selector - Standard Table Logic (Restored)
-                else if (typeof config.cellSelector === 'string') {
-                    // RESTORED: This logic worked for standard tables. 
-                    // We resolve against the PAGE to create a generic locator template.
-                    // Playwright handles the relative filtering correctly for standard tables.
-                    const cellTemplate = resolve(config.cellSelector, page);
-                    
-                    rowLocator = rowLocator.filter({
-                        has: cellTemplate.nth(colIndex).getByText(filterVal, { exact }),
-                    });
-                }
-                // Case 3: Function Cell Selector - Forms (Iterative Fallback)
-                else {
-                    const count = await rowLocator.count();
-                    let matchFound = false;
-                    
-                    for (let i = 0; i < count; i++) {
-                        const specificRow = rowLocator.nth(i);
-                        // Resolve cell relative to this specific row
-                        const specificCell = config.cellSelector(specificRow).nth(colIndex);
-                        
-                        if (await specificCell.getByText(filterVal, { exact }).count() > 0) {
-                            if (matchFound) {
-                                throw new Error(`Strict Mode Violation: Found multiple rows matching ${JSON.stringify(filters)}.`);
-                            }
-                            rowLocator = specificRow; 
-                            matchFound = true;
-                            // Break inner loop to proceed to next filter or return
-                            break; 
-                        }
-                    }
-                    
-                    if (!matchFound) {
-                        // Return empty locator to fail gracefully
-                        return resolve(config.rowSelector as Selector, rootLocator).filter({ hasText: "NON_EXISTENT_ROW_" + Date.now() });
-                    }
-                }
-            }
-
-            const count = await rowLocator.count();
-            if (count > 1) throw new Error(`Strict Mode Violation: Found ${count} rows matching ${JSON.stringify(filters)}.`);
-            if (count === 1) return rowLocator.first();
-
-            // --- PAGINATION ---
-            if (config.pagination && currentPage < effectiveMaxPages) {
-                const context: TableContext = { root: rootLocator, config: config, page: page, resolve: resolve };
-                if (await config.pagination(context)) {
-                    currentPage++;
-                    continue;
-                }
-            }
-            return null;
-        }
-    };
-
-    return {
-        getHeaders: async () => Array.from((await _getMap()).keys()),
-
-        getByRow: async (filters: Record<string, string | RegExp | number>, options: { exact?: boolean, maxPages?: number } = {}) => {
-            const row = await _findRowLocator(filters, options);
-            if (!row) return resolve(config.rowSelector as Selector, rootLocator).filter({ hasText: "NON_EXISTENT_ROW_SENTINEL_" + Date.now() });
-            return row;
-        },
-
-        getByCell: async (rowFilters: Record<string, string | RegExp | number>, targetColumn: string) => {
-            const row = await _findRowLocator(rowFilters);
-            if (!row) throw new Error(`Row not found: ${JSON.stringify(rowFilters)}`);
-            
-            // Guard: getByCell makes no sense for Menus (no cells)
-            if (!config.cellSelector) {
-                throw new Error("getByCell is not supported when 'cellSelector' is null (e.g. Menus). Use getByRow instead.");
-            }
-
-            const map = await _getMap();
-            const colIndex = map.get(targetColumn);
-            if (colIndex === undefined) throw new Error(`Column '${targetColumn}' not found.`);
-
-            if (typeof config.cellSelector === 'string') {
-                return row.locator(config.cellSelector).nth(colIndex);
-            } else {
-                return resolve(config.cellSelector, row).nth(colIndex);
-            }
-        },
-
-        getRows: async () => {
-            const map = await _getMap();
-            const rowLocator = resolve(config.rowSelector, rootLocator);
-            const rowCount = await rowLocator.count();
-            const results: Record<string, string>[] = [];
-
-            for (let i = 0; i < rowCount; i++) {
-                const row = rowLocator.nth(i);
-                let cellTexts: string[] = [];
-                
-                if (!config.cellSelector) {
-                   cellTexts = [await row.innerText()];
-                } else if (typeof config.cellSelector === 'string') {
-                    // For string selectors, we query all matching cells in the row
-                    cellTexts = await row.locator(config.cellSelector).allInnerTexts();
-                } else {
-                    // For function selectors, we resolve against the row
-                    cellTexts = await resolve(config.cellSelector, row).allInnerTexts();
-                }
-                
-                const rowData: Record<string, string> = {};
-                for (const [colName, colIdx] of map.entries()) {
-                    rowData[colName] = (cellTexts[colIdx] || "").trim();
-                }
-                results.push(rowData);
-            }
-            return results;
-        },
-
-        getRowAsJSON: async (filters: Record<string, string | RegExp | number>) => {
-            const row = await _findRowLocator(filters);
-            if (!row) throw new Error(`Row not found: ${JSON.stringify(filters)}`);
-
-            let cellTexts: string[] = [];
-            if (!config.cellSelector) {
-                 cellTexts = [await row.innerText()];
-            } else if (typeof config.cellSelector === 'string') {
-                cellTexts = await row.locator(config.cellSelector).allInnerTexts();
-            } else {
-                cellTexts = await resolve(config.cellSelector, row).allInnerTexts();
-            }
-
-            const map = await _getMap();
-            const result: Record<string, string> = {};
-            for (const [colName, colIndex] of map.entries()) {
-                result[colName] = (cellTexts[colIndex] || "").trim();
-            }
-            return result;
-        },
-
-        setColumnName: async (colIndex: number, newNameOrFn: string | ((current: string) => string)) => {
-            const map = await _getMap();
-            let oldName = "";
-            for (const [name, idx] of map.entries()) {
-                if (idx === colIndex) { oldName = name; break; }
-            }
-            if (!oldName) oldName = `__col_${colIndex}`;
-            const newName = typeof newNameOrFn === 'function' ? newNameOrFn(oldName) : newNameOrFn;
-            if (map.has(oldName)) map.delete(oldName);
-            map.set(newName, colIndex);
-        },
-
-        generateConfigPrompt: async () => {
-            const html = await rootLocator.evaluate((el) => el.outerHTML);
-            console.log(`\n=== CONFIG PROMPT ===\nI have this HTML:\n\`\`\`html\n${html}\n\`\`\`\nGenerate a 'useTable' config for it.`);
-        },
-        generateStrategyPrompt: async () => {
-            const container = rootLocator.locator('xpath=..'); 
-            const html = await container.evaluate((el) => el.outerHTML);
-            console.log(`\n=== STRATEGY PROMPT ===\nI have this Container HTML:\n\`\`\`html\n${html.substring(0, 2000)}\n\`\`\`\nWrite a pagination strategy.`);
-        }
-    };
+    generateStrategyPrompt: async () => {
+      const container = rootLocator.locator('xpath=..'); 
+      const html = await container.evaluate((el) => el.outerHTML);
+      const prompt = `\n==================================================\n🤖 COPY INTO GEMINI/ChatGPT TO WRITE A STRATEGY 🤖\n==================================================\nI need a custom Pagination Strategy for 'playwright-smart-table'.\nContainer HTML:\n\`\`\`html\n${html.substring(0, 5000)} ...\n\`\`\`\n`;
+      console.log(prompt);
+    }
+  };
 };
-
-function escapeRegExp(string: string) {
-  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}

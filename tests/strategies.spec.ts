@@ -1,5 +1,4 @@
-// tests/strategies.spec.ts
-import { test, expect, Locator } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 import { useTable } from '../src/useTable';
 import { TableStrategies } from '../src/strategies';
 
@@ -7,62 +6,97 @@ test.describe('Real World Strategy Tests', () => {
 
   test('Strategy: Click Next (Datatables.net)', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
-
+    
     const tableLoc = page.locator('#example');
 
     const table = useTable(tableLoc, {
       rowSelector: 'tbody tr',
       headerSelector: 'thead th',
       cellSelector: 'td',
-      pagination: TableStrategies.clickNext((root) => (root as Locator).page().getByRole('link', { name: 'Next' })),
+      pagination: TableStrategies.clickNext('#example_next'),
       maxPages: 3
     });
 
-    // Verify Page 1
     await expect(await table.getByRow({ Name: "Airi Satou" })).toBeVisible();
     
-    // Verify Page 2 (Triggers Click Next)
-    // "Colleen Hurst" is usually on Page 2
-    console.log("🔎 Searching for Colleen Hurst (Page 2)...");
-    await expect(await table.getByRow({ Name: "Colleen Hurst" })).toBeVisible();
+    console.log("🔎 Searching for Bradley Greer (Page 2)...");
+    await expect(await table.getByRow({ Name: "Bradley Greer" })).toBeVisible();
     console.log("✅ Found row on Page 2!");
   });
 
   test('Strategy: Infinite Scroll (HTMX Example)', async ({ page }) => {
     await page.goto('https://htmx.org/examples/infinite-scroll/');
     
-    const tableLoc = page.locator('table');
+    const tableLoc = page.locator('table'); 
 
     const table = useTable(tableLoc, {
       rowSelector: 'tbody tr',
       headerSelector: 'thead th',
       cellSelector: 'td',
-      // Strategy: Infinite Scroll (Scroll to bottom -> Wait for row count to increase)
       pagination: TableStrategies.infiniteScroll(),
       maxPages: 5
     });
 
-    // 1. Get initial count
-    const initialRows = await table.getRows();
+    // ✅ UPDATE: getRows -> getAllRows
+    const initialRows = await table.getAllRows();
     console.log(`Initial Row Count: ${initialRows.length}`);
 
-    // 2. Trigger Scroll by searching for a row that doesn't exist yet
-    // HTMX demo generates random IDs. We'll simulate a deep search by asking for
-    // the 40th row (since it loads ~20 at a time).
-    
-    // HACK: Since IDs are random, we simply check that the library *attempts* to scroll.
-    // We expect it to eventually fail finding "NonExistent", but verify it tried 5 pages.
     console.log("🔎 Triggering Scroll...");
     const missing = await table.getByRow({ "ID": "NonExistentID" });
     
-    // It should have tried 5 times (scrolling each time)
     await expect(missing).not.toBeVisible();
     
-    const finalRows = await table.getRows();
+    // ✅ UPDATE: getRows -> getAllRows
+    const finalRows = await table.getAllRows();
     console.log(`Final Row Count: ${finalRows.length}`);
     
     expect(finalRows.length).toBeGreaterThan(initialRows.length);
-    console.log("✅ Infinite Scroll successfully loaded more rows!");
+  });
+
+  test('Material UI Data Grid Interaction', async ({ page }) => {
+    // 1. Navigate to the MUI DataGrid demo
+    await page.goto('https://mui.com/material-ui/react-table/');
+
+    // The demo grid is usually slightly down the page
+    const tableLocator = page.locator('.MuiDataGrid-root').first();
+    await tableLocator.scrollIntoViewIfNeeded();
+
+    // 2. Initialize Smart Table
+    const table = useTable(tableLocator, {
+      rowSelector: '.MuiDataGrid-row',
+      headerSelector: '.MuiDataGrid-columnHeader',
+      cellSelector: '.MuiDataGrid-cell', // MUI uses distinct divs for cells
+      pagination: TableStrategies.clickNext(
+        (root) => root.getByRole("button", { name: "Go to next page" })
+      ),
+      maxPages: 5,
+      // ✅ Rename the empty column to "Actions" so we can reference it easily
+      headerTransformer: (text) => text.includes('__col_') ? "Actions" : text
+    });
+
+    // Debug: See what columns were detected
+    const headers = await table.getHeaders();
+    console.log('Headers Detected:', headers);
+    expect(headers).toContain('Actions');
+
+    // 3. Find a row (Melisandre is usually in the standard demo dataset)
+    const row = await table.getByRow({ "Last name": "Melisandre" });
+    await expect(row).toBeVisible();
+    console.log('✅ Found Melisandre');
+
+    // 4. Check specific cell data
+    const ageCell = row.getCell('Age');
+    await expect(ageCell).toHaveText("150");
+    console.log('✅ Verified Age is 150');
+
+    // 5. Dump Data
+    const userData = await table.getByRow({ "Last name": "Melisandre" }, {asJSON:true});
+    console.log('User Data JSON:', userData);
+
+    // 6. Interact with the Checkbox
+    // Logic: Find the cell in the "Actions" column (was __col_0) for the row with Age: 150
+    // Then click the input/label inside that cell.
+    await (await table.getByRow({Age:"150"})).getCell("Actions").getByLabel("Select row").click();
   });
 
 });
