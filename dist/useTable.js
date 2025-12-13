@@ -25,7 +25,6 @@ const useTable = (rootLocator, configOptions = {}) => {
     const _getMap = () => __awaiter(void 0, void 0, void 0, function* () {
         if (_headerMap)
             return _headerMap;
-        // ✅ New Feature: Auto-Scroll on first interaction
         if (config.autoScroll) {
             yield rootLocator.scrollIntoViewIfNeeded();
         }
@@ -69,7 +68,6 @@ const useTable = (rootLocator, configOptions = {}) => {
         });
         return smart;
     };
-    // ♻️ HELPER: Centralized logic to filter a row locator
     const _applyFilters = (baseRows, filters, map, exact) => {
         let filtered = baseRows;
         const page = rootLocator.page();
@@ -79,18 +77,45 @@ const useTable = (rootLocator, configOptions = {}) => {
                 throw new Error(`Column '${colName}' not found.`);
             const filterVal = typeof value === 'number' ? String(value) : value;
             const cellTemplate = resolve(config.cellSelector, page);
-            // Filter the TRs that contain the matching cell at the specific index
             filtered = filtered.filter({
                 has: cellTemplate.nth(colIndex).getByText(filterVal, { exact }),
             });
         }
         return filtered;
     };
+    const _findRowLocator = (filters_1, ...args_1) => __awaiter(void 0, [filters_1, ...args_1], void 0, function* (filters, options = {}) {
+        var _a;
+        const map = yield _getMap();
+        const effectiveMaxPages = (_a = options.maxPages) !== null && _a !== void 0 ? _a : config.maxPages;
+        let currentPage = 1;
+        while (true) {
+            const allRows = resolve(config.rowSelector, rootLocator);
+            const matchedRows = _applyFilters(allRows, filters, map, options.exact || false);
+            const count = yield matchedRows.count();
+            if (count > 1)
+                throw new Error(`Strict Mode Violation: Found ${count} rows matching ${JSON.stringify(filters)}.`);
+            if (count === 1)
+                return matchedRows.first();
+            if (config.pagination && currentPage < effectiveMaxPages) {
+                const context = {
+                    root: rootLocator,
+                    config: config,
+                    page: rootLocator.page(),
+                    resolve: resolve
+                };
+                const didLoadMore = yield config.pagination(context);
+                if (didLoadMore) {
+                    currentPage++;
+                    continue;
+                }
+            }
+            return null;
+        }
+    });
     const _handlePrompt = (promptName_1, content_1, ...args_1) => __awaiter(void 0, [promptName_1, content_1, ...args_1], void 0, function* (promptName, content, options = {}) {
-        const { output = 'console', includeTypes = true } = options; // Default includeTypes to true
+        const { output = 'console', includeTypes = true } = options;
         let finalPrompt = content;
         if (includeTypes) {
-            // ✅ Inject the dynamic TYPE_CONTEXT
             finalPrompt += `\n\n👇 Useful TypeScript Definitions 👇\n\`\`\`typescript\n${typeContext_1.TYPE_CONTEXT}\n\`\`\`\n`;
         }
         if (output === 'console') {
@@ -105,38 +130,9 @@ const useTable = (rootLocator, configOptions = {}) => {
                 console.log(`✅ Attached '${promptName}' to Playwright Report.`);
             }
             else {
-                console.warn('⚠️ Cannot attach to report: No active test info found.');
+                console.warn('⚠️ Cannot attach to report: No active test info found. Logging to console instead.');
                 console.log(finalPrompt);
             }
-        }
-        // ... (file output logic) ...
-    });
-    const _findRowLocator = (filters_1, ...args_1) => __awaiter(void 0, [filters_1, ...args_1], void 0, function* (filters, options = {}) {
-        var _a;
-        const map = yield _getMap();
-        const effectiveMaxPages = (_a = options.maxPages) !== null && _a !== void 0 ? _a : config.maxPages;
-        let currentPage = 1;
-        while (true) {
-            // 1. Get all rows
-            const allRows = resolve(config.rowSelector, rootLocator);
-            // 2. Apply filters using helper
-            const matchedRows = _applyFilters(allRows, filters, map, options.exact || false);
-            // 3. Check Count
-            const count = yield matchedRows.count();
-            if (count > 1)
-                throw new Error(`Strict Mode Violation: Found ${count} rows matching ${JSON.stringify(filters)}.`);
-            if (count === 1)
-                return matchedRows.first();
-            // 4. Pagination Logic (unchanged)
-            if (config.pagination && currentPage < effectiveMaxPages) {
-                // ... (pagination code same as before)
-                const context = { root: rootLocator, config, page: rootLocator.page(), resolve };
-                if (yield config.pagination(context)) {
-                    currentPage++;
-                    continue;
-                }
-            }
-            return null;
         }
     });
     return {
@@ -150,14 +146,11 @@ const useTable = (rootLocator, configOptions = {}) => {
         }),
         getByRow: (filters, options) => __awaiter(void 0, void 0, void 0, function* () {
             let row = yield _findRowLocator(filters, options);
-            // ✅ FIX: Sentinel Logic for negative assertions (expect(row).not.toBeVisible())
             if (!row) {
                 row = resolve(config.rowSelector, rootLocator).filter({ hasText: "___SENTINEL_ROW_NOT_FOUND___" + Date.now() });
             }
             const smartRow = _makeSmart(row, yield _getMap());
             if (options === null || options === void 0 ? void 0 : options.asJSON) {
-                // If row doesn't exist, toJSON() returns empty object or throws? 
-                // For safety, let's let it run naturally (it will likely return empty strings)
                 return smartRow.toJSON();
             }
             return smartRow;
@@ -165,11 +158,9 @@ const useTable = (rootLocator, configOptions = {}) => {
         getAllRows: (options) => __awaiter(void 0, void 0, void 0, function* () {
             const map = yield _getMap();
             let rowLocators = resolve(config.rowSelector, rootLocator);
-            // ✅ NEW: Apply filters if they exist
             if (options === null || options === void 0 ? void 0 : options.filter) {
                 rowLocators = _applyFilters(rowLocators, options.filter, map, options.exact || false);
             }
-            // Convert Locator to array of Locators
             const rows = yield rowLocators.all();
             const smartRows = rows.map(loc => _makeSmart(loc, map));
             if (options === null || options === void 0 ? void 0 : options.asJSON) {
