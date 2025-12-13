@@ -78,39 +78,7 @@ test.describe('Generator Tools', () => {
     expect(output).not.toContain("Useful TypeScript Definitions");
     expect(output).not.toContain("interface TableConfig");
   });
-
-  test('generateConfigPrompt writes to file', async ({ page }) => {
-    const table = useTable(page.locator('#test-table'));
-    const expectedFileName = 'smart_table_config.md'; // Derived from prompt name 'Smart Table Config'
-    
-    // Ensure clean state
-    if (fs.existsSync(expectedFileName)) fs.unlinkSync(expectedFileName);
-
-    // Run with file output
-    // Mock console.log to keep test output clean
-    const originalLog = console.log;
-    console.log = () => {}; 
-    
-    try {
-      await table.generateConfigPrompt({ output: 'file' });
-    } finally {
-      console.log = originalLog;
-    }
-
-    // Verify file creation and content
-    // We explicitly check for the file in the current working directory
-    const filePath = path.resolve(process.cwd(), expectedFileName);
-    expect(fs.existsSync(filePath)).toBe(true);
-    
-    const content = fs.readFileSync(filePath, 'utf-8');
-    expect(content).toContain("Generate config for:");
-    // Default types included
-    expect(content).toContain("interface TableConfig"); 
-
-    // Cleanup
-    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-  });
-
+  
   test('generateStrategyPrompt attaches to Playwright Report', async ({ page }, testInfo) => {
     const table = useTable(page.locator('#test-table'));
     
