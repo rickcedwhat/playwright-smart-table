@@ -15,6 +15,20 @@ export interface TableContext {
  * Returns true if more data was loaded (navigation occurred), false if end of data.
  */
 export type PaginationStrategy = (context: TableContext) => Promise<boolean>;
+export interface PromptOptions {
+    /** * Where to output the prompt.
+     * - 'console': Logs to stdout (default).
+     * - 'report': Attaches to the Playwright HTML report (best for CI/VMs).
+     * - 'file': Writes to a local file (e.g. 'smart-table-prompt.md').
+     */
+    output?: 'console' | 'report' | 'file';
+    /**
+     * Include TypeScript interfaces in the prompt?
+     * Helps LLMs generate correct code structure.
+     * Default: true
+     */
+    includeTypes?: boolean;
+}
 export interface TableConfig {
     rowSelector?: Selector;
     headerSelector?: Selector;
@@ -30,6 +44,12 @@ export interface TableConfig {
      * Useful for naming empty columns (like '__col_0') to something semantic like 'Actions'.
      */
     headerTransformer?: (text: string, index: number) => string;
+    /**
+     * Automatically scroll the table into view on first interaction.
+     * Helps ensure the table is visible in traces/videos.
+     * Default: true
+     */
+    autoScroll?: boolean;
 }
 export interface TableResult {
     getHeaders: () => Promise<string[]>;
@@ -45,12 +65,17 @@ export interface TableResult {
         maxPages?: number;
     } & T) => Promise<T['asJSON'] extends true ? Record<string, string> : SmartRow>;
     /** * Get all rows on the current page.
-     * Default: Returns SmartRow[] (Locators).
-     * Option { asJSON: true }: Returns Record<string, string>[] (Data).
+     * Can be filtered by column values.
+     * * @param options.asJSON - Returns data objects instead of SmartRows
+     * @param options.filter - Key-Value pairs to filter rows (e.g. { Status: 'Active' })
+     * @param options.exact - Exact match for filters (default: false)
      */
     getAllRows: <T extends {
         asJSON?: boolean;
-    }>(options?: T) => Promise<T['asJSON'] extends true ? Record<string, string>[] : SmartRow[]>;
-    generateConfigPrompt: () => Promise<void>;
-    generateStrategyPrompt: () => Promise<void>;
+    }>(options?: {
+        filter?: Record<string, string | RegExp | number>;
+        exact?: boolean;
+    } & T) => Promise<T['asJSON'] extends true ? Record<string, string>[] : SmartRow[]>;
+    generateConfigPrompt: (options?: PromptOptions) => Promise<void>;
+    generateStrategyPrompt: (options?: PromptOptions) => Promise<void>;
 }

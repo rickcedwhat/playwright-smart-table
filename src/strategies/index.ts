@@ -84,18 +84,20 @@ export const TableStrategies = {
 
       if (oldCount === 0) return false;
 
-      // 1. Scroll the very last row into view to trigger the fetch
-      await rows.last().scrollIntoViewIfNeeded();
-
-      // Optional: Press "End" to force scroll on stubborn grids (like AG Grid)
-      await page.keyboard.press('End');
-
-      // 2. Smart Wait: Wait for row count to increase
+      // Aggressive Scroll Logic:
+      // We use expect.poll to RETRY the scroll action if the count hasn't increased.
+      // This fixes flakiness where the first scroll might be missed by the intersection observer.
       try {
-        await expect(async () => {
-          const newCount = await rows.count();
-          expect(newCount).toBeGreaterThan(oldCount);
-        }).toPass({ timeout });
+        await expect.poll(async () => {
+          // 1. Trigger: Scroll the last row into view
+          await rows.last().scrollIntoViewIfNeeded();
+          
+          // 2. Force: Press "End" to help with stubborn window-scrollers
+          await page.keyboard.press('End');
+
+          // 3. Return count for assertion
+          return rows.count();
+        }, { timeout }).toBeGreaterThan(oldCount);
 
         return true;
       } catch (e) {
