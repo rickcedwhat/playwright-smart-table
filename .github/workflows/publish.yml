@@ -3,14 +3,14 @@ name: Node.js Package Publish
 on:
   push:
     branches:
-      - main  # Or 'master', depending on your repo
+      - main
 
 jobs:
   publish-gpr:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write # Needed for provenance if you use it, harmless otherwise
+      id-token: write
 
     steps:
       - name: Checkout Code
@@ -58,9 +58,7 @@ jobs:
         if: steps.check_version.outputs.changed == 'true'
         run: npm test
 
-      # 🚀 THE PUBLISHER
+      # 🚀 THE PUBLISHER (OIDC MODE)
       - name: Publish to NPM
         if: steps.check_version.outputs.changed == 'true'
-        run: npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --provenance --access public
