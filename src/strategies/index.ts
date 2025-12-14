@@ -78,15 +78,20 @@ export const TableStrategies = {
    * * @param options.timeout - Wait timeout (default: 5000ms)
    * @param options.scrollerSelector - (Optional) Selector for the scrollable container. 
    * If omitted, tries to scroll the table root.
+   * @param options.interval - (Optional) Polling interval in ms (default: 1000ms)
    */
-  infiniteScroll: (options?: { timeout?: number, scrollerSelector?: Selector }): PaginationStrategy => {
-    const { timeout = 5000, scrollerSelector } = options || {};
+  infiniteScroll: (options?: { timeout?: number, scrollerSelector?: Selector, interval?: number }): PaginationStrategy => {
+    const { timeout = 5000, scrollerSelector, interval = 1000 } = options || {};
 
     return async ({ root, config, resolve, page }: TableContext) => {
       const rows = resolve(config.rowSelector, root);
       const oldCount = await rows.count();
+
       if (oldCount === 0) return false;
 
+      // Aggressive Scroll Logic:
+      // We use expect.poll to RETRY the scroll action if the count hasn't increased.
+      // This fixes flakiness where the first scroll might be missed by the intersection observer.
       try {
         await expect.poll(async () => {
           // 1. Determine target container
@@ -106,13 +111,17 @@ export const TableStrategies = {
           // Method B: Playwright Native (Fallback)
           // Scroll the last row into view (good for Window scroll)
           await rows.last().scrollIntoViewIfNeeded().catch(() => {});
-          
+
           // Method C: Keyboard (Desperation)
           await page.keyboard.press('End');
 
           // 3. Return count for assertion
           return rows.count();
-        }, { timeout }).toBeGreaterThan(oldCount);
+        }, { 
+          timeout,
+          // ✅ FIX: Use user-provided interval (default 1000ms)
+          intervals: [interval] 
+        }).toBeGreaterThan(oldCount);
 
         return true;
       } catch (e) {
