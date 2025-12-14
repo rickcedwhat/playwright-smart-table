@@ -11,7 +11,6 @@
     "generate-types": "node scripts/embed-types.mjs",
     "build": "npm run generate-types && tsc",
     "prepublishOnly": "npm run build",
-    "release": "npm run build && npm publish --access public",
     "test": "npx playwright test"
   },
   "keywords": [
