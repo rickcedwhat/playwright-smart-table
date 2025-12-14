@@ -1,5 +1,4 @@
-// src/types.ts
-import { Locator, Page } from '@playwright/test';
+import { Locator, Page, TestInfo } from '@playwright/test';
 
 export type Selector = string | ((root: Locator | Page) => Locator);
 
@@ -15,48 +14,27 @@ export interface TableContext {
   resolve: (selector: Selector, parent: Locator | Page) => Locator;
 }
 
-/**
- * A function that handles pagination logic.
- * Returns true if more data was loaded (navigation occurred), false if end of data.
- */
 export type PaginationStrategy = (context: TableContext) => Promise<boolean>;
 
 export interface PromptOptions {
-  /** * Where to output the prompt.
-   * - 'console': Logs to stdout (default).
-   * - 'report': Attaches to the Playwright HTML report (best for CI/VMs).
-   * - 'file': Writes to a local file (e.g. 'smart-table-prompt.md').
-   */
-  output?: 'console' | 'report' | 'file';
-  
   /**
-   * Include TypeScript interfaces in the prompt?
-   * Helps LLMs generate correct code structure.
-   * Default: true
+   * Output Strategy:
+   * - 'error': Throws an error with the prompt (Best for Cloud/QA Wolf to get clean text).
+   * - 'console': Standard console logs (Default).
+   * - 'report': Attaches to Playwright Report (Requires testInfo).
    */
+  output?: 'console' | 'report' | 'error';
   includeTypes?: boolean;
+  testInfo?: TestInfo;
 }
 
 export interface TableConfig {
   rowSelector?: Selector;
   headerSelector?: Selector;
   cellSelector?: Selector;
-  /**
-   * Strategy for handling pagination.
-   * Use presets from TableStrategies or write your own.
-   */
   pagination?: PaginationStrategy;
   maxPages?: number;
-  /**
-   * Optional hook to rename columns dynamically.
-   * Useful for naming empty columns (like '__col_0') to something semantic like 'Actions'.
-   */
   headerTransformer?: (text: string, index: number) => string;
-  /**
-   * Automatically scroll the table into view on first interaction.
-   * Helps ensure the table is visible in traces/videos.
-   * Default: true
-   */
   autoScroll?: boolean;
 }
 
@@ -64,26 +42,13 @@ export interface TableResult {
   getHeaders: () => Promise<string[]>;
   getHeaderCell: (columnName: string) => Promise<Locator>;
 
-  /** * Find a specific row by its content.
-   * Default: Returns SmartRow (Locator).
-   * Option { asJSON: true }: Returns Record<string, string> (Data).
-   */
   getByRow: <T extends { asJSON?: boolean }>(
     filters: Record<string, string | RegExp | number>, 
     options?: { exact?: boolean, maxPages?: number } & T
   ) => Promise<T['asJSON'] extends true ? Record<string, string> : SmartRow>;
 
-  /** * Get all rows on the current page.
-   * Can be filtered by column values.
-   * * @param options.asJSON - Returns data objects instead of SmartRows
-   * @param options.filter - Key-Value pairs to filter rows (e.g. { Status: 'Active' })
-   * @param options.exact - Exact match for filters (default: false)
-   */
   getAllRows: <T extends { asJSON?: boolean }>(
-    options?: { 
-      filter?: Record<string, string | RegExp | number>; 
-      exact?: boolean 
-    } & T
+    options?: { filter?: Record<string, any>, exact?: boolean } & T
   ) => Promise<T['asJSON'] extends true ? Record<string, string>[] : SmartRow[]>;
 
   generateConfigPrompt: (options?: PromptOptions) => Promise<void>;
