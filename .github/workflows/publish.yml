@@ -10,7 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write # 👈 Required for OIDC
+      id-token: write
 
     steps:
       - name: Checkout Code
@@ -20,13 +20,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          registry-url: 'https://registry.npmjs.org' # ✅ We can keep this now!
+          registry-url: 'https://registry.npmjs.org'
 
-      # 🟢 THE FIX: Upgrade NPM to support OIDC correctly
       - name: Update npm
         run: npm install -g npm@latest
 
-      # 🕵️ CHECK VERSION
       - name: Check if version changed
         id: check_version
         run: |
@@ -42,7 +40,6 @@ jobs:
             echo "changed=false" >> $GITHUB_OUTPUT
           fi
 
-      # 📦 CACHE BROWSERS
       - name: Cache Playwright Browsers
         if: steps.check_version.outputs.changed == 'true'
         id: playwright-cache
@@ -54,18 +51,15 @@ jobs:
             ${{ runner.os }}-playwright-
 
       - name: Install Dependencies
-        if: steps.check_version.outputs.changed == 'true'
         run: npm ci
 
       - name: Install Playwright Browsers
-        if: steps.check_version.outputs.changed == 'true' && steps.playwright-cache.outputs.cache-hit != 'true'
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: npx playwright install --with-deps
 
       - name: Run Tests
-        if: steps.check_version.outputs.changed == 'true'
         run: npm test
 
-      # 🚀 PUBLISH (OIDC Mode - No tokens needed!)
       - name: Publish to NPM
         if: steps.check_version.outputs.changed == 'true'
         run: npm publish --provenance --access public
