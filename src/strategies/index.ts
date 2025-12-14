@@ -73,26 +73,41 @@ export const TableStrategies = {
   },
 
   /**
-   * Strategy: Scrolls to the bottom of the table and waits for more rows to appear.
+   * Strategy: Scrolls a specific container (or the window) to the bottom.
    * Best for: Infinite Scroll grids (Ag-Grid, Virtual Lists)
-   * * @param timeout - Wait timeout (default: 5000ms)
+   * * @param options.timeout - Wait timeout (default: 5000ms)
+   * @param options.scrollerSelector - (Optional) Selector for the scrollable container. 
+   * If omitted, tries to scroll the table root.
    */
-  infiniteScroll: (timeout = 5000): PaginationStrategy => {
+  infiniteScroll: (options?: { timeout?: number, scrollerSelector?: Selector }): PaginationStrategy => {
+    const { timeout = 5000, scrollerSelector } = options || {};
+
     return async ({ root, config, resolve, page }: TableContext) => {
       const rows = resolve(config.rowSelector, root);
       const oldCount = await rows.count();
-
       if (oldCount === 0) return false;
 
-      // Aggressive Scroll Logic:
-      // We use expect.poll to RETRY the scroll action if the count hasn't increased.
-      // This fixes flakiness where the first scroll might be missed by the intersection observer.
       try {
         await expect.poll(async () => {
-          // 1. Trigger: Scroll the last row into view
-          await rows.last().scrollIntoViewIfNeeded();
+          // 1. Determine target container
+          // If user provided a specific scroller (e.g. the div WRAPPING the table), use it.
+          // Otherwise, default to the root locator.
+          const scroller = scrollerSelector 
+            ? resolve(scrollerSelector, root) 
+            : root;
+
+          // 2. Perform the Scroll
+          // Method A: DOM Manipulation (Fastest/Most Reliable for containers)
+          // We set scrollTop to a huge number to force it to the bottom
+          await scroller.evaluate((el) => {
+             el.scrollTop = el.scrollHeight;
+          }).catch(() => {}); // Ignore if element doesn't support scrollTop (e.g. it's a window wrapper)
+
+          // Method B: Playwright Native (Fallback)
+          // Scroll the last row into view (good for Window scroll)
+          await rows.last().scrollIntoViewIfNeeded().catch(() => {});
           
-          // 2. Force: Press "End" to help with stubborn window-scrollers
+          // Method C: Keyboard (Desperation)
           await page.keyboard.press('End');
 
           // 3. Return count for assertion
