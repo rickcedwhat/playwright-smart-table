@@ -10,17 +10,17 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write
+      id-token: write # 👈 Required for Trusted Publishing (OIDC)
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      # ❌ REMOVED "registry-url" to fix the auth conflict
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          registry-url: 'https://registry.npmjs.org'
 
       # 🕵️ THE DETECTIVE STEP
       - name: Check if version changed
@@ -28,10 +28,8 @@ jobs:
         run: |
           PACKAGE_NAME=@rickcedwhat/playwright-smart-table
           
-          # Get the latest version from NPM (silence error if package doesn't exist yet)
+          # Get latest version (silence error if package doesn't exist)
           LATEST_VERSION=$(npm view $PACKAGE_NAME version 2>/dev/null || echo "0.0.0")
-          
-          # Get the local version from package.json
           LOCAL_VERSION=$(node -p "require('./package.json').version")
           
           echo "NPM Version: $LATEST_VERSION"
@@ -45,12 +43,25 @@ jobs:
             echo "changed=false" >> $GITHUB_OUTPUT
           fi
 
+      # 📦 CACHING STEP (New!)
+      # This saves ~50s by reusing binaries if package-lock hasn't changed
+      - name: Cache Playwright Browsers
+        if: steps.check_version.outputs.changed == 'true'
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
       - name: Install Dependencies
         if: steps.check_version.outputs.changed == 'true'
         run: npm ci
 
       - name: Install Playwright Browsers
-        if: steps.check_version.outputs.changed == 'true'
+        # Skip if cache was found
+        if: steps.check_version.outputs.changed == 'true' && steps.playwright-cache.outputs.cache-hit != 'true'
         run: npx playwright install --with-deps
 
       # 🧪 THE QUALITY GATE
@@ -58,7 +69,7 @@ jobs:
         if: steps.check_version.outputs.changed == 'true'
         run: npm test
 
-      # 🚀 THE PUBLISHER (OIDC MODE)
+      # 🚀 THE PUBLISHER (Trusted Publishing Mode)
       - name: Publish to NPM
         if: steps.check_version.outputs.changed == 'true'
         run: npm publish --provenance --access public
