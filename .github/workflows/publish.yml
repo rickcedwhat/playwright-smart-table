@@ -41,7 +41,6 @@ jobs:
           fi
 
       - name: Cache Playwright Browsers
-        if: steps.check_version.outputs.changed == 'true'
         id: playwright-cache
         uses: actions/cache@v4
         with:
