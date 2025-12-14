@@ -1,0 +1,66 @@
+name: Node.js Package Publish
+
+on:
+  push:
+    branches:
+      - main  # Or 'master', depending on your repo
+
+jobs:
+  publish-gpr:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # Needed for provenance if you use it, harmless otherwise
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+
+      # 🕵️ THE DETECTIVE STEP
+      - name: Check if version changed
+        id: check_version
+        run: |
+          PACKAGE_NAME=@rickcedwhat/playwright-smart-table
+          
+          # Get the latest version from NPM (silence error if package doesn't exist yet)
+          LATEST_VERSION=$(npm view $PACKAGE_NAME version 2>/dev/null || echo "0.0.0")
+          
+          # Get the local version from package.json
+          LOCAL_VERSION=$(node -p "require('./package.json').version")
+          
+          echo "NPM Version: $LATEST_VERSION"
+          echo "Local Version: $LOCAL_VERSION"
+          
+          if [ "$LOCAL_VERSION" != "$LATEST_VERSION" ]; then
+            echo "✨ Version change detected!"
+            echo "changed=true" >> $GITHUB_OUTPUT
+          else
+            echo "💤 Version matches NPM. Skipping release."
+            echo "changed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Install Dependencies
+        if: steps.check_version.outputs.changed == 'true'
+        run: npm ci
+
+      - name: Install Playwright Browsers
+        if: steps.check_version.outputs.changed == 'true'
+        run: npx playwright install --with-deps
+
+      # 🧪 THE QUALITY GATE
+      - name: Run Tests
+        if: steps.check_version.outputs.changed == 'true'
+        run: npm test
+
+      # 🚀 THE PUBLISHER
+      - name: Publish to NPM
+        if: steps.check_version.outputs.changed == 'true'
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
