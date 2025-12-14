@@ -1,15 +1,15 @@
-import { Locator, Page, expect, test } from '@playwright/test';
+import { Locator, Page, test } from '@playwright/test';
 import { TableConfig, TableContext, Selector, TableResult, SmartRow, PromptOptions } from './types';
-import { TYPE_CONTEXT } from './typeContext'; 
+import { TYPE_CONTEXT } from './typeContext';
 
 export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}): TableResult => {
   const config: Required<TableConfig> = {
     rowSelector: "tbody tr",
     headerSelector: "th",
     cellSelector: "td",
-    pagination: undefined as any,
+    pagination: async () => false, 
     maxPages: 1,
-    headerTransformer: undefined as any,
+    headerTransformer: (text: string) => text,
     autoScroll: true,
     ...configOptions,
   };
@@ -26,7 +26,7 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
     if (_headerMap) return _headerMap;
 
     if (config.autoScroll) {
-      await rootLocator.scrollIntoViewIfNeeded();
+      try { await rootLocator.scrollIntoViewIfNeeded({ timeout: 1000 }); } catch (e) {}
     }
 
     const headerLoc = resolve(config.headerSelector, rootLocator);
@@ -37,7 +37,8 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
     const texts = await headerLoc.allInnerTexts();
     _headerMap = new Map(texts.map((t, i) => {
       let text = t.trim() || `__col_${i}`;
-      if (config.headerTransformer) text = config.headerTransformer(text, i);
+      // Safe call: config.headerTransformer is always defined now
+      text = config.headerTransformer(text, i);
       return [text, i];
     }));
     return _headerMap;
@@ -109,7 +110,7 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
       if (count > 1) throw new Error(`Strict Mode Violation: Found ${count} rows matching ${JSON.stringify(filters)}.`);
       if (count === 1) return matchedRows.first();
 
-      if (config.pagination && currentPage < effectiveMaxPages) {
+      if (currentPage < effectiveMaxPages) {
         const context: TableContext = {
           root: rootLocator,
           config: config,
@@ -128,7 +129,7 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
   };
 
   const _handlePrompt = async (promptName: string, content: string, options: PromptOptions = {}) => {
-    const { output = 'console', includeTypes = true } = options;
+    const { output = 'console', includeTypes = true, testInfo } = options;
     
     let finalPrompt = content;
     
@@ -136,21 +137,27 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
       finalPrompt += `\n\n👇 Useful TypeScript Definitions 👇\n\`\`\`typescript\n${TYPE_CONTEXT}\n\`\`\`\n`;
     }
 
-    if (output === 'console') {
-      console.log(finalPrompt);
-    } 
-    else if (output === 'report') {
-      if (test.info()) {
-        await test.info().attach(promptName, {
-          body: finalPrompt,
-          contentType: 'text/markdown'
-        });
-        console.log(`✅ Attached '${promptName}' to Playwright Report.`);
+    if (output === 'error') {
+      console.log(`⚠️ Throwing error to display [${promptName}] cleanly...`);
+      throw new Error(finalPrompt);
+    }
+
+    if (output === 'report') {
+      let activeInfo = testInfo;
+      if (!activeInfo) {
+        try { activeInfo = test.info(); } catch (e) {}
+      }
+
+      if (activeInfo) {
+        await activeInfo.attach(promptName, { body: finalPrompt, contentType: 'text/markdown' });
+        console.log(`✅ [${promptName}] Attached to Playwright Report.`);
+        return;
       } else {
-        console.warn('⚠️ Cannot attach to report: No active test info found. Logging to console instead.');
-        console.log(finalPrompt);
+        console.warn(`⚠️ [${promptName}] Cannot attach to report (Context unavailable). Logging to console instead.`);
       }
     } 
+
+    console.log(finalPrompt);
   };
 
   return {
