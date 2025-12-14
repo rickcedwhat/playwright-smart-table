@@ -21,11 +21,10 @@ test.describe('Real World Strategy Tests', () => {
 
     await expect(await table.getByRow({ Name: "Airi Satou" })).toBeVisible();
     
-    // ✅ Verify Colleen is NOT visible initially (She is on Page 2)
+    // ✅ Verify Colleen is NOT visible initially
     await expect(page.getByText("Colleen Hurst")).not.toBeVisible();
 
     console.log("🔎 Searching for Colleen Hurst (Page 2)...");
-    // This will trigger pagination automatically
     await expect(await table.getByRow({ Name: "Colleen Hurst" })).toBeVisible();
     console.log("✅ Found row on Page 2!");
   });
@@ -39,11 +38,10 @@ test.describe('Real World Strategy Tests', () => {
       rowSelector: 'tbody tr',
       headerSelector: 'thead th',
       cellSelector: 'td',
-      pagination: TableStrategies.infiniteScroll(),
+      pagination: TableStrategies.infiniteScroll(), 
       maxPages: 5
     });
 
-    // ✅ UPDATE: getRows -> getAllRows
     const initialRows = await table.getAllRows();
     console.log(`Initial Row Count: ${initialRows.length}`);
 
@@ -63,9 +61,7 @@ test.describe('Real World Strategy Tests', () => {
     // 1. Navigate to the MUI DataGrid demo
     await page.goto('https://mui.com/material-ui/react-table/');
 
-    // The demo grid is usually slightly down the page
     const tableLocator = page.locator('.MuiDataGrid-root').first();
-    await tableLocator.scrollIntoViewIfNeeded();
 
     // 2. Initialize Smart Table
     const table = useTable(tableLocator, {
