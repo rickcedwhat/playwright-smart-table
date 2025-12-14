@@ -1,75 +1,37 @@
-name: Node.js Package Publish
+name: Debug OIDC
 
-on:
-  push:
-    branches:
-      - main
+on: [push]
 
 jobs:
-  publish-gpr:
+  debug-auth:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write # 👈 Required for Trusted Publishing (OIDC)
+      id-token: write # 👈 Crucial
 
     steps:
-      - name: Checkout Code
+      - name: Checkout
         uses: actions/checkout@v4
 
-      # ❌ REMOVED "registry-url" to fix the auth conflict
-      - name: Setup Node.js
+      # 1. Setup Node WITHOUT registry-url
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      # 🕵️ THE DETECTIVE STEP
-      - name: Check if version changed
-        id: check_version
+      # 2. Install dependencies (so we have npm)
+      - run: npm ci
+
+      # 3. PROBE THE CONFIGURATION
+      - name: 🕵️ Debug NPM Config
         run: |
-          PACKAGE_NAME=@rickcedwhat/playwright-smart-table
-          
-          # Get latest version (silence error if package doesn't exist)
-          LATEST_VERSION=$(npm view $PACKAGE_NAME version 2>/dev/null || echo "0.0.0")
-          LOCAL_VERSION=$(node -p "require('./package.json').version")
-          
-          echo "NPM Version: $LATEST_VERSION"
-          echo "Local Version: $LOCAL_VERSION"
-          
-          if [ "$LOCAL_VERSION" != "$LATEST_VERSION" ]; then
-            echo "✨ Version change detected!"
-            echo "changed=true" >> $GITHUB_OUTPUT
-          else
-            echo "💤 Version matches NPM. Skipping release."
-            echo "changed=false" >> $GITHUB_OUTPUT
-          fi
+          echo "=== NPM CONFIG LIST ==="
+          npm config list
+          echo "=== CHECKING FOR .npmrc ==="
+          ls -la .npmrc || echo "No local .npmrc found (Good!)"
+          echo "=== CHECKING IDENTITY ==="
+          npm whoami || echo "Not logged in (Expected for OIDC before publish)"
 
-      # 📦 CACHING STEP (New!)
-      # This saves ~50s by reusing binaries if package-lock hasn't changed
-      - name: Cache Playwright Browsers
-        if: steps.check_version.outputs.changed == 'true'
-        id: playwright-cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-
-
-      - name: Install Dependencies
-        if: steps.check_version.outputs.changed == 'true'
-        run: npm ci
-
-      - name: Install Playwright Browsers
-        # Skip if cache was found
-        if: steps.check_version.outputs.changed == 'true' && steps.playwright-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps
-
-      # 🧪 THE QUALITY GATE
-      - name: Run Tests
-        if: steps.check_version.outputs.changed == 'true'
-        run: npm test
-
-      # 🚀 THE PUBLISHER (Trusted Publishing Mode)
-      - name: Publish to NPM
-        if: steps.check_version.outputs.changed == 'true'
-        run: npm publish --provenance --access public
+      # 4. TEST THE HANDSHAKE (Dry Run)
+      - name: 🧪 Dry Run Publish
+        run: npm publish --provenance --access public --dry-run
