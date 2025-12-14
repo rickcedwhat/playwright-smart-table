@@ -16,12 +16,15 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # ✅ CORRECT SETUP: No "registry-url" line here!
-      # This prevents the auth conflict that caused your errors.
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          registry-url: 'https://registry.npmjs.org' # Put this back
+        env:
+          # 💡 FORCE NULL: This trick prevents the "Bad Token" error
+          # by overriding the default token lookup.
+          NODE_AUTH_TOKEN: ''
 
       # 🕵️ CHECK VERSION
       - name: Check if version changed
