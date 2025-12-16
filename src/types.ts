@@ -32,7 +32,13 @@ export interface TableConfig {
   cellSelector?: Selector;
   pagination?: PaginationStrategy;
   maxPages?: number;
-  headerTransformer?: (text: string, index: number) => string;
+  /**
+   * Hook to rename columns dynamically.
+   * * @param args.text - The default innerText of the header.
+   * @param args.index - The column index.
+   * @param args.locator - The specific header cell locator.
+   */
+  headerTransformer?: (args: { text: string, index: number, locator: Locator }) => string | Promise<string>;
   autoScroll?: boolean;
 }
 
