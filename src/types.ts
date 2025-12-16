@@ -1,4 +1,4 @@
-import { Locator, Page, TestInfo } from '@playwright/test';
+import type { Locator, Page, TestInfo } from '@playwright/test';
 
 export type Selector = string | ((root: Locator | Page) => Locator);
 
@@ -21,11 +21,9 @@ export interface PromptOptions {
    * Output Strategy:
    * - 'error': Throws an error with the prompt (Best for Cloud/QA Wolf to get clean text).
    * - 'console': Standard console logs (Default).
-   * - 'report': Attaches to Playwright Report (Requires testInfo).
    */
-  output?: 'console' | 'report' | 'error';
+  output?: 'console' | 'error';
   includeTypes?: boolean;
-  testInfo?: TestInfo;
 }
 
 export interface TableConfig {

@@ -1,4 +1,4 @@
-import { Locator, Page, test } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { TableConfig, TableContext, Selector, TableResult, SmartRow, PromptOptions } from './types';
 import { TYPE_CONTEXT } from './typeContext';
 
@@ -129,7 +129,7 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
   };
 
   const _handlePrompt = async (promptName: string, content: string, options: PromptOptions = {}) => {
-    const { output = 'console', includeTypes = true, testInfo } = options;
+    const { output = 'console', includeTypes = true } = options;
     
     let finalPrompt = content;
     
@@ -141,21 +141,6 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
       console.log(`⚠️ Throwing error to display [${promptName}] cleanly...`);
       throw new Error(finalPrompt);
     }
-
-    if (output === 'report') {
-      let activeInfo = testInfo;
-      if (!activeInfo) {
-        try { activeInfo = test.info(); } catch (e) {}
-      }
-
-      if (activeInfo) {
-        await activeInfo.attach(promptName, { body: finalPrompt, contentType: 'text/markdown' });
-        console.log(`✅ [${promptName}] Attached to Playwright Report.`);
-        return;
-      } else {
-        console.warn(`⚠️ [${promptName}] Cannot attach to report (Context unavailable). Logging to console instead.`);
-      }
-    } 
 
     console.log(finalPrompt);
   };
