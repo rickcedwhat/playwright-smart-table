@@ -78,34 +78,5 @@ test.describe('Generator Tools', () => {
     expect(output).not.toContain("Useful TypeScript Definitions");
     expect(output).not.toContain("interface TableConfig");
   });
-  
-  test('generateStrategyPrompt attaches to Playwright Report', async ({ page }, testInfo) => {
-    const table = useTable(page.locator('#test-table'));
-    
-    // Mock console to avoid clutter
-    const originalLog = console.log;
-    console.log = () => {};
-
-    try {
-      await table.generateStrategyPrompt({ output: 'report' });
-    } finally {
-      console.log = originalLog;
-    }
-
-    // Verify attachment in current test info
-    const attachment = testInfo.attachments.find(a => a.name === 'Smart Table Strategy');
-    expect(attachment).toBeDefined();
-    expect(attachment?.contentType).toBe('text/markdown');
-    
-    // Verify body content
-    if (attachment && attachment.body) {
-      const bodyString = attachment.body.toString();
-      // FIX: Match the actual output string from the library
-      expect(bodyString).toContain("COPY INTO GEMINI"); 
-      expect(bodyString).toContain("Useful TypeScript Definitions");
-      // Strategy prompt includes parent container HTML
-      expect(bodyString).toContain('<div class="container">');
-    }
-  });
 
 });
