@@ -73,7 +73,7 @@ test.describe('Real World Strategy Tests', () => {
       ),
       maxPages: 5,
       // ✅ Rename the empty column to "Actions" so we can reference it easily
-      headerTransformer: (text) => text.includes('__col_') ? "Actions" : text
+      headerTransformer: ({ text }) => text.includes('__col_') ? "Actions" : text
     });
 
     // Debug: See what columns were detected
