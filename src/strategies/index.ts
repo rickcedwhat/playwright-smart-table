@@ -2,104 +2,103 @@
 import { PaginationStrategy, Selector, TableContext } from '../types';
 
 /**
- * Helper to get 'expect' safely in ANY environment.
- * 1. Tries global scope (QA Wolf / Cloud Runners).
- * 2. Tries local require (Standard Playwright).
+ * Internal helper to wait for a condition to be met.
+ * Replaces the dependency on 'expect(...).toPass()' to ensure compatibility
+ * with environments like QA Wolf where 'expect' is not globally available.
  */
-const getExpect = () => {
-  // 1. Priority: Global (Environment injected)
-  const globalExpect = (globalThis as any).expect;
-  if (globalExpect) return globalExpect;
-
-  // 2. Fallback: Module Import (Local development)
-  // We use a try-catch with require to safely attempt loading the module
-  // without crashing environments where the module doesn't exist.
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { expect } = require('@playwright/test');
-    if (expect) return expect;
-  } catch (e) {
-    // Module not found or require not available.
+const waitForCondition = async (
+  predicate: () => Promise<boolean>, 
+  timeout: number, 
+  page: any // Context page for pauses
+): Promise<boolean> => {
+  const startTime = Date.now();
+  
+  while (Date.now() - startTime < timeout) {
+    if (await predicate()) {
+      return true;
+    }
+    // Wait 100ms before next check (Standard Polling)
+    await page.waitForTimeout(100).catch(() => new Promise(r => setTimeout(r, 100)));
   }
-
-  // 3. Fatal Error
-  throw new Error("@rickcedwhat/playwright-smart-table: 'expect' not found. Ensure you are running in a Playwright test.");
+  
+  return false;
 };
 
 export const TableStrategies = {
+  /**
+   * Strategy: Clicks a "Next" button and waits for the first row of data to change.
+   */
   clickNext: (nextButtonSelector: Selector, timeout = 5000): PaginationStrategy => {
-    return async ({ root, config, resolve }: TableContext) => {
-      // ✅ LAZY LOAD: Safe for both Local & Cloud
-      const expect = getExpect();
-      
+    return async ({ root, config, resolve, page }: TableContext) => {
       const nextBtn = resolve(nextButtonSelector, root).first();
 
+      // Check if button exists/enabled before clicking
       if (!await nextBtn.isVisible() || !await nextBtn.isEnabled()) {
         return false;
       }
 
+      // 1. Snapshot current state
       const firstRow = resolve(config.rowSelector, root).first();
       const oldText = await firstRow.innerText().catch(() => ""); 
 
+      // 2. Click
       await nextBtn.click();
 
-      try {
-        await expect(firstRow).not.toHaveText(oldText, { timeout });
-        return true; 
-      } catch (e) {
-        return false; 
-      }
+      // 3. Smart Wait (Polling) - No 'expect' needed
+      return await waitForCondition(async () => {
+        const newText = await firstRow.innerText().catch(() => "");
+        return newText !== oldText;
+      }, timeout, page);
     };
   },
 
+  /**
+   * Strategy: Clicks a "Load More" button and waits for the row count to increase.
+   */
   clickLoadMore: (buttonSelector: Selector, timeout = 5000): PaginationStrategy => {
-    return async ({ root, config, resolve }: TableContext) => {
-      const expect = getExpect(); // ✅ LAZY LOAD
+    return async ({ root, config, resolve, page }: TableContext) => {
       const loadMoreBtn = resolve(buttonSelector, root).first();
 
       if (!await loadMoreBtn.isVisible() || !await loadMoreBtn.isEnabled()) {
         return false;
       }
 
+      // 1. Snapshot count
       const rows = resolve(config.rowSelector, root);
       const oldCount = await rows.count();
 
+      // 2. Click
       await loadMoreBtn.click();
 
-      try {
-        await expect(async () => {
-          const newCount = await rows.count();
-          expect(newCount).toBeGreaterThan(oldCount);
-        }).toPass({ timeout });
-        
-        return true;
-      } catch (e) {
-        return false;
-      }
+      // 3. Smart Wait (Polling)
+      return await waitForCondition(async () => {
+        const newCount = await rows.count();
+        return newCount > oldCount;
+      }, timeout, page);
     };
   },
 
+  /**
+   * Strategy: Scrolls to the bottom and waits for more rows to appear.
+   */
   infiniteScroll: (timeout = 5000): PaginationStrategy => {
     return async ({ root, config, resolve, page }: TableContext) => {
-      const expect = getExpect(); // ✅ LAZY LOAD
       const rows = resolve(config.rowSelector, root);
       const oldCount = await rows.count();
 
       if (oldCount === 0) return false;
 
+      // 1. Trigger Scroll
       await rows.last().scrollIntoViewIfNeeded();
-      await page.keyboard.press('End');
+      
+      // Optional: Keyboard press for robust grid handling
+      try { await page.keyboard.press('End'); } catch (e) {}
 
-      try {
-        await expect(async () => {
-          const newCount = await rows.count();
-          expect(newCount).toBeGreaterThan(oldCount);
-        }).toPass({ timeout });
-
-        return true;
-      } catch (e) {
-        return false;
-      }
+      // 2. Smart Wait (Polling)
+      return await waitForCondition(async () => {
+        const newCount = await rows.count();
+        return newCount > oldCount;
+      }, timeout, page);
     };
   }
 };
