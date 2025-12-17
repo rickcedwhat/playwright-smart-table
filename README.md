@@ -18,36 +18,16 @@ Requires @playwright/test as a peer dependency.
 For standard tables (<table>, <tr>, <td>), no configuration is needed (defaults work for most standard HTML tables).
 
 <!-- embed: quick-start -->
-```typescript
-const table = useTable(page.locator('#example'), { 
-  headerSelector: 'thead th' // Override for this specific site
-});
 
-// 🪄 Finds the row with Name="Airi Satou", then gets the Position cell.
-// If Airi is on Page 2, it handles pagination automatically.
-const row = await table.getByRow({ Name: 'Airi Satou' });
-
-await expect(row.getCell('Position')).toHaveText('Accountant');
-```
 <!-- /embed: quick-start -->
 
 2. Complex Grids (Material UI / AG-Grid / Divs)
 
 For modern React grids, simply override the selectors and define a pagination strategy.
 
-import { useTable, TableStrategies } from '@rickcedwhat/playwright-smart-table';
+<!-- embed: pagination -->
 
-const table = useTable(page.locator('.MuiDataGrid-root'), {
-  rowSelector: '.MuiDataGrid-row',
-  headerSelector: '.MuiDataGrid-columnHeader',
-  cellSelector: '.MuiDataGrid-cell',
-  // Strategy: Tell it how to find the next page
-  pagination: TableStrategies.clickNext(
-    // Use 'page' to find buttons outside the table container
-    (root) => root.page().getByRole('button', { name: 'Go to next page' })
-  )
-});
-
+<!-- /embed: pagination -->
 
 🧠 SmartRow Pattern
 
@@ -56,19 +36,7 @@ The core power of this library is the SmartRow.
 Unlike a standard Playwright Locator, a SmartRow is aware of its context within the table's schema. It extends the standard Locator API, so you can chain standard Playwright methods (.click(), .isVisible()) directly off it.
 
 <!-- embed: smart-row -->
-```typescript
-// 1. Get SmartRow via getByRow
-const row = await table.getByRow({ Name: 'Airi Satou' });
 
-// 2. Interact with cell (No more getByCell needed!)
-// ✅ Good: Resilient to column reordering
-await row.getCell('Position').click();
-
-// 3. Dump data from row
-const data = await row.toJSON();
-console.log(data); 
-// { Name: "Airi Satou", Position: "Accountant", ... }
-```
 <!-- /embed: smart-row -->
 
 📖 API Reference
@@ -84,14 +52,7 @@ Returns Sentinel if 0 rows match (allows not.toBeVisible() assertions).
 Auto-Paginates if the row isn't found on the current page.
 
 <!-- embed: get-by-row -->
-```typescript
-// Find a row where Name is "Airi Satou" AND Office is "Tokyo"
-const row = await table.getByRow({ Name: "Airi Satou", Office: "Tokyo" });
-await expect(row).toBeVisible();
 
-// Assert it does NOT exist
-await expect(await table.getByRow({ Name: "Ghost User" })).not.toBeVisible();
-```
 <!-- /embed: get-by-row -->
 
 getAllRows(options?)
@@ -103,20 +64,7 @@ Returns: Array of SmartRow objects.
 Best for: Checking existence ("at least one") or validating sort order.
 
 <!-- embed: get-all-rows -->
-```typescript
-// 1. Get ALL rows on the current page
-const allRows = await table.getAllRows();
 
-// 2. Get subset of rows (Filtering)
-const tokyoUsers = await table.getAllRows({ 
-  filter: { Office: 'Tokyo' } 
-});
-expect(tokyoUsers.length).toBeGreaterThan(0); 
-
-// 3. Dump data to JSON
-const data = await table.getAllRows({ asJSON: true });
-console.log(data); // [{ Name: "Airi Satou", ... }, ...]
-```
 <!-- /embed: get-all-rows -->
 
 🧩 Pagination Strategies
