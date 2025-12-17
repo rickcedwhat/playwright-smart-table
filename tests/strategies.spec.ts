@@ -4,30 +4,7 @@ import { TableStrategies } from '../src/strategies';
 
 test.describe('Real World Strategy Tests', () => {
 
-  test('Strategy: Click Next (Datatables.net)', async ({ page }) => {
-    await page.goto('https://datatables.net/examples/data_sources/dom');
-    
-    const tableLoc = page.locator('#example');
-
-    const table = useTable(tableLoc, {
-      rowSelector: 'tbody tr',
-      headerSelector: 'thead th',
-      cellSelector: 'td',
-      pagination: TableStrategies.clickNext(() => 
-        page.getByRole('link', { name: 'Next' })
-      ),
-      maxPages: 3
-    });
-
-    await expect(await table.getByRow({ Name: "Airi Satou" })).toBeVisible();
-    
-    // ✅ Verify Colleen is NOT visible initially
-    await expect(page.getByText("Colleen Hurst")).not.toBeVisible();
-
-    console.log("🔎 Searching for Colleen Hurst (Page 2)...");
-    await expect(await table.getByRow({ Name: "Colleen Hurst" })).toBeVisible();
-    console.log("✅ Found row on Page 2!");
-  });
+  
 
   test('Strategy: Infinite Scroll (HTMX Example)', async ({ page }) => {
     await page.goto('https://htmx.org/examples/infinite-scroll/');

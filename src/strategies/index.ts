@@ -32,9 +32,20 @@ export const TableStrategies = {
     return async ({ root, config, resolve, page }: TableContext) => {
       const nextBtn = resolve(nextButtonSelector, root).first();
 
-      // Check if button exists/enabled before clicking
-      if (!await nextBtn.isVisible() || !await nextBtn.isEnabled()) {
+      // Debug log (can be verbose, maybe useful for debugging only)
+      // console.log(`[Strategy: clickNext] Checking button...`);
+
+      // Check if button exists/enabled before clicking.
+      // We do NOT wait here because if the button isn't visible/enabled, 
+      // we assume we reached the last page.
+      if (!await nextBtn.isVisible()) {
+        console.log(`[Strategy: clickNext] Button not visible. Stopping pagination.`);
         return false;
+      }
+      
+      if (!await nextBtn.isEnabled()) {
+         console.log(`[Strategy: clickNext] Button disabled. Stopping pagination.`);
+         return false;
       }
 
       // 1. Snapshot current state
@@ -42,13 +53,25 @@ export const TableStrategies = {
       const oldText = await firstRow.innerText().catch(() => ""); 
 
       // 2. Click
-      await nextBtn.click();
+      console.log(`[Strategy: clickNext] Clicking next button...`);
+      try {
+        await nextBtn.click({ timeout: 2000 }); 
+      } catch (e) {
+        console.warn(`[Strategy: clickNext] Click failed (blocked or detached): ${e}`);
+        return false;
+      }
 
-      // 3. Smart Wait (Polling) - No 'expect' needed
-      return await waitForCondition(async () => {
+      // 3. Smart Wait (Polling)
+      const success = await waitForCondition(async () => {
         const newText = await firstRow.innerText().catch(() => "");
         return newText !== oldText;
       }, timeout, page);
+
+      if (!success) {
+        console.warn(`[Strategy: clickNext] Warning: Table content did not change after clicking Next.`);
+      }
+
+      return success;
     };
   },
 
