@@ -1,7 +1,5 @@
 import { test, expect } from '@playwright/test';
 import { useTable } from '../src/useTable';
-import * as fs from 'fs';
-import * as path from 'path';
 
 test.describe('Generator Tools', () => {
 
