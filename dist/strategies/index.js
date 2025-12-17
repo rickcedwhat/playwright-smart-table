@@ -34,20 +34,40 @@ exports.TableStrategies = {
     clickNext: (nextButtonSelector, timeout = 5000) => {
         return (_a) => __awaiter(void 0, [_a], void 0, function* ({ root, config, resolve, page }) {
             const nextBtn = resolve(nextButtonSelector, root).first();
-            // Check if button exists/enabled before clicking
-            if (!(yield nextBtn.isVisible()) || !(yield nextBtn.isEnabled())) {
+            // Debug log (can be verbose, maybe useful for debugging only)
+            // console.log(`[Strategy: clickNext] Checking button...`);
+            // Check if button exists/enabled before clicking.
+            // We do NOT wait here because if the button isn't visible/enabled, 
+            // we assume we reached the last page.
+            if (!(yield nextBtn.isVisible())) {
+                console.log(`[Strategy: clickNext] Button not visible. Stopping pagination.`);
+                return false;
+            }
+            if (!(yield nextBtn.isEnabled())) {
+                console.log(`[Strategy: clickNext] Button disabled. Stopping pagination.`);
                 return false;
             }
             // 1. Snapshot current state
             const firstRow = resolve(config.rowSelector, root).first();
             const oldText = yield firstRow.innerText().catch(() => "");
             // 2. Click
-            yield nextBtn.click();
-            // 3. Smart Wait (Polling) - No 'expect' needed
-            return yield waitForCondition(() => __awaiter(void 0, void 0, void 0, function* () {
+            console.log(`[Strategy: clickNext] Clicking next button...`);
+            try {
+                yield nextBtn.click({ timeout: 2000 });
+            }
+            catch (e) {
+                console.warn(`[Strategy: clickNext] Click failed (blocked or detached): ${e}`);
+                return false;
+            }
+            // 3. Smart Wait (Polling)
+            const success = yield waitForCondition(() => __awaiter(void 0, void 0, void 0, function* () {
                 const newText = yield firstRow.innerText().catch(() => "");
                 return newText !== oldText;
             }), timeout, page);
+            if (!success) {
+                console.warn(`[Strategy: clickNext] Warning: Table content did not change after clicking Next.`);
+            }
+            return success;
         });
     },
     /**
