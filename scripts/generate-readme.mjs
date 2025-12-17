@@ -1,8 +1,8 @@
-// scripts/generate-readme.mjs
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+// 1. Recreate __dirname for ESM
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -35,10 +35,17 @@ function run() {
   }
 
   // 3. Read & Update README
+  if (!fs.existsSync(TARGET_FILE)) {
+    console.error(`❌ Target file not found: ${TARGET_FILE}`);
+    process.exit(1);
+  }
+  
   let readmeContent = fs.readFileSync(TARGET_FILE, 'utf8');
   let updatedCount = 0;
 
-  // Regex looks for: (content) const embedRegex = /()([\s\S]*?)()/g;
+  // Regex looks for: <!-- embed: name --> (content) <!-- /embed: name -->
+  // Defined explicitly before usage
+  const embedRegex = /(<!-- embed:\s+([a-zA-Z0-9_-]+)\s+-->)([\s\S]*?)(<!-- \/embed:\s+\2\s+-->)/g;
 
   const newReadme = readmeContent.replace(embedRegex, (fullMatch, startTag, regionName, currentContent, endTag) => {
     if (!snippets.has(regionName)) {
@@ -47,6 +54,7 @@ function run() {
     }
 
     updatedCount++;
+    // Reconstruct the block with the fresh code wrapped in typescript fences
     return `${startTag}\n\`\`\`typescript\n${snippets.get(regionName)}\n\`\`\`\n${endTag}`;
   });
 
