@@ -103,3 +103,60 @@ test.describe('README.md Examples Verification', () => {
     // #endregion get-by-row
   });
 });
+
+test.describe('v2.1 Advanced Features', () => {
+
+  test('Debug Mode', async ({ page }) => {
+     await page.goto('https://datatables.net/examples/data_sources/dom');
+     
+     // #region debug-mode
+     const table = useTable(page.locator('#example'), {
+       debug: true // 🔎 Logs detailed scanning/mapping info to console
+     });
+     // #endregion debug-mode
+     
+     await expect(await table.getHeaderCell('Name')).toBeVisible();
+  });
+
+  test('Column Values Scan', async ({ page }) => {
+    await page.goto('https://datatables.net/examples/data_sources/dom');
+    const table = useTable(page.locator('#example'));
+
+    // #region get-column-values
+    // Efficiently get all "Office" values across the first 2 pages
+    const offices = await table.getColumnValues('Office', { 
+      maxPages: 2 
+    });
+    
+    console.log(offices); // ["Tokyo", "London", "San Francisco", ...]
+    // #endregion get-column-values
+    
+    expect(offices.length).toBeGreaterThan(10);
+  });
+
+  test('Reset Table State', async ({ page }) => {
+     await page.goto('https://datatables.net/examples/data_sources/dom');
+     
+     // #region reset-table
+     const table = useTable(page.locator('#example'), {
+       pagination: TableStrategies.clickNext(() => page.getByRole('link', { name: 'Next' })),
+       // Define how to reset (e.g., reload, click 'First', or clear filters)
+       onReset: async ({ page }) => {
+         await page.reload(); 
+         await page.waitForSelector('#example_wrapper');
+       }
+     });
+
+     // 1. Pagination happens here (State becomes dirty)
+     // We search for a user on Page 2 or later
+     await table.getByRow({ Name: 'Zorita Serrano' }); 
+
+     // 2. Reset back to Page 1
+     await table.reset();
+
+     // 3. Now we can safely search for someone on Page 1
+     await expect(await table.getByRow({ Name: 'Airi Satou' })).toBeVisible();
+     // #endregion reset-table
+  });
+
+});
