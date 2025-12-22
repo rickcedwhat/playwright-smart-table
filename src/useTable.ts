@@ -326,6 +326,8 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
 
     /* * 🚧 ROADMAP (v2.2) 🚧 
      * The following features are planned. Implementations are tentative.
+     * DO NOT DELETE THIS SECTION UNTIL IMPLEMENTED OR REMOVED.
+     * THIS IS BEING USED TO TRACK FUTURE DEVELOPMENT.
      */
     
     // __roadmap__fill: async (data: Record<string, any>) => {
