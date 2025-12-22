@@ -127,7 +127,7 @@ const useTable = (rootLocator, configOptions = {}) => {
                 };
                 const didLoadMore = yield config.pagination(context);
                 if (didLoadMore) {
-                    _hasPaginated = true; // Mark state as dirty
+                    _hasPaginated = true;
                     currentPage++;
                     continue;
                 }
@@ -135,7 +135,6 @@ const useTable = (rootLocator, configOptions = {}) => {
                     logDebug(`Page ${currentPage}: Pagination failed (end of data).`);
                 }
             }
-            // Warn if we are in a dirty state (paginated) and failed to find the row
             if (_hasPaginated) {
                 console.warn(`⚠️ [SmartTable] Row not found. The table has been paginated (Current Page: ${currentPage}). You may need to call 'await table.reset()' if the target row is on a previous page.`);
             }
@@ -153,6 +152,34 @@ const useTable = (rootLocator, configOptions = {}) => {
             throw new Error(finalPrompt);
         }
         console.log(finalPrompt);
+    });
+    // Helper to extract clean HTML for prompts
+    const _getCleanHtml = (loc) => __awaiter(void 0, void 0, void 0, function* () {
+        return loc.evaluate((el) => {
+            const clone = el.cloneNode(true);
+            // 1. Remove Heavy/Useless Elements
+            const removeSelectors = 'script, style, svg, path, circle, rect, noscript, [hidden]';
+            clone.querySelectorAll(removeSelectors).forEach(n => n.remove());
+            // 2. Clean Attributes
+            const walker = document.createTreeWalker(clone, NodeFilter.SHOW_ELEMENT);
+            let currentNode = walker.currentNode;
+            while (currentNode) {
+                currentNode.removeAttribute('style'); // Inline styles are noise
+                currentNode.removeAttribute('data-reactid');
+                // 3. Condense Tailwind Classes (Heuristic)
+                // If class string is very long (>50 chars), keep the first few tokens and truncate.
+                // This preserves "MuiRow" but cuts "text-sm p-4 hover:bg-gray-50 ..."
+                const cls = currentNode.getAttribute('class');
+                if (cls && cls.length > 80) {
+                    const tokens = cls.split(' ');
+                    if (tokens.length > 5) {
+                        currentNode.setAttribute('class', tokens.slice(0, 4).join(' ') + ' ...');
+                    }
+                }
+                currentNode = walker.nextNode();
+            }
+            return clone.outerHTML;
+        });
     });
     return {
         getHeaders: () => __awaiter(void 0, void 0, void 0, function* () { return Array.from((yield _getMap()).keys()); }),
@@ -173,7 +200,7 @@ const useTable = (rootLocator, configOptions = {}) => {
             };
             yield config.onReset(context);
             _hasPaginated = false;
-            _headerMap = null; // Optional: clear header map if reset might change columns
+            _headerMap = null;
             logDebug("Table reset complete.");
         }),
         getColumnValues: (column, options) => __awaiter(void 0, void 0, void 0, function* () {
@@ -183,12 +210,11 @@ const useTable = (rootLocator, configOptions = {}) => {
             if (colIdx === undefined)
                 throw new Error(`Column '${column}' not found.`);
             const mapper = (_a = options === null || options === void 0 ? void 0 : options.mapper) !== null && _a !== void 0 ? _a : ((c) => c.innerText());
-            const effectiveMaxPages = (_b = options === null || options === void 0 ? void 0 : options.maxPages) !== null && _b !== void 0 ? _b : config.maxPages; // Default to current page only unless specified
+            const effectiveMaxPages = (_b = options === null || options === void 0 ? void 0 : options.maxPages) !== null && _b !== void 0 ? _b : config.maxPages;
             let currentPage = 1;
             const results = [];
             logDebug(`Getting column values for '${column}' (Pages: ${effectiveMaxPages})`);
             while (true) {
-                // We must iterate rows to reliably get the specific cell in the column
                 const rows = yield resolve(config.rowSelector, rootLocator).all();
                 for (const row of rows) {
                     const cell = typeof config.cellSelector === 'string'
@@ -235,15 +261,15 @@ const useTable = (rootLocator, configOptions = {}) => {
             return smartRows;
         }),
         generateConfigPrompt: (options) => __awaiter(void 0, void 0, void 0, function* () {
-            const html = yield rootLocator.evaluate((el) => el.outerHTML);
+            const html = yield _getCleanHtml(rootLocator);
             const separator = "=".repeat(50);
-            const content = `\n${separator}\n🤖 COPY INTO GEMINI/ChatGPT 🤖\n${separator}\nI am using 'playwright-smart-table'. Generate config for:\n\`\`\`html\n${html.substring(0, 5000)} ...\n\`\`\`\n${separator}\n`;
+            const content = `\n${separator}\n🤖 COPY INTO GEMINI/ChatGPT 🤖\n${separator}\nI am using 'playwright-smart-table'. Generate config for:\n\`\`\`html\n${html.substring(0, 10000)} ...\n\`\`\`\n${separator}\n`;
             yield _handlePrompt('Smart Table Config', content, options);
         }),
         generateStrategyPrompt: (options) => __awaiter(void 0, void 0, void 0, function* () {
             const container = rootLocator.locator('xpath=..');
-            const html = yield container.evaluate((el) => el.outerHTML);
-            const content = `\n==================================================\n🤖 COPY INTO GEMINI/ChatGPT TO WRITE A STRATEGY 🤖\n==================================================\nI need a custom Pagination Strategy for 'playwright-smart-table'.\nContainer HTML:\n\`\`\`html\n${html.substring(0, 5000)} ...\n\`\`\`\n`;
+            const html = yield _getCleanHtml(container);
+            const content = `\n==================================================\n🤖 COPY INTO GEMINI/ChatGPT TO WRITE A STRATEGY 🤖\n==================================================\nI need a custom Pagination Strategy for 'playwright-smart-table'.\nContainer HTML:\n\`\`\`html\n${html.substring(0, 10000)} ...\n\`\`\`\n`;
             yield _handlePrompt('Smart Table Strategy', content, options);
         }),
         /* * 🚧 ROADMAP (v2.2) 🚧
