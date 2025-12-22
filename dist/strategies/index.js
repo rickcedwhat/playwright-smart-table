@@ -102,11 +102,6 @@ exports.TableStrategies = {
                 return false;
             // 1. Trigger Scroll
             yield rows.last().scrollIntoViewIfNeeded();
-            // Optional: Keyboard press for robust grid handling
-            try {
-                yield page.keyboard.press('End');
-            }
-            catch (e) { }
             // 2. Smart Wait (Polling)
             return yield waitForCondition(() => __awaiter(void 0, void 0, void 0, function* () {
                 const newCount = yield rows.count();
