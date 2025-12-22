@@ -11,6 +11,8 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
     maxPages: 1,
     headerTransformer: ({ text, index, locator }) => text,
     autoScroll: true,
+    debug: false,
+    onReset: async () => { console.warn("⚠️ .reset() called but no 'onReset' strategy defined in config."); },
     ...configOptions,
   };
 
@@ -20,10 +22,18 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
     return item;
   };
 
+  // Internal State
   let _headerMap: Map<string, number> | null = null;
+  let _hasPaginated = false;
+
+  const logDebug = (msg: string) => {
+    if (config.debug) console.log(`🔎 [SmartTable Debug] ${msg}`);
+  };
 
   const _getMap = async () => {
     if (_headerMap) return _headerMap;
+
+    logDebug('Mapping headers...');
 
     if (config.autoScroll) {
       try { await rootLocator.scrollIntoViewIfNeeded({ timeout: 1000 }); } catch (e) { }
@@ -36,7 +46,7 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
 
     // 1. Fetch data efficiently
     const texts = await headerLoc.allInnerTexts();
-    const locators = await headerLoc.all(); // Need specific locators for the transformer
+    const locators = await headerLoc.all(); 
 
     // 2. Map Headers (Async)
     const entries = await Promise.all(texts.map(async (t, i) => {
@@ -53,6 +63,7 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
     }));
 
     _headerMap = new Map(entries);
+    logDebug(`Mapped ${entries.length} columns: ${JSON.stringify(entries.map(e => e[0]))}`);
     return _headerMap;
   };
 
@@ -114,15 +125,20 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
     const effectiveMaxPages = options.maxPages ?? config.maxPages;
     let currentPage = 1;
 
+    logDebug(`Looking for row: ${JSON.stringify(filters)} (MaxPages: ${effectiveMaxPages})`);
+
     while (true) {
       const allRows = resolve(config.rowSelector, rootLocator);
       const matchedRows = _applyFilters(allRows, filters, map, options.exact || false);
 
       const count = await matchedRows.count();
+      logDebug(`Page ${currentPage}: Found ${count} matches.`);
+
       if (count > 1) throw new Error(`Strict Mode Violation: Found ${count} rows matching ${JSON.stringify(filters)}.`);
       if (count === 1) return matchedRows.first();
 
       if (currentPage < effectiveMaxPages) {
+        logDebug(`Page ${currentPage}: Not found. Attempting pagination...`);
         const context: TableContext = {
           root: rootLocator,
           config: config,
@@ -132,17 +148,25 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
 
         const didLoadMore = await config.pagination(context);
         if (didLoadMore) {
+          _hasPaginated = true; // Mark state as dirty
           currentPage++;
           continue;
+        } else {
+          logDebug(`Page ${currentPage}: Pagination failed (end of data).`);
         }
       }
+      
+      // Warn if we are in a dirty state (paginated) and failed to find the row
+      if (_hasPaginated) {
+        console.warn(`⚠️ [SmartTable] Row not found. The table has been paginated (Current Page: ${currentPage}). You may need to call 'await table.reset()' if the target row is on a previous page.`);
+      }
+
       return null;
     }
   };
 
   const _handlePrompt = async (promptName: string, content: string, options: PromptOptions = {}) => {
     const { output = 'console', includeTypes = true } = options;
-
     let finalPrompt = content;
 
     if (includeTypes) {
@@ -153,7 +177,6 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
       console.log(`⚠️ Throwing error to display [${promptName}] cleanly...`);
       throw new Error(finalPrompt);
     }
-
     console.log(finalPrompt);
   };
 
@@ -165,6 +188,60 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
       const idx = map.get(columnName);
       if (idx === undefined) throw new Error(`Column '${columnName}' not found.`);
       return resolve(config.headerSelector, rootLocator).nth(idx);
+    },
+
+    reset: async () => {
+      logDebug("Resetting table...");
+      const context: TableContext = {
+        root: rootLocator,
+        config: config,
+        page: rootLocator.page(),
+        resolve: resolve
+      };
+      await config.onReset(context);
+      _hasPaginated = false;
+      _headerMap = null; // Optional: clear header map if reset might change columns
+      logDebug("Table reset complete.");
+    },
+
+    getColumnValues: async <V = string>(column: string, options?: { mapper?: (cell: Locator) => Promise<V> | V, maxPages?: number }) => {
+      const map = await _getMap();
+      const colIdx = map.get(column);
+      if (colIdx === undefined) throw new Error(`Column '${column}' not found.`);
+      
+      const mapper = options?.mapper ?? ((c: Locator) => c.innerText() as any as V);
+      const effectiveMaxPages = options?.maxPages ?? config.maxPages; // Default to current page only unless specified
+      
+      let currentPage = 1;
+      const results: V[] = [];
+
+      logDebug(`Getting column values for '${column}' (Pages: ${effectiveMaxPages})`);
+
+      while (true) {
+        // We must iterate rows to reliably get the specific cell in the column
+        const rows = await resolve(config.rowSelector, rootLocator).all();
+        
+        for (const row of rows) {
+          const cell = typeof config.cellSelector === 'string'
+            ? row.locator(config.cellSelector).nth(colIdx)
+            : resolve(config.cellSelector, row).nth(colIdx);
+          
+          results.push(await mapper(cell));
+        }
+
+        if (currentPage < effectiveMaxPages) {
+          const context: TableContext = {
+             root: rootLocator, config, page: rootLocator.page(), resolve
+          };
+          if (await config.pagination(context)) {
+            _hasPaginated = true;
+            currentPage++;
+            continue;
+          }
+        }
+        break;
+      }
+      return results;
     },
 
     getByRow: async <T extends { asJSON?: boolean }>(
@@ -206,7 +283,6 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
       const html = await rootLocator.evaluate((el) => el.outerHTML);
       const separator = "=".repeat(50);
       const content = `\n${separator}\n🤖 COPY INTO GEMINI/ChatGPT 🤖\n${separator}\nI am using 'playwright-smart-table'. Generate config for:\n\`\`\`html\n${html.substring(0, 5000)} ...\n\`\`\`\n${separator}\n`;
-
       await _handlePrompt('Smart Table Config', content, options);
     },
 
@@ -214,8 +290,42 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
       const container = rootLocator.locator('xpath=..');
       const html = await container.evaluate((el) => el.outerHTML);
       const content = `\n==================================================\n🤖 COPY INTO GEMINI/ChatGPT TO WRITE A STRATEGY 🤖\n==================================================\nI need a custom Pagination Strategy for 'playwright-smart-table'.\nContainer HTML:\n\`\`\`html\n${html.substring(0, 5000)} ...\n\`\`\`\n`;
-
       await _handlePrompt('Smart Table Strategy', content, options);
-    }
+    },
+
+    /* * 🚧 ROADMAP (v2.2) 🚧 
+     * The following features are planned. Implementations are tentative.
+     */
+    
+    // __roadmap__fill: async (data: Record<string, any>) => {
+    //   /* //    * Goal: Fill a row with data intelligently.
+    //    * Priority: Medium
+    //    * Challenge: Handling different input types (select, checkbox, custom divs) blindly.
+    //    */
+    //    // const row = ... get row context ...
+    //    // for (const [col, val] of Object.entries(data)) {
+    //    //    const cell = row.getCell(col);
+    //    //    const input = cell.locator('input, select, [role="checkbox"]');
+    //    //    if (await input.count() > 1) console.warn("Ambiguous input");
+    //    //    // Heuristics go here...
+    //    // }
+    //    // Note: Maybe we could pass the locator in the options for more control.
+    // },
+
+    // __roadmap__auditPages: async (options: { maxPages: number, audit: (rows: SmartRow[], page: number) => Promise<void> }) => {
+    //   /*
+    //    * Goal: Walk through pages and run a verification function on every page.
+    //    * Priority: Low (Specific use case)
+    //    * Logic:
+    //    * let page = 1;
+    //    * while (page <= options.maxPages) {
+    //    * const rows = await getAllRows();
+    //    * await options.audit(rows, page);
+    //    * if (!await pagination(ctx)) break;
+    //    * page++;
+    //    * }
+    //    */
+    //    // Note: Maybe make is possible to skip several pages at once if the pagination strategy supports it.
+    // }
   };
 };
