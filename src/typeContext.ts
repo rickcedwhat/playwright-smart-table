@@ -53,7 +53,7 @@ export interface TableConfig {
   /**
    * Reset Strategy:
    * Defines how to return the table to its initial state (e.g., Page 1).
-   * Called when you use `table.reset()`.
+   * Called when you use \`table.reset()\`.
    * Example: async ({ page }) => await page.reload()
    */
   onReset?: (context: TableContext) => Promise<void>;
@@ -87,7 +87,7 @@ export interface TableResult {
   ) => Promise<V[]>;
 
   /**
-   * Resets the table state (e.g. goes back to Page 1) using the `onReset` config.
+   * Resets the table state (e.g. goes back to Page 1) using the \`onReset\` config.
    * Clears internal pagination state.
    */
   reset: () => Promise<void>;
