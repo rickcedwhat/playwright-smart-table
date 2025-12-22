@@ -113,9 +113,6 @@ export const TableStrategies = {
 
       // 1. Trigger Scroll
       await rows.last().scrollIntoViewIfNeeded();
-      
-      // Optional: Keyboard press for robust grid handling
-      try { await page.keyboard.press('End'); } catch (e) {}
 
       // 2. Smart Wait (Polling)
       return await waitForCondition(async () => {
