@@ -148,7 +148,7 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
 
         const didLoadMore = await config.pagination(context);
         if (didLoadMore) {
-          _hasPaginated = true; // Mark state as dirty
+          _hasPaginated = true;
           currentPage++;
           continue;
         } else {
@@ -156,7 +156,6 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
         }
       }
       
-      // Warn if we are in a dirty state (paginated) and failed to find the row
       if (_hasPaginated) {
         console.warn(`⚠️ [SmartTable] Row not found. The table has been paginated (Current Page: ${currentPage}). You may need to call 'await table.reset()' if the target row is on a previous page.`);
       }
@@ -180,6 +179,39 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
     console.log(finalPrompt);
   };
 
+  // Helper to extract clean HTML for prompts
+  const _getCleanHtml = async (loc: Locator): Promise<string> => {
+    return loc.evaluate((el) => {
+      const clone = el.cloneNode(true) as Element;
+      
+      // 1. Remove Heavy/Useless Elements
+      const removeSelectors = 'script, style, svg, path, circle, rect, noscript, [hidden]';
+      clone.querySelectorAll(removeSelectors).forEach(n => n.remove());
+
+      // 2. Clean Attributes
+      const walker = document.createTreeWalker(clone, NodeFilter.SHOW_ELEMENT);
+      let currentNode = walker.currentNode as Element;
+      while(currentNode) {
+        currentNode.removeAttribute('style'); // Inline styles are noise
+        currentNode.removeAttribute('data-reactid');
+        
+        // 3. Condense Tailwind Classes (Heuristic)
+        // If class string is very long (>50 chars), keep the first few tokens and truncate.
+        // This preserves "MuiRow" but cuts "text-sm p-4 hover:bg-gray-50 ..."
+        const cls = currentNode.getAttribute('class');
+        if (cls && cls.length > 80) {
+          const tokens = cls.split(' ');
+          if (tokens.length > 5) {
+             currentNode.setAttribute('class', tokens.slice(0, 4).join(' ') + ' ...');
+          }
+        }
+        currentNode = walker.nextNode() as Element;
+      }
+      
+      return clone.outerHTML;
+    });
+  };
+
   return {
     getHeaders: async () => Array.from((await _getMap()).keys()),
 
@@ -200,7 +232,7 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
       };
       await config.onReset(context);
       _hasPaginated = false;
-      _headerMap = null; // Optional: clear header map if reset might change columns
+      _headerMap = null; 
       logDebug("Table reset complete.");
     },
 
@@ -210,7 +242,7 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
       if (colIdx === undefined) throw new Error(`Column '${column}' not found.`);
       
       const mapper = options?.mapper ?? ((c: Locator) => c.innerText() as any as V);
-      const effectiveMaxPages = options?.maxPages ?? config.maxPages; // Default to current page only unless specified
+      const effectiveMaxPages = options?.maxPages ?? config.maxPages; 
       
       let currentPage = 1;
       const results: V[] = [];
@@ -218,7 +250,6 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
       logDebug(`Getting column values for '${column}' (Pages: ${effectiveMaxPages})`);
 
       while (true) {
-        // We must iterate rows to reliably get the specific cell in the column
         const rows = await resolve(config.rowSelector, rootLocator).all();
         
         for (const row of rows) {
@@ -280,16 +311,16 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
     },
 
     generateConfigPrompt: async (options?: PromptOptions) => {
-      const html = await rootLocator.evaluate((el) => el.outerHTML);
+      const html = await _getCleanHtml(rootLocator);
       const separator = "=".repeat(50);
-      const content = `\n${separator}\n🤖 COPY INTO GEMINI/ChatGPT 🤖\n${separator}\nI am using 'playwright-smart-table'. Generate config for:\n\`\`\`html\n${html.substring(0, 5000)} ...\n\`\`\`\n${separator}\n`;
+      const content = `\n${separator}\n🤖 COPY INTO GEMINI/ChatGPT 🤖\n${separator}\nI am using 'playwright-smart-table'. Generate config for:\n\`\`\`html\n${html.substring(0, 10000)} ...\n\`\`\`\n${separator}\n`;
       await _handlePrompt('Smart Table Config', content, options);
     },
 
     generateStrategyPrompt: async (options?: PromptOptions) => {
       const container = rootLocator.locator('xpath=..');
-      const html = await container.evaluate((el) => el.outerHTML);
-      const content = `\n==================================================\n🤖 COPY INTO GEMINI/ChatGPT TO WRITE A STRATEGY 🤖\n==================================================\nI need a custom Pagination Strategy for 'playwright-smart-table'.\nContainer HTML:\n\`\`\`html\n${html.substring(0, 5000)} ...\n\`\`\`\n`;
+      const html = await _getCleanHtml(container);
+      const content = `\n==================================================\n🤖 COPY INTO GEMINI/ChatGPT TO WRITE A STRATEGY 🤖\n==================================================\nI need a custom Pagination Strategy for 'playwright-smart-table'.\nContainer HTML:\n\`\`\`html\n${html.substring(0, 10000)} ...\n\`\`\`\n`;
       await _handlePrompt('Smart Table Strategy', content, options);
     },
 
