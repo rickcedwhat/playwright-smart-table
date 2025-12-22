@@ -17,7 +17,7 @@ The Standard HTML Table
 For standard tables (<table>, <tr>, <td>), no configuration is needed (defaults work for most standard HTML tables).
 
 <!-- embed: quick-start -->
-
+```typescript
 const table = useTable(page.locator('#example'), {
   headerSelector: 'thead th' // Override for this specific site
 });
@@ -27,8 +27,7 @@ const table = useTable(page.locator('#example'), {
 const row = await table.getByRow({ Name: 'Airi Satou' });
 
 await expect(row.getCell('Position')).toHaveText('Accountant');
-
-
+```
 <!-- /embed: quick-start -->
 
 Complex Grids (Material UI / AG-Grid / Divs)
@@ -36,7 +35,7 @@ Complex Grids (Material UI / AG-Grid / Divs)
 For modern React grids, simply override the selectors and define a pagination strategy.
 
 <!-- embed: pagination -->
-
+```typescript
 const table = useTable(page.locator('#example'), {
   rowSelector: 'tbody tr',
   headerSelector: 'thead th',
@@ -53,8 +52,7 @@ await expect(page.getByText("Colleen Hurst")).not.toBeVisible();
 
 await expect(await table.getByRow({ Name: "Colleen Hurst" })).toBeVisible();
 // NOTE: We're now on the page where Colleen Hurst exists (typically Page 2)
-
-
+```
 <!-- /embed: pagination -->
 
 🧠 SmartRow Pattern
@@ -64,7 +62,7 @@ The core power of this library is the SmartRow.
 Unlike a standard Playwright Locator, a SmartRow is aware of its context within the table's schema. It extends the standard Locator API, so you can chain standard Playwright methods (.click(), .isVisible()) directly off it.
 
 <!-- embed: smart-row -->
-
+```typescript
 // 1. Get SmartRow via getByRow
 const row = await table.getByRow({ Name: 'Airi Satou' });
 
@@ -76,8 +74,7 @@ await row.getCell('Position').click();
 const data = await row.toJSON();
 console.log(data);
 // { Name: "Airi Satou", Position: "Accountant", ... }
-
-
+```
 <!-- /embed: smart-row -->
 
 🚀 Advanced Usage
@@ -87,7 +84,12 @@ console.log(data);
 Having trouble finding rows? Enable debug mode to see exactly what the library sees (headers mapped, rows scanned, pagination triggers).
 
 <!-- embed: advanced-debug -->
-
+```typescript
+const table = useTable(page.locator('#example'), {
+  headerSelector: 'thead th',
+  debug: true 
+});
+```
 <!-- /embed: advanced-debug -->
 
 🔄 Resetting State
@@ -95,7 +97,16 @@ Having trouble finding rows? Enable debug mode to see exactly what the library s
 If your tests navigate deep into a table (e.g., Page 5), subsequent searches might fail. Use .reset() to return to the start.
 
 <!-- embed: advanced-reset -->
+```typescript
+// Navigate deep into the table (simulated by finding a row on page 2)
+// For the test to pass, we need a valid row. 'Angelica Ramos' is usually on page 1 or 2 depending on sorting.
+try {
+  await table.getByRow({ Name: 'Angelica Ramos' });
+} catch (e) {}
 
+// Reset internal state (and potentially UI) to Page 1
+await table.reset();
+```
 <!-- /embed: advanced-reset -->
 
 📊 Column Scanning
@@ -103,7 +114,11 @@ If your tests navigate deep into a table (e.g., Page 5), subsequent searches mig
 Need to verify a specific column is sorted or contains specific data? Use getColumnValues for a high-performance scan.
 
 <!-- embed: advanced-column-scan -->
-
+```typescript
+// Quickly grab all text values from the "Office" column
+const offices = await table.getColumnValues('Office'); 
+expect(offices).toContain('Tokyo');
+```
 <!-- /embed: advanced-column-scan -->
 
 📖 API Reference
@@ -119,15 +134,14 @@ Returns Sentinel if 0 rows match (allows not.toBeVisible() assertions).
 Auto-Paginates if the row isn't found on the current page.
 
 <!-- embed: get-by-row -->
-
+```typescript
 // Find a row where Name is "Airi Satou" AND Office is "Tokyo"
 const row = await table.getByRow({ Name: "Airi Satou", Office: "Tokyo" });
 await expect(row).toBeVisible();
 
 // Assert it does NOT exist
 await expect(await table.getByRow({ Name: "Ghost User" })).not.toBeVisible();
-
-
+```
 <!-- /embed: get-by-row -->
 
 getAllRows(options?)
@@ -139,7 +153,7 @@ Returns: Array of SmartRow objects.
 Best for: Checking existence ("at least one") or validating sort order.
 
 <!-- embed: get-all-rows -->
-
+```typescript
 // 1. Get ALL rows on the current page
 const allRows = await table.getAllRows();
 
@@ -152,8 +166,7 @@ expect(tokyoUsers.length).toBeGreaterThan(0);
 // 3. Dump data to JSON
 const data = await table.getAllRows({ asJSON: true });
 console.log(data); // [{ Name: "Airi Satou", ... }, ...]
-
-
+```
 <!-- /embed: get-all-rows -->
 
 🧩 Pagination Strategies

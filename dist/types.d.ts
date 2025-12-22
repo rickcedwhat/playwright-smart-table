@@ -39,16 +39,12 @@ export interface TableConfig {
     }) => string | Promise<string>;
     autoScroll?: boolean;
     /**
-     * Debug Mode:
-     * - Logs detailed finding/scanning logic to console.
-     * - Helps troubleshoot selector issues or pagination misses.
+     * Enable debug mode to log internal state to console.
      */
     debug?: boolean;
     /**
-     * Reset Strategy:
-     * Defines how to return the table to its initial state (e.g., Page 1).
-     * Called when you use `table.reset()`.
-     * Example: async ({ page }) => await page.reload()
+     * Strategy to reset the table to the first page.
+     * Called when table.reset() is invoked.
      */
     onReset?: (context: TableContext) => Promise<void>;
 }
@@ -67,21 +63,17 @@ export interface TableResult {
         filter?: Record<string, any>;
         exact?: boolean;
     } & T) => Promise<T['asJSON'] extends true ? Record<string, string>[] : SmartRow[]>;
+    generateConfigPrompt: (options?: PromptOptions) => Promise<void>;
+    generateStrategyPrompt: (options?: PromptOptions) => Promise<void>;
     /**
-     * Efficiently retrieves values from a specific column across one or more pages.
-     * @param column - The name of the column.
-     * @param options.mapper - Optional function to transform the cell locator to a value (Default: innerText).
-     * @param options.maxPages - Number of pages to scan (Default: 1).
+     * Resets the table state (clears cache, flags) and invokes the onReset strategy.
+     */
+    reset: () => Promise<void>;
+    /**
+     * Scans a specific column across all pages and returns the values.
      */
     getColumnValues: <V = string>(column: string, options?: {
         mapper?: (cell: Locator) => Promise<V> | V;
         maxPages?: number;
     }) => Promise<V[]>;
-    /**
-     * Resets the table state (e.g. goes back to Page 1) using the `onReset` config.
-     * Clears internal pagination state.
-     */
-    reset: () => Promise<void>;
-    generateConfigPrompt: (options?: PromptOptions) => Promise<void>;
-    generateStrategyPrompt: (options?: PromptOptions) => Promise<void>;
 }
