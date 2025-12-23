@@ -9,9 +9,13 @@ exports.TYPE_CONTEXT = void 0;
 exports.TYPE_CONTEXT = `
 export type Selector = string | ((root: Locator | Page) => Locator);
 
-export type SmartRow = Locator & {
+export type SmartRow = Omit<Locator, 'fill'> & {
   getCell(column: string): Locator;
   toJSON(): Promise<Record<string, string>>;
+  /**
+   * Fills the row with data. Automatically detects input types (text input, select, checkbox, etc.).
+   */
+  fill: (data: Record<string, any>, options?: FillOptions) => Promise<void>;
 };
 
 export interface TableContext {
@@ -56,6 +60,15 @@ export interface TableConfig {
    * Called when table.reset() is invoked.
    */
   onReset?: (context: TableContext) => Promise<void>;
+}
+
+export interface FillOptions {
+  /**
+   * Custom input mappers for specific columns.
+   * Maps column names to functions that return the input locator for that cell.
+   * Columns not specified here will use auto-detection.
+   */
+  inputMappers?: Record<string, (cell: Locator) => Locator>;
 }
 
 export interface TableResult {

@@ -27,6 +27,30 @@ const useTable = (rootLocator, configOptions = {}) => {
         if (config.debug)
             console.log(`🔎 [SmartTable Debug] ${msg}`);
     };
+    const _suggestColumnName = (colName, availableColumns) => {
+        // Simple fuzzy matching - find columns with similar names
+        const lowerCol = colName.toLowerCase();
+        const suggestions = availableColumns.filter(col => col.toLowerCase().includes(lowerCol) ||
+            lowerCol.includes(col.toLowerCase()) ||
+            col.toLowerCase().replace(/\s+/g, '') === lowerCol.replace(/\s+/g, ''));
+        if (suggestions.length > 0 && suggestions[0] !== colName) {
+            return `. Did you mean "${suggestions[0]}"?`;
+        }
+        // Show similar column names (first 3)
+        if (availableColumns.length > 0 && availableColumns.length <= 10) {
+            return `. Available columns: ${availableColumns.map(c => `"${c}"`).join(', ')}`;
+        }
+        else if (availableColumns.length > 0) {
+            return `. Available columns (first 5): ${availableColumns.slice(0, 5).map(c => `"${c}"`).join(', ')}, ...`;
+        }
+        return '.';
+    };
+    const _createColumnError = (colName, map, context) => {
+        const availableColumns = Array.from(map.keys());
+        const suggestion = _suggestColumnName(colName, availableColumns);
+        const contextMsg = context ? ` (${context})` : '';
+        return new Error(`Column "${colName}" not found${contextMsg}${suggestion}`);
+    };
     const _getMap = () => __awaiter(void 0, void 0, void 0, function* () {
         if (_headerMap)
             return _headerMap;
@@ -65,8 +89,11 @@ const useTable = (rootLocator, configOptions = {}) => {
         const smart = rowLocator;
         smart.getCell = (colName) => {
             const idx = map.get(colName);
-            if (idx === undefined)
-                throw new Error(`Column '${colName}' not found.`);
+            if (idx === undefined) {
+                const availableColumns = Array.from(map.keys());
+                const suggestion = _suggestColumnName(colName, availableColumns);
+                throw new Error(`Column "${colName}" not found${suggestion}`);
+            }
             if (typeof config.cellSelector === 'string') {
                 return rowLocator.locator(config.cellSelector).nth(idx);
             }
@@ -85,6 +112,92 @@ const useTable = (rootLocator, configOptions = {}) => {
             }
             return result;
         });
+        smart.fill = (data, fillOptions) => __awaiter(void 0, void 0, void 0, function* () {
+            var _a;
+            logDebug(`Filling row with data: ${JSON.stringify(data)}`);
+            // Fill each column
+            for (const [colName, value] of Object.entries(data)) {
+                const colIdx = map.get(colName);
+                if (colIdx === undefined) {
+                    throw _createColumnError(colName, map, 'in fill data');
+                }
+                const cell = smart.getCell(colName);
+                // Use custom input mapper for this column if provided, otherwise auto-detect
+                let inputLocator;
+                if ((_a = fillOptions === null || fillOptions === void 0 ? void 0 : fillOptions.inputMappers) === null || _a === void 0 ? void 0 : _a[colName]) {
+                    inputLocator = fillOptions.inputMappers[colName](cell);
+                }
+                else {
+                    // Auto-detect input type
+                    // Try different input types in order of commonality
+                    // Check for text input
+                    const textInput = cell.locator('input[type="text"], input:not([type]), textarea').first();
+                    const textInputCount = yield textInput.count().catch(() => 0);
+                    // Check for select
+                    const select = cell.locator('select').first();
+                    const selectCount = yield select.count().catch(() => 0);
+                    // Check for checkbox/radio
+                    const checkbox = cell.locator('input[type="checkbox"], input[type="radio"], [role="checkbox"]').first();
+                    const checkboxCount = yield checkbox.count().catch(() => 0);
+                    // Check for contenteditable or div-based inputs
+                    const contentEditable = cell.locator('[contenteditable="true"]').first();
+                    const contentEditableCount = yield contentEditable.count().catch(() => 0);
+                    // Determine which input to use (prioritize by commonality)
+                    if (textInputCount > 0 && selectCount === 0 && checkboxCount === 0) {
+                        inputLocator = textInput;
+                    }
+                    else if (selectCount > 0) {
+                        inputLocator = select;
+                    }
+                    else if (checkboxCount > 0) {
+                        inputLocator = checkbox;
+                    }
+                    else if (contentEditableCount > 0) {
+                        inputLocator = contentEditable;
+                    }
+                    else if (textInputCount > 0) {
+                        // Fallback to text input even if others exist
+                        inputLocator = textInput;
+                    }
+                    else {
+                        // No input found - try to click the cell itself (might trigger an editor)
+                        inputLocator = cell;
+                    }
+                    // Warn if multiple inputs found (ambiguous)
+                    const totalInputs = textInputCount + selectCount + checkboxCount + contentEditableCount;
+                    if (totalInputs > 1 && config.debug) {
+                        logDebug(`⚠️ Multiple inputs found in cell "${colName}" (${totalInputs} total). Using first match. Consider using inputMapper option for explicit control.`);
+                    }
+                }
+                // Fill based on value type and input type
+                const inputTag = yield inputLocator.evaluate((el) => el.tagName.toLowerCase()).catch(() => 'unknown');
+                const inputType = yield inputLocator.getAttribute('type').catch(() => null);
+                const isContentEditable = yield inputLocator.getAttribute('contenteditable').catch(() => null);
+                logDebug(`Filling "${colName}" with value "${value}" (input: ${inputTag}, type: ${inputType})`);
+                if (inputType === 'checkbox' || inputType === 'radio') {
+                    // Boolean value for checkbox/radio
+                    const shouldBeChecked = Boolean(value);
+                    const isChecked = yield inputLocator.isChecked().catch(() => false);
+                    if (isChecked !== shouldBeChecked) {
+                        yield inputLocator.click();
+                    }
+                }
+                else if (inputTag === 'select') {
+                    // Select dropdown
+                    yield inputLocator.selectOption(String(value));
+                }
+                else if (isContentEditable === 'true') {
+                    // Contenteditable div
+                    yield inputLocator.click();
+                    yield inputLocator.fill(String(value));
+                }
+                else {
+                    // Text input, textarea, or generic
+                    yield inputLocator.fill(String(value));
+                }
+            }
+            logDebug('Fill operation completed');
+        });
         return smart;
     };
     const _applyFilters = (baseRows, filters, map, exact) => {
@@ -92,8 +205,9 @@ const useTable = (rootLocator, configOptions = {}) => {
         const page = rootLocator.page();
         for (const [colName, value] of Object.entries(filters)) {
             const colIndex = map.get(colName);
-            if (colIndex === undefined)
-                throw new Error(`Column '${colName}' not found.`);
+            if (colIndex === undefined) {
+                throw _createColumnError(colName, map, 'in filter');
+            }
             const filterVal = typeof value === 'number' ? String(value) : value;
             const cellTemplate = resolve(config.cellSelector, page);
             filtered = filtered.filter({
@@ -113,8 +227,26 @@ const useTable = (rootLocator, configOptions = {}) => {
             const matchedRows = _applyFilters(allRows, filters, map, options.exact || false);
             const count = yield matchedRows.count();
             logDebug(`Page ${currentPage}: Found ${count} matches.`);
-            if (count > 1)
-                throw new Error(`Strict Mode Violation: Found ${count} rows matching ${JSON.stringify(filters)}.`);
+            if (count > 1) {
+                // Try to get sample row data to help user identify the issue
+                const sampleData = [];
+                try {
+                    const firstFewRows = yield matchedRows.all();
+                    const sampleCount = Math.min(firstFewRows.length, 3);
+                    for (let i = 0; i < sampleCount; i++) {
+                        const rowData = yield _makeSmart(firstFewRows[i], map).toJSON();
+                        sampleData.push(JSON.stringify(rowData));
+                    }
+                }
+                catch (e) {
+                    // If we can't extract sample data, that's okay - continue without it
+                }
+                const sampleMsg = sampleData.length > 0
+                    ? `\nSample matching rows:\n${sampleData.map((d, i) => `  ${i + 1}. ${d}`).join('\n')}`
+                    : '';
+                throw new Error(`Strict Mode Violation: Found ${count} rows matching ${JSON.stringify(filters)} on page ${currentPage}. ` +
+                    `Expected exactly one match. Try adding more filters to make your query unique.${sampleMsg}`);
+            }
             if (count === 1)
                 return matchedRows.first();
             if (currentPage < effectiveMaxPages) {
@@ -187,7 +319,7 @@ const useTable = (rootLocator, configOptions = {}) => {
             const map = yield _getMap();
             const idx = map.get(columnName);
             if (idx === undefined)
-                throw new Error(`Column '${columnName}' not found.`);
+                throw _createColumnError(columnName, map, 'header cell');
             return resolve(config.headerSelector, rootLocator).nth(idx);
         }),
         reset: () => __awaiter(void 0, void 0, void 0, function* () {
@@ -208,7 +340,7 @@ const useTable = (rootLocator, configOptions = {}) => {
             const map = yield _getMap();
             const colIdx = map.get(column);
             if (colIdx === undefined)
-                throw new Error(`Column '${column}' not found.`);
+                throw _createColumnError(column, map);
             const mapper = (_a = options === null || options === void 0 ? void 0 : options.mapper) !== null && _a !== void 0 ? _a : ((c) => c.innerText());
             const effectiveMaxPages = (_b = options === null || options === void 0 ? void 0 : options.maxPages) !== null && _b !== void 0 ? _b : config.maxPages;
             let currentPage = 1;

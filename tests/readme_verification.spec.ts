@@ -8,12 +8,12 @@ test.describe('README.md Examples Verification', () => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
 
     // #region quick-start
+    // Example from: https://datatables.net/examples/data_sources/dom
     const table = useTable(page.locator('#example'), {
       headerSelector: 'thead th' // Override for this specific site
     });
 
-    // 🪄 Finds the row with Name="Airi Satou", then gets the Position cell.
-    // If Airi is on Page 2, it handles pagination automatically.
+    // Find the row with Name="Airi Satou", then get the Position cell
     const row = await table.getByRow({ Name: 'Airi Satou' });
 
     await expect(row.getCell('Position')).toHaveText('Accountant');
@@ -25,14 +25,15 @@ test.describe('README.md Examples Verification', () => {
     const table = useTable(page.locator('#example'), { headerSelector: 'thead th' });
 
     // #region smart-row
-    // 1. Get SmartRow via getByRow
+    // Example from: https://datatables.net/examples/data_sources/dom
+    
+    // Get SmartRow via getByRow
     const row = await table.getByRow({ Name: 'Airi Satou' });
 
-    // 2. Interact with cell
-    // ✅ Good: Resilient to column reordering
+    // Interact with cell using column name (resilient to column reordering)
     await row.getCell('Position').click();
 
-    // 3. Dump data from row
+    // Extract row data as JSON
     const data = await row.toJSON();
     console.log(data);
     // { Name: "Airi Satou", Position: "Accountant", ... }
@@ -46,6 +47,7 @@ test.describe('README.md Examples Verification', () => {
     await page.waitForSelector('#example_wrapper');
 
     // #region pagination
+    // Example from: https://datatables.net/examples/data_sources/dom
     const table = useTable(page.locator('#example'), {
       rowSelector: 'tbody tr',
       headerSelector: 'thead th',
@@ -70,6 +72,7 @@ test.describe('README.md Examples Verification', () => {
     const table = useTable(page.locator('#example'), { headerSelector: 'thead th' });
 
     // #region get-by-row
+    // Example from: https://datatables.net/examples/data_sources/dom
     // Find a row where Name is "Airi Satou" AND Office is "Tokyo"
     const row = await table.getByRow({ Name: "Airi Satou", Office: "Tokyo" });
     await expect(row).toBeVisible();
@@ -84,6 +87,7 @@ test.describe('README.md Examples Verification', () => {
     const table = useTable(page.locator('#example'), { headerSelector: 'thead th' });
 
     // #region get-all-rows
+    // Example from: https://datatables.net/examples/data_sources/dom
     // 1. Get ALL rows on the current page
     const allRows = await table.getAllRows();
     expect(allRows.length).toBeGreaterThan(0);
@@ -106,6 +110,7 @@ test.describe('README.md Examples Verification', () => {
     await page.goto('https://mui.com/material-ui/react-table/');
     
     // #region header-transformer
+    // Example from: https://mui.com/material-ui/react-table/
     const table = useTable(page.locator('.MuiDataGrid-root').first(), {
       rowSelector: '.MuiDataGrid-row',
       headerSelector: '.MuiDataGrid-columnHeader',
@@ -138,6 +143,7 @@ test.describe('README.md Examples Verification', () => {
     await page.goto('https://the-internet.herokuapp.com/tables');
     
     // #region header-transformer-normalize
+    // Example from: https://the-internet.herokuapp.com/tables
     const table = useTable(page.locator('#table1'), {
       // Normalize column names: remove extra spaces, handle inconsistent casing
       headerTransformer: ({ text }) => {
@@ -157,6 +163,7 @@ test.describe('README.md Examples Verification', () => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
     
     // #region advanced-debug
+    // Example from: https://datatables.net/examples/data_sources/dom
     const table = useTable(page.locator('#example'), {
       headerSelector: 'thead th',
       debug: true // Enables verbose logging of internal operations
@@ -178,6 +185,7 @@ test.describe('README.md Examples Verification', () => {
     });
     
     // #region advanced-reset
+    // Example from: https://datatables.net/examples/data_sources/dom
     // Navigate deep into the table by searching for a row on a later page
     try {
       await table.getByRow({ Name: 'Angelica Ramos' });
@@ -197,6 +205,7 @@ test.describe('README.md Examples Verification', () => {
     const table = useTable(page.locator('#example'), { headerSelector: 'thead th' });
 
     // #region advanced-column-scan
+    // Example from: https://datatables.net/examples/data_sources/dom
     // Quickly grab all text values from the "Office" column
     const offices = await table.getColumnValues('Office'); 
     expect(offices).toContain('Tokyo');
@@ -250,5 +259,127 @@ test.describe('README.md Examples Verification', () => {
     
     expect(exactMatches.length).toBeGreaterThan(0);
     // #endregion get-all-rows-exact
+  });
+
+  test('fill: Intelligent Row Data Entry', async ({ page }) => {
+    // Create a test table with editable inputs
+    await page.setContent(`
+      <table id="editable-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Name</th>
+            <th>Status</th>
+            <th>Active</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>1</td>
+            <td><input type="text" value="John Doe" /></td>
+            <td>
+              <select>
+                <option value="Pending">Pending</option>
+                <option value="Active" selected>Active</option>
+                <option value="Inactive">Inactive</option>
+              </select>
+            </td>
+            <td><input type="checkbox" checked /></td>
+            <td><textarea>Initial notes</textarea></td>
+          </tr>
+          <tr>
+            <td>2</td>
+            <td><input type="text" value="Jane Smith" /></td>
+            <td>
+              <select>
+                <option value="Pending" selected>Pending</option>
+                <option value="Active">Active</option>
+                <option value="Inactive">Inactive</option>
+              </select>
+            </td>
+            <td><input type="checkbox" /></td>
+            <td><textarea>Another row</textarea></td>
+          </tr>
+        </tbody>
+      </table>
+    `);
+
+    const table = useTable(page.locator('#editable-table'));
+
+    // #region fill-basic
+    // Find a row and fill it with new data
+    const row = await table.getByRow({ ID: '1' });
+    
+    await row.fill({
+      Name: 'John Updated',
+      Status: 'Inactive',
+      Active: false,
+      Notes: 'Updated notes here'
+    });
+
+    // Verify the values were filled correctly
+    await expect(row.getCell('Name').locator('input')).toHaveValue('John Updated');
+    await expect(row.getCell('Status').locator('select')).toHaveValue('Inactive');
+    await expect(row.getCell('Active').locator('input[type="checkbox"]')).not.toBeChecked();
+    await expect(row.getCell('Notes').locator('textarea')).toHaveValue('Updated notes here');
+    // #endregion fill-basic
+  });
+
+  test('fill: With Custom Input Mappers', async ({ page }) => {
+    // Create a test table with custom input structure
+    await page.setContent(`
+      <table id="custom-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Name</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>1</td>
+            <td>
+              <div class="cell-wrapper">
+                <input type="text" class="primary-input" value="John" />
+                <button>Edit</button>
+              </div>
+            </td>
+            <td>
+              <div class="custom-select">
+                <select>
+                  <option value="Active" selected>Active</option>
+                  <option value="Inactive">Inactive</option>
+                </select>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    `);
+
+    const table = useTable(page.locator('#custom-table'));
+
+    // #region fill-custom-mappers
+    const row = await table.getByRow({ ID: '1' });
+    
+    // Use custom input mappers for specific columns
+    await row.fill({
+      Name: 'John Updated',
+      Status: 'Inactive'
+    }, {
+      inputMappers: {
+        // Name column has multiple inputs - target the primary one
+        Name: (cell) => cell.locator('.primary-input'),
+        // Status uses standard select, but we could customize if needed
+        Status: (cell) => cell.locator('select')
+      }
+    });
+
+    // Verify the values
+    await expect(row.getCell('Name').locator('.primary-input')).toHaveValue('John Updated');
+    await expect(row.getCell('Status').locator('select')).toHaveValue('Inactive');
+    // #endregion fill-custom-mappers
   });
 });
