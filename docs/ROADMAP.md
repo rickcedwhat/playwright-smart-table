@@ -98,6 +98,42 @@ while (page <= options.maxPages) {
 
 ---
 
+### Table Scraping with Deduplication
+
+**Priority**: Low  
+**Status**: Planned  
+**Target Version**: v2.3+
+
+**Goal**: Scrape table data row-by-row while scrolling, handling deduplication when new data loads dynamically.
+
+**Description**:  
+When scrolling through a table that loads new data dynamically (infinite scroll, virtual scrolling), rows may appear multiple times as new content loads. A scraping method that deduplicates data based on a unique identifier would handle this scenario.
+
+**Use Cases**:
+- Scraping all rows from a dynamically loading table
+- Data extraction from virtualized tables
+- Handling tables where rows can appear multiple times during scroll
+
+**Proposed API** (tentative):
+```typescript
+const allData = await table.scrapeAllRows({
+  uniqueKey: 'ID', // Column to use for deduplication
+  maxPages: 100,
+  onScroll: async () => {
+    // Optional: custom scroll behavior
+  }
+});
+// Returns: Array of unique row data objects
+```
+
+**Implementation Notes**:
+- Need to track seen unique keys to avoid duplicates
+- Should work with infinite scroll strategies
+- May need custom scroll behavior for row-by-row scrolling
+- Consider performance implications for large datasets
+
+---
+
 ## Version History
 
 - **v2.2.0** (Current): Added `fill()` method to SmartRow for intelligent row data entry, enhanced error messages with suggestions and context

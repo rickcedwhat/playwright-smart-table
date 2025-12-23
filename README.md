@@ -513,7 +513,7 @@ await table.generateStrategyPrompt({ output: 'console' });
 export interface PromptOptions {
   /**
    * Output Strategy:
-   * - 'error': Throws an error with the prompt (Best for Cloud/QA Wolf to get clean text).
+   * - 'error': Throws an error with the prompt (useful for platforms that capture error output cleanly).
    * - 'console': Standard console logs (Default).
    */
   output?: 'console' | 'error';
