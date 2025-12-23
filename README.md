@@ -1,20 +1,22 @@
-Playwright Smart Table 🧠
+# Playwright Smart Table 🧠
 
-A production-ready, type-safe table wrapper for Playwright.
+A production-ready, type-safe table wrapper for Playwright that abstracts away the complexity of testing dynamic web tables. Handles pagination, infinite scroll, virtualization, and data grids (MUI, AG-Grid) so your tests remain clean and readable.
 
-This library abstracts away the complexity of testing dynamic web tables. It handles Pagination, Infinite Scroll, Virtualization, and Data Grids (MUI, AG-Grid) so your tests remain clean and readable.
+## 📦 Installation
 
-📦 Installation
-
+```bash
 npm install @rickcedwhat/playwright-smart-table
+```
 
-Requires @playwright/test as a peer dependency.
+> **Note:** Requires `@playwright/test` as a peer dependency.
 
-⚡ Quick Start
+---
 
-The Standard HTML Table
+## 🎯 Getting Started
 
-For standard tables (<table>, <tr>, <td>), no configuration is needed (defaults work for most standard HTML tables).
+### Step 1: Basic Table Interaction
+
+For standard HTML tables (`<table>`, `<tr>`, `<td>`), the library works out of the box with sensible defaults:
 
 <!-- embed: quick-start -->
 ```typescript
@@ -30,9 +32,43 @@ await expect(row.getCell('Position')).toHaveText('Accountant');
 ```
 <!-- /embed: quick-start -->
 
-Complex Grids (Material UI / AG-Grid / Divs)
+**What's happening here?**
+- `useTable()` creates a smart table wrapper around your table locator
+- `getByRow()` finds a specific row by column values
+- The returned `SmartRow` knows its column structure, so `.getCell('Position')` works directly
 
-For modern React grids, simply override the selectors and define a pagination strategy.
+### Step 2: Understanding SmartRow
+
+The `SmartRow` is the core power of this library. Unlike a standard Playwright `Locator`, it understands your table's column structure.
+
+<!-- embed: smart-row -->
+```typescript
+// 1. Get SmartRow via getByRow
+const row = await table.getByRow({ Name: 'Airi Satou' });
+
+// 2. Interact with cell
+// ✅ Good: Resilient to column reordering
+await row.getCell('Position').click();
+
+// 3. Dump data from row
+const data = await row.toJSON();
+console.log(data);
+// { Name: "Airi Satou", Position: "Accountant", ... }
+```
+<!-- /embed: smart-row -->
+
+**Key Benefits:**
+- ✅ Column names instead of indices (survives column reordering)
+- ✅ Extends Playwright's `Locator` API (all `.click()`, `.isVisible()`, etc. work)
+- ✅ `.toJSON()` for quick data extraction
+
+---
+
+## 🔧 Configuration & Advanced Scenarios
+
+### Working with Paginated Tables
+
+For tables that span multiple pages, configure a pagination strategy:
 
 <!-- embed: pagination -->
 ```typescript
@@ -55,83 +91,131 @@ await expect(await table.getByRow({ Name: "Colleen Hurst" })).toBeVisible();
 ```
 <!-- /embed: pagination -->
 
-🧠 SmartRow Pattern
+### Debug Mode
 
-The core power of this library is the SmartRow.
-
-Unlike a standard Playwright Locator, a SmartRow is aware of its context within the table's schema. It extends the standard Locator API, so you can chain standard Playwright methods (.click(), .isVisible()) directly off it.
-
-<!-- embed: smart-row -->
-```typescript
-// 1. Get SmartRow via getByRow
-const row = await table.getByRow({ Name: 'Airi Satou' });
-
-// 2. Interact with cell (No more getByCell needed!)
-// ✅ Good: Resilient to column reordering
-await row.getCell('Position').click();
-
-// 3. Dump data from row
-const data = await row.toJSON();
-console.log(data);
-// { Name: "Airi Satou", Position: "Accountant", ... }
-```
-<!-- /embed: smart-row -->
-
-🚀 Advanced Usage
-
-🔎 Debug Mode
-
-Having trouble finding rows? Enable debug mode to see exactly what the library sees (headers mapped, rows scanned, pagination triggers).
+Enable debug logging to see exactly what the library is doing:
 
 <!-- embed: advanced-debug -->
 ```typescript
 const table = useTable(page.locator('#example'), {
   headerSelector: 'thead th',
-  debug: true 
+  debug: true // Enables verbose logging of internal operations
 });
+
+const row = await table.getByRow({ Name: 'Airi Satou' });
+await expect(row).toBeVisible();
 ```
 <!-- /embed: advanced-debug -->
 
-🔄 Resetting State
+This will log header mappings, row scans, and pagination triggers to help troubleshoot issues.
 
-If your tests navigate deep into a table (e.g., Page 5), subsequent searches might fail. Use .reset() to return to the start.
+### Resetting Table State
+
+If your tests navigate deep into a paginated table, use `.reset()` to return to the first page:
 
 <!-- embed: advanced-reset -->
 ```typescript
-// Navigate deep into the table (simulated by finding a row on page 2)
-// For the test to pass, we need a valid row. 'Angelica Ramos' is usually on page 1 or 2 depending on sorting.
+// Navigate deep into the table by searching for a row on a later page
 try {
   await table.getByRow({ Name: 'Angelica Ramos' });
 } catch (e) {}
 
 // Reset internal state (and potentially UI) to Page 1
 await table.reset();
+
+// Now subsequent searches start from the beginning
+const firstPageRow = await table.getByRow({ Name: 'Airi Satou' });
+await expect(firstPageRow).toBeVisible();
 ```
 <!-- /embed: advanced-reset -->
 
-📊 Column Scanning
+### Column Scanning
 
-Need to verify a specific column is sorted or contains specific data? Use getColumnValues for a high-performance scan.
+Efficiently extract all values from a specific column:
 
 <!-- embed: advanced-column-scan -->
 ```typescript
 // Quickly grab all text values from the "Office" column
 const offices = await table.getColumnValues('Office'); 
 expect(offices).toContain('Tokyo');
+expect(offices.length).toBeGreaterThan(0);
 ```
 <!-- /embed: advanced-column-scan -->
 
-📖 API Reference
+### Transforming Column Headers
 
-getByRow(filters, options?)
+Use `headerTransformer` to normalize or rename column headers. This is especially useful for tables with empty headers, inconsistent formatting, or when you want to use cleaner names in your tests.
 
-Strict Retrieval. Finds a single specific row.
+**Example 1: Renaming Empty Columns**
 
-Throws Error if >1 rows match (ambiguous query).
+Tables with empty header cells (like Material UI DataGrids) get auto-assigned names like `__col_0`, `__col_1`. Transform them to meaningful names:
 
-Returns Sentinel if 0 rows match (allows not.toBeVisible() assertions).
+<!-- embed: header-transformer -->
+```typescript
+const table = useTable(page.locator('.MuiDataGrid-root').first(), {
+  rowSelector: '.MuiDataGrid-row',
+  headerSelector: '.MuiDataGrid-columnHeader',
+  cellSelector: '.MuiDataGrid-cell',
+  pagination: TableStrategies.clickNext(
+    (root) => root.getByRole("button", { name: "Go to next page" })
+  ),
+  maxPages: 5,
+  // Transform empty columns (detected as __col_0, __col_1, etc.) to meaningful names
+  headerTransformer: ({ text }) => {
+    // We know there is only one empty column which we will rename to "Actions" for easier reference
+    if (text.includes('__col_') || text.trim() === '') {
+      return 'Actions';
+    }
+    return text;
+  }
+});
 
-Auto-Paginates if the row isn't found on the current page.
+const headers = await table.getHeaders();
+// Now we can reference the "Actions" column even if it has no header text
+expect(headers).toContain('Actions');
+
+// Use the renamed column
+const row = await table.getByRow({ "Last name": "Melisandre" });
+await row.getCell('Actions').getByLabel("Select row").click();
+```
+<!-- /embed: header-transformer -->
+
+**Example 2: Normalizing Column Names**
+
+Clean up inconsistent column names (extra spaces, inconsistent casing):
+
+<!-- embed: header-transformer-normalize -->
+```typescript
+const table = useTable(page.locator('#table1'), {
+  // Normalize column names: remove extra spaces, handle inconsistent casing
+  headerTransformer: ({ text }) => {
+    return text.trim()
+      .replace(/\s+/g, ' ')  // Normalize whitespace
+      .replace(/^\s*|\s*$/g, ''); // Remove leading/trailing spaces
+  }
+});
+
+// Now column names are consistent
+const row = await table.getByRow({ "Last Name": "Doe" });
+await expect(row.getCell("Email")).toHaveText("jdoe@hotmail.com");
+```
+<!-- /embed: header-transformer-normalize -->
+
+---
+
+## 📖 API Reference
+
+### Table Methods
+
+#### <a name="getbyrow"></a>`getByRow(filters, options?)`
+
+**Purpose:** Strict retrieval - finds exactly one row matching the filters.
+
+**Behavior:**
+- ✅ Returns `SmartRow` if exactly one match
+- ❌ Throws error if multiple matches (ambiguous query)
+- 👻 Returns sentinel locator if no match (allows `.not.toBeVisible()` assertions)
+- 🔄 Auto-paginates if row isn't on current page
 
 <!-- embed: get-by-row -->
 ```typescript
@@ -144,18 +228,49 @@ await expect(await table.getByRow({ Name: "Ghost User" })).not.toBeVisible();
 ```
 <!-- /embed: get-by-row -->
 
-getAllRows(options?)
+**Type Signature:**
+<!-- embed-type: TableResult -->
+```typescript
+export interface TableResult {
+  getHeaders: () => Promise<string[]>;
+  getHeaderCell: (columnName: string) => Promise<Locator>;
 
-Inclusive Retrieval. Gets a collection of rows.
+  getByRow: <T extends { asJSON?: boolean }>(
+    filters: Record<string, string | RegExp | number>, 
+    options?: { exact?: boolean, maxPages?: number } & T
+  ) => Promise<T['asJSON'] extends true ? Record<string, string> : SmartRow>;
 
-Returns: Array of SmartRow objects.
+  getAllRows: <T extends { asJSON?: boolean }>(
+    options?: { filter?: Record<string, any>, exact?: boolean } & T
+  ) => Promise<T['asJSON'] extends true ? Record<string, string>[] : SmartRow[]>;
 
-Best for: Checking existence ("at least one") or validating sort order.
+  generateConfigPrompt: (options?: PromptOptions) => Promise<void>;
+  generateStrategyPrompt: (options?: PromptOptions) => Promise<void>;
+
+  /**
+   * Resets the table state (clears cache, flags) and invokes the onReset strategy.
+   */
+  reset: () => Promise<void>;
+
+  /**
+   * Scans a specific column across all pages and returns the values.
+   */
+  getColumnValues: <V = string>(column: string, options?: { mapper?: (cell: Locator) => Promise<V> | V, maxPages?: number }) => Promise<V[]>;
+}
+```
+<!-- /embed-type: TableResult -->
+
+#### <a name="getallrows"></a>`getAllRows(options?)`
+
+**Purpose:** Inclusive retrieval - gets all rows matching optional filters.
+
+**Best for:** Checking existence, validating sort order, bulk data extraction.
 
 <!-- embed: get-all-rows -->
 ```typescript
 // 1. Get ALL rows on the current page
 const allRows = await table.getAllRows();
+expect(allRows.length).toBeGreaterThan(0);
 
 // 2. Get subset of rows (Filtering)
 const tokyoUsers = await table.getAllRows({
@@ -166,40 +281,278 @@ expect(tokyoUsers.length).toBeGreaterThan(0);
 // 3. Dump data to JSON
 const data = await table.getAllRows({ asJSON: true });
 console.log(data); // [{ Name: "Airi Satou", ... }, ...]
+expect(data.length).toBeGreaterThan(0);
+expect(data[0]).toHaveProperty('Name');
 ```
 <!-- /embed: get-all-rows -->
 
-🧩 Pagination Strategies
+#### <a name="getcolumnvalues"></a>`getColumnValues(column, options?)`
 
-This library uses the Strategy Pattern to handle navigation. You can use the built-in strategies or write your own.
+Scans a specific column across all pages and returns values. Supports custom mappers for extracting non-text data.
 
-Built-in Strategies
+**Additional Examples:**
 
-clickNext(selector) Best for standard tables (Datatables, lists). Clicks a button and waits for data to change.
+Get row data as JSON:
+<!-- embed: get-by-row-json -->
+```typescript
+// Get row data directly as JSON object
+const data = await table.getByRow({ Name: 'Airi Satou' }, { asJSON: true });
+// Returns: { Name: "Airi Satou", Position: "Accountant", Office: "Tokyo", ... }
 
+expect(data).toHaveProperty('Name', 'Airi Satou');
+expect(data).toHaveProperty('Position');
+```
+<!-- /embed: get-by-row-json -->
+
+Filter rows with exact match:
+<!-- embed: get-all-rows-exact -->
+```typescript
+// Get rows with exact match (default is fuzzy/contains match)
+const exactMatches = await table.getAllRows({
+  filter: { Office: 'Tokyo' },
+  exact: true // Requires exact string match
+});
+
+expect(exactMatches.length).toBeGreaterThan(0);
+```
+<!-- /embed: get-all-rows-exact -->
+
+Column scanning with custom mapper:
+<!-- embed: advanced-column-scan-mapper -->
+```typescript
+// Extract numeric values from a column
+const ages = await table.getColumnValues('Age', {
+  mapper: async (cell) => {
+    const text = await cell.innerText();
+    return parseInt(text, 10);
+  }
+});
+
+// Now ages is an array of numbers
+expect(ages.every(age => typeof age === 'number')).toBe(true);
+expect(ages.length).toBeGreaterThan(0);
+```
+<!-- /embed: advanced-column-scan-mapper -->
+
+#### <a name="reset"></a>`reset()`
+
+Resets table state (clears cache, pagination flags) and invokes the `onReset` strategy to return to the first page.
+
+#### <a name="getheaders"></a>`getHeaders()`
+
+Returns an array of all column names in the table.
+
+#### <a name="getheadercell"></a>`getHeaderCell(columnName)`
+
+Returns a Playwright `Locator` for the specified header cell.
+
+---
+
+## 🧩 Pagination Strategies
+
+This library uses the **Strategy Pattern** for pagination. Use built-in strategies or write custom ones.
+
+### Built-in Strategies
+
+#### <a name="tablestrategiesclicknext"></a>`TableStrategies.clickNext(selector)`
+
+Best for standard paginated tables (Datatables, lists). Clicks a button/link and waits for table content to change.
+
+```typescript
 pagination: TableStrategies.clickNext((root) =>
-root.page().getByRole('button', { name: 'Next' })
+  root.page().getByRole('button', { name: 'Next' })
 )
+```
 
-infiniteScroll() Best for Virtualized Grids (AG-Grid, HTMX). Aggressively scrolls to trigger data loading.
+#### <a name="tablestrategiesinfinitescroll"></a>`TableStrategies.infiniteScroll()`
 
+Best for virtualized grids (AG-Grid, HTMX). Aggressively scrolls to trigger data loading.
+
+```typescript
 pagination: TableStrategies.infiniteScroll()
+```
 
-clickLoadMore(selector) Best for "Load More" buttons. Clicks and waits for row count to increase.
+#### <a name="tablestrategiesclickloadmore"></a>`TableStrategies.clickLoadMore(selector)`
 
-🛠️ Developer Tools
+Best for "Load More" buttons. Clicks and waits for row count to increase.
 
-Don't waste time writing selectors manually. Use the generator tools to create your config.
+```typescript
+pagination: TableStrategies.clickLoadMore((root) =>
+  root.getByRole('button', { name: 'Load More' })
+)
+```
 
-generateConfigPrompt(options?)
+### Custom Strategies
 
-Prints a prompt you can paste into ChatGPT/Gemini to generate the TableConfig for your specific HTML.
+A pagination strategy is a function that receives a `TableContext` and returns `Promise<boolean>` (true if more data loaded, false if no more pages):
 
-// Options: 'console' (default), 'error' (Throw error to see prompt in trace/cloud)
+<!-- embed-type: PaginationStrategy -->
+```typescript
+export type PaginationStrategy = (context: TableContext) => Promise<boolean>;
+```
+<!-- /embed-type: PaginationStrategy -->
+
+<!-- embed-type: TableContext -->
+```typescript
+export interface TableContext {
+  root: Locator;
+  config: Required<TableConfig>;
+  page: Page;
+  resolve: (selector: Selector, parent: Locator | Page) => Locator;
+}
+```
+<!-- /embed-type: TableContext -->
+
+---
+
+## 🛠️ Developer Tools
+
+### <a name="generateconfigprompt"></a>`generateConfigPrompt(options?)`
+
+Generates a prompt you can paste into ChatGPT/Gemini to automatically generate the `TableConfig` for your specific HTML.
+
+```typescript
 await table.generateConfigPrompt({ output: 'console' });
+```
 
-generateStrategyPrompt(options?)
+### <a name="generatestrategyprompt"></a>`generateStrategyPrompt(options?)`
 
-Prints a prompt to help you write a custom Pagination Strategy.
+Generates a prompt to help you write a custom pagination strategy.
 
+```typescript
 await table.generateStrategyPrompt({ output: 'console' });
+```
+
+**Options:**
+<!-- embed-type: PromptOptions -->
+```typescript
+export interface PromptOptions {
+  /**
+   * Output Strategy:
+   * - 'error': Throws an error with the prompt (Best for Cloud/QA Wolf to get clean text).
+   * - 'console': Standard console logs (Default).
+   */
+  output?: 'console' | 'error';
+  includeTypes?: boolean;
+}
+```
+<!-- /embed-type: PromptOptions -->
+
+---
+
+## 📚 Type Reference
+
+### Core Types
+
+#### <a name="smartrow"></a>`SmartRow`
+
+A `SmartRow` extends Playwright's `Locator` with table-aware methods.
+
+<!-- embed-type: SmartRow -->
+```typescript
+export type SmartRow = Locator & {
+  getCell(column: string): Locator;
+  toJSON(): Promise<Record<string, string>>;
+};
+```
+<!-- /embed-type: SmartRow -->
+
+**Methods:**
+- `getCell(column: string)`: Returns a `Locator` for the specified cell in this row
+- `toJSON()`: Extracts all cell data as a key-value object
+
+All standard Playwright `Locator` methods (`.click()`, `.isVisible()`, `.textContent()`, etc.) are also available.
+
+#### <a name="tableconfig"></a>`TableConfig`
+
+Configuration options for `useTable()`.
+
+<!-- embed-type: TableConfig -->
+```typescript
+export interface TableConfig {
+  rowSelector?: Selector;
+  headerSelector?: Selector;
+  cellSelector?: Selector;
+  pagination?: PaginationStrategy;
+  maxPages?: number;
+  /**
+   * Hook to rename columns dynamically.
+   * * @param args.text - The default innerText of the header.
+   * @param args.index - The column index.
+   * @param args.locator - The specific header cell locator.
+   */
+  headerTransformer?: (args: { text: string, index: number, locator: Locator }) => string | Promise<string>;
+  autoScroll?: boolean;
+  /**
+   * Enable debug mode to log internal state to console.
+   */
+  debug?: boolean;
+  /**
+   * Strategy to reset the table to the first page.
+   * Called when table.reset() is invoked.
+   */
+  onReset?: (context: TableContext) => Promise<void>;
+}
+```
+<!-- /embed-type: TableConfig -->
+
+**Property Descriptions:**
+
+- `rowSelector`: CSS selector or function for table rows (default: `"tbody tr"`)
+- `headerSelector`: CSS selector or function for header cells (default: `"th"`)
+- `cellSelector`: CSS selector or function for data cells (default: `"td"`)
+- `pagination`: Strategy function for navigating pages (default: no pagination)
+- `maxPages`: Maximum pages to scan when searching (default: `1`)
+- `headerTransformer`: Function to transform/rename column headers dynamically
+- `autoScroll`: Automatically scroll table into view (default: `true`)
+- `debug`: Enable verbose logging (default: `false`)
+- `onReset`: Strategy called when `table.reset()` is invoked
+
+#### <a name="selector"></a>`Selector`
+
+Flexible selector type supporting strings, functions, or existing locators.
+
+<!-- embed-type: Selector -->
+```typescript
+export type Selector = string | ((root: Locator | Page) => Locator);
+```
+<!-- /embed-type: Selector -->
+
+**Examples:**
+```typescript
+// String selector
+rowSelector: 'tbody tr'
+
+// Function selector (useful for complex cases)
+rowSelector: (root) => root.locator('[role="row"]')
+
+// Can also accept a Locator directly
+```
+
+#### <a name="paginationstrategy"></a>`PaginationStrategy`
+
+Function signature for custom pagination logic.
+
+<!-- embed-type: PaginationStrategy -->
+```typescript
+export type PaginationStrategy = (context: TableContext) => Promise<boolean>;
+```
+<!-- /embed-type: PaginationStrategy -->
+
+Returns `true` if more data was loaded, `false` if pagination should stop.
+
+---
+
+## 🚀 Tips & Best Practices
+
+1. **Start Simple**: Try the defaults first - they work for most standard HTML tables
+2. **Use Debug Mode**: When troubleshooting, enable `debug: true` to see what the library is doing
+3. **Leverage SmartRow**: Use `.getCell()` instead of manual column indices - your tests will be more maintainable
+4. **Type Safety**: All methods are fully typed - use TypeScript for the best experience
+5. **Pagination Strategies**: Create reusable strategies for tables with similar pagination patterns
+
+---
+
+## 📝 License
+
+ISC
