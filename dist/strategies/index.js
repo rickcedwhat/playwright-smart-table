@@ -13,7 +13,7 @@ exports.TableStrategies = void 0;
 /**
  * Internal helper to wait for a condition to be met.
  * Replaces the dependency on 'expect(...).toPass()' to ensure compatibility
- * with environments like QA Wolf where 'expect' is not globally available.
+ * with environments where 'expect' is not globally available.
  */
 const waitForCondition = (predicate, timeout, page // Context page for pauses
 ) => __awaiter(void 0, void 0, void 0, function* () {

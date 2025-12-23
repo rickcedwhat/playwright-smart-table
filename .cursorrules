@@ -16,6 +16,30 @@ Sentinel Rows: Returns a sentinel locator if a row isn't found, enabling expect(
 
 Tech Stack: TypeScript, Playwright Test, Node.js (commonjs).
 
+User Context & Real-World Usage
+
+Primary User: The maintainer is the main user of this library, actively using it in production test automation.
+
+Key Constraints:
+- Code must work without direct access to `test` context (executes inside test blocks).
+- `playwright/test` is an optional peer dependency to support various execution environments.
+- Code should follow AAA pattern (Arrange-Act-Assert) for clarity and maintainability.
+
+Development Philosophy:
+- Features are driven by real-world use cases encountered in production testing.
+- The library is battle-tested across multiple projects with different table structures and frameworks.
+- New features are added iteratively as use cases are discovered in practice.
+- Practicality and reliability are prioritized over theoretical completeness.
+- APIs are designed to prevent accidental breaking changes when code is edited by others.
+
+When suggesting features or changes:
+- Consider real-world table testing scenarios across different projects and frameworks.
+- Prioritize features that solve actual pain points encountered in production workflows.
+- Think about how features will be used in production test automation environments.
+- Keep the API simple and intuitive for day-to-day testing workflows.
+- Ensure implementations are robust and maintainable.
+- Consider use cases like table scraping with deduplication (see roadmap).
+
 Response Protocols
 
 Conversation Initialization:

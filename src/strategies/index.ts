@@ -4,7 +4,7 @@ import { PaginationStrategy, Selector, TableContext } from '../types';
 /**
  * Internal helper to wait for a condition to be met.
  * Replaces the dependency on 'expect(...).toPass()' to ensure compatibility
- * with environments like QA Wolf where 'expect' is not globally available.
+ * with environments where 'expect' is not globally available.
  */
 const waitForCondition = async (
   predicate: () => Promise<boolean>, 
