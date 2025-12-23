@@ -323,42 +323,5 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
       const content = `\n==================================================\n🤖 COPY INTO GEMINI/ChatGPT TO WRITE A STRATEGY 🤖\n==================================================\nI need a custom Pagination Strategy for 'playwright-smart-table'.\nContainer HTML:\n\`\`\`html\n${html.substring(0, 10000)} ...\n\`\`\`\n`;
       await _handlePrompt('Smart Table Strategy', content, options);
     },
-
-    /* * 🚧 ROADMAP (v2.2) 🚧 
-     * The following features are planned. Implementations are tentative.
-     * DO NOT DELETE THIS SECTION UNTIL IMPLEMENTED OR REMOVED.
-     * THIS IS BEING USED TO TRACK FUTURE DEVELOPMENT.
-     */
-    
-    // __roadmap__fill: async (data: Record<string, any>) => {
-    //   /* //    * Goal: Fill a row with data intelligently.
-    //    * Priority: Medium
-    //    * Challenge: Handling different input types (select, checkbox, custom divs) blindly.
-    //    */
-    //    // const row = ... get row context ...
-    //    // for (const [col, val] of Object.entries(data)) {
-    //    //    const cell = row.getCell(col);
-    //    //    const input = cell.locator('input, select, [role="checkbox"]');
-    //    //    if (await input.count() > 1) console.warn("Ambiguous input");
-    //    //    // Heuristics go here...
-    //    // }
-    //    // Note: Maybe we could pass the locator in the options for more control.
-    // },
-
-    // __roadmap__auditPages: async (options: { maxPages: number, audit: (rows: SmartRow[], page: number) => Promise<void> }) => {
-    //   /*
-    //    * Goal: Walk through pages and run a verification function on every page.
-    //    * Priority: Low (Specific use case)
-    //    * Logic:
-    //    * let page = 1;
-    //    * while (page <= options.maxPages) {
-    //    * const rows = await getAllRows();
-    //    * await options.audit(rows, page);
-    //    * if (!await pagination(ctx)) break;
-    //    * page++;
-    //    * }
-    //    */
-    //    // Note: Maybe make is possible to skip several pages at once if the pagination strategy supports it.
-    // }
   };
 };

@@ -21,12 +21,6 @@ Response Protocols
 Conversation Initialization:
 At the very start of every new conversation (first message only), output this banner:
 
-====== 🧠 Smart Table Helper [v2.1.2] ======
-Commands:
-* /update-gem : Generate fresh system instructions based on current context.
-=============================================
-
-
 Commands:
 /update-gem: When invoked, you must generate a full, updated System Prompt (Role, Context, Guidelines, Knowledge Base) based on the library's current state.
 
