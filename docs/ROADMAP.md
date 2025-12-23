@@ -11,8 +11,8 @@ This document tracks planned features and enhancements for the Smart Table libra
 ### `fill` - Intelligent Row Data Entry
 
 **Priority**: Medium  
-**Status**: Planned  
-**Target Version**: v2.2+
+**Status**: ✅ Implemented in v2.2.0  
+**Target Version**: v2.2.0
 
 **Goal**: Fill a row with data intelligently, handling different input types automatically.
 
@@ -24,20 +24,28 @@ A method to populate form fields within a table row. The feature would intellige
 - Dealing with ambiguous inputs when multiple inputs exist in a cell
 - Providing flexibility for edge cases
 
-**Proposed API**:
+**API**:
 ```typescript
-await table.fill({ 
+const row = await table.getByRow({ ID: 123 });
+await row.fill({ 
   Name: 'John Doe', 
   Status: 'Active',
   IsVerified: true 
+}, {
+  inputMappers: {
+    Name: (cell) => cell.locator('input').nth(1), // Custom mapper for Name column
+    Status: (cell) => cell.locator('.custom-select'), // Custom mapper for Status column
+    // Other columns use auto-detection
+  }
 });
 ```
 
-**Implementation Notes**:
-- Could leverage `row.getCell(colName)` to find the target cell
-- Would need heuristics to determine input type: `input, select, [role="checkbox"]`
-- May need to handle ambiguous cases (multiple inputs in a cell) with warnings or options
-- Could accept a locator mapper in options for more control: `{ inputMapper: (cell) => cell.locator('custom-selector') }`
+**Implementation Details**:
+- Finds row using filters (same as `getByRow`)
+- Automatically detects input types: text inputs, selects, checkboxes, contenteditable divs
+- Handles ambiguous cases (multiple inputs in cell) by using the first match
+- Supports custom `inputMapper` option for explicit control
+- Logs warnings in debug mode when multiple inputs are detected
 
 ---
 
@@ -92,9 +100,9 @@ while (page <= options.maxPages) {
 
 ## Version History
 
-- **v2.1.3** (Current): Enhanced documentation with type references, headerTransformer examples, compatibility test suite
+- **v2.2.0** (Current): Added `fill()` method to SmartRow for intelligent row data entry, enhanced error messages with suggestions and context
+- **v2.1.3**: Enhanced documentation with type references, headerTransformer examples, compatibility test suite
 - **v2.1.2**: Core table functionality, pagination strategies, SmartRow pattern
-- **v2.2+** (Planned): New features listed above
 
 ---
 
