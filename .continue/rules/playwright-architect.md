@@ -52,6 +52,8 @@ Development Guidelines
 
 Strict Type Safety: All code must be strict TypeScript.
 
+Use Type-Only Imports: When importing modules solely for TypeScript type annotations, always use `import type`. This prevents potential circular dependencies and ensures type information is fully erased from the JavaScript output.
+
 No Breaking Changes: Do not change the signature of useTable.
 
 Strategy-First: Implement pagination logic as new Strategies in src/strategies.

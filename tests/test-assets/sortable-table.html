@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Sortable Test Table</title>
+    <style>
+        body { font-family: sans-serif; }
+        table { border-collapse: collapse; }
+        th, td { border: 1px solid #ccc; padding: 8px; }
+        th { cursor: pointer; user-select: none; background-color: #f4f4f4; }
+        th[aria-sort="ascending"]::after { content: ' ▲'; }
+        th[aria-sort="descending"]::after { content: ' ▼'; }
+    </style>
+</head>
+<body>
+
+    <h1>Sortable Table</h1>
+    <p>A test table for playwright-smart-table sorting strategies.</p>
+
+    <table id="sortable-table">
+        <thead>
+            <tr>
+                <th id="name-header" aria-sort="none">Name</th>
+                <th id="age-header" aria-sort="none">Age</th>
+                <th id="city-header">City (unsortable)</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>Charlie</td>
+                <td>35</td>
+                <td>Chicago</td>
+            </tr>
+            <tr>
+                <td>Alice</td>
+                <td>30</td>
+                <td>New York</td>
+            </tr>
+            <tr>
+                <td>Bob</td>
+                <td>25</td>
+                <td>Los Angeles</td>
+            </tr>
+        </tbody>
+    </table>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const table = document.getElementById('sortable-table');
+            const headers = table.querySelectorAll('thead th[aria-sort]');
+            const tbody = table.querySelector('tbody');
+
+            headers.forEach((header, index) => {
+                header.addEventListener('click', () => {
+                    const currentSort = header.getAttribute('aria-sort');
+                    let newSort;
+                    if (currentSort === 'none' || currentSort === 'descending') {
+                        newSort = 'ascending';
+                    } else {
+                        newSort = 'descending';
+                    }
+
+                    // Reset other headers and set the new one
+                    headers.forEach(h => h.setAttribute('aria-sort', 'none'));
+                    header.setAttribute('aria-sort', newSort);
+
+                    sortColumn(index, newSort);
+                });
+            });
+
+            function sortColumn(columnIndex, direction) {
+                const rows = Array.from(tbody.querySelectorAll('tr'));
+                const isNumeric = !isNaN(parseFloat(rows[0].children[columnIndex].textContent));
+
+                rows.sort((a, b) => {
+                    const aText = a.children[columnIndex].textContent;
+                    const bText = b.children[columnIndex].textContent;
+
+                    const valA = isNumeric ? parseFloat(aText) : aText.toLowerCase();
+                    const valB = isNumeric ? parseFloat(bText) : bText.toLowerCase();
+                    
+                    if (valA < valB) return direction === 'ascending' ? -1 : 1;
+                    if (valA > valB) return direction === 'ascending' ? 1 : -1;
+                    return 0;
+                });
+
+                // Re-append sorted rows to the tbody
+                rows.forEach(row => tbody.appendChild(row));
+            }
+        });
+    </script>
+
+</body>
+</html>
