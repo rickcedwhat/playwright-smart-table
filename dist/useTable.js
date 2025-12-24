@@ -9,8 +9,52 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.useTable = void 0;
+exports.useTable = exports.SortingStrategies = exports.TableStrategies = exports.PaginationStrategies = void 0;
 const typeContext_1 = require("./typeContext");
+const sorting_1 = require("./strategies/sorting");
+/**
+ * A collection of pre-built pagination strategies.
+ */
+exports.PaginationStrategies = {
+    /**
+     * Clicks a "Next" button.
+     * @param selector - The CSS selector for the "Next" button.
+     */
+    NextButton: (selector) => {
+        return (_a) => __awaiter(void 0, [_a], void 0, function* ({ root }) {
+            const nextButton = root.locator(selector);
+            if ((yield nextButton.isVisible()) && (yield nextButton.isEnabled())) {
+                yield nextButton.click();
+                return true;
+            }
+            return false;
+        });
+    },
+    /**
+     * Clicks numbered page links.
+     * @param selector - The CSS selector for the page number links.
+     */
+    NumberedPages: (selector) => {
+        let currentPage = 1;
+        return (_a) => __awaiter(void 0, [_a], void 0, function* ({ root }) {
+            currentPage++;
+            const pageLink = root.locator(selector).filter({ hasText: String(currentPage) });
+            if (yield pageLink.isVisible()) {
+                yield pageLink.click();
+                return true;
+            }
+            return false;
+        });
+    },
+};
+/**
+ * @deprecated Use `PaginationStrategies` instead. This alias will be removed in a future major version.
+ */
+exports.TableStrategies = exports.PaginationStrategies;
+/**
+ * A collection of pre-built sorting strategies.
+ */
+exports.SortingStrategies = sorting_1.SortingStrategies;
 const useTable = (rootLocator, configOptions = {}) => {
     const config = Object.assign({ rowSelector: "tbody tr", headerSelector: "th", cellSelector: "td", pagination: () => __awaiter(void 0, void 0, void 0, function* () { return false; }), maxPages: 1, headerTransformer: ({ text, index, locator }) => text, autoScroll: true, debug: false, onReset: () => __awaiter(void 0, void 0, void 0, function* () { console.warn("⚠️ .reset() called but no 'onReset' strategy defined in config."); }) }, configOptions);
     const resolve = (item, parent) => {
@@ -313,6 +357,34 @@ const useTable = (rootLocator, configOptions = {}) => {
             return clone.outerHTML;
         });
     });
+    const sortingNamespace = {
+        apply: (columnName, direction) => __awaiter(void 0, void 0, void 0, function* () {
+            if (!config.sorting) {
+                throw new Error('No sorting strategy has been configured. Please add a `sorting` strategy to your useTable config.');
+            }
+            logDebug(`Applying sort for column "${columnName}" (${direction})`);
+            const context = {
+                root: rootLocator,
+                config: config,
+                page: rootLocator.page(),
+                resolve: resolve
+            };
+            yield config.sorting.doSort({ columnName, direction, context });
+        }),
+        getState: (columnName) => __awaiter(void 0, void 0, void 0, function* () {
+            if (!config.sorting) {
+                throw new Error('No sorting strategy has been configured. Please add a `sorting` strategy to your useTable config.');
+            }
+            logDebug(`Getting sort state for column "${columnName}"`);
+            const context = {
+                root: rootLocator,
+                config: config,
+                page: rootLocator.page(),
+                resolve: resolve
+            };
+            return config.sorting.getSortState({ columnName, context });
+        })
+    };
     return {
         getHeaders: () => __awaiter(void 0, void 0, void 0, function* () { return Array.from((yield _getMap()).keys()); }),
         getHeaderCell: (columnName) => __awaiter(void 0, void 0, void 0, function* () {
@@ -404,6 +476,7 @@ const useTable = (rootLocator, configOptions = {}) => {
             const content = `\n==================================================\n🤖 COPY INTO GEMINI/ChatGPT TO WRITE A STRATEGY 🤖\n==================================================\nI need a custom Pagination Strategy for 'playwright-smart-table'.\nContainer HTML:\n\`\`\`html\n${html.substring(0, 10000)} ...\n\`\`\`\n`;
             yield _handlePrompt('Smart Table Strategy', content, options);
         }),
+        sorting: sortingNamespace,
     };
 };
 exports.useTable = useTable;
