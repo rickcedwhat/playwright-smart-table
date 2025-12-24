@@ -480,7 +480,7 @@ export type PaginationStrategy = (context: TableContext) => Promise<boolean>;
 ```typescript
 export interface TableContext {
   root: Locator;
-  config: Required<TableConfig>;
+  config: FinalTableConfig;
   page: Page;
   resolve: (selector: Selector, parent: Locator | Page) => Locator;
 }
@@ -563,6 +563,7 @@ export interface TableConfig {
   headerSelector?: Selector;
   cellSelector?: Selector;
   pagination?: PaginationStrategy;
+  sorting?: SortingStrategy;
   maxPages?: number;
   /**
    * Hook to rename columns dynamically.

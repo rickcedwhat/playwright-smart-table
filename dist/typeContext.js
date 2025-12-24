@@ -18,9 +18,33 @@ export type SmartRow = Omit<Locator, 'fill'> & {
   fill: (data: Record<string, any>, options?: FillOptions) => Promise<void>;
 };
 
+export type StrategyContext = TableContext;
+
+/**
+ * Defines the contract for a sorting strategy.
+ */
+export interface SortingStrategy {
+  /**
+   * Performs the sort action on a column.
+   */
+  doSort(options: {
+    columnName: string;
+    direction: 'asc' | 'desc';
+    context: StrategyContext;
+  }): Promise<void>;
+
+  /**
+   * Retrieves the current sort state of a column.
+   */
+  getSortState(options: {
+    columnName: string;
+    context: StrategyContext;
+  }): Promise<'asc' | 'desc' | 'none'>;
+}
+
 export interface TableContext {
   root: Locator;
-  config: Required<TableConfig>;
+  config: FinalTableConfig;
   page: Page;
   resolve: (selector: Selector, parent: Locator | Page) => Locator;
 }
@@ -42,6 +66,7 @@ export interface TableConfig {
   headerSelector?: Selector;
   cellSelector?: Selector;
   pagination?: PaginationStrategy;
+  sorting?: SortingStrategy;
   maxPages?: number;
   /**
    * Hook to rename columns dynamically.
@@ -61,6 +86,14 @@ export interface TableConfig {
    */
   onReset?: (context: TableContext) => Promise<void>;
 }
+
+/**
+ * Represents the final, resolved table configuration after default values have been applied.
+ * All optional properties from TableConfig are now required, except for \`sorting\`.
+ */
+export type FinalTableConfig = Required<Omit<TableConfig, 'sorting'>> & {
+  sorting?: SortingStrategy;
+};
 
 export interface FillOptions {
   /**
@@ -96,5 +129,23 @@ export interface TableResult {
    * Scans a specific column across all pages and returns the values.
    */
   getColumnValues: <V = string>(column: string, options?: { mapper?: (cell: Locator) => Promise<V> | V, maxPages?: number }) => Promise<V[]>;
+
+  /**
+   * Provides access to sorting actions and assertions.
+   */
+  sorting: {
+    /**
+     * Applies the configured sorting strategy to the specified column.
+     * @param columnName The name of the column to sort.
+     * @param direction The direction to sort ('asc' or 'desc').
+     */
+    apply(columnName: string, direction: 'asc' | 'desc'): Promise<void>;
+    /**
+     * Gets the current sort state of a column using the configured sorting strategy.
+     * @param columnName The name of the column to check.
+     * @returns A promise that resolves to 'asc', 'desc', or 'none'.
+     */
+    getState(columnName: string): Promise<'asc' | 'desc' | 'none'>;
+  };
 }
 `;
