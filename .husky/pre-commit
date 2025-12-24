@@ -1,0 +1,14 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+echo "🚧 Running build and docs generation..."
+npm run build
+
+# Add all generated/modified files to the commit
+git add dist README.md src/typeContext.ts
+
+# Check if npm run build was successful before committing
+if [ $? -ne 0 ]; then
+  echo "Build failed, commit aborted."
+  exit 1
+fi
