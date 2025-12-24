@@ -3,6 +3,8 @@ import { TableConfig, TableContext, Selector, TableResult, SmartRow, PromptOptio
 import { TYPE_CONTEXT } from './typeContext';
 import { SortingStrategies as ImportedSortingStrategies } from './strategies/sorting';
 
+// console.log('This is a test comment that will be removed in the next build process.');
+
 /**
  * A collection of pre-built pagination strategies.
  */
