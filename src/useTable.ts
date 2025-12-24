@@ -1,9 +1,56 @@
 import type { Locator, Page } from '@playwright/test';
-import { TableConfig, TableContext, Selector, TableResult, SmartRow, PromptOptions, FillOptions } from './types';
+import { TableConfig, TableContext, Selector, TableResult, SmartRow, PromptOptions, FillOptions, StrategyContext, FinalTableConfig } from './types';
 import { TYPE_CONTEXT } from './typeContext';
+import { SortingStrategies as ImportedSortingStrategies } from './strategies/sorting';
+
+/**
+ * A collection of pre-built pagination strategies.
+ */
+export const PaginationStrategies = {
+  /**
+   * Clicks a "Next" button.
+   * @param selector - The CSS selector for the "Next" button.
+   */
+  NextButton: (selector: string): ((context: TableContext) => Promise<boolean>) => {
+    return async ({ root }) => {
+      const nextButton = root.locator(selector);
+      if (await nextButton.isVisible() && await nextButton.isEnabled()) {
+        await nextButton.click();
+        return true;
+      }
+      return false;
+    };
+  },
+  /**
+   * Clicks numbered page links.
+   * @param selector - The CSS selector for the page number links.
+   */
+  NumberedPages: (selector: string): ((context: TableContext) => Promise<boolean>) => {
+    let currentPage = 1;
+    return async ({ root }) => {
+      currentPage++;
+      const pageLink = root.locator(selector).filter({ hasText: String(currentPage) });
+      if (await pageLink.isVisible()) {
+        await pageLink.click();
+        return true;
+      }
+      return false;
+    };
+  },
+};
+
+/**
+ * @deprecated Use `PaginationStrategies` instead. This alias will be removed in a future major version.
+ */
+export const TableStrategies = PaginationStrategies;
+
+/**
+ * A collection of pre-built sorting strategies.
+ */
+export const SortingStrategies = ImportedSortingStrategies;
 
 export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}): TableResult => {
-  const config: Required<TableConfig> = {
+  const config: FinalTableConfig = {
     rowSelector: "tbody tr",
     headerSelector: "th",
     cellSelector: "td",
@@ -362,6 +409,35 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
     });
   };
 
+  const sortingNamespace = {
+    apply: async (columnName: string, direction: 'asc' | 'desc'): Promise<void> => {
+      if (!config.sorting) {
+        throw new Error('No sorting strategy has been configured. Please add a `sorting` strategy to your useTable config.');
+      }
+      logDebug(`Applying sort for column "${columnName}" (${direction})`);
+      const context: StrategyContext = {
+        root: rootLocator,
+        config: config,
+        page: rootLocator.page(),
+        resolve: resolve
+      };
+      await config.sorting.doSort({ columnName, direction, context });
+    },
+    getState: async (columnName: string): Promise<'asc' | 'desc' | 'none'> => {
+      if (!config.sorting) {
+        throw new Error('No sorting strategy has been configured. Please add a `sorting` strategy to your useTable config.');
+      }
+      logDebug(`Getting sort state for column "${columnName}"`);
+      const context: StrategyContext = {
+        root: rootLocator,
+        config: config,
+        page: rootLocator.page(),
+        resolve: resolve
+      };
+      return config.sorting.getSortState({ columnName, context });
+    }
+  };
+
   return {
     getHeaders: async () => Array.from((await _getMap()).keys()),
 
@@ -473,5 +549,7 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
       const content = `\n==================================================\n🤖 COPY INTO GEMINI/ChatGPT TO WRITE A STRATEGY 🤖\n==================================================\nI need a custom Pagination Strategy for 'playwright-smart-table'.\nContainer HTML:\n\`\`\`html\n${html.substring(0, 10000)} ...\n\`\`\`\n`;
       await _handlePrompt('Smart Table Strategy', content, options);
     },
+
+    sorting: sortingNamespace,
   };
 };
