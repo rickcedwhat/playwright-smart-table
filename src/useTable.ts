@@ -2,49 +2,17 @@ import type { Locator, Page } from '@playwright/test';
 import { TableConfig, TableContext, Selector, TableResult, SmartRow, PromptOptions, FillOptions, StrategyContext, FinalTableConfig } from './types';
 import { TYPE_CONTEXT } from './typeContext';
 import { SortingStrategies as ImportedSortingStrategies } from './strategies/sorting';
-
-// console.log('This is a test comment that will be removed in the next build process.');
+import { PaginationStrategies as ImportedPaginationStrategies, TableStrategies as DeprecatedTableStrategies } from './strategies/pagination';
 
 /**
  * A collection of pre-built pagination strategies.
  */
-export const PaginationStrategies = {
-  /**
-   * Clicks a "Next" button.
-   * @param selector - The CSS selector for the "Next" button.
-   */
-  NextButton: (selector: string): ((context: TableContext) => Promise<boolean>) => {
-    return async ({ root }) => {
-      const nextButton = root.locator(selector);
-      if (await nextButton.isVisible() && await nextButton.isEnabled()) {
-        await nextButton.click();
-        return true;
-      }
-      return false;
-    };
-  },
-  /**
-   * Clicks numbered page links.
-   * @param selector - The CSS selector for the page number links.
-   */
-  NumberedPages: (selector: string): ((context: TableContext) => Promise<boolean>) => {
-    let currentPage = 1;
-    return async ({ root }) => {
-      currentPage++;
-      const pageLink = root.locator(selector).filter({ hasText: String(currentPage) });
-      if (await pageLink.isVisible()) {
-        await pageLink.click();
-        return true;
-      }
-      return false;
-    };
-  },
-};
+export const PaginationStrategies = ImportedPaginationStrategies;
 
 /**
  * @deprecated Use `PaginationStrategies` instead. This alias will be removed in a future major version.
  */
-export const TableStrategies = PaginationStrategies;
+export const TableStrategies = DeprecatedTableStrategies;
 
 /**
  * A collection of pre-built sorting strategies.
