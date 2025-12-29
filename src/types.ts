@@ -113,18 +113,19 @@ export interface TableResult {
    * Finds a row on the current page only. Returns immediately (sync).
    * Throws error if table is not initialized.
    */
-  getByRow: <T extends { asJSON?: boolean }>(
+  getByRow: (
     filters: Record<string, string | RegExp | number>, 
-    options?: { exact?: boolean } & T
-  ) => T['asJSON'] extends true ? Promise<Record<string, string>> : SmartRow;
+    options?: { exact?: boolean }
+  ) => SmartRow;
 
   /**
-   * Finds a row across multiple pages using pagination. Auto-initializes if needed.
+   * Searches for a row across all available data using the configured strategy (pagination, scroll, etc.).
+   * Auto-initializes if needed.
    */
-  getByRowAcrossPages: <T extends { asJSON?: boolean }>(
+  searchForRow: (
     filters: Record<string, string | RegExp | number>, 
-    options?: { exact?: boolean, maxPages?: number } & T
-  ) => Promise<T['asJSON'] extends true ? Record<string, string> : SmartRow>;
+    options?: { exact?: boolean, maxPages?: number }
+  ) => Promise<SmartRow>;
 
   getAllRows: <T extends { asJSON?: boolean }>(
     options?: { filter?: Record<string, any>, exact?: boolean } & T
@@ -189,4 +190,4 @@ export interface TableResult {
 /**
  * Restricted table result that excludes methods that shouldn't be called during iteration.
  */
-export type RestrictedTableResult = Omit<TableResult, 'getByRowAcrossPages' | 'iterateThroughTable' | 'reset'>;
+export type RestrictedTableResult = Omit<TableResult, 'searchForRow' | 'iterateThroughTable' | 'reset'>;
