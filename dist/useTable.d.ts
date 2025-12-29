@@ -1,34 +1,20 @@
 import type { Locator } from '@playwright/test';
-import { TableConfig, TableContext, TableResult } from './types';
+import { TableConfig, Selector, TableResult, PaginationStrategy } from './types';
 /**
  * A collection of pre-built pagination strategies.
  */
 export declare const PaginationStrategies: {
-    /**
-     * Clicks a "Next" button.
-     * @param selector - The CSS selector for the "Next" button.
-     */
-    NextButton: (selector: string) => ((context: TableContext) => Promise<boolean>);
-    /**
-     * Clicks numbered page links.
-     * @param selector - The CSS selector for the page number links.
-     */
-    NumberedPages: (selector: string) => ((context: TableContext) => Promise<boolean>);
+    clickNext: (nextButtonSelector: Selector, timeout?: number) => PaginationStrategy;
+    clickLoadMore: (buttonSelector: Selector, timeout?: number) => PaginationStrategy;
+    infiniteScroll: (timeout?: number) => PaginationStrategy;
 };
 /**
  * @deprecated Use `PaginationStrategies` instead. This alias will be removed in a future major version.
  */
 export declare const TableStrategies: {
-    /**
-     * Clicks a "Next" button.
-     * @param selector - The CSS selector for the "Next" button.
-     */
-    NextButton: (selector: string) => ((context: TableContext) => Promise<boolean>);
-    /**
-     * Clicks numbered page links.
-     * @param selector - The CSS selector for the page number links.
-     */
-    NumberedPages: (selector: string) => ((context: TableContext) => Promise<boolean>);
+    clickNext: (nextButtonSelector: Selector, timeout?: number) => PaginationStrategy;
+    clickLoadMore: (buttonSelector: Selector, timeout?: number) => PaginationStrategy;
+    infiniteScroll: (timeout?: number) => PaginationStrategy;
 };
 /**
  * A collection of pre-built sorting strategies.

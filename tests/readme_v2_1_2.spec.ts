@@ -8,15 +8,16 @@ test.describe('README.md Examples Verification', () => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
 
     // #region quick-start
-    const table = useTable(page.locator('#example'), {
+    const table = await useTable(page.locator('#example'), {
       headerSelector: 'thead th' // Override for this specific site
-    });
+    }).init();
 
     // 🪄 Finds the row with Name="Airi Satou", then gets the Position cell.
-    // If Airi is on Page 2, it handles pagination automatically.
-    const row = await table.getByRow({ Name: 'Airi Satou' });
+    // If Airi is on Page 2, use getByRowAcrossPages for pagination.
+    const row = table.getByRow({ Name: 'Airi Satou' });
 
-    await expect(row.getCell('Position')).toHaveText('Accountant');
+    const positionCell = row.getCell('Position');
+    await expect(positionCell).toHaveText('Accountant');
     // #endregion quick-start
   });
 
@@ -36,11 +37,13 @@ test.describe('README.md Examples Verification', () => {
       ),
       maxPages: 5 // Allow scanning up to 5 pages
     });
+    await table.init();
 
     // ✅ Verify Colleen is NOT visible initially
     await expect(page.getByText("Colleen Hurst")).not.toBeVisible();
 
-    await expect(await table.getByRow({ Name: "Colleen Hurst" })).toBeVisible();
+    // Use getByRowAcrossPages for pagination
+    await expect(await table.getByRowAcrossPages({ Name: "Colleen Hurst" })).toBeVisible();
     // NOTE: We're now on the page where Colleen Hurst exists (typically Page 2)
 
     // #endregion pagination
@@ -49,14 +52,16 @@ test.describe('README.md Examples Verification', () => {
   test('SmartRow interaction (v2.0 Feature)', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
     const table = useTable(page.locator('#example'), { headerSelector: 'thead th' });
+    await table.init();
 
     // #region smart-row
     // 1. Get SmartRow via getByRow
-    const row = await table.getByRow({ Name: 'Airi Satou' });
+    const row = table.getByRow({ Name: 'Airi Satou' });
 
     // 2. Interact with cell (No more getByCell needed!)
     // ✅ Good: Resilient to column reordering
-    await row.getCell('Position').click();
+    const positionCell = row.getCell('Position');
+    await positionCell.click();
 
     // 3. Dump data from row
     const data = await row.toJSON();
@@ -70,6 +75,7 @@ test.describe('README.md Examples Verification', () => {
   test('getAllRows({ asJSON: true }) returns data objects', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
     const table = useTable(page.locator('#example'), { headerSelector: 'thead th' });
+    await table.init();
 
     // #region get-all-rows
     // 1. Get ALL rows on the current page
@@ -92,14 +98,15 @@ test.describe('README.md Examples Verification', () => {
   test('Strict Retrieval & Negative Assertion', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
     const table = useTable(page.locator('#example'), { headerSelector: 'thead th' });
+    await table.init();
 
     // #region get-by-row
     // Find a row where Name is "Airi Satou" AND Office is "Tokyo"
-    const row = await table.getByRow({ Name: "Airi Satou", Office: "Tokyo" });
+    const row = table.getByRow({ Name: "Airi Satou", Office: "Tokyo" });
     await expect(row).toBeVisible();
 
     // Assert it does NOT exist
-    await expect(await table.getByRow({ Name: "Ghost User" })).not.toBeVisible();
+    await expect(table.getByRow({ Name: "Ghost User" })).not.toBeVisible();
     // #endregion get-by-row
   });
 
@@ -111,17 +118,19 @@ test.describe('README.md Examples Verification', () => {
       headerSelector: 'thead th',
       debug: true 
     });
+    await table.init();
     // #endregion advanced-debug
 
     // #region advanced-reset
     // Navigate deep into the table (simulated by finding a row on page 2)
     // For the test to pass, we need a valid row. 'Angelica Ramos' is usually on page 1 or 2 depending on sorting.
     try {
-      await table.getByRow({ Name: 'Angelica Ramos' });
+      await table.getByRowAcrossPages({ Name: 'Angelica Ramos' });
     } catch (e) {}
     
     // Reset internal state (and potentially UI) to Page 1
-    await table.reset(); 
+    await table.reset();
+    await table.init(); // Re-init after reset
     // #endregion advanced-reset
 
     // #region advanced-column-scan

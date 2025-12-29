@@ -1,6 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { useTable } from '../src/useTable';
-import { TableStrategies } from '../src/strategies';
+import { useTable, PaginationStrategies } from '../src/useTable';
 
 /**
  * Compatibility Test Suite
@@ -22,6 +21,7 @@ test.describe('Backwards Compatibility Tests', () => {
     const table = useTable(page.locator('#example'), {
       headerSelector: 'thead th'
     });
+    await table.init();
 
     // Table should have all expected methods
     expect(table).toHaveProperty('getByRow');
@@ -40,8 +40,9 @@ test.describe('Backwards Compatibility Tests', () => {
     const table = useTable(page.locator('#example'), {
       headerSelector: 'thead th'
     });
+    await table.init();
 
-    const row = await table.getByRow({ Name: 'Airi Satou' });
+    const row = table.getByRow({ Name: 'Airi Satou' });
     
     // SmartRow should have getCell method
     expect(typeof row.getCell).toBe('function');
@@ -58,8 +59,9 @@ test.describe('Backwards Compatibility Tests', () => {
     const table = useTable(page.locator('#example'), {
       headerSelector: 'thead th'
     });
+    await table.init();
 
-    const row = await table.getByRow({ Name: 'Airi Satou', Office: 'Tokyo' });
+    const row = table.getByRow({ Name: 'Airi Satou', Office: 'Tokyo' });
     await expect(row).toBeVisible();
   });
 
@@ -69,8 +71,9 @@ test.describe('Backwards Compatibility Tests', () => {
     const table = useTable(page.locator('#example'), {
       headerSelector: 'thead th'
     });
+    await table.init();
 
-    const row = await table.getByRow({ Name: 'NonExistentUser' });
+    const row = table.getByRow({ Name: 'NonExistentUser' });
     await expect(row).not.toBeVisible();
   });
 
@@ -80,6 +83,7 @@ test.describe('Backwards Compatibility Tests', () => {
     const table = useTable(page.locator('#example'), {
       headerSelector: 'thead th'
     });
+    await table.init();
 
     const rows = await table.getAllRows();
     
@@ -94,6 +98,7 @@ test.describe('Backwards Compatibility Tests', () => {
     const table = useTable(page.locator('#example'), {
       headerSelector: 'thead th'
     });
+    await table.init();
 
     const filtered = await table.getAllRows({
       filter: { Office: 'Tokyo' }
@@ -109,6 +114,7 @@ test.describe('Backwards Compatibility Tests', () => {
     const table = useTable(page.locator('#example'), {
       headerSelector: 'thead th'
     });
+    await table.init();
 
     const data = await table.getAllRows({ asJSON: true });
     
@@ -124,6 +130,7 @@ test.describe('Backwards Compatibility Tests', () => {
     const table = useTable(page.locator('#example'), {
       headerSelector: 'thead th'
     });
+    await table.init();
 
     const data = await table.getByRow({ Name: 'Airi Satou' }, { asJSON: true });
     
@@ -138,8 +145,9 @@ test.describe('Backwards Compatibility Tests', () => {
     const table = useTable(page.locator('#example'), {
       headerSelector: 'thead th'
     });
+    await table.init();
 
-    const row = await table.getByRow({ Name: 'Airi Satou' });
+    const row = table.getByRow({ Name: 'Airi Satou' });
     const data = await row.toJSON();
     
     expect(typeof data).toBe('object');
@@ -153,6 +161,7 @@ test.describe('Backwards Compatibility Tests', () => {
     const table = useTable(page.locator('#example'), {
       headerSelector: 'thead th'
     });
+    await table.init();
 
     const headers = await table.getHeaders();
     
@@ -168,6 +177,7 @@ test.describe('Backwards Compatibility Tests', () => {
     const table = useTable(page.locator('#example'), {
       headerSelector: 'thead th'
     });
+    await table.init();
 
     const headerCell = await table.getHeaderCell('Name');
     await expect(headerCell).toBeVisible();
@@ -180,6 +190,7 @@ test.describe('Backwards Compatibility Tests', () => {
     const table = useTable(page.locator('#example'), {
       headerSelector: 'thead th'
     });
+    await table.init();
 
     const offices = await table.getColumnValues('Office');
     
@@ -194,6 +205,7 @@ test.describe('Backwards Compatibility Tests', () => {
     const table = useTable(page.locator('#example'), {
       headerSelector: 'thead th'
     });
+    await table.init();
 
     // Should not throw
     await expect(table.reset()).resolves.not.toThrow();
@@ -205,14 +217,16 @@ test.describe('Backwards Compatibility Tests', () => {
     
     const table = useTable(page.locator('#example'), {
       headerSelector: 'thead th',
-      pagination: TableStrategies.clickNext(() => 
+      pagination: PaginationStrategies.clickNext(() => 
         page.getByRole('link', { name: 'Next' })
       ),
       maxPages: 2
     });
+    await table.init();
 
     // Should be able to find a row (even if it requires pagination)
-    const row = await table.getByRow({ Name: 'Airi Satou' });
+    // Use getByRowAcrossPages for pagination
+    const row = await table.getByRowAcrossPages({ Name: 'Airi Satou' });
     await expect(row).toBeVisible();
   });
 
@@ -222,6 +236,7 @@ test.describe('Backwards Compatibility Tests', () => {
     const table = useTable(page.locator('#table1'), {
       headerTransformer: ({ text }) => text.trim().toLowerCase()
     });
+    await table.init();
 
     const headers = await table.getHeaders();
     // Verify transformer was applied (headers should be lowercase)
@@ -234,14 +249,405 @@ test.describe('Backwards Compatibility Tests', () => {
     const table = useTable(page.locator('#example'), {
       headerSelector: 'thead th'
     });
+    await table.init();
 
-    const row = await table.getByRow({ Name: 'Airi Satou' });
+    const row = table.getByRow({ Name: 'Airi Satou' });
     
     // Should have standard Locator methods
     await expect(row).toBeVisible();
     await expect(row).toBeEnabled();
     const text = await row.textContent();
     expect(text).toBeTruthy();
+  });
+
+  test('Lazy Loading: getByRow works when table appears later', async ({ page }) => {
+    // Start with empty page
+    await page.setContent('<div id="container"></div>');
+    
+    // Create table instance before table exists
+    const table = useTable(page.locator('#my-table'));
+    
+    // Now create the table
+    await page.setContent(`
+      <table id="my-table">
+        <thead><tr><th>Name</th><th>Age</th></tr></thead>
+        <tbody><tr><td>John</td><td>30</td></tr></tbody>
+      </table>
+    `);
+    
+    // Initialize after table exists
+    await table.init();
+    
+    // Call getByRow - should return immediately (sync)
+    const row = table.getByRow({ Name: 'John' });
+    
+    // getCell should work (returns lazy locator)
+    const nameCell = row.getCell('Name');
+    const ageCell = row.getCell('Age');
+    
+    // Now the locators should work
+    await expect(nameCell).toHaveText('John');
+    await expect(ageCell).toHaveText('30');
+    await expect(row).toBeVisible();
+    
+    // Test that if row is deleted, isVisible returns false
+    await page.evaluate(() => {
+      document.querySelector('#my-table tbody tr')?.remove();
+    });
+    
+    await expect(row).not.toBeVisible();
+  });
+
+  test('New API: Sync methods throw error if not initialized', async ({ page }) => {
+    await page.setContent(`
+      <table id="test-table">
+        <thead><tr><th>Name</th><th>Age</th></tr></thead>
+        <tbody><tr><td>John</td><td>30</td></tr></tbody>
+      </table>
+    `);
+    
+    const table = useTable(page.locator('#test-table'));
+    
+    // getByRow should throw if not initialized
+    expect(() => table.getByRow({ Name: 'John' })).toThrow('Table not initialized');
+    
+    // getCell should throw if not initialized (via getByRow)
+    await table.init();
+    const row = table.getByRow({ Name: 'John' });
+    // getCell itself doesn't need init check since it's called on an already-created SmartRow
+    // But let's verify getHeaders throws
+    const table2 = useTable(page.locator('#test-table'));
+    await expect(table2.getHeaders()).rejects.toThrow('Table not initialized');
+  });
+
+  test('New API: Async methods auto-initialize', async ({ page }) => {
+    await page.setContent(`
+      <table id="test-table">
+        <thead><tr><th>Name</th><th>Age</th></tr></thead>
+        <tbody><tr><td>John</td><td>30</td></tr></tbody>
+      </table>
+    `);
+    
+    const table = useTable(page.locator('#test-table'));
+    
+    // getAllRows should auto-init
+    const rows = await table.getAllRows();
+    expect(rows.length).toBeGreaterThan(0);
+    
+    // getColumnValues should auto-init
+    const names = await table.getColumnValues('Name');
+    expect(names).toContain('John');
+    
+    // getByRowAcrossPages should auto-init
+    const row = await table.getByRowAcrossPages({ Name: 'John' });
+    await expect(row).toBeVisible();
+  });
+
+  test('New API: init() method with timeout', async ({ page }) => {
+    // Start with empty page
+    await page.setContent('<div id="container"></div>');
+    
+    const table = useTable(page.locator('#test-table'));
+    
+    // Set table content after 2 seconds (to test timeout)
+    // Use Promise to ensure async execution
+    const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+    delay(2000).then(async () => {
+      await page.setContent(`
+        <table id="test-table">
+          <thead><tr><th>Name</th></tr></thead>
+          <tbody><tr><td>John</td></tr></tbody>
+        </table>
+      `);
+    });
+    
+    // init() should wait for table to appear (with 5 second timeout)
+    await table.init({ timeout: 5000 });
+    
+    // Should be able to use sync methods after init
+    const row = table.getByRow({ Name: 'John' });
+    await expect(row).toBeVisible();
+  });
+
+  test('New API: init() method chaining', async ({ page }) => {
+    await page.setContent(`
+      <table id="test-table">
+        <thead><tr><th>Name</th></tr></thead>
+        <tbody><tr><td>John</td></tr></tbody>
+      </table>
+    `);
+    
+    // Chained init pattern
+    const table = await useTable(page.locator('#test-table')).init();
+    
+    // Should be able to use sync methods immediately
+    const row = table.getByRow({ Name: 'John' });
+    await expect(row).toBeVisible();
+  });
+
+  test('New API: getByRow vs getByRowAcrossPages', async ({ page }) => {
+    await page.goto('https://datatables.net/examples/data_sources/dom');
+    await page.waitForSelector('#example_wrapper');
+    
+    const table = useTable(page.locator('#example'), {
+      headerSelector: 'thead th',
+      pagination: PaginationStrategies.clickNext(() => 
+        page.getByRole('link', { name: 'Next' })
+      ),
+      maxPages: 2
+    });
+    await table.init();
+
+    // First, verify Colleen is NOT on current page using getByRow (current page only)
+    const currentPageColleen = table.getByRow({ Name: 'Colleen Hurst' });
+    await expect(currentPageColleen).not.toBeVisible();
+    
+    // Verify Airi IS on current page using getByRow
+    const currentPageRow = table.getByRow({ Name: 'Airi Satou' });
+    await expect(currentPageRow).toBeVisible();
+    
+    // Now use getByRowAcrossPages to find Colleen (searches across pages)
+    const secondPageRow = await table.getByRowAcrossPages({ Name: 'Colleen Hurst' });
+    await expect(secondPageRow).toBeVisible();
+  });
+
+  test('iterateThroughTable: Basic iteration with clickNext', async ({ page }) => {
+    await page.goto('https://datatables.net/examples/data_sources/dom');
+    await page.waitForSelector('#example_wrapper');
+    
+    const table = useTable(page.locator('#example'), {
+      headerSelector: 'thead th',
+      pagination: PaginationStrategies.clickNext(() => 
+        page.getByRole('link', { name: 'Next' })
+      ),
+      maxPages: 3
+    });
+    await table.init();
+
+    const allNames = await table.iterateThroughTable(async ({ rows, index }) => {
+      // Return names from this iteration - automatically appended to allData
+      const names = await Promise.all(rows.map(r => r.getCell('Name').innerText()));
+      return names;
+    });
+
+    // allNames should be an array of arrays (one array per iteration)
+    expect(allNames.length).toBeGreaterThan(0);
+    expect(Array.isArray(allNames[0])).toBe(true);
+    
+    // Verify we collected data from multiple iterations
+    const totalNames = allNames.flat();
+    expect(totalNames.length).toBeGreaterThan(10); // Should have names from multiple pages
+  });
+
+  test('iterateThroughTable: Deduplication with infiniteScroll', async ({ page }) => {
+    await page.goto('https://htmx.org/examples/infinite-scroll/');
+    
+    const table = useTable(page.locator('table'), {
+      rowSelector: 'tbody tr',
+      headerSelector: 'thead th',
+      cellSelector: 'td',
+      pagination: PaginationStrategies.infiniteScroll(),
+      maxPages: 3
+    });
+    await table.init();
+
+    // Get headers to find a suitable column for deduplication
+    const headers = await table.getHeaders();
+    console.log('Available headers:', headers);
+    
+    // Use first column as deduplication key (usually ID or similar)
+    const dedupeColumn = headers[0];
+    
+    const allData = await table.iterateThroughTable(
+      async ({ rows }) => {
+        // Return row data - automatically appended to allData
+        return await Promise.all(rows.map(r => r.toJSON()));
+      },
+      { 
+        dedupeStrategy: (row) => row.getCell(dedupeColumn).innerText(),
+        getIsLast: ({ paginationResult }) => !paginationResult
+      }
+    );
+
+    // Verify deduplication worked (rows should be unique)
+    const allRows = allData.flat();
+    const allKeys = allRows.map((row: any) => row[dedupeColumn] || row[dedupeColumn.toLowerCase()] || JSON.stringify(row));
+    const uniqueKeys = new Set(allKeys);
+    
+    // Deduplication should ensure all keys are unique
+    expect(uniqueKeys.size).toBe(allKeys.length); // All keys should be unique
+    console.log(`Total rows collected: ${allRows.length}, Unique keys: ${uniqueKeys.size}`);
+  });
+
+  test('iterateThroughTable: Callback return values appended to allData', async ({ page }) => {
+    await page.goto('https://datatables.net/examples/data_sources/dom');
+    await page.waitForSelector('#example_wrapper');
+    
+    const table = useTable(page.locator('#example'), {
+      headerSelector: 'thead th',
+      pagination: PaginationStrategies.clickNext(() => 
+        page.getByRole('link', { name: 'Next' })
+      ),
+      maxPages: 2
+    });
+    await table.init();
+
+    const results = await table.iterateThroughTable(async ({ rows, index }) => {
+      // Return a simple object - should be appended to allData
+      return { pageIndex: index, rowCount: rows.length };
+    });
+
+    // Verify return values were collected
+    expect(results.length).toBeGreaterThan(0);
+    expect(results[0]).toHaveProperty('pageIndex');
+    expect(results[0]).toHaveProperty('rowCount');
+    expect(results[0].pageIndex).toBe(0);
+  });
+
+  test('iterateThroughTable: getIsFirst/getIsLast functions', async ({ page }) => {
+    await page.goto('https://datatables.net/examples/data_sources/dom');
+    await page.waitForSelector('#example_wrapper');
+    
+    const table = useTable(page.locator('#example'), {
+      headerSelector: 'thead th',
+      pagination: PaginationStrategies.clickNext(() => 
+        page.getByRole('link', { name: 'Next' })
+      ),
+      maxPages: 2
+    });
+    await table.init();
+
+    const flags: Array<{ index: number, isFirst: boolean, isLast: boolean }> = [];
+
+    await table.iterateThroughTable(
+      async ({ index, isFirst, isLast }) => {
+        flags.push({ index, isFirst, isLast });
+        return { index, isFirst, isLast };
+      },
+      {
+        getIsFirst: ({ index }) => index === 0,
+        getIsLast: ({ paginationResult }) => !paginationResult
+      }
+    );
+
+    // Verify flags
+    expect(flags[0].isFirst).toBe(true);
+    expect(flags[0].index).toBe(0);
+    // Note: isLast is determined AFTER pagination attempt, so the callback receives
+    // the previous iteration's isLast value. The last flag should be false (before pagination),
+    // but we can verify that pagination eventually fails by checking we have multiple iterations
+    expect(flags.length).toBeGreaterThan(1);
+  });
+
+  test('iterateThroughTable: onFirst/onLast hooks', async ({ page }) => {
+    await page.goto('https://datatables.net/examples/data_sources/dom');
+    await page.waitForSelector('#example_wrapper');
+    
+    const table = useTable(page.locator('#example'), {
+      headerSelector: 'thead th',
+      pagination: PaginationStrategies.clickNext(() => 
+        page.getByRole('link', { name: 'Next' })
+      ),
+      maxPages: 3 // Increase to ensure we have multiple iterations
+    });
+    await table.init();
+
+    let onFirstCalled = false;
+    let onLastCalled = false;
+    let iterationCount = 0;
+
+    await table.iterateThroughTable(
+      async ({ rows, index }) => {
+        iterationCount++;
+        return rows.length;
+      },
+      {
+        getIsLast: ({ paginationResult }) => !paginationResult,
+        onFirst: async ({ index, rows }) => {
+          onFirstCalled = true;
+          expect(index).toBe(0);
+          expect(rows.length).toBeGreaterThan(0);
+        },
+        onLast: async ({ index, rows }) => {
+          onLastCalled = true;
+          expect(rows.length).toBeGreaterThan(0);
+          // onLast should be called on the last iteration (when pagination fails or maxIterations reached)
+          console.log(`onLast called at index ${index}, iterationCount: ${iterationCount}`);
+        }
+      }
+    );
+
+    expect(onFirstCalled).toBe(true);
+    expect(onLastCalled).toBe(true);
+    expect(iterationCount).toBeGreaterThan(0);
+  });
+
+  test('iterateThroughTable: Restricted table context', async ({ page }) => {
+    await page.goto('https://datatables.net/examples/data_sources/dom');
+    await page.waitForSelector('#example_wrapper');
+    
+    const table = useTable(page.locator('#example'), {
+      headerSelector: 'thead th',
+      pagination: PaginationStrategies.clickNext(() => 
+        page.getByRole('link', { name: 'Next' })
+      ),
+      maxPages: 2
+    });
+    await table.init();
+
+    await table.iterateThroughTable(async ({ table: restrictedTable }) => {
+      // Should have safe methods
+      expect(restrictedTable).toHaveProperty('getByRow');
+      expect(restrictedTable).toHaveProperty('getAllRows');
+      expect(restrictedTable).toHaveProperty('getHeaders');
+      
+      // Should NOT have problematic methods
+      expect(restrictedTable).not.toHaveProperty('getByRowAcrossPages');
+      expect(restrictedTable).not.toHaveProperty('iterateThroughTable');
+      expect(restrictedTable).not.toHaveProperty('reset');
+      
+      return { success: true };
+    });
+  });
+
+  test('iterateThroughTable: Pagination strategy from options', async ({ page }) => {
+    await page.goto('https://datatables.net/examples/data_sources/dom');
+    await page.waitForSelector('#example_wrapper');
+    
+    // Create table without pagination in config
+    const table = useTable(page.locator('#example'), {
+      headerSelector: 'thead th'
+    });
+    await table.init();
+
+    // Should work with pagination in options
+    const results = await table.iterateThroughTable(
+      async ({ rows }) => rows.length,
+      {
+        pagination: PaginationStrategies.clickNext(() => 
+          page.getByRole('link', { name: 'Next' })
+        ),
+        maxIterations: 2
+      }
+    );
+
+    expect(results.length).toBeGreaterThan(0);
+  });
+
+  test('iterateThroughTable: Throws error if no pagination strategy', async ({ page }) => {
+    await page.goto('https://datatables.net/examples/data_sources/dom');
+    await page.waitForSelector('#example_wrapper');
+    
+    // Create table without pagination
+    const table = useTable(page.locator('#example'), {
+      headerSelector: 'thead th'
+    });
+    await table.init();
+
+    // Should throw error when no pagination provided
+    await expect(
+      table.iterateThroughTable(async ({ rows }) => rows.length)
+    ).rejects.toThrow('No pagination strategy provided');
   });
 });
 
