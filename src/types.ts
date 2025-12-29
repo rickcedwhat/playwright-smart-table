@@ -2,13 +2,13 @@ import type { Locator, Page } from '@playwright/test';
 
 export type Selector = string | ((root: Locator | Page) => Locator);
 
-export type SmartRow = Omit<Locator, 'fill'> & {
+export type SmartRow = Locator & {
   getCell(column: string): Locator;
   toJSON(): Promise<Record<string, string>>;
   /**
    * Fills the row with data. Automatically detects input types (text input, select, checkbox, etc.).
    */
-  fill: (data: Record<string, any>, options?: FillOptions) => Promise<void>;
+  smartFill: (data: Record<string, any>, options?: FillOptions) => Promise<void>;
 };
 
 export type StrategyContext = TableContext;
@@ -44,6 +44,8 @@ export interface TableContext {
 
 export type PaginationStrategy = (context: TableContext) => Promise<boolean>;
 
+export type DedupeStrategy = (row: SmartRow) => string | number | Promise<string | number>;
+
 export interface PromptOptions {
   /**
    * Output Strategy:
@@ -74,7 +76,7 @@ export interface TableConfig {
    */
   debug?: boolean;
   /**
-   * Strategy to reset the table to the first page.
+   * Strategy to reset the table to the initial page.
    * Called when table.reset() is invoked.
    */
   onReset?: (context: TableContext) => Promise<void>;
@@ -98,10 +100,28 @@ export interface FillOptions {
 }
 
 export interface TableResult {
+  /**
+   * Initializes the table by resolving headers. Must be called before using sync methods.
+   * @param options Optional timeout for header resolution (default: 3000ms)
+   */
+  init(options?: { timeout?: number }): Promise<TableResult>;
+
   getHeaders: () => Promise<string[]>;
   getHeaderCell: (columnName: string) => Promise<Locator>;
 
+  /**
+   * Finds a row on the current page only. Returns immediately (sync).
+   * Throws error if table is not initialized.
+   */
   getByRow: <T extends { asJSON?: boolean }>(
+    filters: Record<string, string | RegExp | number>, 
+    options?: { exact?: boolean } & T
+  ) => T['asJSON'] extends true ? Promise<Record<string, string>> : SmartRow;
+
+  /**
+   * Finds a row across multiple pages using pagination. Auto-initializes if needed.
+   */
+  getByRowAcrossPages: <T extends { asJSON?: boolean }>(
     filters: Record<string, string | RegExp | number>, 
     options?: { exact?: boolean, maxPages?: number } & T
   ) => Promise<T['asJSON'] extends true ? Record<string, string> : SmartRow>;
@@ -140,4 +160,33 @@ export interface TableResult {
      */
     getState(columnName: string): Promise<'asc' | 'desc' | 'none'>;
   };
+
+  /**
+   * Iterates through paginated table data, calling the callback for each iteration.
+   * Callback return values are automatically appended to allData, which is returned.
+   */
+  iterateThroughTable: <T = any>(
+    callback: (context: {
+      index: number;
+      isFirst: boolean;
+      isLast: boolean;
+      rows: SmartRow[];
+      allData: T[];
+      table: RestrictedTableResult;
+    }) => T | Promise<T>,
+    options?: {
+      pagination?: PaginationStrategy;
+      dedupeStrategy?: DedupeStrategy;
+      maxIterations?: number;
+      getIsFirst?: (context: { index: number }) => boolean;
+      getIsLast?: (context: { index: number, paginationResult: boolean }) => boolean;
+      onFirst?: (context: { index: number, rows: SmartRow[], allData: any[] }) => void | Promise<void>;
+      onLast?: (context: { index: number, rows: SmartRow[], allData: any[] }) => void | Promise<void>;
+    }
+  ) => Promise<T[]>;
 }
+
+/**
+ * Restricted table result that excludes methods that shouldn't be called during iteration.
+ */
+export type RestrictedTableResult = Omit<TableResult, 'getByRowAcrossPages' | 'iterateThroughTable' | 'reset'>;
