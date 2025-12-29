@@ -429,7 +429,7 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
       };
       await config.onReset(context);
       _hasPaginated = false;
-      _headerMap = null;
+      _headerMap = null; 
       _isInitialized = false;
       logDebug("Table reset complete.");
     },
@@ -475,10 +475,10 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
       return results;
     },
 
-    getByRow: <T extends { asJSON?: boolean }>(
+    getByRow: (
       filters: Record<string, string | RegExp | number>,
-      options?: { exact?: boolean } & T
-    ): T['asJSON'] extends true ? Promise<Record<string, string>> : SmartRow => {
+      options?: { exact?: boolean }
+    ): SmartRow => {
       // Throw error if not initialized (sync methods require explicit init)
       if (!_isInitialized || !_headerMap) {
         throw new Error('Table not initialized. Call await table.init() first.');
@@ -490,18 +490,13 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
       
       // Return first match (or sentinel) - lazy, doesn't check existence
       const rowLocator = matchedRows.first();
-      const smartRow = _makeSmart(rowLocator, _headerMap);
-
-      if (options?.asJSON) {
-        return smartRow.toJSON() as any;
-      }
-      return smartRow as any;
+      return _makeSmart(rowLocator, _headerMap);
     },
 
-    getByRowAcrossPages: async <T extends { asJSON?: boolean }>(
+    searchForRow: async (
       filters: Record<string, string | RegExp | number>,
-      options?: { exact?: boolean, maxPages?: number } & T
-    ): Promise<T['asJSON'] extends true ? Record<string, string> : SmartRow> => {
+      options?: { exact?: boolean, maxPages?: number }
+    ): Promise<SmartRow> => {
       // Auto-init if needed (async methods can auto-init)
       await _ensureInitialized();
 
@@ -511,12 +506,7 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
         row = resolve(config.rowSelector, rootLocator).filter({ hasText: "___SENTINEL_ROW_NOT_FOUND___" + Date.now() });
       }
 
-      const smartRow = _makeSmart(row, _headerMap!);
-
-      if (options?.asJSON) {
-        return smartRow.toJSON() as any;
-      }
-      return smartRow as any;
+      return _makeSmart(row, _headerMap!);
     },
 
     getAllRows: async <T extends { asJSON?: boolean }>(options?: { filter?: Record<string, any>, exact?: boolean } & T): Promise<any> => {

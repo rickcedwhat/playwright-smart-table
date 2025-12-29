@@ -13,7 +13,7 @@ test.describe('README.md Examples Verification', () => {
     }).init();
 
     // 🪄 Finds the row with Name="Airi Satou", then gets the Position cell.
-    // If Airi is on Page 2, use getByRowAcrossPages for pagination.
+    // If Airi is on Page 2, use searchForRow for pagination.
     const row = table.getByRow({ Name: 'Airi Satou' });
 
     const positionCell = row.getCell('Position');
@@ -42,8 +42,8 @@ test.describe('README.md Examples Verification', () => {
     // ✅ Verify Colleen is NOT visible initially
     await expect(page.getByText("Colleen Hurst")).not.toBeVisible();
 
-    // Use getByRowAcrossPages for pagination
-    await expect(await table.getByRowAcrossPages({ Name: "Colleen Hurst" })).toBeVisible();
+    // Use searchForRow for pagination
+    await expect(await table.searchForRow({ Name: "Colleen Hurst" })).toBeVisible();
     // NOTE: We're now on the page where Colleen Hurst exists (typically Page 2)
 
     // #endregion pagination
@@ -125,7 +125,7 @@ test.describe('README.md Examples Verification', () => {
     // Navigate deep into the table (simulated by finding a row on page 2)
     // For the test to pass, we need a valid row. 'Angelica Ramos' is usually on page 1 or 2 depending on sorting.
     try {
-      await table.getByRowAcrossPages({ Name: 'Angelica Ramos' });
+      await table.searchForRow({ Name: 'Angelica Ramos' });
     } catch (e) {}
     
     // Reset internal state (and potentially UI) to Page 1

@@ -124,7 +124,7 @@ test.describe('Backwards Compatibility Tests', () => {
     expect(data[0]).toHaveProperty('Name');
   });
 
-  test('Core: getByRow with asJSON option', async ({ page }) => {
+  test('Core: getByRow with toJSON()', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
     
     const table = useTable(page.locator('#example'), {
@@ -132,7 +132,8 @@ test.describe('Backwards Compatibility Tests', () => {
     });
     await table.init();
 
-    const data = await table.getByRow({ Name: 'Airi Satou' }, { asJSON: true });
+    const row = table.getByRow({ Name: 'Airi Satou' });
+    const data = await row.toJSON();
     
     expect(typeof data).toBe('object');
     expect(data).toHaveProperty('Name', 'Airi Satou');
@@ -225,8 +226,8 @@ test.describe('Backwards Compatibility Tests', () => {
     await table.init();
 
     // Should be able to find a row (even if it requires pagination)
-    // Use getByRowAcrossPages for pagination
-    const row = await table.getByRowAcrossPages({ Name: 'Airi Satou' });
+    // Use searchForRow for pagination
+    const row = await table.searchForRow({ Name: 'Airi Satou' });
     await expect(row).toBeVisible();
   });
 
@@ -338,8 +339,8 @@ test.describe('Backwards Compatibility Tests', () => {
     const names = await table.getColumnValues('Name');
     expect(names).toContain('John');
     
-    // getByRowAcrossPages should auto-init
-    const row = await table.getByRowAcrossPages({ Name: 'John' });
+    // searchForRow should auto-init
+    const row = await table.searchForRow({ Name: 'John' });
     await expect(row).toBeVisible();
   });
 
@@ -385,7 +386,7 @@ test.describe('Backwards Compatibility Tests', () => {
     await expect(row).toBeVisible();
   });
 
-  test('New API: getByRow vs getByRowAcrossPages', async ({ page }) => {
+  test('New API: getByRow vs searchForRow', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
     await page.waitForSelector('#example_wrapper');
     
@@ -406,8 +407,8 @@ test.describe('Backwards Compatibility Tests', () => {
     const currentPageRow = table.getByRow({ Name: 'Airi Satou' });
     await expect(currentPageRow).toBeVisible();
     
-    // Now use getByRowAcrossPages to find Colleen (searches across pages)
-    const secondPageRow = await table.getByRowAcrossPages({ Name: 'Colleen Hurst' });
+    // Now use searchForRow to find Colleen (searches across pages)
+    const secondPageRow = await table.searchForRow({ Name: 'Colleen Hurst' });
     await expect(secondPageRow).toBeVisible();
   });
 
@@ -602,7 +603,7 @@ test.describe('Backwards Compatibility Tests', () => {
       expect(restrictedTable).toHaveProperty('getHeaders');
       
       // Should NOT have problematic methods
-      expect(restrictedTable).not.toHaveProperty('getByRowAcrossPages');
+      expect(restrictedTable).not.toHaveProperty('searchForRow');
       expect(restrictedTable).not.toHaveProperty('iterateThroughTable');
       expect(restrictedTable).not.toHaveProperty('reset');
       

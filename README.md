@@ -91,8 +91,8 @@ await table.init();
 // ✅ Verify Colleen is NOT visible initially
 await expect(page.getByText("Colleen Hurst")).not.toBeVisible();
 
-// Use getByRowAcrossPages for pagination
-await expect(await table.getByRowAcrossPages({ Name: "Colleen Hurst" })).toBeVisible();
+// Use searchForRow for pagination
+await expect(await table.searchForRow({ Name: "Colleen Hurst" })).toBeVisible();
 // NOTE: We're now on the page where Colleen Hurst exists (typically Page 2)
 ```
 <!-- /embed: pagination -->
@@ -126,7 +126,7 @@ If your tests navigate deep into a paginated table, use `.reset()` to return to 
 // Example from: https://datatables.net/examples/data_sources/dom
 // Navigate deep into the table by searching for a row on a later page
 try {
-  await table.getByRowAcrossPages({ Name: 'Angelica Ramos' });
+  await table.searchForRow({ Name: 'Angelica Ramos' });
 } catch (e) {}
 
 // Reset internal state (and potentially UI) to initial page
@@ -256,7 +256,7 @@ const currentPageRow = table.getByRow({ "Last name": "Melisandre" });
 await expect(currentPageRow).not.toBeVisible();
 
 // Then find it across pages
-const row = await table.getByRowAcrossPages({ "Last name": "Melisandre" });
+const row = await table.searchForRow({ "Last name": "Melisandre" });
 const actionsCell = row.getCell('Actions');
 await actionsCell.getByLabel("Select row").click();
 ```
@@ -328,8 +328,9 @@ await expect(table.getByRow({ Name: "Ghost User" })).not.toBeVisible();
 Get row data as JSON:
 <!-- embed: get-by-row-json -->
 ```typescript
-// Get row data directly as JSON object
-const data = await table.getByRow({ Name: 'Airi Satou' }, { asJSON: true });
+// Get row data as JSON object
+const row = table.getByRow({ Name: 'Airi Satou' });
+const data = await row.toJSON();
 // Returns: { Name: "Airi Satou", Position: "Accountant", Office: "Tokyo", ... }
 
 expect(data).toHaveProperty('Name', 'Airi Satou');
