@@ -16,6 +16,7 @@ test.describe('AriaSort Strategy', () => {
     const table = useTable(page.locator('#sortable-table'), {
       sorting: SortingStrategies.AriaSort(),
     });
+    await table.init();
 
     await expect(table.sorting.getState('Name')).resolves.toBe('none');
     await expect(table.sorting.getState('Age')).resolves.toBe('none');
@@ -25,6 +26,7 @@ test.describe('AriaSort Strategy', () => {
     const table = useTable(page.locator('#sortable-table'), {
       sorting: SortingStrategies.AriaSort(),
     });
+    await table.init();
 
     await table.sorting.apply('Name', 'asc');
 
@@ -36,6 +38,7 @@ test.describe('AriaSort Strategy', () => {
     const table = useTable(page.locator('#sortable-table'), {
       sorting: SortingStrategies.AriaSort(),
     });
+    await table.init();
 
     // It takes two clicks to get to descending for this implementation
     await table.sorting.apply('Age', 'asc');
@@ -49,6 +52,7 @@ test.describe('AriaSort Strategy', () => {
     const table = useTable(page.locator('#sortable-table'), {
       sorting: SortingStrategies.AriaSort(),
     });
+    await table.init();
 
     await table.sorting.apply('Name', 'asc');
     
@@ -61,6 +65,7 @@ test.describe('AriaSort Strategy', () => {
     const table = useTable(page.locator('#sortable-table'), {
       sorting: SortingStrategies.AriaSort(),
     });
+    await table.init();
 
     await table.sorting.apply('Age', 'desc');
 
@@ -73,6 +78,7 @@ test.describe('AriaSort Strategy', () => {
     const table = useTable(page.locator('#sortable-table'), {
       sorting: SortingStrategies.AriaSort(),
     });
+    await table.init();
 
     // The 'City' column in our test HTML doesn't have `aria-sort` and is not part of the script
     await expect(table.sorting.apply('City', 'asc')).rejects.toThrow();

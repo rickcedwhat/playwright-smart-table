@@ -9,29 +9,31 @@ test.describe('README.md Examples Verification', () => {
 
     // #region quick-start
     // Example from: https://datatables.net/examples/data_sources/dom
-    const table = useTable(page.locator('#example'), {
+    const table = await useTable(page.locator('#example'), {
       headerSelector: 'thead th' // Override for this specific site
-    });
+    }).init();
 
     // Find the row with Name="Airi Satou", then get the Position cell
-    const row = await table.getByRow({ Name: 'Airi Satou' });
+    const row = table.getByRow({ Name: 'Airi Satou' });
 
-    await expect(row.getCell('Position')).toHaveText('Accountant');
+    const positionCell = row.getCell('Position');
+    await expect(positionCell).toHaveText('Accountant');
     // #endregion quick-start
   });
 
   test('SmartRow: Core Pattern', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
-    const table = useTable(page.locator('#example'), { headerSelector: 'thead th' });
+    const table = await useTable(page.locator('#example'), { headerSelector: 'thead th' }).init();
 
     // #region smart-row
     // Example from: https://datatables.net/examples/data_sources/dom
     
     // Get SmartRow via getByRow
-    const row = await table.getByRow({ Name: 'Airi Satou' });
+    const row = table.getByRow({ Name: 'Airi Satou' });
 
     // Interact with cell using column name (resilient to column reordering)
-    await row.getCell('Position').click();
+    const positionCell = row.getCell('Position');
+    await positionCell.click();
 
     // Extract row data as JSON
     const data = await row.toJSON();
@@ -58,33 +60,38 @@ test.describe('README.md Examples Verification', () => {
       ),
       maxPages: 5 // Allow scanning up to 5 pages
     });
+    await table.init();
 
     // ✅ Verify Colleen is NOT visible initially
     await expect(page.getByText("Colleen Hurst")).not.toBeVisible();
 
-    await expect(await table.getByRow({ Name: "Colleen Hurst" })).toBeVisible();
+    // Use getByRowAcrossPages for pagination
+    await expect(await table.getByRowAcrossPages({ Name: "Colleen Hurst" })).toBeVisible();
     // NOTE: We're now on the page where Colleen Hurst exists (typically Page 2)
     // #endregion pagination
   });
 
   test('getByRow: Strict Retrieval & Negative Assertion', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
-    const table = useTable(page.locator('#example'), { headerSelector: 'thead th' });
-
+    
     // #region get-by-row
     // Example from: https://datatables.net/examples/data_sources/dom
+    const table = useTable(page.locator('#example'), { headerSelector: 'thead th' });
+    await table.init();
+    
     // Find a row where Name is "Airi Satou" AND Office is "Tokyo"
-    const row = await table.getByRow({ Name: "Airi Satou", Office: "Tokyo" });
+    const row = table.getByRow({ Name: "Airi Satou", Office: "Tokyo" });
     await expect(row).toBeVisible();
 
     // Assert it does NOT exist
-    await expect(await table.getByRow({ Name: "Ghost User" })).not.toBeVisible();
+    await expect(table.getByRow({ Name: "Ghost User" })).not.toBeVisible();
     // #endregion get-by-row
   });
 
   test('getAllRows: Multiple Usage Patterns', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
     const table = useTable(page.locator('#example'), { headerSelector: 'thead th' });
+    await table.init();
 
     // #region get-all-rows
     // Example from: https://datatables.net/examples/data_sources/dom
@@ -128,14 +135,21 @@ test.describe('README.md Examples Verification', () => {
         return text;
       }
     });
+    await table.init();
 
     const headers = await table.getHeaders();
     // Now we can reference the "Actions" column even if it has no header text
     expect(headers).toContain('Actions');
     
     // Use the renamed column
-    const row = await table.getByRow({ "Last name": "Melisandre" });
-    await row.getCell('Actions').getByLabel("Select row").click();
+    // First check it's not on the current page
+    const currentPageRow = table.getByRow({ "Last name": "Melisandre" });
+    await expect(currentPageRow).not.toBeVisible();
+    
+    // Then find it across pages
+    const row = await table.getByRowAcrossPages({ "Last name": "Melisandre" });
+    const actionsCell = row.getCell('Actions');
+    await actionsCell.getByLabel("Select row").click();
     // #endregion header-transformer
   });
 
@@ -152,10 +166,12 @@ test.describe('README.md Examples Verification', () => {
           .replace(/^\s*|\s*$/g, ''); // Remove leading/trailing spaces
       }
     });
+    await table.init();
 
     // Now column names are consistent
-    const row = await table.getByRow({ "Last Name": "Doe" });
-    await expect(row.getCell("Email")).toHaveText("jdoe@hotmail.com");
+    const row = table.getByRow({ "Last Name": "Doe" });
+    const emailCell = row.getCell("Email");
+    await expect(emailCell).toHaveText("jdoe@hotmail.com");
     // #endregion header-transformer-normalize
   });
 
@@ -168,8 +184,9 @@ test.describe('README.md Examples Verification', () => {
       headerSelector: 'thead th',
       debug: true // Enables verbose logging of internal operations
     });
+    await table.init();
     
-    const row = await table.getByRow({ Name: 'Airi Satou' });
+    const row = table.getByRow({ Name: 'Airi Satou' });
     await expect(row).toBeVisible();
     // #endregion advanced-debug
   });
@@ -183,26 +200,29 @@ test.describe('README.md Examples Verification', () => {
       ),
       maxPages: 5
     });
+    await table.init();
     
     // #region advanced-reset
     // Example from: https://datatables.net/examples/data_sources/dom
     // Navigate deep into the table by searching for a row on a later page
     try {
-      await table.getByRow({ Name: 'Angelica Ramos' });
+      await table.getByRowAcrossPages({ Name: 'Angelica Ramos' });
     } catch (e) {}
     
-    // Reset internal state (and potentially UI) to Page 1
-    await table.reset();
+    // Reset internal state (and potentially UI) to initial page
+    await table.reset(); 
+    await table.init(); // Re-init after reset
     
     // Now subsequent searches start from the beginning
-    const firstPageRow = await table.getByRow({ Name: 'Airi Satou' });
-    await expect(firstPageRow).toBeVisible();
+    const currentPageRow = table.getByRow({ Name: 'Airi Satou' });
+    await expect(currentPageRow).toBeVisible();
     // #endregion advanced-reset
   });
 
   test('Advanced: Column Scanning', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
     const table = useTable(page.locator('#example'), { headerSelector: 'thead th' });
+    await table.init();
 
     // #region advanced-column-scan
     // Example from: https://datatables.net/examples/data_sources/dom
@@ -216,6 +236,7 @@ test.describe('README.md Examples Verification', () => {
   test('Advanced: Column Scanning with Custom Mapper', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
     const table = useTable(page.locator('#example'), { headerSelector: 'thead th' });
+    await table.init();
 
     // #region advanced-column-scan-mapper
     // Extract numeric values from a column
@@ -235,6 +256,7 @@ test.describe('README.md Examples Verification', () => {
   test('getByRow: Returning JSON Data', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
     const table = useTable(page.locator('#example'), { headerSelector: 'thead th' });
+    await table.init();
 
     // #region get-by-row-json
     // Get row data directly as JSON object
@@ -249,6 +271,7 @@ test.describe('README.md Examples Verification', () => {
   test('getAllRows: Filtering with Exact Match', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
     const table = useTable(page.locator('#example'), { headerSelector: 'thead th' });
+    await table.init();
 
     // #region get-all-rows-exact
     // Get rows with exact match (default is fuzzy/contains match)
@@ -259,6 +282,102 @@ test.describe('README.md Examples Verification', () => {
     
     expect(exactMatches.length).toBeGreaterThan(0);
     // #endregion get-all-rows-exact
+  });
+
+  test('iterateThroughTable: Iterate through paginated data', async ({ page }) => {
+    await page.goto('https://datatables.net/examples/data_sources/dom');
+    await page.waitForSelector('#example_wrapper');
+    
+    const table = useTable(page.locator('#example'), {
+      headerSelector: 'thead th',
+      pagination: TableStrategies.clickNext(() => 
+        page.getByRole('link', { name: 'Next' })
+      ),
+      maxPages: 3
+    });
+    await table.init();
+
+    // #region iterate-through-table
+    // Iterate through all pages and collect data
+    const allNames = await table.iterateThroughTable(async ({ rows, index }) => {
+      // Return names from this iteration - automatically appended to allData
+      return await Promise.all(rows.map(r => r.getCell('Name').innerText()));
+    });
+    
+    // allNames contains all names from all iterations
+    // Verify sorting across allNames
+    expect(allNames.flat().length).toBeGreaterThan(10);
+    // #endregion iterate-through-table
+  });
+
+  test('iterateThroughTable: Scrape all data with deduplication', async ({ page }) => {
+    await page.goto('https://htmx.org/examples/infinite-scroll/');
+    
+    const table = useTable(page.locator('table'), {
+      rowSelector: 'tbody tr',
+      headerSelector: 'thead th',
+      cellSelector: 'td',
+      pagination: TableStrategies.infiniteScroll(),
+      maxPages: 3
+    });
+    await table.init();
+
+    // Get headers to find a suitable column for deduplication
+    const headers = await table.getHeaders();
+    const dedupeColumn = headers[0];
+
+    // #region iterate-through-table-dedupe
+    // Scrape all data with deduplication (useful for infinite scroll)
+    const allData = await table.iterateThroughTable(
+      async ({ rows }) => {
+        // Return row data - automatically appended to allData
+        return await Promise.all(rows.map(r => r.toJSON()));
+      },
+      { 
+        dedupeStrategy: (row) => row.getCell(dedupeColumn).innerText(),
+        getIsLast: ({ paginationResult }) => !paginationResult
+      }
+    );
+    
+    // allData contains all row data from all iterations (deduplicated at row level)
+    expect(allData.flat().length).toBeGreaterThan(0);
+    // #endregion iterate-through-table-dedupe
+  });
+
+  test('iterateThroughTable: Using hooks and custom logic', async ({ page }) => {
+    await page.goto('https://datatables.net/examples/data_sources/dom');
+    await page.waitForSelector('#example_wrapper');
+    
+    const table = useTable(page.locator('#example'), {
+      headerSelector: 'thead th',
+      pagination: TableStrategies.clickNext(() => 
+        page.getByRole('link', { name: 'Next' })
+      ),
+      maxPages: 3
+    });
+    await table.init();
+
+    // #region iterate-through-table-hooks
+    const allData = await table.iterateThroughTable(
+      async ({ rows, index, isFirst, isLast }) => {
+        // Normal logic for each iteration - return value appended to allData
+        return await Promise.all(rows.map(r => r.toJSON()));
+      },
+      {
+        getIsLast: ({ paginationResult }) => !paginationResult,
+        onFirst: async ({ allData }) => {
+          console.log('Starting data collection...');
+          // Could perform setup actions
+        },
+        onLast: async ({ allData }) => {
+          console.log(`Collected ${allData.length} total items`);
+          // Could perform cleanup or final actions
+        }
+      }
+    );
+    // #endregion iterate-through-table-hooks
+    
+    expect(allData.length).toBeGreaterThan(0);
   });
 
   test('fill: Intelligent Row Data Entry', async ({ page }) => {
@@ -306,12 +425,13 @@ test.describe('README.md Examples Verification', () => {
     `);
 
     const table = useTable(page.locator('#editable-table'));
+    await table.init();
 
     // #region fill-basic
     // Find a row and fill it with new data
-    const row = await table.getByRow({ ID: '1' });
+    const row = table.getByRow({ ID: '1' });
     
-    await row.fill({
+    await row.smartFill({
       Name: 'John Updated',
       Status: 'Inactive',
       Active: false,
@@ -319,10 +439,14 @@ test.describe('README.md Examples Verification', () => {
     });
 
     // Verify the values were filled correctly
-    await expect(row.getCell('Name').locator('input')).toHaveValue('John Updated');
-    await expect(row.getCell('Status').locator('select')).toHaveValue('Inactive');
-    await expect(row.getCell('Active').locator('input[type="checkbox"]')).not.toBeChecked();
-    await expect(row.getCell('Notes').locator('textarea')).toHaveValue('Updated notes here');
+    const nameCell = row.getCell('Name');
+    const statusCell = row.getCell('Status');
+    const activeCell = row.getCell('Active');
+    const notesCell = row.getCell('Notes');
+    await expect(nameCell.locator('input')).toHaveValue('John Updated');
+    await expect(statusCell.locator('select')).toHaveValue('Inactive');
+    await expect(activeCell.locator('input[type="checkbox"]')).not.toBeChecked();
+    await expect(notesCell.locator('textarea')).toHaveValue('Updated notes here');
     // #endregion fill-basic
   });
 
@@ -360,12 +484,13 @@ test.describe('README.md Examples Verification', () => {
     `);
 
     const table = useTable(page.locator('#custom-table'));
+    await table.init();
 
     // #region fill-custom-mappers
-    const row = await table.getByRow({ ID: '1' });
+    const row = table.getByRow({ ID: '1' });
     
     // Use custom input mappers for specific columns
-    await row.fill({
+    await row.smartFill({
       Name: 'John Updated',
       Status: 'Inactive'
     }, {
@@ -378,8 +503,10 @@ test.describe('README.md Examples Verification', () => {
     });
 
     // Verify the values
-    await expect(row.getCell('Name').locator('.primary-input')).toHaveValue('John Updated');
-    await expect(row.getCell('Status').locator('select')).toHaveValue('Inactive');
+    const nameCell = row.getCell('Name');
+    const statusCell = row.getCell('Status');
+    await expect(nameCell.locator('.primary-input')).toHaveValue('John Updated');
+    await expect(statusCell.locator('select')).toHaveValue('Inactive');
     // #endregion fill-custom-mappers
   });
 });
