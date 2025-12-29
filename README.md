@@ -21,14 +21,15 @@ For standard HTML tables (`<table>`, `<tr>`, `<td>`), the library works out of t
 <!-- embed: quick-start -->
 ```typescript
 // Example from: https://datatables.net/examples/data_sources/dom
-const table = useTable(page.locator('#example'), {
+const table = await useTable(page.locator('#example'), {
   headerSelector: 'thead th' // Override for this specific site
-});
+}).init();
 
 // Find the row with Name="Airi Satou", then get the Position cell
-const row = await table.getByRow({ Name: 'Airi Satou' });
+const row = table.getByRow({ Name: 'Airi Satou' });
 
-await expect(row.getCell('Position')).toHaveText('Accountant');
+const positionCell = row.getCell('Position');
+await expect(positionCell).toHaveText('Accountant');
 ```
 <!-- /embed: quick-start -->
 
@@ -46,10 +47,11 @@ The `SmartRow` is the core power of this library. Unlike a standard Playwright `
 // Example from: https://datatables.net/examples/data_sources/dom
 
 // Get SmartRow via getByRow
-const row = await table.getByRow({ Name: 'Airi Satou' });
+const row = table.getByRow({ Name: 'Airi Satou' });
 
 // Interact with cell using column name (resilient to column reordering)
-await row.getCell('Position').click();
+const positionCell = row.getCell('Position');
+await positionCell.click();
 
 // Extract row data as JSON
 const data = await row.toJSON();
@@ -84,11 +86,13 @@ const table = useTable(page.locator('#example'), {
   ),
   maxPages: 5 // Allow scanning up to 5 pages
 });
+await table.init();
 
 // ✅ Verify Colleen is NOT visible initially
 await expect(page.getByText("Colleen Hurst")).not.toBeVisible();
 
-await expect(await table.getByRow({ Name: "Colleen Hurst" })).toBeVisible();
+// Use getByRowAcrossPages for pagination
+await expect(await table.getByRowAcrossPages({ Name: "Colleen Hurst" })).toBeVisible();
 // NOTE: We're now on the page where Colleen Hurst exists (typically Page 2)
 ```
 <!-- /embed: pagination -->
@@ -104,8 +108,9 @@ const table = useTable(page.locator('#example'), {
   headerSelector: 'thead th',
   debug: true // Enables verbose logging of internal operations
 });
+await table.init();
 
-const row = await table.getByRow({ Name: 'Airi Satou' });
+const row = table.getByRow({ Name: 'Airi Satou' });
 await expect(row).toBeVisible();
 ```
 <!-- /embed: advanced-debug -->
@@ -121,15 +126,16 @@ If your tests navigate deep into a paginated table, use `.reset()` to return to 
 // Example from: https://datatables.net/examples/data_sources/dom
 // Navigate deep into the table by searching for a row on a later page
 try {
-  await table.getByRow({ Name: 'Angelica Ramos' });
+  await table.getByRowAcrossPages({ Name: 'Angelica Ramos' });
 } catch (e) {}
 
-// Reset internal state (and potentially UI) to Page 1
-await table.reset();
+// Reset internal state (and potentially UI) to initial page
+await table.reset(); 
+await table.init(); // Re-init after reset
 
 // Now subsequent searches start from the beginning
-const firstPageRow = await table.getByRow({ Name: 'Airi Satou' });
-await expect(firstPageRow).toBeVisible();
+const currentPageRow = table.getByRow({ Name: 'Airi Satou' });
+await expect(currentPageRow).toBeVisible();
 ```
 <!-- /embed: advanced-reset -->
 
@@ -149,14 +155,14 @@ expect(offices.length).toBeGreaterThan(0);
 
 ### Filling Row Data
 
-Use `fill()` to intelligently populate form fields in a table row. The method automatically detects input types (text inputs, selects, checkboxes, contenteditable divs) and fills them appropriately.
+Use `smartFill()` to intelligently populate form fields in a table row. The method automatically detects input types (text inputs, selects, checkboxes, contenteditable divs) and fills them appropriately. You can still use Locator's standard `fill()` method for single-input scenarios.
 
 <!-- embed: fill-basic -->
 ```typescript
 // Find a row and fill it with new data
-const row = await table.getByRow({ ID: '1' });
+const row = table.getByRow({ ID: '1' });
 
-await row.fill({
+await row.smartFill({
   Name: 'John Updated',
   Status: 'Inactive',
   Active: false,
@@ -164,10 +170,14 @@ await row.fill({
 });
 
 // Verify the values were filled correctly
-await expect(row.getCell('Name').locator('input')).toHaveValue('John Updated');
-await expect(row.getCell('Status').locator('select')).toHaveValue('Inactive');
-await expect(row.getCell('Active').locator('input[type="checkbox"]')).not.toBeChecked();
-await expect(row.getCell('Notes').locator('textarea')).toHaveValue('Updated notes here');
+const nameCell = row.getCell('Name');
+const statusCell = row.getCell('Status');
+const activeCell = row.getCell('Active');
+const notesCell = row.getCell('Notes');
+await expect(nameCell.locator('input')).toHaveValue('John Updated');
+await expect(statusCell.locator('select')).toHaveValue('Inactive');
+await expect(activeCell.locator('input[type="checkbox"]')).not.toBeChecked();
+await expect(notesCell.locator('textarea')).toHaveValue('Updated notes here');
 ```
 <!-- /embed: fill-basic -->
 
@@ -183,10 +193,10 @@ For edge cases where auto-detection doesn't work (e.g., custom components, multi
 
 <!-- embed: fill-custom-mappers -->
 ```typescript
-const row = await table.getByRow({ ID: '1' });
+const row = table.getByRow({ ID: '1' });
 
 // Use custom input mappers for specific columns
-await row.fill({
+await row.smartFill({
   Name: 'John Updated',
   Status: 'Inactive'
 }, {
@@ -199,8 +209,10 @@ await row.fill({
 });
 
 // Verify the values
-await expect(row.getCell('Name').locator('.primary-input')).toHaveValue('John Updated');
-await expect(row.getCell('Status').locator('select')).toHaveValue('Inactive');
+const nameCell = row.getCell('Name');
+const statusCell = row.getCell('Status');
+await expect(nameCell.locator('.primary-input')).toHaveValue('John Updated');
+await expect(statusCell.locator('select')).toHaveValue('Inactive');
 ```
 <!-- /embed: fill-custom-mappers -->
 
@@ -232,14 +244,21 @@ const table = useTable(page.locator('.MuiDataGrid-root').first(), {
     return text;
   }
 });
+await table.init();
 
 const headers = await table.getHeaders();
 // Now we can reference the "Actions" column even if it has no header text
 expect(headers).toContain('Actions');
 
 // Use the renamed column
-const row = await table.getByRow({ "Last name": "Melisandre" });
-await row.getCell('Actions').getByLabel("Select row").click();
+// First check it's not on the current page
+const currentPageRow = table.getByRow({ "Last name": "Melisandre" });
+await expect(currentPageRow).not.toBeVisible();
+
+// Then find it across pages
+const row = await table.getByRowAcrossPages({ "Last name": "Melisandre" });
+const actionsCell = row.getCell('Actions');
+await actionsCell.getByLabel("Select row").click();
 ```
 <!-- /embed: header-transformer -->
 
@@ -258,10 +277,12 @@ const table = useTable(page.locator('#table1'), {
       .replace(/^\s*|\s*$/g, ''); // Remove leading/trailing spaces
   }
 });
+await table.init();
 
 // Now column names are consistent
-const row = await table.getByRow({ "Last Name": "Doe" });
-await expect(row.getCell("Email")).toHaveText("jdoe@hotmail.com");
+const row = table.getByRow({ "Last Name": "Doe" });
+const emailCell = row.getCell("Email");
+await expect(emailCell).toHaveText("jdoe@hotmail.com");
 ```
 <!-- /embed: header-transformer-normalize -->
 
@@ -292,12 +313,15 @@ getByRow: <T extends { asJSON?: boolean }>(
 <!-- embed: get-by-row -->
 ```typescript
 // Example from: https://datatables.net/examples/data_sources/dom
+const table = useTable(page.locator('#example'), { headerSelector: 'thead th' });
+await table.init();
+
 // Find a row where Name is "Airi Satou" AND Office is "Tokyo"
-const row = await table.getByRow({ Name: "Airi Satou", Office: "Tokyo" });
+const row = table.getByRow({ Name: "Airi Satou", Office: "Tokyo" });
 await expect(row).toBeVisible();
 
 // Assert it does NOT exist
-await expect(await table.getByRow({ Name: "Ghost User" })).not.toBeVisible();
+await expect(table.getByRow({ Name: "Ghost User" })).not.toBeVisible();
 ```
 <!-- /embed: get-by-row -->
 
@@ -534,13 +558,13 @@ A `SmartRow` extends Playwright's `Locator` with table-aware methods.
 
 <!-- embed-type: SmartRow -->
 ```typescript
-export type SmartRow = Omit<Locator, 'fill'> & {
+export type SmartRow = Locator & {
   getCell(column: string): Locator;
   toJSON(): Promise<Record<string, string>>;
   /**
    * Fills the row with data. Automatically detects input types (text input, select, checkbox, etc.).
    */
-  fill: (data: Record<string, any>, options?: FillOptions) => Promise<void>;
+  smartFill: (data: Record<string, any>, options?: FillOptions) => Promise<void>;
 };
 ```
 <!-- /embed-type: SmartRow -->
@@ -548,7 +572,7 @@ export type SmartRow = Omit<Locator, 'fill'> & {
 **Methods:**
 - `getCell(column: string)`: Returns a `Locator` for the specified cell in this row
 - `toJSON()`: Extracts all cell data as a key-value object
-- `fill(data, options?)`: Intelligently fills form fields in the row. Automatically detects input types or use `inputMappers` for custom control
+- `smartFill(data, options?)`: Intelligently fills form fields in the row. Automatically detects input types or use `inputMappers` for custom control. Use Locator's standard `fill()` for single-input scenarios.
 
 All standard Playwright `Locator` methods (`.click()`, `.isVisible()`, `.textContent()`, etc.) are also available.
 
@@ -578,7 +602,7 @@ export interface TableConfig {
    */
   debug?: boolean;
   /**
-   * Strategy to reset the table to the first page.
+   * Strategy to reset the table to the initial page.
    * Called when table.reset() is invoked.
    */
   onReset?: (context: TableContext) => Promise<void>;

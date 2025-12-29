@@ -9,13 +9,13 @@ exports.TYPE_CONTEXT = void 0;
 exports.TYPE_CONTEXT = `
 export type Selector = string | ((root: Locator | Page) => Locator);
 
-export type SmartRow = Omit<Locator, 'fill'> & {
+export type SmartRow = Locator & {
   getCell(column: string): Locator;
   toJSON(): Promise<Record<string, string>>;
   /**
    * Fills the row with data. Automatically detects input types (text input, select, checkbox, etc.).
    */
-  fill: (data: Record<string, any>, options?: FillOptions) => Promise<void>;
+  smartFill: (data: Record<string, any>, options?: FillOptions) => Promise<void>;
 };
 
 export type StrategyContext = TableContext;
@@ -51,6 +51,8 @@ export interface TableContext {
 
 export type PaginationStrategy = (context: TableContext) => Promise<boolean>;
 
+export type DedupeStrategy = (row: SmartRow) => string | number;
+
 export interface PromptOptions {
   /**
    * Output Strategy:
@@ -81,7 +83,7 @@ export interface TableConfig {
    */
   debug?: boolean;
   /**
-   * Strategy to reset the table to the first page.
+   * Strategy to reset the table to the initial page.
    * Called when table.reset() is invoked.
    */
   onReset?: (context: TableContext) => Promise<void>;
@@ -105,10 +107,28 @@ export interface FillOptions {
 }
 
 export interface TableResult {
+  /**
+   * Initializes the table by resolving headers. Must be called before using sync methods.
+   * @param options Optional timeout for header resolution (default: 3000ms)
+   */
+  init(options?: { timeout?: number }): Promise<TableResult>;
+
   getHeaders: () => Promise<string[]>;
   getHeaderCell: (columnName: string) => Promise<Locator>;
 
+  /**
+   * Finds a row on the current page only. Returns immediately (sync).
+   * Throws error if table is not initialized.
+   */
   getByRow: <T extends { asJSON?: boolean }>(
+    filters: Record<string, string | RegExp | number>, 
+    options?: { exact?: boolean } & T
+  ) => T['asJSON'] extends true ? Promise<Record<string, string>> : SmartRow;
+
+  /**
+   * Finds a row across multiple pages using pagination. Auto-initializes if needed.
+   */
+  getByRowAcrossPages: <T extends { asJSON?: boolean }>(
     filters: Record<string, string | RegExp | number>, 
     options?: { exact?: boolean, maxPages?: number } & T
   ) => Promise<T['asJSON'] extends true ? Record<string, string> : SmartRow>;

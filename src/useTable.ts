@@ -1,5 +1,5 @@
 import type { Locator, Page } from '@playwright/test';
-import { TableConfig, TableContext, Selector, TableResult, SmartRow, PromptOptions, FillOptions, StrategyContext, FinalTableConfig } from './types';
+import { TableConfig, TableContext, Selector, TableResult, SmartRow, PromptOptions, FillOptions, StrategyContext, FinalTableConfig, DedupeStrategy, RestrictedTableResult, PaginationStrategy } from './types';
 import { TYPE_CONTEXT } from './typeContext';
 import { SortingStrategies as ImportedSortingStrategies } from './strategies/sorting';
 import { PaginationStrategies as ImportedPaginationStrategies, TableStrategies as DeprecatedTableStrategies } from './strategies/pagination';
@@ -20,6 +20,9 @@ export const TableStrategies = DeprecatedTableStrategies;
 export const SortingStrategies = ImportedSortingStrategies;
 
 export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}): TableResult => {
+  // Store whether pagination was explicitly provided in config
+  const hasPaginationInConfig = configOptions.pagination !== undefined;
+  
   const config: FinalTableConfig = {
     rowSelector: "tbody tr",
     headerSelector: "th",
@@ -42,6 +45,7 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
   // Internal State
   let _headerMap: Map<string, number> | null = null;
   let _hasPaginated = false;
+  let _isInitialized = false;
 
   const logDebug = (msg: string) => {
     if (config.debug) console.log(`🔎 [SmartTable Debug] ${msg}`);
@@ -77,10 +81,12 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
     return new Error(`Column "${colName}" not found${contextMsg}${suggestion}`);
   };
 
-  const _getMap = async () => {
+  const _getMap = async (timeout?: number) => {
     if (_headerMap) return _headerMap;
 
     logDebug('Mapping headers...');
+
+    const headerTimeout = timeout ?? 3000;
 
     if (config.autoScroll) {
       try { await rootLocator.scrollIntoViewIfNeeded({ timeout: 1000 }); } catch (e) { }
@@ -88,7 +94,7 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
 
     const headerLoc = resolve(config.headerSelector, rootLocator);
     try {
-      await headerLoc.first().waitFor({ state: 'visible', timeout: 3000 });
+      await headerLoc.first().waitFor({ state: 'visible', timeout: headerTimeout });
     } catch (e) { /* Ignore hydration */ }
 
     // 1. Fetch data efficiently
@@ -145,7 +151,7 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
       return result;
     };
 
-    smart.fill = async (data: Record<string, any>, fillOptions?: FillOptions) => {
+    smart.smartFill = async (data: Record<string, any>, fillOptions?: FillOptions) => {
       logDebug(`Filling row with data: ${JSON.stringify(data)}`);
       
       // Fill each column
@@ -379,42 +385,37 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
     });
   };
 
-  const sortingNamespace = {
-    apply: async (columnName: string, direction: 'asc' | 'desc'): Promise<void> => {
-      if (!config.sorting) {
-        throw new Error('No sorting strategy has been configured. Please add a `sorting` strategy to your useTable config.');
-      }
-      logDebug(`Applying sort for column "${columnName}" (${direction})`);
-      const context: StrategyContext = {
-        root: rootLocator,
-        config: config,
-        page: rootLocator.page(),
-        resolve: resolve
-      };
-      await config.sorting.doSort({ columnName, direction, context });
-    },
-    getState: async (columnName: string): Promise<'asc' | 'desc' | 'none'> => {
-      if (!config.sorting) {
-        throw new Error('No sorting strategy has been configured. Please add a `sorting` strategy to your useTable config.');
-      }
-      logDebug(`Getting sort state for column "${columnName}"`);
-      const context: StrategyContext = {
-        root: rootLocator,
-        config: config,
-        page: rootLocator.page(),
-        resolve: resolve
-      };
-      return config.sorting.getSortState({ columnName, context });
+  // Helper to ensure initialization for async methods
+  const _ensureInitialized = async () => {
+    if (!_isInitialized) {
+      await _getMap();
+      _isInitialized = true;
     }
   };
 
-  return {
-    getHeaders: async () => Array.from((await _getMap()).keys()),
+  const result: TableResult = {
+    init: async (options?: { timeout?: number }): Promise<TableResult> => {
+      if (_isInitialized && _headerMap) {
+        return result;
+      }
+      await _getMap(options?.timeout);
+      _isInitialized = true;
+      return result;
+    },
+
+    getHeaders: async () => {
+      if (!_isInitialized || !_headerMap) {
+        throw new Error('Table not initialized. Call await table.init() first.');
+      }
+      return Array.from(_headerMap.keys());
+    },
 
     getHeaderCell: async (columnName: string) => {
-      const map = await _getMap();
-      const idx = map.get(columnName);
-      if (idx === undefined) throw _createColumnError(columnName, map, 'header cell');
+      if (!_isInitialized || !_headerMap) {
+        throw new Error('Table not initialized. Call await table.init() first.');
+      }
+      const idx = _headerMap.get(columnName);
+      if (idx === undefined) throw _createColumnError(columnName, _headerMap, 'header cell');
       return resolve(config.headerSelector, rootLocator).nth(idx);
     },
 
@@ -428,14 +429,17 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
       };
       await config.onReset(context);
       _hasPaginated = false;
-      _headerMap = null; 
+      _headerMap = null;
+      _isInitialized = false;
       logDebug("Table reset complete.");
     },
 
     getColumnValues: async <V = string>(column: string, options?: { mapper?: (cell: Locator) => Promise<V> | V, maxPages?: number }) => {
-      const map = await _getMap();
-      const colIdx = map.get(column);
-      if (colIdx === undefined) throw _createColumnError(column, map);
+      // Auto-init if needed (async methods can auto-init)
+      await _ensureInitialized();
+
+      const colIdx = _headerMap!.get(column);
+      if (colIdx === undefined) throw _createColumnError(column, _headerMap!);
       
       const mapper = options?.mapper ?? ((c: Locator) => c.innerText() as any as V);
       const effectiveMaxPages = options?.maxPages ?? config.maxPages; 
@@ -471,17 +475,43 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
       return results;
     },
 
-    getByRow: async <T extends { asJSON?: boolean }>(
+    getByRow: <T extends { asJSON?: boolean }>(
+      filters: Record<string, string | RegExp | number>,
+      options?: { exact?: boolean } & T
+    ): T['asJSON'] extends true ? Promise<Record<string, string>> : SmartRow => {
+      // Throw error if not initialized (sync methods require explicit init)
+      if (!_isInitialized || !_headerMap) {
+        throw new Error('Table not initialized. Call await table.init() first.');
+      }
+
+      // Build locator chain (sync) - current page only
+      const allRows = resolve(config.rowSelector, rootLocator);
+      const matchedRows = _applyFilters(allRows, filters, _headerMap, options?.exact || false);
+      
+      // Return first match (or sentinel) - lazy, doesn't check existence
+      const rowLocator = matchedRows.first();
+      const smartRow = _makeSmart(rowLocator, _headerMap);
+
+      if (options?.asJSON) {
+        return smartRow.toJSON() as any;
+      }
+      return smartRow as any;
+    },
+
+    getByRowAcrossPages: async <T extends { asJSON?: boolean }>(
       filters: Record<string, string | RegExp | number>,
       options?: { exact?: boolean, maxPages?: number } & T
     ): Promise<T['asJSON'] extends true ? Record<string, string> : SmartRow> => {
-      let row = await _findRowLocator(filters, options);
+      // Auto-init if needed (async methods can auto-init)
+      await _ensureInitialized();
 
+      // Full pagination logic (existing _findRowLocator logic)
+      let row = await _findRowLocator(filters, options);
       if (!row) {
         row = resolve(config.rowSelector, rootLocator).filter({ hasText: "___SENTINEL_ROW_NOT_FOUND___" + Date.now() });
       }
 
-      const smartRow = _makeSmart(row, await _getMap());
+      const smartRow = _makeSmart(row, _headerMap!);
 
       if (options?.asJSON) {
         return smartRow.toJSON() as any;
@@ -490,15 +520,17 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
     },
 
     getAllRows: async <T extends { asJSON?: boolean }>(options?: { filter?: Record<string, any>, exact?: boolean } & T): Promise<any> => {
-      const map = await _getMap();
+      // Auto-init if needed (async methods can auto-init)
+      await _ensureInitialized();
+
       let rowLocators = resolve(config.rowSelector, rootLocator);
 
       if (options?.filter) {
-        rowLocators = _applyFilters(rowLocators, options.filter, map, options.exact || false);
+        rowLocators = _applyFilters(rowLocators, options.filter, _headerMap!, options.exact || false);
       }
 
       const rows = await rowLocators.all();
-      const smartRows = rows.map(loc => _makeSmart(loc, map));
+      const smartRows = rows.map(loc => _makeSmart(loc, _headerMap!));
 
       if (options?.asJSON) {
         return Promise.all(smartRows.map(r => r.toJSON()));
@@ -520,6 +552,181 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
       await _handlePrompt('Smart Table Strategy', content, options);
     },
 
-    sorting: sortingNamespace,
+    sorting: {
+      apply: async (columnName: string, direction: 'asc' | 'desc'): Promise<void> => {
+        // Auto-init if needed (async methods can auto-init)
+        await _ensureInitialized();
+
+        if (!config.sorting) {
+          throw new Error('No sorting strategy has been configured. Please add a `sorting` strategy to your useTable config.');
+        }
+        logDebug(`Applying sort for column "${columnName}" (${direction})`);
+        const context: StrategyContext = {
+          root: rootLocator,
+          config: config,
+          page: rootLocator.page(),
+          resolve: resolve
+        };
+        await config.sorting.doSort({ columnName, direction, context });
+      },
+      getState: async (columnName: string): Promise<'asc' | 'desc' | 'none'> => {
+        // Auto-init if needed (async methods can auto-init)
+        await _ensureInitialized();
+
+        if (!config.sorting) {
+          throw new Error('No sorting strategy has been configured. Please add a `sorting` strategy to your useTable config.');
+        }
+        logDebug(`Getting sort state for column "${columnName}"`);
+        const context: StrategyContext = {
+          root: rootLocator,
+          config: config,
+          page: rootLocator.page(),
+          resolve: resolve
+        };
+        return config.sorting.getSortState({ columnName, context });
+      }
+    },
+
+    iterateThroughTable: async <T = any>(
+      callback: (context: {
+        index: number;
+        isFirst: boolean;
+        isLast: boolean;
+        rows: SmartRow[];
+        allData: T[];
+        table: RestrictedTableResult;
+      }) => T | Promise<T>,
+      options?: {
+        pagination?: PaginationStrategy;
+        dedupeStrategy?: DedupeStrategy;
+        maxIterations?: number;
+        getIsFirst?: (context: { index: number }) => boolean;
+        getIsLast?: (context: { index: number, paginationResult: boolean }) => boolean;
+        onFirst?: (context: { index: number, rows: SmartRow[], allData: any[] }) => void | Promise<void>;
+        onLast?: (context: { index: number, rows: SmartRow[], allData: any[] }) => void | Promise<void>;
+      }
+    ): Promise<T[]> => {
+      // Auto-init if needed (async methods can auto-init)
+      await _ensureInitialized();
+
+      // Determine pagination strategy
+      const paginationStrategy = options?.pagination ?? config.pagination;
+      
+      // Check if pagination was explicitly provided in options or config
+      const hasPaginationInOptions = options?.pagination !== undefined;
+      
+      if (!hasPaginationInOptions && !hasPaginationInConfig) {
+        throw new Error('No pagination strategy provided. Either set pagination in options or in table config.');
+      }
+
+      // Reset to initial page before starting
+      await result.reset();
+      await result.init();
+
+      // Create restricted table instance (excludes problematic methods)
+      const restrictedTable: RestrictedTableResult = {
+        init: result.init,
+        getHeaders: result.getHeaders,
+        getHeaderCell: result.getHeaderCell,
+        getByRow: result.getByRow,
+        getAllRows: result.getAllRows,
+        getColumnValues: result.getColumnValues,
+        generateConfigPrompt: result.generateConfigPrompt,
+        generateStrategyPrompt: result.generateStrategyPrompt,
+        sorting: result.sorting,
+      };
+
+      // Default functions
+      const getIsFirst = options?.getIsFirst ?? (({ index }) => index === 0);
+      const getIsLast = options?.getIsLast ?? (() => false);
+
+      // Create allData array (persists across iterations)
+      const allData: T[] = [];
+      const effectiveMaxIterations = options?.maxIterations ?? config.maxPages;
+      let index = 0;
+      let paginationResult = true; // Will be set after first pagination attempt
+      let seenKeys: Set<string | number> | null = null; // Track seen keys across iterations for deduplication
+
+      logDebug(`Starting iterateThroughTable (maxIterations: ${effectiveMaxIterations})`);
+
+      while (index < effectiveMaxIterations) {
+        // Get current rows
+        const rowLocators = await resolve(config.rowSelector, rootLocator).all();
+        let rows = rowLocators.map(loc => _makeSmart(loc, _headerMap!));
+
+        // Deduplicate if dedupeStrategy provided (across all iterations)
+        if (options?.dedupeStrategy && rows.length > 0) {
+          if (!seenKeys) {
+            seenKeys = new Set<string | number>();
+          }
+          const deduplicated: SmartRow[] = [];
+          for (const row of rows) {
+            const key = await options.dedupeStrategy(row);
+            if (!seenKeys.has(key)) {
+              seenKeys.add(key);
+              deduplicated.push(row);
+            }
+          }
+          rows = deduplicated;
+          logDebug(`Deduplicated ${rowLocators.length} rows to ${rows.length} unique rows (total seen: ${seenKeys.size})`);
+        }
+
+        // Determine flags (isLast will be checked after pagination attempt)
+        const isFirst = getIsFirst({ index });
+        let isLast = getIsLast({ index, paginationResult });
+        
+        // Check if this is the last iteration due to maxIterations (before attempting pagination)
+        const isLastDueToMax = index === effectiveMaxIterations - 1;
+
+        // Call onFirst hook if applicable
+        if (isFirst && options?.onFirst) {
+          await options.onFirst({ index, rows, allData });
+        }
+
+        // Call main callback
+        const returnValue = await callback({
+          index,
+          isFirst,
+          isLast,
+          rows,
+          allData,
+          table: restrictedTable,
+        });
+
+        // Append return value to allData
+        allData.push(returnValue);
+
+        // Attempt pagination (before checking if we should continue)
+        const context: TableContext = {
+          root: rootLocator,
+          config: config,
+          page: rootLocator.page(),
+          resolve: resolve
+        };
+        paginationResult = await paginationStrategy(context);
+
+        // Now check isLast with updated paginationResult
+        isLast = getIsLast({ index, paginationResult }) || isLastDueToMax;
+
+        // Call onLast hook if applicable (after we know pagination failed or we're at max iterations)
+        if (isLast && options?.onLast) {
+          await options.onLast({ index, rows, allData });
+        }
+
+        // Check if we should continue
+        if (isLast || !paginationResult) {
+          logDebug(`Reached last iteration (index: ${index}, paginationResult: ${paginationResult}, isLastDueToMax: ${isLastDueToMax})`);
+          break;
+        }
+
+        index++;
+        logDebug(`Iteration ${index} completed, continuing...`);
+      }
+
+      logDebug(`iterateThroughTable completed after ${index + 1} iterations, collected ${allData.length} items`);
+      return allData;
+    },
   };
+
+  return result;
 };

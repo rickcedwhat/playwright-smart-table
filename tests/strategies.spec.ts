@@ -18,12 +18,14 @@ test.describe('Real World Strategy Tests', () => {
       pagination: TableStrategies.infiniteScroll(), 
       maxPages: 5
     });
+    await table.init();
 
     const initialRows = await table.getAllRows();
     console.log(`Initial Row Count: ${initialRows.length}`);
 
     console.log("🔎 Triggering Scroll...");
-    const missing = await table.getByRow({ "ID": "NonExistentID" });
+    // Use getByRowAcrossPages for pagination
+    const missing = await table.getByRowAcrossPages({ "ID": "NonExistentID" });
     
     await expect(missing).not.toBeVisible();
     
@@ -52,6 +54,7 @@ test.describe('Real World Strategy Tests', () => {
       // ✅ Rename the empty column to "Actions" so we can reference it easily
       headerTransformer: ({ text }) => text.includes('__col_') ? "Actions" : text
     });
+    await table.init();
 
     // Debug: See what columns were detected
     const headers = await table.getHeaders();
@@ -59,7 +62,12 @@ test.describe('Real World Strategy Tests', () => {
     expect(headers).toContain('Actions');
 
     // 3. Find a row (Melisandre is usually in the standard demo dataset)
-    const row = await table.getByRow({ "Last name": "Melisandre" });
+    // First check it's not on the current page
+    const currentPageRow = table.getByRow({ "Last name": "Melisandre" });
+    await expect(currentPageRow).not.toBeVisible();
+    
+    // Then find it across pages
+    const row = await table.getByRowAcrossPages({ "Last name": "Melisandre" });
     await expect(row).toBeVisible();
     console.log('✅ Found Melisandre');
 
@@ -69,13 +77,15 @@ test.describe('Real World Strategy Tests', () => {
     console.log('✅ Verified Age is 150');
 
     // 5. Dump Data
-    const userData = await table.getByRow({ "Last name": "Melisandre" }, {asJSON:true});
+    const userData = await table.getByRowAcrossPages({ "Last name": "Melisandre" }, {asJSON:true});
     console.log('User Data JSON:', userData);
 
     // 6. Interact with the Checkbox
     // Logic: Find the cell in the "Actions" column (was __col_0) for the row with Age: 150
     // Then click the input/label inside that cell.
-    await (await table.getByRow({Age:"150"})).getCell("Actions").getByLabel("Select row").click();
+    const actionsRow = await table.getByRowAcrossPages({Age:"150"});
+    const actionsCell = actionsRow.getCell("Actions");
+    await actionsCell.getByLabel("Select row").click();
   });
 
 });
