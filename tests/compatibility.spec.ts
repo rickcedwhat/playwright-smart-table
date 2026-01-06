@@ -25,7 +25,7 @@ test.describe('Backwards Compatibility Tests', () => {
 
     // Table should have all expected methods
     expect(table).toHaveProperty('getByRow');
-    expect(table).toHaveProperty('getAllRows');
+    expect(table).toHaveProperty('getAllCurrentRows');
     expect(table).toHaveProperty('getHeaders');
     expect(table).toHaveProperty('getHeaderCell');
     expect(table).toHaveProperty('reset');
@@ -77,7 +77,7 @@ test.describe('Backwards Compatibility Tests', () => {
     await expect(row).not.toBeVisible();
   });
 
-  test('Core: getAllRows returns array of SmartRows', async ({ page }) => {
+  test('Core: getAllCurrentRows returns array of SmartRows', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
     
     const table = useTable(page.locator('#example'), {
@@ -85,14 +85,14 @@ test.describe('Backwards Compatibility Tests', () => {
     });
     await table.init();
 
-    const rows = await table.getAllRows();
+    const rows = await table.getAllCurrentRows();
     
     expect(Array.isArray(rows)).toBe(true);
     expect(rows.length).toBeGreaterThan(0);
     expect(typeof rows[0].getCell).toBe('function');
   });
 
-  test('Core: getAllRows with filter option', async ({ page }) => {
+  test('Core: getAllCurrentRows with filter option', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
     
     const table = useTable(page.locator('#example'), {
@@ -100,7 +100,7 @@ test.describe('Backwards Compatibility Tests', () => {
     });
     await table.init();
 
-    const filtered = await table.getAllRows({
+    const filtered = await table.getAllCurrentRows({
       filter: { Office: 'Tokyo' }
     });
     
@@ -108,7 +108,7 @@ test.describe('Backwards Compatibility Tests', () => {
     expect(filtered.length).toBeGreaterThan(0);
   });
 
-  test('Core: getAllRows with asJSON option', async ({ page }) => {
+  test('Core: getAllCurrentRows with asJSON option', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
     
     const table = useTable(page.locator('#example'), {
@@ -116,7 +116,7 @@ test.describe('Backwards Compatibility Tests', () => {
     });
     await table.init();
 
-    const data = await table.getAllRows({ asJSON: true });
+    const data = await table.getAllCurrentRows({ asJSON: true });
     
     expect(Array.isArray(data)).toBe(true);
     expect(data.length).toBeGreaterThan(0);
@@ -331,8 +331,8 @@ test.describe('Backwards Compatibility Tests', () => {
     
     const table = useTable(page.locator('#test-table'));
     
-    // getAllRows should auto-init
-    const rows = await table.getAllRows();
+    // getAllCurrentRows should auto-init
+    const rows = await table.getAllCurrentRows();
     expect(rows.length).toBeGreaterThan(0);
     
     // getColumnValues should auto-init
@@ -599,7 +599,7 @@ test.describe('Backwards Compatibility Tests', () => {
     await table.iterateThroughTable(async ({ table: restrictedTable }) => {
       // Should have safe methods
       expect(restrictedTable).toHaveProperty('getByRow');
-      expect(restrictedTable).toHaveProperty('getAllRows');
+      expect(restrictedTable).toHaveProperty('getAllCurrentRows');
       expect(restrictedTable).toHaveProperty('getHeaders');
       
       // Should NOT have problematic methods

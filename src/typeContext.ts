@@ -48,7 +48,7 @@ export interface TableContext {
 
 export type PaginationStrategy = (context: TableContext) => Promise<boolean>;
 
-export type DedupeStrategy = (row: SmartRow) => string | number;
+export type DedupeStrategy = (row: SmartRow) => string | number | Promise<string | number>;
 
 export interface PromptOptions {
   /**
@@ -117,19 +117,27 @@ export interface TableResult {
    * Finds a row on the current page only. Returns immediately (sync).
    * Throws error if table is not initialized.
    */
-  getByRow: <T extends { asJSON?: boolean }>(
+  getByRow: (
     filters: Record<string, string | RegExp | number>, 
-    options?: { exact?: boolean } & T
-  ) => T['asJSON'] extends true ? Promise<Record<string, string>> : SmartRow;
+    options?: { exact?: boolean }
+  ) => SmartRow;
 
   /**
-   * Finds a row across multiple pages using pagination. Auto-initializes if needed.
+   * Searches for a row across all available data using the configured strategy (pagination, scroll, etc.).
+   * Auto-initializes if needed.
    */
-  getByRowAcrossPages: <T extends { asJSON?: boolean }>(
+  searchForRow: (
     filters: Record<string, string | RegExp | number>, 
-    options?: { exact?: boolean, maxPages?: number } & T
-  ) => Promise<T['asJSON'] extends true ? Record<string, string> : SmartRow>;
+    options?: { exact?: boolean, maxPages?: number }
+  ) => Promise<SmartRow>;
 
+  getAllCurrentRows: <T extends { asJSON?: boolean }>(
+    options?: { filter?: Record<string, any>, exact?: boolean } & T
+  ) => Promise<T['asJSON'] extends true ? Record<string, string>[] : SmartRow[]>;
+
+  /**
+   * @deprecated Use getAllCurrentRows instead. This method will be removed in a future major version.
+   */
   getAllRows: <T extends { asJSON?: boolean }>(
     options?: { filter?: Record<string, any>, exact?: boolean } & T
   ) => Promise<T['asJSON'] extends true ? Record<string, string>[] : SmartRow[]>;
@@ -164,5 +172,34 @@ export interface TableResult {
      */
     getState(columnName: string): Promise<'asc' | 'desc' | 'none'>;
   };
+
+  /**
+   * Iterates through paginated table data, calling the callback for each iteration.
+   * Callback return values are automatically appended to allData, which is returned.
+   */
+  iterateThroughTable: <T = any>(
+    callback: (context: {
+      index: number;
+      isFirst: boolean;
+      isLast: boolean;
+      rows: SmartRow[];
+      allData: T[];
+      table: RestrictedTableResult;
+    }) => T | Promise<T>,
+    options?: {
+      pagination?: PaginationStrategy;
+      dedupeStrategy?: DedupeStrategy;
+      maxIterations?: number;
+      getIsFirst?: (context: { index: number }) => boolean;
+      getIsLast?: (context: { index: number, paginationResult: boolean }) => boolean;
+      onFirst?: (context: { index: number, rows: SmartRow[], allData: any[] }) => void | Promise<void>;
+      onLast?: (context: { index: number, rows: SmartRow[], allData: any[] }) => void | Promise<void>;
+    }
+  ) => Promise<T[]>;
 }
+
+/**
+ * Restricted table result that excludes methods that shouldn't be called during iteration.
+ */
+export type RestrictedTableResult = Omit<TableResult, 'searchForRow' | 'iterateThroughTable' | 'reset'>;
 `;

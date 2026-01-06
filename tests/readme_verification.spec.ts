@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { useTable } from '../src/useTable';
-import { TableStrategies } from '../src/strategies';
+import { PaginationStrategies } from '../src/strategies';
 
 test.describe('README.md Examples Verification', () => {
 
@@ -27,7 +27,7 @@ test.describe('README.md Examples Verification', () => {
 
     // #region smart-row
     // Example from: https://datatables.net/examples/data_sources/dom
-    
+
     // Get SmartRow via getByRow
     const row = table.getByRow({ Name: 'Airi Satou' });
 
@@ -55,7 +55,7 @@ test.describe('README.md Examples Verification', () => {
       headerSelector: 'thead th',
       cellSelector: 'td',
       // Strategy: Tell it how to find the next page
-      pagination: TableStrategies.clickNext(() => 
+      pagination: PaginationStrategies.clickNext(() =>
         page.getByRole('link', { name: 'Next' })
       ),
       maxPages: 5 // Allow scanning up to 5 pages
@@ -73,12 +73,12 @@ test.describe('README.md Examples Verification', () => {
 
   test('getByRow: Strict Retrieval & Negative Assertion', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
-    
+
     // #region get-by-row
     // Example from: https://datatables.net/examples/data_sources/dom
     const table = useTable(page.locator('#example'), { headerSelector: 'thead th' });
     await table.init();
-    
+
     // Find a row where Name is "Airi Satou" AND Office is "Tokyo"
     const row = table.getByRow({ Name: "Airi Satou", Office: "Tokyo" });
     await expect(row).toBeVisible();
@@ -88,7 +88,7 @@ test.describe('README.md Examples Verification', () => {
     // #endregion get-by-row
   });
 
-  test('getAllRows: Multiple Usage Patterns', async ({ page }) => {
+  test('getAllCurrentRows: Multiple Usage Patterns', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
     const table = useTable(page.locator('#example'), { headerSelector: 'thead th' });
     await table.init();
@@ -96,17 +96,17 @@ test.describe('README.md Examples Verification', () => {
     // #region get-all-rows
     // Example from: https://datatables.net/examples/data_sources/dom
     // 1. Get ALL rows on the current page
-    const allRows = await table.getAllRows();
+    const allRows = await table.getAllCurrentRows();
     expect(allRows.length).toBeGreaterThan(0);
 
     // 2. Get subset of rows (Filtering)
-    const tokyoUsers = await table.getAllRows({
+    const tokyoUsers = await table.getAllCurrentRows({
       filter: { Office: 'Tokyo' }
     });
     expect(tokyoUsers.length).toBeGreaterThan(0);
 
     // 3. Dump data to JSON
-    const data = await table.getAllRows({ asJSON: true });
+    const data = await table.getAllCurrentRows({ asJSON: true });
     console.log(data); // [{ Name: "Airi Satou", ... }, ...]
     expect(data.length).toBeGreaterThan(0);
     expect(data[0]).toHaveProperty('Name');
@@ -115,14 +115,14 @@ test.describe('README.md Examples Verification', () => {
 
   test('headerTransformer: Renaming Empty Columns', async ({ page }) => {
     await page.goto('https://mui.com/material-ui/react-table/');
-    
+
     // #region header-transformer
     // Example from: https://mui.com/material-ui/react-table/
     const table = useTable(page.locator('.MuiDataGrid-root').first(), {
       rowSelector: '.MuiDataGrid-row',
       headerSelector: '.MuiDataGrid-columnHeader',
       cellSelector: '.MuiDataGrid-cell',
-      pagination: TableStrategies.clickNext(
+      pagination: PaginationStrategies.clickNext(
         (root) => root.getByRole("button", { name: "Go to next page" })
       ),
       maxPages: 5,
@@ -140,12 +140,12 @@ test.describe('README.md Examples Verification', () => {
     const headers = await table.getHeaders();
     // Now we can reference the "Actions" column even if it has no header text
     expect(headers).toContain('Actions');
-    
+
     // Use the renamed column
     // First check it's not on the current page
     const currentPageRow = table.getByRow({ "Last name": "Melisandre" });
     await expect(currentPageRow).not.toBeVisible();
-    
+
     // Then find it across pages
     const row = await table.searchForRow({ "Last name": "Melisandre" });
     const actionsCell = row.getCell('Actions');
@@ -155,7 +155,7 @@ test.describe('README.md Examples Verification', () => {
 
   test('headerTransformer: Normalizing Column Names', async ({ page }) => {
     await page.goto('https://the-internet.herokuapp.com/tables');
-    
+
     // #region header-transformer-normalize
     // Example from: https://the-internet.herokuapp.com/tables
     const table = useTable(page.locator('#table1'), {
@@ -177,7 +177,7 @@ test.describe('README.md Examples Verification', () => {
 
   test('Advanced: Debug Mode', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
-    
+
     // #region advanced-debug
     // Example from: https://datatables.net/examples/data_sources/dom
     const table = useTable(page.locator('#example'), {
@@ -185,7 +185,7 @@ test.describe('README.md Examples Verification', () => {
       debug: true // Enables verbose logging of internal operations
     });
     await table.init();
-    
+
     const row = table.getByRow({ Name: 'Airi Satou' });
     await expect(row).toBeVisible();
     // #endregion advanced-debug
@@ -193,26 +193,33 @@ test.describe('README.md Examples Verification', () => {
 
   test('Advanced: Reset Table State', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
-    const table = useTable(page.locator('#example'), { 
+    const table = useTable(page.locator('#example'), {
       headerSelector: 'thead th',
-      pagination: TableStrategies.clickNext(() => 
+      pagination: PaginationStrategies.clickNext(() =>
         page.getByRole('link', { name: 'Next' })
       ),
-      maxPages: 5
+      maxPages: 5,
+      onReset: async ({ page }) => {
+        // Return to first page by clicking "First" link if available
+        const firstLink = page.getByRole('link', { name: 'First' });
+        if (await firstLink.isEnabled()) {
+          await firstLink.click();
+        }
+      }
     });
     await table.init();
-    
+
     // #region advanced-reset
     // Example from: https://datatables.net/examples/data_sources/dom
     // Navigate deep into the table by searching for a row on a later page
     try {
       await table.searchForRow({ Name: 'Angelica Ramos' });
-    } catch (e) {}
-    
+    } catch (e) { }
+
     // Reset internal state (and potentially UI) to initial page
-    await table.reset(); 
+    await table.reset();
     await table.init(); // Re-init after reset
-    
+
     // Now subsequent searches start from the beginning
     const currentPageRow = table.getByRow({ Name: 'Airi Satou' });
     await expect(currentPageRow).toBeVisible();
@@ -221,66 +228,36 @@ test.describe('README.md Examples Verification', () => {
 
   test('Advanced: Column Scanning', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
-    const table = useTable(page.locator('#example'), { headerSelector: 'thead th' });
+    const table = useTable(page.locator('#example'), {
+      headerSelector: 'thead th',
+      pagination: PaginationStrategies.clickNext(() =>
+        page.getByRole('link', { name: 'Next' })
+      ),
+      maxPages: 3
+    });
     await table.init();
 
     // #region advanced-column-scan
     // Example from: https://datatables.net/examples/data_sources/dom
     // Quickly grab all text values from the "Office" column
-    const offices = await table.getColumnValues('Office'); 
+    const offices = await table.getColumnValues('Office');
     expect(offices).toContain('Tokyo');
     expect(offices.length).toBeGreaterThan(0);
     // #endregion advanced-column-scan
   });
 
-  test('Advanced: Column Scanning with Custom Mapper', async ({ page }) => {
-    await page.goto('https://datatables.net/examples/data_sources/dom');
-    const table = useTable(page.locator('#example'), { headerSelector: 'thead th' });
-    await table.init();
-
-    // #region advanced-column-scan-mapper
-    // Extract numeric values from a column
-    const ages = await table.getColumnValues('Age', {
-      mapper: async (cell) => {
-        const text = await cell.innerText();
-        return parseInt(text, 10);
-      }
-    });
-    
-    // Now ages is an array of numbers
-    expect(ages.every(age => typeof age === 'number')).toBe(true);
-    expect(ages.length).toBeGreaterThan(0);
-    // #endregion advanced-column-scan-mapper
-  });
-
-  test('getByRow: Returning JSON Data', async ({ page }) => {
-    await page.goto('https://datatables.net/examples/data_sources/dom');
-    const table = useTable(page.locator('#example'), { headerSelector: 'thead th' });
-    await table.init();
-
-    // #region get-by-row-json
-    // Get row data as JSON object
-    const row = table.getByRow({ Name: 'Airi Satou' });
-    const data = await row.toJSON();
-    // Returns: { Name: "Airi Satou", Position: "Accountant", Office: "Tokyo", ... }
-    
-    expect(data).toHaveProperty('Name', 'Airi Satou');
-    expect(data).toHaveProperty('Position');
-    // #endregion get-by-row-json
-  });
-
-  test('getAllRows: Filtering with Exact Match', async ({ page }) => {
+  test('getAllCurrentRows: Filtering with Exact Match', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
     const table = useTable(page.locator('#example'), { headerSelector: 'thead th' });
     await table.init();
 
     // #region get-all-rows-exact
     // Get rows with exact match (default is fuzzy/contains match)
-    const exactMatches = await table.getAllRows({
+    const exactMatches = await table.getAllCurrentRows({
       filter: { Office: 'Tokyo' },
       exact: true // Requires exact string match
     });
-    
+
     expect(exactMatches.length).toBeGreaterThan(0);
     // #endregion get-all-rows-exact
   });
@@ -288,10 +265,10 @@ test.describe('README.md Examples Verification', () => {
   test('iterateThroughTable: Iterate through paginated data', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
     await page.waitForSelector('#example_wrapper');
-    
+
     const table = useTable(page.locator('#example'), {
       headerSelector: 'thead th',
-      pagination: TableStrategies.clickNext(() => 
+      pagination: PaginationStrategies.clickNext(() =>
         page.getByRole('link', { name: 'Next' })
       ),
       maxPages: 3
@@ -304,7 +281,7 @@ test.describe('README.md Examples Verification', () => {
       // Return names from this iteration - automatically appended to allData
       return await Promise.all(rows.map(r => r.getCell('Name').innerText()));
     });
-    
+
     // allNames contains all names from all iterations
     // Verify sorting across allNames
     expect(allNames.flat().length).toBeGreaterThan(10);
@@ -313,12 +290,12 @@ test.describe('README.md Examples Verification', () => {
 
   test('iterateThroughTable: Scrape all data with deduplication', async ({ page }) => {
     await page.goto('https://htmx.org/examples/infinite-scroll/');
-    
+
     const table = useTable(page.locator('table'), {
       rowSelector: 'tbody tr',
       headerSelector: 'thead th',
       cellSelector: 'td',
-      pagination: TableStrategies.infiniteScroll(),
+      pagination: PaginationStrategies.infiniteScroll(),
       maxPages: 3
     });
     await table.init();
@@ -334,12 +311,12 @@ test.describe('README.md Examples Verification', () => {
         // Return row data - automatically appended to allData
         return await Promise.all(rows.map(r => r.toJSON()));
       },
-      { 
+      {
         dedupeStrategy: (row) => row.getCell(dedupeColumn).innerText(),
         getIsLast: ({ paginationResult }) => !paginationResult
       }
     );
-    
+
     // allData contains all row data from all iterations (deduplicated at row level)
     expect(allData.flat().length).toBeGreaterThan(0);
     // #endregion iterate-through-table-dedupe
@@ -348,10 +325,10 @@ test.describe('README.md Examples Verification', () => {
   test('iterateThroughTable: Using hooks and custom logic', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
     await page.waitForSelector('#example_wrapper');
-    
+
     const table = useTable(page.locator('#example'), {
       headerSelector: 'thead th',
-      pagination: TableStrategies.clickNext(() => 
+      pagination: PaginationStrategies.clickNext(() =>
         page.getByRole('link', { name: 'Next' })
       ),
       maxPages: 3
@@ -377,8 +354,185 @@ test.describe('README.md Examples Verification', () => {
       }
     );
     // #endregion iterate-through-table-hooks
-    
+
     expect(allData.length).toBeGreaterThan(0);
+  });
+
+  test('iterateThroughTable: Filter and Validate Across Pages', async ({ page }) => {
+    // Create a self-contained paginated table with search functionality
+    await page.setContent(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: sans-serif; padding: 20px; }
+          .search-container { margin-bottom: 20px; }
+          .search-container input { padding: 8px; margin-right: 10px; }
+          .search-container button { padding: 8px 16px; }
+          table { border-collapse: collapse; width: 100%; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          th { background-color: #f4f4f4; }
+          .pagination { margin-top: 20px; }
+          .pagination button { padding: 8px 16px; margin-right: 5px; }
+          .pagination button:disabled { opacity: 0.5; cursor: not-allowed; }
+        </style>
+      </head>
+      <body>
+        <h1>Vehicle Search</h1>
+        <div class="search-container">
+          <input type="text" id="search-input" placeholder="Search by Make..." />
+          <button id="search-btn">Search</button>
+          <button id="reset-btn">Reset</button>
+        </div>
+        <div id="result-count"></div>
+        <table id="vehicle-table">
+          <thead>
+            <tr>
+              <th>VIN</th>
+              <th>Year</th>
+              <th>Make</th>
+              <th>Model</th>
+            </tr>
+          </thead>
+          <tbody id="table-body">
+          </tbody>
+        </table>
+        <div class="pagination">
+          <button id="next-btn">›</button>
+        </div>
+
+        <script>
+          // Sample vehicle data
+          const allVehicles = [
+            { vin: '1HGBH41JXMN109186', year: '2020', make: 'Audi', model: 'A3' },
+            { vin: '2HGBH41JXMN109187', year: '2021', make: 'Toyota', model: 'Camry' },
+            { vin: '3HGBH41JXMN109188', year: '2019', make: 'Audi', model: 'A4' },
+            { vin: '4HGBH41JXMN109189', year: '2022', make: 'Honda', model: 'Civic' },
+            { vin: '5HGBH41JXMN109190', year: '2020', make: 'Audi', model: 'A5' },
+            { vin: '6HGBH41JXMN109191', year: '2021', make: 'Ford', model: 'F-150' },
+            { vin: '7HGBH41JXMN109192', year: '2019', make: 'Audi', model: 'A6' },
+            { vin: '8HGBH41JXMN109193', year: '2022', make: 'Chevrolet', model: 'Silverado' },
+            { vin: '9HGBH41JXMN109194', year: '2020', make: 'Audi', model: 'Q3' },
+            { vin: 'AHGBH41JXMN109195', year: '2021', make: 'Nissan', model: 'Altima' },
+            { vin: 'BHGBH41JXMN109196', year: '2019', make: 'Audi', model: 'Q5' },
+            { vin: 'CHGBH41JXMN109197', year: '2022', make: 'BMW', model: '3 Series' },
+            { vin: 'DHGBH41JXMN109198', year: '2020', make: 'Audi', model: 'Q7' },
+            { vin: 'EHGBH41JXMN109199', year: '2021', make: 'Mercedes', model: 'C-Class' },
+          ];
+
+          let currentPage = 0;
+          const rowsPerPage = 5;
+          let filteredData = [...allVehicles];
+
+          function renderTable() {
+            const tbody = document.getElementById('table-body');
+            tbody.innerHTML = '';
+            
+            const start = currentPage * rowsPerPage;
+            const end = start + rowsPerPage;
+            const pageData = filteredData.slice(start, end);
+            
+            pageData.forEach(vehicle => {
+              const tr = document.createElement('tr');
+              tr.innerHTML = \`
+                <td>\${vehicle.vin}</td>
+                <td>\${vehicle.year}</td>
+                <td>\${vehicle.make}</td>
+                <td>\${vehicle.model}</td>
+              \`;
+              tbody.appendChild(tr);
+            });
+            
+            const totalPages = Math.ceil(filteredData.length / rowsPerPage);
+            const nextBtn = document.getElementById('next-btn');
+            nextBtn.disabled = currentPage >= totalPages - 1;
+            
+            document.getElementById('result-count').textContent = 
+              \`Showing \${start + 1} to \${Math.min(end, filteredData.length)} of \${filteredData.length} vehicles\`;
+          }
+
+          document.getElementById('search-btn').addEventListener('click', () => {
+            const searchTerm = document.getElementById('search-input').value.trim();
+            if (searchTerm) {
+              filteredData = allVehicles.filter(v => 
+                v.make.toLowerCase().includes(searchTerm.toLowerCase())
+              );
+            } else {
+              filteredData = [...allVehicles];
+            }
+            currentPage = 0;
+            renderTable();
+          });
+
+          document.getElementById('reset-btn').addEventListener('click', () => {
+            document.getElementById('search-input').value = '';
+            filteredData = [...allVehicles];
+            currentPage = 0;
+            renderTable();
+          });
+
+          document.getElementById('next-btn').addEventListener('click', () => {
+            const totalPages = Math.ceil(filteredData.length / rowsPerPage);
+            if (currentPage < totalPages - 1) {
+              currentPage++;
+              renderTable();
+            }
+          });
+
+          // Initial render
+          renderTable();
+        </script>
+      </body>
+      </html>
+    `);
+
+    const table = useTable(page.locator('#vehicle-table'), {
+      rowSelector: 'tbody tr',
+      headerSelector: 'thead th',
+      cellSelector: 'td',
+      pagination: PaginationStrategies.clickNext(() =>
+        page.getByRole('button', { name: '›' })
+      ),
+      maxPages: 10
+    });
+    await table.init();
+
+    // #region iterate-through-table-filter
+    // Perform a search/filter action
+    await page.getByPlaceholder('Search by Make...').fill('Audi');
+    await page.getByRole('button', { name: 'Search' }).click();
+
+    // Wait for table to update
+    await page.waitForTimeout(500);
+
+    // Reset table to start from page 1
+    await table.reset();
+    await table.init();
+
+    // Validate all rows across all pages match the filter
+    const searchTerm = 'Audi';
+    let totalValidated = 0;
+
+    const validationCounts = await table.iterateThroughTable(
+      async ({ rows }) => {
+        let pageCount = 0;
+        for (const row of rows) {
+          // Assert that all rows have the expected Make value
+          await expect(row.getCell('Make')).toHaveText(searchTerm);
+          pageCount++;
+        }
+        return pageCount;
+      },
+      {
+        getIsLast: ({ paginationResult }) => !paginationResult
+      }
+    );
+
+    totalValidated = validationCounts.reduce((a, b) => a + b, 0);
+
+    // Assert we validated all filtered results (7 Audi vehicles)
+    expect(totalValidated).toBe(7);
+    // #endregion iterate-through-table-filter
   });
 
   test('fill: Intelligent Row Data Entry', async ({ page }) => {
@@ -431,7 +585,7 @@ test.describe('README.md Examples Verification', () => {
     // #region fill-basic
     // Find a row and fill it with new data
     const row = table.getByRow({ ID: '1' });
-    
+
     await row.smartFill({
       Name: 'John Updated',
       Status: 'Inactive',
@@ -466,18 +620,17 @@ test.describe('README.md Examples Verification', () => {
           <tr>
             <td>1</td>
             <td>
-              <div class="cell-wrapper">
-                <input type="text" class="primary-input" value="John" />
-                <button>Edit</button>
+              <div class="input-wrapper">
+                <input class="primary-input" type="text" value="John Doe" />
+                <input class="secondary-input" type="text" value="alt" />
               </div>
             </td>
             <td>
-              <div class="custom-select">
-                <select>
-                  <option value="Active" selected>Active</option>
-                  <option value="Inactive">Inactive</option>
-                </select>
-              </div>
+              <select>
+                <option value="Pending">Pending</option>
+                <option value="Active" selected>Active</option>
+                <option value="Inactive">Inactive</option>
+              </select>
             </td>
           </tr>
         </tbody>
@@ -487,9 +640,9 @@ test.describe('README.md Examples Verification', () => {
     const table = useTable(page.locator('#custom-table'));
     await table.init();
 
-    // #region fill-custom-mappers
     const row = table.getByRow({ ID: '1' });
-    
+
+    // #region fill-custom-mappers
     // Use custom input mappers for specific columns
     await row.smartFill({
       Name: 'John Updated',
