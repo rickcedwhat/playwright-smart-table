@@ -1,8 +1,9 @@
 import type { Locator, Page } from '@playwright/test';
-import { TableConfig, TableContext, Selector, TableResult, SmartRow, PromptOptions, FillOptions, StrategyContext, FinalTableConfig, DedupeStrategy, RestrictedTableResult, PaginationStrategy } from './types';
+import { TableConfig, TableContext, Selector, TableResult, SmartRow, PromptOptions, FillOptions, StrategyContext, FinalTableConfig, DedupeStrategy, RestrictedTableResult, PaginationStrategy, FillStrategy } from './types';
 import { TYPE_CONTEXT } from './typeContext';
 import { SortingStrategies as ImportedSortingStrategies } from './strategies/sorting';
 import { PaginationStrategies as ImportedPaginationStrategies, TableStrategies as DeprecatedTableStrategies } from './strategies/pagination';
+import { FillStrategies } from './strategies/fill';
 
 /**
  * A collection of pre-built pagination strategies.
@@ -42,6 +43,7 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
     return item;
   };
 
+
   // Internal State
   let _headerMap: Map<string, number> | null = null;
   let _hasPaginated = false;
@@ -50,6 +52,7 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
   const logDebug = (msg: string) => {
     if (config.debug) console.log(`🔎 [SmartTable Debug] ${msg}`);
   };
+
 
   const _suggestColumnName = (colName: string, availableColumns: string[]): string => {
     // Simple fuzzy matching - find columns with similar names
@@ -120,6 +123,10 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
     return _headerMap;
   };
 
+
+  // Placeholder for the final table object, to be captured by closure
+  let finalTable: TableResult = null as unknown as TableResult;
+
   const _makeSmart = (rowLocator: Locator, map: Map<string, number>): SmartRow => {
     const smart = rowLocator as unknown as SmartRow;
 
@@ -151,7 +158,8 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
       return result;
     };
 
-    smart.smartFill = async (data: Record<string, any>, fillOptions?: FillOptions) => {
+    // @ts-ignore - Intentionally overriding Locator's fill method to accept object
+    smart.fill = async (data: Record<string, any>, fillOptions?: FillOptions) => {
       logDebug(`Filling row with data: ${JSON.stringify(data)}`);
 
       // Fill each column
@@ -161,81 +169,19 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
           throw _createColumnError(colName, map, 'in fill data');
         }
 
-        const cell = smart.getCell(colName);
+        // Use configured strategy or default to internal DOM logic
+        const strategy = config.fillStrategy || FillStrategies.default;
 
-        // Use custom input mapper for this column if provided, otherwise auto-detect
-        let inputLocator: Locator;
-        if (fillOptions?.inputMappers?.[colName]) {
-          inputLocator = fillOptions.inputMappers[colName](cell);
-        } else {
-          // Auto-detect input type
-          // Try different input types in order of commonality
-
-          // Check for text input
-          const textInput = cell.locator('input[type="text"], input:not([type]), textarea').first();
-          const textInputCount = await textInput.count().catch(() => 0);
-
-          // Check for select
-          const select = cell.locator('select').first();
-          const selectCount = await select.count().catch(() => 0);
-
-          // Check for checkbox/radio
-          const checkbox = cell.locator('input[type="checkbox"], input[type="radio"], [role="checkbox"]').first();
-          const checkboxCount = await checkbox.count().catch(() => 0);
-
-          // Check for contenteditable or div-based inputs
-          const contentEditable = cell.locator('[contenteditable="true"]').first();
-          const contentEditableCount = await contentEditable.count().catch(() => 0);
-
-          // Determine which input to use (prioritize by commonality)
-          if (textInputCount > 0 && selectCount === 0 && checkboxCount === 0) {
-            inputLocator = textInput;
-          } else if (selectCount > 0) {
-            inputLocator = select;
-          } else if (checkboxCount > 0) {
-            inputLocator = checkbox;
-          } else if (contentEditableCount > 0) {
-            inputLocator = contentEditable;
-          } else if (textInputCount > 0) {
-            // Fallback to text input even if others exist
-            inputLocator = textInput;
-          } else {
-            // No input found - try to click the cell itself (might trigger an editor)
-            inputLocator = cell;
-          }
-
-          // Warn if multiple inputs found (ambiguous)
-          const totalInputs = textInputCount + selectCount + checkboxCount + contentEditableCount;
-          if (totalInputs > 1 && config.debug) {
-            logDebug(`⚠️ Multiple inputs found in cell "${colName}" (${totalInputs} total). Using first match. Consider using inputMapper option for explicit control.`);
-          }
-        }
-
-        // Fill based on value type and input type
-        const inputTag = await inputLocator.evaluate((el: Element) => el.tagName.toLowerCase()).catch(() => 'unknown');
-        const inputType = await inputLocator.getAttribute('type').catch(() => null);
-        const isContentEditable = await inputLocator.getAttribute('contenteditable').catch(() => null);
-
-        logDebug(`Filling "${colName}" with value "${value}" (input: ${inputTag}, type: ${inputType})`);
-
-        if (inputType === 'checkbox' || inputType === 'radio') {
-          // Boolean value for checkbox/radio
-          const shouldBeChecked = Boolean(value);
-          const isChecked = await inputLocator.isChecked().catch(() => false);
-          if (isChecked !== shouldBeChecked) {
-            await inputLocator.click();
-          }
-        } else if (inputTag === 'select') {
-          // Select dropdown
-          await inputLocator.selectOption(String(value));
-        } else if (isContentEditable === 'true') {
-          // Contenteditable div
-          await inputLocator.click();
-          await inputLocator.fill(String(value));
-        } else {
-          // Text input, textarea, or generic
-          await inputLocator.fill(String(value));
-        }
+        await strategy({
+          row: smart,
+          columnName: colName,
+          value,
+          index: -1, // We don't track row index in smartFill currently, would need to pass it down or ignore
+          page: rootLocator.page(),
+          rootLocator,
+          table: finalTable, // Passed via closure
+          fillOptions
+        });
       }
 
       logDebug('Fill operation completed');
@@ -726,5 +672,6 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
     },
   };
 
+  finalTable = result;
   return result;
 };
