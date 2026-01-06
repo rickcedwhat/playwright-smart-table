@@ -8,7 +8,7 @@ export type SmartRow = Locator & {
   /**
    * Fills the row with data. Automatically detects input types (text input, select, checkbox, etc.).
    */
-  smartFill: (data: Record<string, any>, options?: FillOptions) => Promise<void>;
+  fill: (data: Record<string, any>, options?: FillOptions) => Promise<void>;
 };
 
 export type StrategyContext = TableContext;
@@ -56,12 +56,24 @@ export interface PromptOptions {
   includeTypes?: boolean;
 }
 
+export type FillStrategy = (options: {
+  row: SmartRow;
+  columnName: string;
+  value: any;
+  index: number;
+  page: Page;
+  rootLocator: Locator;
+  table: TableResult; // The parent table instance
+  fillOptions?: FillOptions;
+}) => Promise<void>;
+
 export interface TableConfig {
   rowSelector?: Selector;
   headerSelector?: Selector;
   cellSelector?: Selector;
   pagination?: PaginationStrategy;
   sorting?: SortingStrategy;
+  fillStrategy?: FillStrategy;
   maxPages?: number;
   /**
    * Hook to rename columns dynamically.
@@ -86,8 +98,9 @@ export interface TableConfig {
  * Represents the final, resolved table configuration after default values have been applied.
  * All optional properties from TableConfig are now required, except for `sorting`.
  */
-export type FinalTableConfig = Required<Omit<TableConfig, 'sorting'>> & {
+export type FinalTableConfig = Required<Omit<TableConfig, 'sorting' | 'fillStrategy'>> & {
   sorting?: SortingStrategy;
+  fillStrategy?: FillStrategy;
 };
 
 export interface FillOptions {
