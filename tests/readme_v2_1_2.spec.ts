@@ -72,23 +72,23 @@ test.describe('README.md Examples Verification', () => {
     expect(data.Office).toBe('Tokyo');
   });
 
-  test('getAllRows({ asJSON: true }) returns data objects', async ({ page }) => {
+  test('getAllCurrentRows({ asJSON: true }) returns data objects', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
     const table = useTable(page.locator('#example'), { headerSelector: 'thead th' });
     await table.init();
 
     // #region get-all-rows
     // 1. Get ALL rows on the current page
-    const allRows = await table.getAllRows();
+    const allRows = await table.getAllCurrentRows();
 
     // 2. Get subset of rows (Filtering)
-    const tokyoUsers = await table.getAllRows({
+    const tokyoUsers = await table.getAllCurrentRows({
       filter: { Office: 'Tokyo' }
     });
     expect(tokyoUsers.length).toBeGreaterThan(0);
 
     // 3. Dump data to JSON
-    const data = await table.getAllRows({ asJSON: true });
+    const data = await table.getAllCurrentRows({ asJSON: true });
     console.log(data); // [{ Name: "Airi Satou", ... }, ...]
     // #endregion get-all-rows
 

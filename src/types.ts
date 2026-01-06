@@ -114,7 +114,7 @@ export interface TableResult {
    * Throws error if table is not initialized.
    */
   getByRow: (
-    filters: Record<string, string | RegExp | number>, 
+    filters: Record<string, string | RegExp | number>,
     options?: { exact?: boolean }
   ) => SmartRow;
 
@@ -123,10 +123,17 @@ export interface TableResult {
    * Auto-initializes if needed.
    */
   searchForRow: (
-    filters: Record<string, string | RegExp | number>, 
+    filters: Record<string, string | RegExp | number>,
     options?: { exact?: boolean, maxPages?: number }
   ) => Promise<SmartRow>;
 
+  getAllCurrentRows: <T extends { asJSON?: boolean }>(
+    options?: { filter?: Record<string, any>, exact?: boolean } & T
+  ) => Promise<T['asJSON'] extends true ? Record<string, string>[] : SmartRow[]>;
+
+  /**
+   * @deprecated Use getAllCurrentRows instead. This method will be removed in a future major version.
+   */
   getAllRows: <T extends { asJSON?: boolean }>(
     options?: { filter?: Record<string, any>, exact?: boolean } & T
   ) => Promise<T['asJSON'] extends true ? Record<string, string>[] : SmartRow[]>;
@@ -190,4 +197,4 @@ export interface TableResult {
 /**
  * Restricted table result that excludes methods that shouldn't be called during iteration.
  */
-export type RestrictedTableResult = Omit<TableResult, 'searchForRow' | 'iterateThroughTable' | 'reset'>;
+export type RestrictedTableResult = Omit<TableResult, 'searchForRow' | 'iterateThroughTable' | 'reset' | 'getAllRows'>;

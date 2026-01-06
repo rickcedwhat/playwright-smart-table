@@ -338,15 +338,17 @@ expect(data).toHaveProperty('Position');
 ```
 <!-- /embed: get-by-row-json -->
 
-#### <a name="getallrows"></a>`getAllRows(options?)`
+#### <a name="getallcurrentrows"></a>`getAllCurrentRows(options?)`
 
-**Purpose:** Inclusive retrieval - gets all rows matching optional filters.
+**Purpose:** Inclusive retrieval - gets all rows on the current page matching optional filters.
 
-**Best for:** Checking existence, validating sort order, bulk data extraction.
+**Best for:** Checking existence, validating sort order, bulk data extraction on the current page.
+
+> **Note:** `getAllRows` is deprecated and will be removed in a future major version. Use `getAllCurrentRows` instead. The deprecated method still works for backwards compatibility.
 
 **Type Signature:**
 ```typescript
-getAllRows: <T extends { asJSON?: boolean }>(
+getAllCurrentRows: <T extends { asJSON?: boolean }>(
   options?: { filter?: Record<string, any>, exact?: boolean } & T
 ) => Promise<T['asJSON'] extends true ? Record<string, string>[] : SmartRow[]>;
 ```
@@ -355,17 +357,17 @@ getAllRows: <T extends { asJSON?: boolean }>(
 ```typescript
 // Example from: https://datatables.net/examples/data_sources/dom
 // 1. Get ALL rows on the current page
-const allRows = await table.getAllRows();
+const allRows = await table.getAllCurrentRows();
 expect(allRows.length).toBeGreaterThan(0);
 
 // 2. Get subset of rows (Filtering)
-const tokyoUsers = await table.getAllRows({
+const tokyoUsers = await table.getAllCurrentRows({
   filter: { Office: 'Tokyo' }
 });
 expect(tokyoUsers.length).toBeGreaterThan(0);
 
 // 3. Dump data to JSON
-const data = await table.getAllRows({ asJSON: true });
+const data = await table.getAllCurrentRows({ asJSON: true });
 console.log(data); // [{ Name: "Airi Satou", ... }, ...]
 expect(data.length).toBeGreaterThan(0);
 expect(data[0]).toHaveProperty('Name');
@@ -376,7 +378,7 @@ Filter rows with exact match:
 <!-- embed: get-all-rows-exact -->
 ```typescript
 // Get rows with exact match (default is fuzzy/contains match)
-const exactMatches = await table.getAllRows({
+const exactMatches = await table.getAllCurrentRows({
   filter: { Office: 'Tokyo' },
   exact: true // Requires exact string match
 });

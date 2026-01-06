@@ -20,7 +20,7 @@ test.describe('Real World Strategy Tests', () => {
     });
     await table.init();
 
-    const initialRows = await table.getAllRows();
+    const initialRows = await table.getAllCurrentRows();
     console.log(`Initial Row Count: ${initialRows.length}`);
 
     console.log("🔎 Triggering Scroll...");
@@ -29,8 +29,8 @@ test.describe('Real World Strategy Tests', () => {
     
     await expect(missing).not.toBeVisible();
     
-    // ✅ UPDATE: getRows -> getAllRows
-    const finalRows = await table.getAllRows();
+    // ✅ UPDATE: getRows -> getAllCurrentRows
+    const finalRows = await table.getAllCurrentRows();
     console.log(`Final Row Count: ${finalRows.length}`);
     
     expect(finalRows.length).toBeGreaterThan(initialRows.length);
