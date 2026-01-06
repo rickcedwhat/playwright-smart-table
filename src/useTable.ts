@@ -539,7 +539,7 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
     generateConfigPrompt: async (options?: PromptOptions) => {
       const html = await _getCleanHtml(rootLocator);
       const separator = "=".repeat(50);
-      const content = `\n${separator}\n🤖 COPY INTO GEMINI/ChatGPT 🤖\n${separator}\nI am using 'playwright-smart-table'. Generate config for:\n\`\`\`html\n${html.substring(0, 10000)} ...\n\`\`\`\n${separator}\n`;
+      const content = `\n${separator}\n🤖 COPY INTO GEMINI/ChatGPT 🤖\n${separator}\nI am using 'playwright-smart-table'.\nTarget Table Locator: ${rootLocator.toString()}\nGenerate config for:\n\`\`\`html\n${html.substring(0, 10000)} ...\n\`\`\`\n${separator}\n`;
       await _handlePrompt('Smart Table Config', content, options);
     },
 
