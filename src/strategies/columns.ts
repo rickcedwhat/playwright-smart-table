@@ -34,11 +34,7 @@ export const ColumnStrategies = {
         console.log(`[ColumnStrat:keyboard] Using Row Index Navigation: Row ${rowIndex}, Col ${index}`);
 
         await root.focus();
-        // await page.keyboard.press('Tab');
         await page.waitForTimeout(200);
-        const activeIdAfterClick = await root.locator('td[aria-selected="true"]').getAttribute('id').catch(() => undefined);
-        console.log(`[ColumnStrat:keyboard] Clicked into table to establish focus`, { id: activeIdAfterClick });
-
 
         // Robust Navigation:
         // 1. Jump to Top-Left (Reset) - Sequence for Cross-OS (Mac/Windows)
@@ -46,10 +42,6 @@ export const ColumnStrategies = {
         await page.keyboard.press('Meta+ArrowUp'); // Mac Go-To-Top
         await page.keyboard.press('Home'); // Ensure start of row
         await page.waitForTimeout(300);
-
-        // Debug: Check focus after Reset
-        const activeIdAfterReset = await root.locator('td[aria-selected="true"]').getAttribute('id').catch(() => undefined);
-        console.log(`[ColumnStrat:keyboard] Focus after reset:`, { id: activeIdAfterReset });
 
         // 2. Move Down to Target Row
         for (let i = 0; i < rowIndex; i++) {
@@ -60,8 +52,6 @@ export const ColumnStrategies = {
             await page.keyboard.press('ArrowRight');
         }
         await page.waitForTimeout(100);
-        const activeIdAfterMove = await root.locator('td[aria-selected="true"]').getAttribute('id').catch(() => undefined);
-        console.log(`[ColumnStrat:keyboard] Focus after move:`, { id: activeIdAfterMove });
 
         await page.waitForTimeout(100);
     }

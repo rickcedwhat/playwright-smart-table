@@ -21,7 +21,7 @@ export const HeaderStrategies = {
         }
 
         const texts = await headerLoc.allInnerTexts();
-        return texts.map(t => t.trim()).filter(Boolean);
+        return texts.map(t => t.trim());
     },
 
     /**
@@ -36,7 +36,7 @@ export const HeaderStrategies = {
         const getVisible = async () => {
             const headerLoc = resolve(config.headerSelector, root);
             const texts = await headerLoc.allInnerTexts();
-            return texts.map(t => t.trim()).filter(Boolean);
+            return texts.map(t => t.trim());
         };
 
         // Initial capture
@@ -100,7 +100,7 @@ export const HeaderStrategies = {
         const getVisible = async () => {
             const headerLoc = resolve(config.headerSelector, root);
             const texts = await headerLoc.allInnerTexts();
-            return texts.map(t => t.trim()).filter(Boolean);
+            return texts.map(t => t.trim());
         };
 
         // 1. Initial capture

@@ -17,12 +17,6 @@ test.describe('Live Glide Data Grid - Combined', () => {
         // Custom fill strategy for Glide (Just typing/editing)
         // Navigation is now handled by ColumnStrategies.keyboard using rowIndex
         const glideFillStrategy: FillStrategy = async ({ value, page }) => {
-            console.log(`[FillStrategy] Typing value: ${value}`);
-
-            // Temp Log for debugging focus as requested
-            const activeId = await page.locator('td[aria-selected="true"]').getAttribute('id').catch(() => undefined);
-            console.log(`[FillStrategy] Selected Element before typing:`, { id: activeId });
-
             // Edit Cell
             await page.keyboard.press('Enter');
             await page.waitForTimeout(100);
@@ -39,11 +33,10 @@ test.describe('Live Glide Data Grid - Combined', () => {
             columnStrategy: ColumnStrategies.keyboard, // Use our refactored keyboard strategy
             fillStrategy: glideFillStrategy, // Pass the custom fill strategy
             // Update cellResolver for virtualized columns using ID selector
-            cellResolver: (row, colName, colIndex, rowIndex) => {
-                console.log("[CellResolver]", { colName, colIndex, rowIndex });
+            cellResolver: ({ row, columnIndex, rowIndex }) => {
                 // Glide uses 1-based colIndex for data cells (colIndex 0 is row header usually)
                 // rowIndex seems to be 0-based in the ID based on "glide-cell-1-0"
-                return page.locator(`#glide-cell-${colIndex + 1}-${rowIndex}`);
+                return page.locator(`#glide-cell-${columnIndex + 1}-${rowIndex}`);
             }
         });
 
