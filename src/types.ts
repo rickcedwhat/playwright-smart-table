@@ -3,6 +3,8 @@ import type { Locator, Page } from '@playwright/test';
 export type Selector = string | ((root: Locator | Page) => Locator);
 
 export type SmartRow = Locator & {
+  getRequestIndex(): number | undefined; // Helper to get the row index if known
+  rowIndex?: number;
   getCell(column: string): Locator;
   toJSON(): Promise<Record<string, string>>;
   /**
@@ -11,7 +13,7 @@ export type SmartRow = Locator & {
   fill: (data: Record<string, any>, options?: FillOptions) => Promise<void>;
 };
 
-export type StrategyContext = TableContext;
+export type StrategyContext = TableContext & { rowLocator?: Locator; rowIndex?: number };
 
 /**
  * Defines the contract for a sorting strategy.
@@ -67,47 +69,72 @@ export type FillStrategy = (options: {
   fillOptions?: FillOptions;
 }) => Promise<void>;
 
-export interface TableConfig {
-  rowSelector?: Selector;
-  headerSelector?: Selector;
-  cellSelector?: Selector;
-  pagination?: PaginationStrategy;
-  sorting?: SortingStrategy;
-  fillStrategy?: FillStrategy;
-  maxPages?: number;
-  /**
-   * Hook to rename columns dynamically.
-   * * @param args.text - The default innerText of the header.
-   * @param args.index - The column index.
-   * @param args.locator - The specific header cell locator.
-   */
-  headerTransformer?: (args: { text: string, index: number, locator: Locator }) => string | Promise<string>;
-  autoScroll?: boolean;
-  /**
-   * Enable debug mode to log internal state to console.
-   */
-  debug?: boolean;
-  /**
-   * Strategy to reset the table to the initial page.
-   * Called when table.reset() is invoked.
-   */
-  onReset?: (context: TableContext) => Promise<void>;
-}
+export type { HeaderStrategy } from './strategies/headers';
+export type { ColumnStrategy } from './strategies/columns';
+import { HeaderStrategy } from './strategies/headers';
+import { ColumnStrategy } from './strategies/columns';
 
 /**
- * Represents the final, resolved table configuration after default values have been applied.
- * All optional properties from TableConfig are now required, except for `sorting`.
+ * Configuration options for useTable.
  */
-export type FinalTableConfig = Required<Omit<TableConfig, 'sorting' | 'fillStrategy'>> & {
-  sorting?: SortingStrategy;
+export interface TableConfig {
+  /** Selector for the table headers */
+  headerSelector?: string;
+  /** Selector for the table rows */
+  rowSelector?: string;
+  /** Selector for the cells within a row */
+  cellSelector?: string;
+  /** Strategy for filling forms within the table */
   fillStrategy?: FillStrategy;
-};
+  /** Strategy for discovering headers */
+  headerStrategy?: HeaderStrategy;
+  /** Strategy for navigating to columns */
+  columnStrategy?: ColumnStrategy;
+  /** Number of pages to scan for verification */
+  maxPages?: number;
+
+  /** Pagination Strategy */
+  pagination?: PaginationStrategy;
+  /** Sorting Strategy */
+  sorting?: SortingStrategy;
+  /** 
+   * Hook to rename columns dynamically.
+   */
+  headerTransformer?: (args: { text: string, index: number, locator: Locator }) => string | Promise<string>;
+  /** Automatically scroll to table on init */
+  autoScroll?: boolean;
+  /** Enable debug logs */
+  debug?: boolean;
+  /** Reset hook */
+  onReset?: (context: TableContext) => Promise<void>;
+  /**
+   * Custom resolver for finding a cell. 
+   * Overrides cellSelector logic if provided.
+   * Useful for virtualized tables where nth() index doesn't match DOM index.
+  */
+  cellResolver?: (row: Locator, columnName: string, columnIndex: number, rowIndex?: number) => Locator;
+}
+
+export interface FinalTableConfig extends TableConfig {
+  headerSelector: string;
+  rowSelector: string;
+  cellSelector: string;
+  fillStrategy: FillStrategy;
+  headerStrategy: HeaderStrategy;
+  columnStrategy: ColumnStrategy;
+  maxPages: number;
+  pagination: PaginationStrategy;
+  autoScroll: boolean;
+  debug: boolean;
+  headerTransformer: (args: { text: string, index: number, locator: Locator }) => string | Promise<string>;
+  onReset: (context: TableContext) => Promise<void>;
+  cellResolver?: (row: Locator, columnName: string, columnIndex: number, rowIndex?: number) => Locator;
+}
 
 export interface FillOptions {
   /**
    * Custom input mappers for specific columns.
    * Maps column names to functions that return the input locator for that cell.
-   * Columns not specified here will use auto-detection.
    */
   inputMappers?: Record<string, (cell: Locator) => Locator>;
 }
@@ -126,10 +153,13 @@ export interface TableResult {
    * Finds a row on the current page only. Returns immediately (sync).
    * Throws error if table is not initialized.
    */
-  getByRow: (
-    filters: Record<string, string | RegExp | number>,
-    options?: { exact?: boolean }
-  ) => SmartRow;
+  getByRow: {
+    (index: number): SmartRow;
+    (
+      filters: Record<string, string | RegExp | number>,
+      options?: { exact?: boolean }
+    ): SmartRow;
+  };
 
   /**
    * Searches for a row across all available data using the configured strategy (pagination, scroll, etc.).
@@ -139,6 +169,11 @@ export interface TableResult {
     filters: Record<string, string | RegExp | number>,
     options?: { exact?: boolean, maxPages?: number }
   ) => Promise<SmartRow>;
+
+  /**
+   * Manually scrolls to a column using the configured ColumnStrategy.
+   */
+  scrollToColumn: (columnName: string) => Promise<void>;
 
   getAllCurrentRows: <T extends { asJSON?: boolean }>(
     options?: { filter?: Record<string, any>, exact?: boolean } & T
