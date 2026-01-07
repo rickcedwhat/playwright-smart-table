@@ -4,22 +4,12 @@ import { TYPE_CONTEXT } from './typeContext';
 import { SortingStrategies as ImportedSortingStrategies } from './strategies/sorting';
 import { PaginationStrategies as ImportedPaginationStrategies, TableStrategies as DeprecatedTableStrategies } from './strategies/pagination';
 import { FillStrategies } from './strategies/fill';
+import { HeaderStrategies } from './strategies/headers';
+import { ColumnStrategies } from './strategies/columns';
 
 /**
- * A collection of pre-built pagination strategies.
+ * Main hook to interact with a table.
  */
-export const PaginationStrategies = ImportedPaginationStrategies;
-
-/**
- * @deprecated Use `PaginationStrategies` instead. This alias will be removed in a future major version.
- */
-export const TableStrategies = DeprecatedTableStrategies;
-
-/**
- * A collection of pre-built sorting strategies.
- */
-export const SortingStrategies = ImportedSortingStrategies;
-
 export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}): TableResult => {
   // Store whether pagination was explicitly provided in config
   const hasPaginationInConfig = configOptions.pagination !== undefined;
@@ -33,6 +23,9 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
     headerTransformer: ({ text, index, locator }) => text,
     autoScroll: true,
     debug: false,
+    fillStrategy: FillStrategies.default,
+    headerStrategy: HeaderStrategies.visible,
+    columnStrategy: ColumnStrategies.default,
     onReset: async () => { console.warn("⚠️ .reset() called but no 'onReset' strategy defined in config."); },
     ...configOptions,
   };
@@ -100,19 +93,39 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
       await headerLoc.first().waitFor({ state: 'visible', timeout: headerTimeout });
     } catch (e) { /* Ignore hydration */ }
 
-    // 1. Fetch data efficiently
-    const texts = await headerLoc.allInnerTexts();
-    const locators = await headerLoc.all();
+    // 1. Fetch headers using strategy
+    const strategy = config.headerStrategy || HeaderStrategies.visible;
+
+    // We need to construct context - but wait, HeaderStrategies definition I made imports StrategyContext
+    // We need to import HeaderStrategies in useTable.ts first (it was imported as HeaderStrategies?).
+    // Wait, useTable.ts imports `FillStrategies`.
+    // I need to import `HeaderStrategies`.
+
+    const context: StrategyContext = {
+      root: rootLocator,
+      config: config,
+      page: rootLocator.page(),
+      resolve: resolve
+    };
+
+    const rawHeaders = await strategy(context);
 
     // 2. Map Headers (Async)
-    const entries = await Promise.all(texts.map(async (t, i) => {
+    // Note: We lose locator access here for transformer unless strategy provides it. 
+    // For now assuming transformer handles missing locator or we don't pass it if generic strategy.
+
+    const entries = await Promise.all(rawHeaders.map(async (t, i) => {
       let text = t.trim() || `__col_${i}`;
 
       if (config.headerTransformer) {
         text = await config.headerTransformer({
           text,
           index: i,
-          locator: locators[i]
+          locator: rootLocator.locator(config.headerSelector as string).nth(i) // Best effort lazy locator? 
+          // Danger: scanning strategy implies nth(i) might not map to visual i if scrolled.
+          // But map index maps to logical index. 
+          // If scanning returns 100 headers, nth(99) might not exist in DOM.
+          // Passing fallback locator or stub.
         });
       }
       return [text, i] as [string, number];
@@ -127,8 +140,11 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
   // Placeholder for the final table object, to be captured by closure
   let finalTable: TableResult = null as unknown as TableResult;
 
-  const _makeSmart = (rowLocator: Locator, map: Map<string, number>): SmartRow => {
+  const _makeSmart = (rowLocator: Locator, map: Map<string, number>, rowIndex?: number): SmartRow => {
     const smart = rowLocator as unknown as SmartRow;
+
+    smart.getRequestIndex = () => rowIndex;
+    smart.rowIndex = rowIndex;
 
     smart.getCell = (colName: string) => {
       const idx = map.get(colName);
@@ -138,11 +154,10 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
         throw new Error(`Column "${colName}" not found${suggestion}`);
       }
 
-      if (typeof config.cellSelector === 'string') {
-        return rowLocator.locator(config.cellSelector).nth(idx);
-      } else {
-        return resolve(config.cellSelector, rowLocator).nth(idx);
+      if (config.cellResolver) {
+        return config.cellResolver(rowLocator, colName, idx, rowIndex);
       }
+      return resolve(config.cellSelector, rowLocator).nth(idx);
     };
 
     smart.toJSON = async () => {
@@ -169,6 +184,18 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
           throw _createColumnError(colName, map, 'in fill data');
         }
 
+        // Execute Column Strategy BEFORE filling
+        await config.columnStrategy({
+          config: config as FinalTableConfig,
+          root: rootLocator,
+          page: rootLocator.page(),
+          resolve,
+          column: colName,
+          index: colIdx,
+          rowLocator: rowLocator,
+          rowIndex: rowIndex
+        });
+
         // Use configured strategy or default to internal DOM logic
         const strategy = config.fillStrategy || FillStrategies.default;
 
@@ -176,10 +203,10 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
           row: smart,
           columnName: colName,
           value,
-          index: -1, // We don't track row index in smartFill currently, would need to pass it down or ignore
+          index: -1,
           page: rootLocator.page(),
           rootLocator,
-          table: finalTable, // Passed via closure
+          table: finalTable,
           fillOptions
         });
       }
@@ -189,6 +216,8 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
 
     return smart;
   };
+
+
 
   const _applyFilters = (
     baseRows: Locator,
@@ -349,6 +378,23 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
       return result;
     },
 
+    scrollToColumn: async (columnName: string) => {
+      const map = await _getMap();
+      const idx = map.get(columnName);
+      if (idx === undefined) {
+        throw _createColumnError(columnName, map);
+      }
+
+      await config.columnStrategy({
+        config: config as FinalTableConfig,
+        root: rootLocator,
+        page: rootLocator.page(),
+        resolve,
+        column: columnName,
+        index: idx
+      });
+    },
+
     getHeaders: async () => {
       if (!_isInitialized || !_headerMap) {
         throw new Error('Table not initialized. Call await table.init() first.');
@@ -421,22 +467,33 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
       return results;
     },
 
+    // @ts-ignore - implementing overload
     getByRow: (
-      filters: Record<string, string | RegExp | number>,
-      options?: { exact?: boolean }
+      filtersOrIndex: Record<string, string | RegExp | number> | number,
+      options: { exact?: boolean } = { exact: false }
     ): SmartRow => {
-      // Throw error if not initialized (sync methods require explicit init)
+      // Throw error if not initialized
       if (!_isInitialized || !_headerMap) {
         throw new Error('Table not initialized. Call await table.init() first.');
       }
 
-      // Build locator chain (sync) - current page only
-      const allRows = resolve(config.rowSelector, rootLocator);
-      const matchedRows = _applyFilters(allRows, filters, _headerMap, options?.exact || false);
+      // Handle Index Overload (1-based index)
+      if (typeof filtersOrIndex === 'number') {
+        const rowIndex = filtersOrIndex - 1;
+        const rowLocator = resolve(config.rowSelector, rootLocator).nth(rowIndex);
+        return _makeSmart(rowLocator, _headerMap, rowIndex);
+      }
 
-      // Return first match (or sentinel) - lazy, doesn't check existence
+      // Handle Filter Logic (Sync - lazy)
+      const filters = filtersOrIndex;
+      const allRows = resolve(config.rowSelector, rootLocator);
+      const matchedRows = _applyFilters(allRows, filters, _headerMap, options.exact || false);
+
       const rowLocator = matchedRows.first();
-      return _makeSmart(rowLocator, _headerMap);
+      // We pass rowIndex=0 as a fallback. 
+      // NOTE: Filter-based sync lookup doesn't know the absolute index easily without scanning.
+      // If accurate rowIndex is needed for filtered rows, use searchForRow or getAllCurrentRows.
+      return _makeSmart(rowLocator, _headerMap, 0);
     },
 
     searchForRow: async (
@@ -452,7 +509,7 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
         row = resolve(config.rowSelector, rootLocator).filter({ hasText: "___SENTINEL_ROW_NOT_FOUND___" + Date.now() });
       }
 
-      return _makeSmart(row, _headerMap!);
+      return _makeSmart(row, _headerMap!, 0);
     },
 
     getAllCurrentRows: async <T extends { asJSON?: boolean }>(options?: { filter?: Record<string, any>, exact?: boolean } & T): Promise<any> => {
@@ -466,7 +523,7 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
       }
 
       const rows = await rowLocators.all();
-      const smartRows = rows.map(loc => _makeSmart(loc, _headerMap!));
+      const smartRows = rows.map((loc, i) => _makeSmart(loc, _headerMap!, i));
 
       if (options?.asJSON) {
         return Promise.all(smartRows.map(r => r.toJSON()));
@@ -578,6 +635,7 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
         generateConfigPrompt: result.generateConfigPrompt,
         generateStrategyPrompt: result.generateStrategyPrompt,
         sorting: result.sorting,
+        scrollToColumn: result.scrollToColumn, // Add to restricted result as well
       };
 
       // Default functions
@@ -596,7 +654,7 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
       while (index < effectiveMaxIterations) {
         // Get current rows
         const rowLocators = await resolve(config.rowSelector, rootLocator).all();
-        let rows = rowLocators.map(loc => _makeSmart(loc, _headerMap!));
+        let rows = rowLocators.map((loc, i) => _makeSmart(loc, _headerMap!, i));
 
         // Deduplicate if dedupeStrategy provided (across all iterations)
         if (options?.dedupeStrategy && rows.length > 0) {

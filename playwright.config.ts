@@ -23,11 +23,11 @@ export default defineConfig({
   use: {
     // Collect trace when retrying the failed test.
     // Setting to 'on' forces it for every run (useful for debugging now).
-    trace: 'on', 
-    
-    // Record video for failures
-    video: 'retain-on-failure',
-    
+    trace: 'on',
+
+    // Record video for every run
+    video: 'on',
+
     // Take screenshot on failure
     screenshot: 'only-on-failure',
   },
