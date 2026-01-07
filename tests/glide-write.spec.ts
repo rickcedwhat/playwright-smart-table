@@ -62,7 +62,7 @@ test.describe('Live Glide Data Grid - Writing', () => {
         const rows = await table.getAllCurrentRows();
         const firstRow = rows[0];
 
-        const newValue = "Cedrick";
+        const newValue = "Thomas";
 
         console.log("Attempting to write:", newValue);
         await firstRow.fill({ "First name": newValue });

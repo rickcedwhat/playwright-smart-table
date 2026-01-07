@@ -11,6 +11,10 @@ export type SmartRow = Locator & {
    * Fills the row with data. Automatically detects input types (text input, select, checkbox, etc.).
    */
   fill: (data: Record<string, any>, options?: FillOptions) => Promise<void>;
+  /**
+   * Alias for fill() to avoid conflict with Locator.fill() 
+   */
+  smartFill: (data: Record<string, any>, options?: FillOptions) => Promise<void>;
 };
 
 export type StrategyContext = TableContext & { rowLocator?: Locator; rowIndex?: number };
@@ -112,7 +116,7 @@ export interface TableConfig {
    * Overrides cellSelector logic if provided.
    * Useful for virtualized tables where nth() index doesn't match DOM index.
   */
-  cellResolver?: (row: Locator, columnName: string, columnIndex: number, rowIndex?: number) => Locator;
+  cellResolver?: (args: { row: Locator, columnName: string, columnIndex: number, rowIndex?: number }) => Locator;
 }
 
 export interface FinalTableConfig extends TableConfig {
@@ -128,7 +132,7 @@ export interface FinalTableConfig extends TableConfig {
   debug: boolean;
   headerTransformer: (args: { text: string, index: number, locator: Locator }) => string | Promise<string>;
   onReset: (context: TableContext) => Promise<void>;
-  cellResolver?: (row: Locator, columnName: string, columnIndex: number, rowIndex?: number) => Locator;
+  cellResolver?: (args: { row: Locator, columnName: string, columnIndex: number, rowIndex?: number }) => Locator;
 }
 
 export interface FillOptions {

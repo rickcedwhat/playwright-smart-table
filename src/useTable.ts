@@ -155,7 +155,7 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
       }
 
       if (config.cellResolver) {
-        return config.cellResolver(rowLocator, colName, idx, rowIndex);
+        return config.cellResolver({ row: rowLocator, columnName: colName, columnIndex: idx, rowIndex });
       }
       return resolve(config.cellSelector, rowLocator).nth(idx);
     };
@@ -213,6 +213,8 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
 
       logDebug('Fill operation completed');
     };
+    // Alias for explicit usage avoiding Locator.fill conflict
+    smart.smartFill = smart.fill;
 
     return smart;
   };
@@ -733,3 +735,8 @@ export const useTable = (rootLocator: Locator, configOptions: TableConfig = {}):
   finalTable = result;
   return result;
 };
+
+export const PaginationStrategies = ImportedPaginationStrategies;
+export const TableStrategies = DeprecatedTableStrategies;
+export const SortingStrategies = ImportedSortingStrategies;
+export { FillStrategies, HeaderStrategies, ColumnStrategies };
