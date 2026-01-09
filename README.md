@@ -57,9 +57,6 @@ await positionCell.click();
 const data = await row.toJSON();
 console.log(data);
 // { Name: "Airi Satou", Position: "Accountant", ... }
-
-// Optimized extraction (only fetch specific columns)
-const partialData = await row.toJSON({ columns: ['Name', 'Position'] });
 ```
 <!-- /embed: smart-row -->
 
@@ -132,10 +129,10 @@ If your tests navigate deep into a paginated table, use `.reset()` to return to 
 // Navigate deep into the table by searching for a row on a later page
 try {
   await table.searchForRow({ Name: 'Angelica Ramos' });
-} catch (e) {}
+} catch (e) { }
 
 // Reset internal state (and potentially UI) to initial page
-await table.reset(); 
+await table.reset();
 await table.init(); // Re-init after reset
 
 // Now subsequent searches start from the beginning
@@ -152,7 +149,7 @@ Efficiently extract all values from a specific column:
 ```typescript
 // Example from: https://datatables.net/examples/data_sources/dom
 // Quickly grab all text values from the "Office" column
-const offices = await table.getColumnValues('Office'); 
+const offices = await table.getColumnValues('Office');
 expect(offices).toContain('Tokyo');
 expect(offices.length).toBeGreaterThan(0);
 ```
@@ -198,8 +195,6 @@ For edge cases where auto-detection doesn't work (e.g., custom components, multi
 
 <!-- embed: fill-custom-mappers -->
 ```typescript
-const row = table.getByRow({ ID: '1' });
-
 // Use custom input mappers for specific columns
 await row.smartFill({
   Name: 'John Updated',
@@ -235,7 +230,6 @@ Tables with empty header cells (like Material UI DataGrids) get auto-assigned na
 const table = useTable(page.locator('.MuiDataGrid-root').first(), {
   rowSelector: '.MuiDataGrid-row',
   headerSelector: '.MuiDataGrid-columnHeader',
-  cellSelector: '.MuiDataGrid-cell',
   cellSelector: '.MuiDataGrid-cell',
   strategies: {
     pagination: Strategies.Pagination.clickNext(
@@ -419,7 +413,7 @@ Basic usage:
 ```typescript
 // Example from: https://datatables.net/examples/data_sources/dom
 // Quickly grab all text values from the "Office" column
-const offices = await table.getColumnValues('Office'); 
+const offices = await table.getColumnValues('Office');
 expect(offices).toContain('Tokyo');
 expect(offices.length).toBeGreaterThan(0);
 ```
@@ -579,13 +573,24 @@ A `SmartRow` extends Playwright's `Locator` with table-aware methods.
 
 <!-- embed-type: SmartRow -->
 ```typescript
-export type SmartRow = Locator & {
+export type SmartRow<T = any> = Locator & {
+  getRequestIndex(): number | undefined;
+  rowIndex?: number;
   getCell(column: string): Locator;
-  toJSON(options?: { columns?: string[] }): Promise<Record<string, string>>;
+  toJSON(options?: { columns?: string[] }): Promise<T>;
   /**
-   * Fills the row with data. Automatically detects input types (text input, select, checkbox, etc.).
+   * Scrolls/paginates to bring this row into view.
+   * Only works if rowIndex is known.
    */
-  smartFill: (data: Record<string, any>, options?: FillOptions) => Promise<void>;
+  bringIntoView(): Promise<void>;
+  /**
+   * Fills the row with data. Automatically detects input types.
+   */
+  fill: (data: Partial<T> | Record<string, any>, options?: FillOptions) => Promise<void>;
+  /**
+   * Alias for fill() to avoid conflict with Locator.fill()
+   */
+  smartFill: (data: Partial<T> | Record<string, any>, options?: FillOptions) => Promise<void>;
 };
 ```
 <!-- /embed-type: SmartRow -->
@@ -603,36 +608,60 @@ Configuration options for `useTable()`.
 
 <!-- embed-type: TableConfig -->
 ```typescript
+/**
+ * Strategy to filter rows based on criteria.
+ */
+export interface FilterStrategy {
+  apply(options: {
+    rows: Locator;
+    filter: { column: string, value: string | RegExp | number };
+    colIndex: number;
+    tableContext: TableContext;
+  }): Locator;
+}
+
+/**
+ * Organized container for all table interaction strategies.
+ */
+export interface TableStrategies {
+  /** Strategy for discovering/scanning headers */
+  header?: HeaderStrategy;
+  /** Strategy for navigating to specific cells (row + column) */
+  cellNavigation?: CellNavigationStrategy;
+  /** Strategy for filling form inputs */
+  fill?: FillStrategy;
+  /** Strategy for paginating through data */
+  pagination?: PaginationStrategy;
+  /** Strategy for sorting columns */
+  sorting?: SortingStrategy;
+  /** Function to get a cell locator */
+  getCellLocator?: GetCellLocatorFn;
+  /** Function to get the currently active/focused cell */
+  getActiveCell?: GetActiveCellFn;
+}
+
+/**
+ * Configuration options for useTable.
+ */
 export interface TableConfig {
-  rowSelector?: Selector;
-  headerSelector?: Selector;
-  cellSelector?: Selector;
-  cellSelector?: Selector;
-  strategies?: {
-    pagination?: PaginationStrategy;
-    sorting?: SortingStrategy;
-    column?: ColumnStrategy;
-    // ... other strategies
-  };
+  /** Selector for the table headers */
+  headerSelector?: string;
+  /** Selector for the table rows */
+  rowSelector?: string;
+  /** Selector for the cells within a row */
+  cellSelector?: string;
+  /** Number of pages to scan for verification */
   maxPages?: number;
-  /**
-   * Hook to rename columns dynamically.
-   * * @param args.text - The default innerText of the header.
-   * @param args.index - The column index.
-   * @param args.locator - The specific header cell locator.
-   */
-   */
+  /** Hook to rename columns dynamically */
   headerTransformer?: (args: { text: string, index: number, locator: Locator }) => string | Promise<string>;
+  /** Automatically scroll to table on init */
   autoScroll?: boolean;
-  /**
-   * Enable debug mode to log internal state to console.
-   */
+  /** Enable debug logs */
   debug?: boolean;
-  /**
-   * Strategy to reset the table to the initial page.
-   * Called when table.reset() is invoked.
-   */
+  /** Reset hook */
   onReset?: (context: TableContext) => Promise<void>;
+  /** All interaction strategies */
+  strategies?: TableStrategies;
 }
 ```
 <!-- /embed-type: TableConfig -->
@@ -656,6 +685,11 @@ Flexible selector type supporting strings, functions, or existing locators.
 <!-- embed-type: Selector -->
 ```typescript
 export type Selector = string | ((root: Locator | Page) => Locator);
+
+/**
+ * Function to get a cell locator given row, column info.
+ * Replaces the old cellResolver.
+ */
 ```
 <!-- /embed-type: Selector -->
 

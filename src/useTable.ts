@@ -496,6 +496,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
 };
 
 export const PaginationStrategies = ImportedPaginationStrategies;
-export const TableStrategies = DeprecatedPaginationStrategies;
+/** @deprecated Use Strategies.Pagination instead */
+export const DeprecatedTableStrategies = DeprecatedPaginationStrategies;
 export const SortingStrategies = ImportedSortingStrategies;
 export { FillStrategies, HeaderStrategies, CellNavigationStrategies, ColumnStrategies, ResolutionStrategies, Strategies };

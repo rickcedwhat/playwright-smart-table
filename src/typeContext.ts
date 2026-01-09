@@ -6,16 +6,51 @@
 export const TYPE_CONTEXT = `
 export type Selector = string | ((root: Locator | Page) => Locator);
 
-export type SmartRow = Locator & {
+/**
+ * Function to get a cell locator given row, column info.
+ * Replaces the old cellResolver.
+ */
+export type GetCellLocatorFn = (args: {
+  row: Locator;
+  columnName: string;
+  columnIndex: number;
+  rowIndex?: number;
+  page: Page;
+}) => Locator;
+
+/**
+ * Function to get the currently active/focused cell.
+ * Returns null if no cell is active.
+ */
+export type GetActiveCellFn = (args: TableContext) => Promise<{
+  rowIndex: number;
+  columnIndex: number;
+  columnName?: string;
+  locator: Locator;
+} | null>;
+
+
+export type SmartRow<T = any> = Locator & {
+  getRequestIndex(): number | undefined;
+  rowIndex?: number;
   getCell(column: string): Locator;
-  toJSON(): Promise<Record<string, string>>;
+  toJSON(options?: { columns?: string[] }): Promise<T>;
   /**
-   * Fills the row with data. Automatically detects input types (text input, select, checkbox, etc.).
+   * Scrolls/paginates to bring this row into view.
+   * Only works if rowIndex is known.
    */
-  smartFill: (data: Record<string, any>, options?: FillOptions) => Promise<void>;
+  bringIntoView(): Promise<void>;
+  /**
+   * Fills the row with data. Automatically detects input types.
+   */
+  fill: (data: Partial<T> | Record<string, any>, options?: FillOptions) => Promise<void>;
+  /**
+   * Alias for fill() to avoid conflict with Locator.fill()
+   */
+  smartFill: (data: Partial<T> | Record<string, any>, options?: FillOptions) => Promise<void>;
 };
 
-export type StrategyContext = TableContext;
+export type StrategyContext = TableContext & { rowLocator?: Locator; rowIndex?: number };
 
 /**
  * Defines the contract for a sorting strategy.
@@ -60,50 +95,103 @@ export interface PromptOptions {
   includeTypes?: boolean;
 }
 
-export interface TableConfig {
-  rowSelector?: Selector;
-  headerSelector?: Selector;
-  cellSelector?: Selector;
-  pagination?: PaginationStrategy;
-  sorting?: SortingStrategy;
-  maxPages?: number;
-  /**
-   * Hook to rename columns dynamically.
-   * * @param args.text - The default innerText of the header.
-   * @param args.index - The column index.
-   * @param args.locator - The specific header cell locator.
-   */
-  headerTransformer?: (args: { text: string, index: number, locator: Locator }) => string | Promise<string>;
-  autoScroll?: boolean;
-  /**
-   * Enable debug mode to log internal state to console.
-   */
-  debug?: boolean;
-  /**
-   * Strategy to reset the table to the initial page.
-   * Called when table.reset() is invoked.
-   */
-  onReset?: (context: TableContext) => Promise<void>;
+export type FillStrategy = (options: {
+  row: SmartRow;
+  columnName: string;
+  value: any;
+  index: number;
+  page: Page;
+  rootLocator: Locator;
+  table: TableResult; // The parent table instance
+  fillOptions?: FillOptions;
+}) => Promise<void>;
+
+export type { HeaderStrategy } from './strategies/headers';
+export type { CellNavigationStrategy } from './strategies/columns';
+
+/**
+ * Strategy to resolve column names (string or regex) to their index.
+ */
+export type { ColumnResolutionStrategy } from './strategies/resolution';
+
+/**
+ * Strategy to filter rows based on criteria.
+ */
+export interface FilterStrategy {
+  apply(options: {
+    rows: Locator;
+    filter: { column: string, value: string | RegExp | number };
+    colIndex: number;
+    tableContext: TableContext;
+  }): Locator;
 }
 
 /**
- * Represents the final, resolved table configuration after default values have been applied.
- * All optional properties from TableConfig are now required, except for \`sorting\`.
+ * Organized container for all table interaction strategies.
  */
-export type FinalTableConfig = Required<Omit<TableConfig, 'sorting'>> & {
+export interface TableStrategies {
+  /** Strategy for discovering/scanning headers */
+  header?: HeaderStrategy;
+  /** Strategy for navigating to specific cells (row + column) */
+  cellNavigation?: CellNavigationStrategy;
+  /** Strategy for filling form inputs */
+  fill?: FillStrategy;
+  /** Strategy for paginating through data */
+  pagination?: PaginationStrategy;
+  /** Strategy for sorting columns */
   sorting?: SortingStrategy;
-};
+  /** Function to get a cell locator */
+  getCellLocator?: GetCellLocatorFn;
+  /** Function to get the currently active/focused cell */
+  getActiveCell?: GetActiveCellFn;
+}
+
+/**
+ * Configuration options for useTable.
+ */
+export interface TableConfig {
+  /** Selector for the table headers */
+  headerSelector?: string;
+  /** Selector for the table rows */
+  rowSelector?: string;
+  /** Selector for the cells within a row */
+  cellSelector?: string;
+  /** Number of pages to scan for verification */
+  maxPages?: number;
+  /** Hook to rename columns dynamically */
+  headerTransformer?: (args: { text: string, index: number, locator: Locator }) => string | Promise<string>;
+  /** Automatically scroll to table on init */
+  autoScroll?: boolean;
+  /** Enable debug logs */
+  debug?: boolean;
+  /** Reset hook */
+  onReset?: (context: TableContext) => Promise<void>;
+  /** All interaction strategies */
+  strategies?: TableStrategies;
+}
+
+export interface FinalTableConfig extends TableConfig {
+  headerSelector: string;
+  rowSelector: string;
+  cellSelector: string;
+  maxPages: number;
+  autoScroll: boolean;
+  debug: boolean;
+  headerTransformer: (args: { text: string, index: number, locator: Locator }) => string | Promise<string>;
+  onReset: (context: TableContext) => Promise<void>;
+  strategies: TableStrategies;
+}
+
 
 export interface FillOptions {
   /**
    * Custom input mappers for specific columns.
    * Maps column names to functions that return the input locator for that cell.
-   * Columns not specified here will use auto-detection.
    */
   inputMappers?: Record<string, (cell: Locator) => Locator>;
 }
 
-export interface TableResult {
+export interface TableResult<T = any> {
   /**
    * Initializes the table by resolving headers. Must be called before using sync methods.
    * @param options Optional timeout for header resolution (default: 3000ms)
@@ -114,12 +202,23 @@ export interface TableResult {
   getHeaderCell: (columnName: string) => Promise<Locator>;
 
   /**
-   * Finds a row on the current page only. Returns immediately (sync).
+   * Finds a row by filters on the current page only. Returns immediately (sync).
    * Throws error if table is not initialized.
    */
   getByRow: (
-    filters: Record<string, string | RegExp | number>, 
+    filters: Record<string, string | RegExp | number>,
     options?: { exact?: boolean }
+  ) => SmartRow;
+
+  /**
+   * Gets a row by 1-based index on the current page.
+   * Throws error if table is not initialized.
+   * @param index 1-based row index
+   * @param options Optional settings including bringIntoView
+   */
+  getByRowIndex: (
+    index: number,
+    options?: { bringIntoView?: boolean }
   ) => SmartRow;
 
   /**
@@ -127,9 +226,14 @@ export interface TableResult {
    * Auto-initializes if needed.
    */
   searchForRow: (
-    filters: Record<string, string | RegExp | number>, 
+    filters: Record<string, string | RegExp | number>,
     options?: { exact?: boolean, maxPages?: number }
   ) => Promise<SmartRow>;
+
+  /**
+   * Navigates to a specific column using the configured CellNavigationStrategy.
+   */
+  scrollToColumn: (columnName: string) => Promise<void>;
 
   getAllCurrentRows: <T extends { asJSON?: boolean }>(
     options?: { filter?: Record<string, any>, exact?: boolean } & T
@@ -149,6 +253,12 @@ export interface TableResult {
    * Resets the table state (clears cache, flags) and invokes the onReset strategy.
    */
   reset: () => Promise<void>;
+
+  /**
+   * Revalidates the table's structure (headers, columns) without resetting pagination or state.
+   * Useful when columns change visibility or order dynamically.
+   */
+  revalidate: () => Promise<void>;
 
   /**
    * Scans a specific column across all pages and returns the values.
@@ -201,5 +311,5 @@ export interface TableResult {
 /**
  * Restricted table result that excludes methods that shouldn't be called during iteration.
  */
-export type RestrictedTableResult = Omit<TableResult, 'searchForRow' | 'iterateThroughTable' | 'reset'>;
+export type RestrictedTableResult<T = any> = Omit<TableResult<T>, 'searchForRow' | 'iterateThroughTable' | 'reset' | 'getAllRows'>;
 `;
