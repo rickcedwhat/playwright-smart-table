@@ -31,13 +31,13 @@ exports.CellNavigationStrategies = {
             throw new Error('Row index is required for keyboard navigation');
         }
         yield root.focus();
-        yield page.waitForTimeout(200);
+        yield page.waitForTimeout(100);
         // Robust Navigation:
         // 1. Jump to Top-Left (Reset) - Sequence for Cross-OS (Mac/Windows)
         yield page.keyboard.press('Control+Home');
         yield page.keyboard.press('Meta+ArrowUp'); // Mac Go-To-Top
         yield page.keyboard.press('Home'); // Ensure start of row
-        yield page.waitForTimeout(300);
+        yield page.waitForTimeout(150);
         // 2. Move Down to Target Row
         for (let i = 0; i < rowIndex; i++) {
             yield page.keyboard.press('ArrowDown');
@@ -46,7 +46,7 @@ exports.CellNavigationStrategies = {
         for (let i = 0; i < index; i++) {
             yield page.keyboard.press('ArrowRight');
         }
-        yield page.waitForTimeout(100);
+        yield page.waitForTimeout(50);
     })
 };
 // Backwards compatibility - deprecated

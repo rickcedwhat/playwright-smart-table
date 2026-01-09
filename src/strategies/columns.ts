@@ -35,14 +35,14 @@ export const CellNavigationStrategies = {
         }
 
         await root.focus();
-        await page.waitForTimeout(200);
+        await page.waitForTimeout(100);
 
         // Robust Navigation:
         // 1. Jump to Top-Left (Reset) - Sequence for Cross-OS (Mac/Windows)
         await page.keyboard.press('Control+Home');
         await page.keyboard.press('Meta+ArrowUp'); // Mac Go-To-Top
         await page.keyboard.press('Home'); // Ensure start of row
-        await page.waitForTimeout(300);
+        await page.waitForTimeout(150);
 
         // 2. Move Down to Target Row
         for (let i = 0; i < rowIndex; i++) {
@@ -52,7 +52,7 @@ export const CellNavigationStrategies = {
         for (let i = 0; i < index; i++) {
             await page.keyboard.press('ArrowRight');
         }
-        await page.waitForTimeout(100);
+        await page.waitForTimeout(50);
     }
 };
 

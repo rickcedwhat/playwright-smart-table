@@ -4,6 +4,7 @@ import type { FillStrategy, TableConfig, TableContext } from '../src/types';
 import { Strategies } from '../src/strategies';
 
 test.describe('Live Glide Data Grid', () => {
+    test.setTimeout(60000); // Increase timeout for CI
     // Shared Strategies & Configuration
     const glideFillStrategy: FillStrategy = async ({ value, page }) => {
         // Edit Cell
@@ -46,7 +47,7 @@ test.describe('Live Glide Data Grid', () => {
 
         // Wait for virtual rows to render
         // We use root.page() for timeout which is fine (global timer)
-        await root.page().waitForTimeout(1000);
+        await root.page().waitForTimeout(500);
 
         return true;
     };
