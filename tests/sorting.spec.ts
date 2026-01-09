@@ -1,7 +1,7 @@
 // tests/sorting.spec.ts
 import { test, expect } from '@playwright/test';
 import path from 'path';
-import { useTable, SortingStrategies } from '../src/useTable';
+import { useTable, Strategies } from '../src/useTable';
 
 // Resolve the absolute path to the test HTML file
 const testFile = `file://${path.resolve(__dirname, 'test-assets/sortable-table.html')}`;
@@ -14,7 +14,9 @@ test.describe('AriaSort Strategy', () => {
 
   test('should correctly read initial sort state', async ({ page }) => {
     const table = useTable(page.locator('#sortable-table'), {
-      sorting: SortingStrategies.AriaSort(),
+      strategies: {
+        sorting: Strategies.Sorting.AriaSort(),
+      },
     });
     await table.init();
 
@@ -24,7 +26,9 @@ test.describe('AriaSort Strategy', () => {
 
   test('should apply ascending sort and update aria-sort attribute', async ({ page }) => {
     const table = useTable(page.locator('#sortable-table'), {
-      sorting: SortingStrategies.AriaSort(),
+      strategies: {
+        sorting: Strategies.Sorting.AriaSort(),
+      },
     });
     await table.init();
 
@@ -36,7 +40,9 @@ test.describe('AriaSort Strategy', () => {
 
   test('should apply descending sort and update aria-sort attribute', async ({ page }) => {
     const table = useTable(page.locator('#sortable-table'), {
-      sorting: SortingStrategies.AriaSort(),
+      strategies: {
+        sorting: Strategies.Sorting.AriaSort(),
+      },
     });
     await table.init();
 
@@ -50,12 +56,14 @@ test.describe('AriaSort Strategy', () => {
 
   test('should verify row data is correctly sorted alphabetically', async ({ page }) => {
     const table = useTable(page.locator('#sortable-table'), {
-      sorting: SortingStrategies.AriaSort(),
+      strategies: {
+        sorting: Strategies.Sorting.AriaSort(),
+      },
     });
     await table.init();
 
     await table.sorting.apply('Name', 'asc');
-    
+
     // After sorting by name asc, the order should be Alice, Bob, Charlie
     const names = await table.getColumnValues('Name');
     expect(names).toEqual(['Alice', 'Bob', 'Charlie']);
@@ -63,7 +71,9 @@ test.describe('AriaSort Strategy', () => {
 
   test('should verify row data is correctly sorted numerically', async ({ page }) => {
     const table = useTable(page.locator('#sortable-table'), {
-      sorting: SortingStrategies.AriaSort(),
+      strategies: {
+        sorting: Strategies.Sorting.AriaSort(),
+      },
     });
     await table.init();
 
@@ -76,7 +86,9 @@ test.describe('AriaSort Strategy', () => {
 
   test('should throw an error when trying to sort an unsortable column', async ({ page }) => {
     const table = useTable(page.locator('#sortable-table'), {
-      sorting: SortingStrategies.AriaSort(),
+      strategies: {
+        sorting: Strategies.Sorting.AriaSort(),
+      },
     });
     await table.init();
 

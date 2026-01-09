@@ -15,9 +15,9 @@ export const PaginationStrategies = {
       }
 
       const firstRow = resolve(config.rowSelector, root).first();
-      const oldText = await firstRow.innerText().catch(() => ""); 
+      const oldText = await firstRow.innerText().catch(() => "");
 
-      await nextBtn.click({ timeout: 2000 }).catch(() => {});
+      await nextBtn.click({ timeout: 2000 }).catch(() => { });
 
       const success = await waitForCondition(async () => {
         const newText = await firstRow.innerText().catch(() => "");
@@ -69,7 +69,8 @@ export const PaginationStrategies = {
   }
 };
 
+
 /**
  * @deprecated Use `PaginationStrategies` instead. This alias will be removed in a future major version.
  */
-export const TableStrategies = PaginationStrategies;
+export const DeprecatedPaginationStrategies = PaginationStrategies;

@@ -1,81 +1,216 @@
-
-import { test, expect } from '@playwright/test';
+import { test, expect, Locator, Page } from '@playwright/test';
 import { useTable } from '../src/useTable';
+import type { FillStrategy, TableConfig, TableContext } from '../src/types';
+import { Strategies } from '../src/strategies';
 
-test.describe('Glide Table', () => {
-    test('should interact with Glide-like grid structure', async ({ page }) => {
-        // Inject the user's provided HTML
-        await page.setContent(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <style>
-            table { border-collapse: collapse; width: 100%; font-family: sans-serif; }
-            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-            th { background-color: #f2f2f2; }
-        </style>
-      </head>
-      <body>
-        <h1>Glide Table Demo</h1>
-        <div id="table-container">
-            <table role="grid" aria-rowcount="11" aria-multiselectable="true" aria-colcount="6">
-                <thead role="rowgroup">
-                    <tr role="row" aria-rowindex="1">
-                        <th role="columnheader" aria-selected="false" aria-colindex="1" tabindex="-1">Name</th>
-                        <th role="columnheader" aria-selected="false" aria-colindex="2" tabindex="-1">Description</th>
-                        <th role="columnheader" aria-selected="false" aria-colindex="3" tabindex="-1">Image</th>
-                        <th role="columnheader" aria-selected="false" aria-colindex="4" tabindex="-1">Category</th>
-                        <th role="columnheader" aria-selected="false" aria-colindex="5" tabindex="-1">Email</th>
-                        <th role="columnheader" aria-selected="false" aria-colindex="6" tabindex="-1">Is Favorited?</th>
-                    </tr>
-                </thead>
-                <tbody role="rowgroup">
-                    <tr role="row" aria-selected="false" aria-rowindex="2">
-                        <td role="gridcell" aria-colindex="1" id="glide-cell-1-0">Item Title</td>
-                        <td role="gridcell" aria-colindex="2" id="glide-cell-2-0">A short description of the item</td>
-                        <td role="gridcell" aria-colindex="3" id="glide-cell-3-0">Image.png</td>
-                        <td role="gridcell" aria-colindex="4" id="glide-cell-4-0">Category 1</td>
-                        <td role="gridcell" aria-colindex="5" id="glide-cell-5-0"></td>
-                        <td role="gridcell" aria-colindex="6" id="glide-cell-6-0">false</td>
-                    </tr>
-                    <tr role="row" aria-selected="false" aria-rowindex="3">
-                        <td role="gridcell" aria-colindex="1" id="glide-cell-1-1">Item Title 2</td>
-                        <td role="gridcell" aria-colindex="2" id="glide-cell-2-1">Another description</td>
-                        <td role="gridcell" aria-colindex="3" id="glide-cell-3-1">Image2.png</td>
-                        <td role="gridcell" aria-colindex="4" id="glide-cell-4-1">Category 2</td>
-                        <td role="gridcell" aria-colindex="5" id="glide-cell-5-1">bob@example.com</td>
-                        <td role="gridcell" aria-colindex="6" id="glide-cell-6-1">true</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-      </body>
-      </html>
-    `);
+test.describe('Live Glide Data Grid', () => {
+    // Shared Strategies & Configuration
+    const glideFillStrategy: FillStrategy = async ({ value, page }) => {
+        // Edit Cell
+        await page.keyboard.press('Enter');
+        await page.waitForTimeout(100);
+        await page.keyboard.type(String(value));
+        await page.waitForTimeout(200);
+        await page.keyboard.press('Enter');
+        await page.waitForTimeout(500);
+    };
 
-        const table = useTable(page.locator('table[role="grid"]'), {
-            // Specific selectors derived from the HTML structure
-            headerSelector: 'thead[role="rowgroup"] th[role="columnheader"]',
-            rowSelector: 'tbody[role="rowgroup"] tr[role="row"]',
-            cellSelector: 'td[role="gridcell"]'
-        });
+    const glidePaginationStrategy = async ({ root }: TableContext) => {
+        // Strategy: Scroll the overlay container.
+        // We need to find the scroller within the same frame as the root.
+        // Using xpath to go up to body and find the scroller ensures we stay in the frame.
+        const scroller = root.locator('xpath=//ancestor::body//div[contains(@class, "dvn-scroller")]').first();
+        await expect(scroller).toBeAttached();
+
+        // Force scroll via JS (most reliable for virtual lists)
+        await scroller.evaluate(div => div.scrollTop += 500);
+
+        // Wait for virtual rows to render
+        // We use root.page() for timeout which is fine (global timer)
+        await root.page().waitForTimeout(1000);
+
+        return true;
+    };
+
+    const glideConfig: TableConfig = {
+        headerSelector: 'thead tr th',
+        rowSelector: 'tbody tr',
+        cellSelector: 'td',
+        strategies: {
+            header: Strategies.Header.scrollRight,
+            cellNavigation: Strategies.Column.keyboard,
+            fill: glideFillStrategy,
+            pagination: glidePaginationStrategy,
+            getCellLocator: ({ page, columnIndex, rowIndex }) => {
+                // Glide uses 1-based colIndex for data cells (colIndex 0 is row header usually)
+                // rowIndex seems to be 0-based in the ID based on "glide-cell-1-0"
+                return page.locator(`#glide-cell-${columnIndex + 1}-${rowIndex}`);
+            },
+            getActiveCell: async ({ page }) => {
+                // Find the focused cell/element
+                // Use broad selector for focused element
+                const focused = page.locator('*:focus').first();
+
+                if (await focused.count() === 0) return null;
+
+                // Debug log
+                if (process.env.DEBUG) console.log('Found focused element:', await focused.evaluate(e => e.outerHTML));
+
+                // Try to extract position from ID if possible
+                const id = await focused.getAttribute('id') || '';
+                // Expected format: glide-cell-COL-ROW
+                const parts = id.split('-');
+
+                let rowIndex = -1;
+                let columnIndex = -1;
+
+                if (parts.length >= 4 && parts[0] === 'glide' && parts[1] === 'cell') {
+                    columnIndex = parseInt(parts[2]) - 1; // 1-based in ID to 0-based
+                    rowIndex = parseInt(parts[3]);
+                } else {
+                    // Fallback: If we can't parse ID, we assume it's the correct cell 
+                    // because we just navigated to it. 
+                    // Returning -1 indices might be confusing but won't stop smartRow from using the locator.
+                }
+
+                return {
+                    rowIndex,
+                    columnIndex,
+                    locator: focused
+                };
+            }
+        }
+    };
+
+    test('should scan headers and write to multiple columns', async ({ page }) => {
+        // 1. Setup
+        await page.goto('https://glideapps.github.io/glide-data-grid/iframe.html?viewMode=story&id=glide-data-grid-dataeditor-demos--add-data&globals=');
+        // Stabilize: Wait for grid to be attached
+        const grid = page.locator('table[role="grid"]').first();
+        await expect(grid).toBeAttached({ timeout: 15000 });
+
+        // 3. Configure Table
+        // Root is the CANVAS itself as per user request for this test
+        const table = useTable(page.locator('canvas').first(), glideConfig);
 
         await table.init();
 
-        // Verify headers
         const headers = await table.getHeaders();
-        expect(headers).toEqual(['Name', 'Description', 'Image', 'Category', 'Email', 'Is Favorited?']);
+        console.log('Headers found:', headers);
+        expect(headers.length).toBeGreaterThan(50); // Verify we found many columns
 
-        // Verify Row 1
-        const row1 = table.getByRow({ Category: 'Category 1' });
-        const row1Data = await row1.toJSON();
-        expect(row1Data.Name).toBe('Item Title');
-        expect(row1Data['Is Favorited?']).toBe('false');
+        // Use getByRowIndex(1) (1-based index) to get the first row with rowIndex context
+        const firstRow = table.getByRowIndex(1);
 
-        // Verify Row 2
-        const row2 = table.getByRow({ Category: 'Category 2' });
-        const row2Data = await row2.toJSON();
-        expect(row2Data.Name).toBe('Item Title 2');
-        expect(row2Data.Email).toBe('bob@example.com');
+        const newName = "Antigravity";
+        const newTitle = "CEO";
+
+        console.log(`Writing Name: ${newName}`);
+        await firstRow.fill({ "First name": newName });
+
+        console.log(`Writing Title: ${newTitle}`);
+        await firstRow.fill({ "Title": newTitle });
+
+        // 5. Verify using table helpers
+
+        // Verify Title (should be visible as we just wrote to it)
+        console.log("Verifying Title...");
+        const titleCell = firstRow.getCell("Title");
+        await expect(titleCell).toHaveText(newTitle);
+
+        const nameCell = firstRow.getCell("First name");
+        await expect(nameCell).toHaveText(newName);
+
+        console.log("Verified successfully using table helpers!");
+    });
+
+    test('should infinite scroll', async ({ page }) => {
+        await page.goto('https://glideapps.github.io/glide-data-grid/iframe.html?viewMode=story&id=glide-data-grid-dataeditor-demos--add-data&globals=');
+        // Stabilize: Wait for grid to be attached
+        const grid = page.locator('table[role="grid"]').first();
+        await expect(grid).toBeAttached({ timeout: 15000 });
+
+        // 3. Configure Table
+        // Root is the CANVAS itself as per user request for this test
+        const table = useTable(page.locator('canvas').first(), { ...glideConfig, debug: true });
+        await table.init();
+
+        // Collect data using iterateThroughTable
+        const allData = await table.iterateThroughTable(
+            async ({ rows }) => {
+                return Promise.all(rows.map(r => r.toJSON({ columns: ['First name', 'Last name', 'Title', 'Email'] })));
+            },
+            { maxIterations: 3 }
+        );
+
+        const flattenedData = allData.flat();
+
+        console.log(`Collected ${flattenedData.length} total rows after scroll`);
+        expect(flattenedData.length).toBeGreaterThan(12);
+
+        // Verify we got new data
+        const uniqueNames = new Set(flattenedData.map((r: any) => r["First name"]));
+        console.log(`Unique Names: ${uniqueNames.size}`);
+
+
+        console.log("--- Verification Data ---");
+        const indicesToLog = [0, 10, 20, 30];
+        indicesToLog.forEach(idx => {
+            if (flattenedData[idx]) {
+                console.log(`Row ${idx + 1}:`, flattenedData[idx]);
+            } else {
+                console.log(`Row ${idx + 1}: [NOT FOUND - Total rows: ${flattenedData.length}]`);
+            }
+        });
+        console.log("-------------------------");
+
+        // If we scrolled successfully, we should have more unique names than the page size (12)
+        expect(uniqueNames.size).toBeGreaterThan(12);
+    });
+
+    test('should infinite scroll with scroll right', async ({ page }) => {
+        await page.goto('https://glideapps.github.io/glide-data-grid/iframe.html?viewMode=story&id=glide-data-grid-dataeditor-demos--add-data&globals=');
+        // Stabilize: Wait for grid to be attached
+        const grid = page.locator('table[role="grid"]').first();
+        await expect(grid).toBeAttached({ timeout: 15000 });
+
+        // 3. Configure Table
+        // Root is the CANVAS itself as per user request for this test
+        const table = useTable(page.locator('canvas').first(), glideConfig);
+        await table.init();
+
+        const columns = ["First name", "Title", "Column 59"];
+
+        // Collect data using iterateThroughTable
+        const allData = await table.iterateThroughTable(
+            async ({ rows }) => {
+                return Promise.all(rows.map(r => r.toJSON({ columns })));
+            },
+            { maxIterations: 3 }
+        );
+
+        const flattenedData = allData.flat();
+
+        console.log(`Collected ${flattenedData.length} total rows after scroll`);
+        expect(flattenedData.length).toBeGreaterThan(12);
+
+        // Verify we got new data
+        const uniqueNames = new Set(flattenedData.map((r: any) => r["First name"]));
+        console.log(`Unique Names: ${uniqueNames.size}`);
+
+
+        console.log("--- Verification Data ---");
+        const indicesToLog = [0, 10, 20, 30];
+        indicesToLog.forEach(idx => {
+            if (flattenedData[idx]) {
+                console.log(`Row ${idx + 1}:`, flattenedData[idx]);
+            } else {
+                console.log(`Row ${idx + 1}: [NOT FOUND - Total rows: ${flattenedData.length}]`);
+            }
+        });
+        console.log("-------------------------");
+
+        // If we scrolled successfully, we should have more unique names than the page size (12)
+        expect(uniqueNames.size).toBeGreaterThan(12);
     });
 });

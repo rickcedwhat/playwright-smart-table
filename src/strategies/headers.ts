@@ -65,7 +65,6 @@ export const HeaderStrategies = {
                 await page.waitForTimeout(300);
 
                 const newHeaders = await getVisible();
-                console.log(`[HeaderStrat:scrollRight] Scrolled ${scrollAmount}, found: ${newHeaders.length} visible.`);
                 newHeaders.forEach(h => collectedHeaders.add(h));
 
                 if (collectedHeaders.size === sizeBefore) {
@@ -121,7 +120,8 @@ export const HeaderStrategies = {
         // Reset to home
         await page.keyboard.press('Control+Home');
         await page.keyboard.press('Home');
-        await page.waitForTimeout(200);
+        // Wait for potential scroll/focus reset
+        await page.evaluate(() => new Promise(requestAnimationFrame));
 
         currentHeaders = await getVisible();
         currentHeaders.forEach(h => collectedHeaders.add(h));
@@ -132,10 +132,11 @@ export const HeaderStrategies = {
             const sizeBefore = collectedHeaders.size;
 
             await page.keyboard.press('ArrowRight');
-            await page.waitForTimeout(100);
+            // Small breathing room for key press to register
+            await page.evaluate(() => new Promise(requestAnimationFrame));
+
 
             const newHeaders = await getVisible();
-            console.log(`[HeaderStrat:keyboard] Step ${i}, found visible: ${newHeaders}`);
             newHeaders.forEach(h => collectedHeaders.add(h));
 
             if (collectedHeaders.size === sizeBefore) {

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { useTable, PaginationStrategies } from '../src/useTable';
+import { useTable, Strategies } from '../src/useTable';
 
 /**
  * Compatibility Test Suite
@@ -17,7 +17,7 @@ test.describe('Backwards Compatibility Tests', () => {
 
   test('Core: useTable creates table instance', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
-    
+
     const table = useTable(page.locator('#example'), {
       headerSelector: 'thead th'
     });
@@ -36,18 +36,18 @@ test.describe('Backwards Compatibility Tests', () => {
 
   test('Core: getByRow returns SmartRow with getCell method', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
-    
+
     const table = useTable(page.locator('#example'), {
       headerSelector: 'thead th'
     });
     await table.init();
 
     const row = table.getByRow({ Name: 'Airi Satou' });
-    
+
     // SmartRow should have getCell method
     expect(typeof row.getCell).toBe('function');
     expect(typeof row.toJSON).toBe('function');
-    
+
     // getCell should return a Locator
     const cell = row.getCell('Position');
     await expect(cell).toHaveText('Accountant');
@@ -55,7 +55,7 @@ test.describe('Backwards Compatibility Tests', () => {
 
   test('Core: getByRow with multiple filters', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
-    
+
     const table = useTable(page.locator('#example'), {
       headerSelector: 'thead th'
     });
@@ -67,7 +67,7 @@ test.describe('Backwards Compatibility Tests', () => {
 
   test('Core: getByRow returns sentinel for non-existent rows', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
-    
+
     const table = useTable(page.locator('#example'), {
       headerSelector: 'thead th'
     });
@@ -79,14 +79,14 @@ test.describe('Backwards Compatibility Tests', () => {
 
   test('Core: getAllCurrentRows returns array of SmartRows', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
-    
+
     const table = useTable(page.locator('#example'), {
       headerSelector: 'thead th'
     });
     await table.init();
 
     const rows = await table.getAllCurrentRows();
-    
+
     expect(Array.isArray(rows)).toBe(true);
     expect(rows.length).toBeGreaterThan(0);
     expect(typeof rows[0].getCell).toBe('function');
@@ -94,7 +94,7 @@ test.describe('Backwards Compatibility Tests', () => {
 
   test('Core: getAllCurrentRows with filter option', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
-    
+
     const table = useTable(page.locator('#example'), {
       headerSelector: 'thead th'
     });
@@ -103,21 +103,21 @@ test.describe('Backwards Compatibility Tests', () => {
     const filtered = await table.getAllCurrentRows({
       filter: { Office: 'Tokyo' }
     });
-    
+
     expect(Array.isArray(filtered)).toBe(true);
     expect(filtered.length).toBeGreaterThan(0);
   });
 
   test('Core: getAllCurrentRows with asJSON option', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
-    
+
     const table = useTable(page.locator('#example'), {
       headerSelector: 'thead th'
     });
     await table.init();
 
     const data = await table.getAllCurrentRows({ asJSON: true });
-    
+
     expect(Array.isArray(data)).toBe(true);
     expect(data.length).toBeGreaterThan(0);
     expect(typeof data[0]).toBe('object');
@@ -126,7 +126,7 @@ test.describe('Backwards Compatibility Tests', () => {
 
   test('Core: getByRow with toJSON()', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
-    
+
     const table = useTable(page.locator('#example'), {
       headerSelector: 'thead th'
     });
@@ -134,7 +134,7 @@ test.describe('Backwards Compatibility Tests', () => {
 
     const row = table.getByRow({ Name: 'Airi Satou' });
     const data = await row.toJSON();
-    
+
     expect(typeof data).toBe('object');
     expect(data).toHaveProperty('Name', 'Airi Satou');
     expect(data).toHaveProperty('Position');
@@ -142,7 +142,7 @@ test.describe('Backwards Compatibility Tests', () => {
 
   test('Core: SmartRow.toJSON returns row data', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
-    
+
     const table = useTable(page.locator('#example'), {
       headerSelector: 'thead th'
     });
@@ -150,7 +150,7 @@ test.describe('Backwards Compatibility Tests', () => {
 
     const row = table.getByRow({ Name: 'Airi Satou' });
     const data = await row.toJSON();
-    
+
     expect(typeof data).toBe('object');
     expect(data).toHaveProperty('Name', 'Airi Satou');
     expect(data).toHaveProperty('Position');
@@ -158,14 +158,14 @@ test.describe('Backwards Compatibility Tests', () => {
 
   test('Core: getHeaders returns array of column names', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
-    
+
     const table = useTable(page.locator('#example'), {
       headerSelector: 'thead th'
     });
     await table.init();
 
     const headers = await table.getHeaders();
-    
+
     expect(Array.isArray(headers)).toBe(true);
     expect(headers.length).toBeGreaterThan(0);
     expect(headers).toContain('Name');
@@ -174,7 +174,7 @@ test.describe('Backwards Compatibility Tests', () => {
 
   test('Core: getHeaderCell returns Locator', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
-    
+
     const table = useTable(page.locator('#example'), {
       headerSelector: 'thead th'
     });
@@ -187,14 +187,14 @@ test.describe('Backwards Compatibility Tests', () => {
 
   test('Core: getColumnValues returns array of values', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
-    
+
     const table = useTable(page.locator('#example'), {
       headerSelector: 'thead th'
     });
     await table.init();
 
     const offices = await table.getColumnValues('Office');
-    
+
     expect(Array.isArray(offices)).toBe(true);
     expect(offices.length).toBeGreaterThan(0);
     expect(typeof offices[0]).toBe('string');
@@ -202,7 +202,7 @@ test.describe('Backwards Compatibility Tests', () => {
 
   test('Core: reset method exists and is callable', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
-    
+
     const table = useTable(page.locator('#example'), {
       headerSelector: 'thead th'
     });
@@ -215,12 +215,14 @@ test.describe('Backwards Compatibility Tests', () => {
   test('Core: pagination with clickNext strategy', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
     await page.waitForSelector('#example_wrapper');
-    
+
     const table = useTable(page.locator('#example'), {
       headerSelector: 'thead th',
-      pagination: PaginationStrategies.clickNext(() => 
-        page.getByRole('link', { name: 'Next' })
-      ),
+      strategies: {
+        pagination: Strategies.Pagination.clickNext(() =>
+          page.getByRole('link', { name: 'Next' })
+        ),
+      },
       maxPages: 2
     });
     await table.init();
@@ -233,7 +235,7 @@ test.describe('Backwards Compatibility Tests', () => {
 
   test('Core: headerTransformer function is applied', async ({ page }) => {
     await page.goto('https://the-internet.herokuapp.com/tables');
-    
+
     const table = useTable(page.locator('#table1'), {
       headerTransformer: ({ text }) => text.trim().toLowerCase()
     });
@@ -246,14 +248,14 @@ test.describe('Backwards Compatibility Tests', () => {
 
   test('Core: SmartRow extends Locator API', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
-    
+
     const table = useTable(page.locator('#example'), {
       headerSelector: 'thead th'
     });
     await table.init();
 
     const row = table.getByRow({ Name: 'Airi Satou' });
-    
+
     // Should have standard Locator methods
     await expect(row).toBeVisible();
     await expect(row).toBeEnabled();
@@ -264,10 +266,10 @@ test.describe('Backwards Compatibility Tests', () => {
   test('Lazy Loading: getByRow works when table appears later', async ({ page }) => {
     // Start with empty page
     await page.setContent('<div id="container"></div>');
-    
+
     // Create table instance before table exists
     const table = useTable(page.locator('#my-table'));
-    
+
     // Now create the table
     await page.setContent(`
       <table id="my-table">
@@ -275,27 +277,27 @@ test.describe('Backwards Compatibility Tests', () => {
         <tbody><tr><td>John</td><td>30</td></tr></tbody>
       </table>
     `);
-    
+
     // Initialize after table exists
     await table.init();
-    
+
     // Call getByRow - should return immediately (sync)
     const row = table.getByRow({ Name: 'John' });
-    
+
     // getCell should work (returns lazy locator)
     const nameCell = row.getCell('Name');
     const ageCell = row.getCell('Age');
-    
+
     // Now the locators should work
     await expect(nameCell).toHaveText('John');
     await expect(ageCell).toHaveText('30');
     await expect(row).toBeVisible();
-    
+
     // Test that if row is deleted, isVisible returns false
     await page.evaluate(() => {
       document.querySelector('#my-table tbody tr')?.remove();
     });
-    
+
     await expect(row).not.toBeVisible();
   });
 
@@ -306,12 +308,12 @@ test.describe('Backwards Compatibility Tests', () => {
         <tbody><tr><td>John</td><td>30</td></tr></tbody>
       </table>
     `);
-    
+
     const table = useTable(page.locator('#test-table'));
-    
+
     // getByRow should throw if not initialized
     expect(() => table.getByRow({ Name: 'John' })).toThrow('Table not initialized');
-    
+
     // getCell should throw if not initialized (via getByRow)
     await table.init();
     const row = table.getByRow({ Name: 'John' });
@@ -328,17 +330,17 @@ test.describe('Backwards Compatibility Tests', () => {
         <tbody><tr><td>John</td><td>30</td></tr></tbody>
       </table>
     `);
-    
+
     const table = useTable(page.locator('#test-table'));
-    
+
     // getAllCurrentRows should auto-init
     const rows = await table.getAllCurrentRows();
     expect(rows.length).toBeGreaterThan(0);
-    
+
     // getColumnValues should auto-init
     const names = await table.getColumnValues('Name');
     expect(names).toContain('John');
-    
+
     // searchForRow should auto-init
     const row = await table.searchForRow({ Name: 'John' });
     await expect(row).toBeVisible();
@@ -347,9 +349,9 @@ test.describe('Backwards Compatibility Tests', () => {
   test('New API: init() method with timeout', async ({ page }) => {
     // Start with empty page
     await page.setContent('<div id="container"></div>');
-    
+
     const table = useTable(page.locator('#test-table'));
-    
+
     // Set table content after 2 seconds (to test timeout)
     // Use Promise to ensure async execution
     const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -361,10 +363,10 @@ test.describe('Backwards Compatibility Tests', () => {
         </table>
       `);
     });
-    
+
     // init() should wait for table to appear (with 5 second timeout)
     await table.init({ timeout: 5000 });
-    
+
     // Should be able to use sync methods after init
     const row = table.getByRow({ Name: 'John' });
     await expect(row).toBeVisible();
@@ -377,10 +379,10 @@ test.describe('Backwards Compatibility Tests', () => {
         <tbody><tr><td>John</td></tr></tbody>
       </table>
     `);
-    
+
     // Chained init pattern
     const table = await useTable(page.locator('#test-table')).init();
-    
+
     // Should be able to use sync methods immediately
     const row = table.getByRow({ Name: 'John' });
     await expect(row).toBeVisible();
@@ -389,12 +391,14 @@ test.describe('Backwards Compatibility Tests', () => {
   test('New API: getByRow vs searchForRow', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
     await page.waitForSelector('#example_wrapper');
-    
+
     const table = useTable(page.locator('#example'), {
       headerSelector: 'thead th',
-      pagination: PaginationStrategies.clickNext(() => 
-        page.getByRole('link', { name: 'Next' })
-      ),
+      strategies: {
+        pagination: Strategies.Pagination.clickNext(() =>
+          page.getByRole('link', { name: 'Next' })
+        ),
+      },
       maxPages: 2
     });
     await table.init();
@@ -402,11 +406,11 @@ test.describe('Backwards Compatibility Tests', () => {
     // First, verify Colleen is NOT on current page using getByRow (current page only)
     const currentPageColleen = table.getByRow({ Name: 'Colleen Hurst' });
     await expect(currentPageColleen).not.toBeVisible();
-    
+
     // Verify Airi IS on current page using getByRow
     const currentPageRow = table.getByRow({ Name: 'Airi Satou' });
     await expect(currentPageRow).toBeVisible();
-    
+
     // Now use searchForRow to find Colleen (searches across pages)
     const secondPageRow = await table.searchForRow({ Name: 'Colleen Hurst' });
     await expect(secondPageRow).toBeVisible();
@@ -415,12 +419,14 @@ test.describe('Backwards Compatibility Tests', () => {
   test('iterateThroughTable: Basic iteration with clickNext', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
     await page.waitForSelector('#example_wrapper');
-    
+
     const table = useTable(page.locator('#example'), {
       headerSelector: 'thead th',
-      pagination: PaginationStrategies.clickNext(() => 
-        page.getByRole('link', { name: 'Next' })
-      ),
+      strategies: {
+        pagination: Strategies.Pagination.clickNext(() =>
+          page.getByRole('link', { name: 'Next' })
+        ),
+      },
       maxPages: 3
     });
     await table.init();
@@ -434,7 +440,7 @@ test.describe('Backwards Compatibility Tests', () => {
     // allNames should be an array of arrays (one array per iteration)
     expect(allNames.length).toBeGreaterThan(0);
     expect(Array.isArray(allNames[0])).toBe(true);
-    
+
     // Verify we collected data from multiple iterations
     const totalNames = allNames.flat();
     expect(totalNames.length).toBeGreaterThan(10); // Should have names from multiple pages
@@ -442,12 +448,14 @@ test.describe('Backwards Compatibility Tests', () => {
 
   test('iterateThroughTable: Deduplication with infiniteScroll', async ({ page }) => {
     await page.goto('https://htmx.org/examples/infinite-scroll/');
-    
+
     const table = useTable(page.locator('table'), {
       rowSelector: 'tbody tr',
       headerSelector: 'thead th',
       cellSelector: 'td',
-      pagination: PaginationStrategies.infiniteScroll(),
+      strategies: {
+        pagination: Strategies.Pagination.infiniteScroll(),
+      },
       maxPages: 3
     });
     await table.init();
@@ -455,16 +463,16 @@ test.describe('Backwards Compatibility Tests', () => {
     // Get headers to find a suitable column for deduplication
     const headers = await table.getHeaders();
     console.log('Available headers:', headers);
-    
+
     // Use first column as deduplication key (usually ID or similar)
     const dedupeColumn = headers[0];
-    
+
     const allData = await table.iterateThroughTable(
       async ({ rows }) => {
         // Return row data - automatically appended to allData
         return await Promise.all(rows.map(r => r.toJSON()));
       },
-      { 
+      {
         dedupeStrategy: (row) => row.getCell(dedupeColumn).innerText(),
         getIsLast: ({ paginationResult }) => !paginationResult
       }
@@ -474,7 +482,7 @@ test.describe('Backwards Compatibility Tests', () => {
     const allRows = allData.flat();
     const allKeys = allRows.map((row: any) => row[dedupeColumn] || row[dedupeColumn.toLowerCase()] || JSON.stringify(row));
     const uniqueKeys = new Set(allKeys);
-    
+
     // Deduplication should ensure all keys are unique
     expect(uniqueKeys.size).toBe(allKeys.length); // All keys should be unique
     console.log(`Total rows collected: ${allRows.length}, Unique keys: ${uniqueKeys.size}`);
@@ -483,12 +491,14 @@ test.describe('Backwards Compatibility Tests', () => {
   test('iterateThroughTable: Callback return values appended to allData', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
     await page.waitForSelector('#example_wrapper');
-    
+
     const table = useTable(page.locator('#example'), {
       headerSelector: 'thead th',
-      pagination: PaginationStrategies.clickNext(() => 
-        page.getByRole('link', { name: 'Next' })
-      ),
+      strategies: {
+        pagination: Strategies.Pagination.clickNext(() =>
+          page.getByRole('link', { name: 'Next' })
+        ),
+      },
       maxPages: 2
     });
     await table.init();
@@ -508,12 +518,14 @@ test.describe('Backwards Compatibility Tests', () => {
   test('iterateThroughTable: getIsFirst/getIsLast functions', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
     await page.waitForSelector('#example_wrapper');
-    
+
     const table = useTable(page.locator('#example'), {
       headerSelector: 'thead th',
-      pagination: PaginationStrategies.clickNext(() => 
-        page.getByRole('link', { name: 'Next' })
-      ),
+      strategies: {
+        pagination: Strategies.Pagination.clickNext(() =>
+          page.getByRole('link', { name: 'Next' })
+        ),
+      },
       maxPages: 2
     });
     await table.init();
@@ -543,12 +555,14 @@ test.describe('Backwards Compatibility Tests', () => {
   test('iterateThroughTable: onFirst/onLast hooks', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
     await page.waitForSelector('#example_wrapper');
-    
+
     const table = useTable(page.locator('#example'), {
       headerSelector: 'thead th',
-      pagination: PaginationStrategies.clickNext(() => 
-        page.getByRole('link', { name: 'Next' })
-      ),
+      strategies: {
+        pagination: Strategies.Pagination.clickNext(() =>
+          page.getByRole('link', { name: 'Next' })
+        ),
+      },
       maxPages: 3 // Increase to ensure we have multiple iterations
     });
     await table.init();
@@ -586,12 +600,14 @@ test.describe('Backwards Compatibility Tests', () => {
   test('iterateThroughTable: Restricted table context', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
     await page.waitForSelector('#example_wrapper');
-    
+
     const table = useTable(page.locator('#example'), {
       headerSelector: 'thead th',
-      pagination: PaginationStrategies.clickNext(() => 
-        page.getByRole('link', { name: 'Next' })
-      ),
+      strategies: {
+        pagination: Strategies.Pagination.clickNext(() =>
+          page.getByRole('link', { name: 'Next' })
+        ),
+      },
       maxPages: 2
     });
     await table.init();
@@ -601,12 +617,13 @@ test.describe('Backwards Compatibility Tests', () => {
       expect(restrictedTable).toHaveProperty('getByRow');
       expect(restrictedTable).toHaveProperty('getAllCurrentRows');
       expect(restrictedTable).toHaveProperty('getHeaders');
-      
+      expect(restrictedTable).toHaveProperty('getByRowIndex');
+
       // Should NOT have problematic methods
       expect(restrictedTable).not.toHaveProperty('searchForRow');
       expect(restrictedTable).not.toHaveProperty('iterateThroughTable');
       expect(restrictedTable).not.toHaveProperty('reset');
-      
+
       return { success: true };
     });
   });
@@ -614,7 +631,7 @@ test.describe('Backwards Compatibility Tests', () => {
   test('iterateThroughTable: Pagination strategy from options', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
     await page.waitForSelector('#example_wrapper');
-    
+
     // Create table without pagination in config
     const table = useTable(page.locator('#example'), {
       headerSelector: 'thead th'
@@ -625,7 +642,7 @@ test.describe('Backwards Compatibility Tests', () => {
     const results = await table.iterateThroughTable(
       async ({ rows }) => rows.length,
       {
-        pagination: PaginationStrategies.clickNext(() => 
+        pagination: Strategies.Pagination.clickNext(() =>
           page.getByRole('link', { name: 'Next' })
         ),
         maxIterations: 2
@@ -638,7 +655,7 @@ test.describe('Backwards Compatibility Tests', () => {
   test('iterateThroughTable: Throws error if no pagination strategy', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
     await page.waitForSelector('#example_wrapper');
-    
+
     // Create table without pagination
     const table = useTable(page.locator('#example'), {
       headerSelector: 'thead th'

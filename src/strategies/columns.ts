@@ -2,13 +2,16 @@
 import { StrategyContext } from '../types';
 
 /**
- * Defines the contract for a column navigation strategy.
- * It is responsible for ensuring a specific column is visible/focused,
- * typically by scrolling or navigating to it.
+ * Defines the contract for a cell navigation strategy.
+ * It is responsible for ensuring a specific CELL is visible/focused (navigates to row + column),
+ * typically by scrolling or using keyboard navigation.
  */
-export type ColumnStrategy = (context: StrategyContext & { column: string, index: number, rowIndex?: number }) => Promise<void>;
+export type CellNavigationStrategy = (context: StrategyContext & { column: string, index: number, rowIndex?: number }) => Promise<void>;
 
-export const ColumnStrategies = {
+/** @deprecated Use CellNavigationStrategy instead */
+export type ColumnStrategy = CellNavigationStrategy;
+
+export const CellNavigationStrategies = {
     /**
      * Default strategy: Assumes column is accessible or standard scrolling works.
      * No specific action taken other than what Playwright's default locator handling does.
@@ -19,7 +22,7 @@ export const ColumnStrategies = {
 
     /**
      * Strategy that clicks into the table to establish focus and then uses the Right Arrow key
-     * to navigate to the target column index.
+     * to navigate to the target CELL (navigates down to the row, then right to the column).
      * 
      * Useful for canvas-based grids like Glide where DOM scrolling might not be enough for interaction
      * or where keyboard navigation is the primary way to move focus.
@@ -30,8 +33,6 @@ export const ColumnStrategies = {
         if (typeof rowIndex !== 'number') {
             throw new Error('Row index is required for keyboard navigation');
         }
-
-        console.log(`[ColumnStrat:keyboard] Using Row Index Navigation: Row ${rowIndex}, Col ${index}`);
 
         await root.focus();
         await page.waitForTimeout(200);
@@ -52,8 +53,9 @@ export const ColumnStrategies = {
             await page.keyboard.press('ArrowRight');
         }
         await page.waitForTimeout(100);
-
-        await page.waitForTimeout(100);
     }
 };
 
+// Backwards compatibility - deprecated
+/** @deprecated Use CellNavigationStrategies instead */
+export const ColumnStrategies = CellNavigationStrategies;

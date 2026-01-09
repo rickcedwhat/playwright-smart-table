@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { useTable } from '../src/useTable';
-import { TableStrategies } from '../src/strategies';
+import { Strategies } from '../src/strategies';
 
 test.describe('README.md Examples Verification', () => {
 
@@ -32,9 +32,11 @@ test.describe('README.md Examples Verification', () => {
       headerSelector: 'thead th',
       cellSelector: 'td',
       // Strategy: Tell it how to find the next page
-      pagination: TableStrategies.clickNext(() => 
-        page.getByRole('link', { name: 'Next' })
-      ),
+      strategies: {
+        pagination: Strategies.Pagination.clickNext(() =>
+          page.getByRole('link', { name: 'Next' })
+        )
+      },
       maxPages: 5 // Allow scanning up to 5 pages
     });
     await table.init();
@@ -112,11 +114,11 @@ test.describe('README.md Examples Verification', () => {
 
   test('Advanced Usage Features', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
-    
+
     // #region advanced-debug
     const table = useTable(page.locator('#example'), {
       headerSelector: 'thead th',
-      debug: true 
+      debug: true
     });
     await table.init();
     // #endregion advanced-debug
@@ -126,8 +128,8 @@ test.describe('README.md Examples Verification', () => {
     // For the test to pass, we need a valid row. 'Angelica Ramos' is usually on page 1 or 2 depending on sorting.
     try {
       await table.searchForRow({ Name: 'Angelica Ramos' });
-    } catch (e) {}
-    
+    } catch (e) { }
+
     // Reset internal state (and potentially UI) to Page 1
     await table.reset();
     await table.init(); // Re-init after reset
@@ -135,7 +137,7 @@ test.describe('README.md Examples Verification', () => {
 
     // #region advanced-column-scan
     // Quickly grab all text values from the "Office" column
-    const offices = await table.getColumnValues('Office'); 
+    const offices = await table.getColumnValues('Office');
     expect(offices).toContain('Tokyo');
     // #endregion advanced-column-scan
   });
