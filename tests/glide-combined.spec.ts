@@ -18,11 +18,30 @@ test.describe('Live Glide Data Grid', () => {
         const glideFillStrategy: FillStrategy = async ({ value, page }) => {
             // Edit Cell
             await page.keyboard.press('Enter');
-            await page.waitForTimeout(100);
+            // Wait for editor to appear
+            const textarea = page.locator('textarea.gdg-input');
+            await textarea.waitFor({ state: 'visible', timeout: 2000 });
             await page.keyboard.type(String(value));
-            await page.waitForTimeout(200);
+            // Wait for textarea value to match what we typed
+            await textarea.evaluate((el, expectedValue) => {
+                return new Promise<void>((resolve) => {
+                    const checkValue = () => {
+                        if ((el as HTMLTextAreaElement).value === expectedValue) {
+                            resolve();
+                        } else {
+                            setTimeout(checkValue, 10);
+                        }
+                    };
+                    checkValue();
+                });
+            }, String(value));
+            // Small delay to let the grid process the value
+            await page.waitForTimeout(50);
             await page.keyboard.press('Enter');
-            await page.waitForTimeout(500);
+            // Wait for editor to close (commit completed)
+            await textarea.waitFor({ state: 'detached', timeout: 2000 });
+            // Wait for accessibility layer to sync with canvas state
+            await page.waitForTimeout(300);
         };
 
         // 3. Configure Table
