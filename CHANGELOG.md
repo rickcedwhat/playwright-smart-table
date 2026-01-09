@@ -5,6 +5,80 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.0] - 2026-01-09
+
+### 🚀 Major Changes
+
+#### Strategy Consolidation
+- **BREAKING**: All strategy imports consolidated under `Strategies` object
+  - `PaginationStrategies.X` → `Strategies.Pagination.X`
+  - `SortingStrategies.X` → `Strategies.Sorting.X`
+  - `HeaderStrategies.X` → `Strategies.Header.X`
+  - `ColumnStrategies.X` → `Strategies.Column.X`
+- Individual strategy exports maintained for backward compatibility (deprecated)
+
+#### Generic Type Support
+- **NEW**: `useTable<T>()` now accepts generic type parameter for type-safe row data
+- `SmartRow.toJSON()` returns `Promise<T>` instead of `Promise<Record<string, string>>`
+- `getByRow()` and `searchForRow()` accept `Partial<T>` for filters
+- Full type inference throughout the API
+
+#### New Methods
+- **NEW**: `table.revalidate()` - Refresh column mappings without resetting pagination state
+- Useful when table columns change dynamically (visibility, reordering)
+
+### ✨ Added
+
+- `Strategies` unified export object containing all strategy types
+- Generic type parameter `<T>` for `useTable`, `SmartRow`, and `TableResult`
+- `revalidate()` method for refreshing table structure
+- 3 new tests for RowType generic support
+
+### 🔄 Changed
+
+- **BREAKING**: Import path for strategies changed to use `Strategies` object
+- Strategy organization improved for better discoverability
+- Type definitions enhanced with generic support
+
+### 📚 Documentation
+
+- Added AI-optimized migration guide (MIGRATION_v4.md)
+- Updated all examples to use `Strategies` object
+- Added TypeScript generic usage examples
+- Documented `revalidate()` method
+
+### 🔧 Migration Guide
+
+See [MIGRATION_v4.md](./MIGRATION_v4.md) for detailed AI-assisted migration instructions.
+
+**Quick Reference:**
+```typescript
+// Before (v3.2)
+import { PaginationStrategies } from '../src/useTable';
+strategies: {
+  pagination: PaginationStrategies.clickNext(...)
+}
+
+// After (v4.0)
+import { Strategies } from '../src/strategies';
+strategies: {
+  pagination: Strategies.Pagination.clickNext(...)
+}
+
+// Optional: Add type safety
+interface User { Name: string; Email: string; }
+const table = useTable<User>(locator, config);
+const data = await row.toJSON(); // Type: User
+```
+
+### 🧪 Testing
+
+- All 66 tests passing (consolidated from 69)
+- Added 3 RowType generic tests
+- Consolidated test files for better organization
+
+---
+
 ## [3.1.0] - 2024-12-XX
 
 ### 🚀 Major Changes
