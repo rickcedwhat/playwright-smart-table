@@ -57,13 +57,16 @@ await positionCell.click();
 const data = await row.toJSON();
 console.log(data);
 // { Name: "Airi Satou", Position: "Accountant", ... }
+
+// Optimized extraction (only fetch specific columns)
+const partialData = await row.toJSON({ columns: ['Name', 'Position'] });
 ```
 <!-- /embed: smart-row -->
 
 **Key Benefits:**
 - ✅ Column names instead of indices (survives column reordering)
 - ✅ Extends Playwright's `Locator` API (all `.click()`, `.isVisible()`, etc. work)
-- ✅ `.toJSON()` for quick data extraction
+- ✅ `.toJSON()` for quick data extraction (uses `columnStrategy` to ensure visibility)
 
 ---
 
@@ -81,9 +84,11 @@ const table = useTable(page.locator('#example'), {
   headerSelector: 'thead th',
   cellSelector: 'td',
   // Strategy: Tell it how to find the next page
-  pagination: TableStrategies.clickNext(() => 
-    page.getByRole('link', { name: 'Next' })
-  ),
+  strategies: {
+    pagination: PaginationStrategies.clickNext(() =>
+      page.getByRole('link', { name: 'Next' })
+    )
+  },
   maxPages: 5 // Allow scanning up to 5 pages
 });
 await table.init();
@@ -231,9 +236,12 @@ const table = useTable(page.locator('.MuiDataGrid-root').first(), {
   rowSelector: '.MuiDataGrid-row',
   headerSelector: '.MuiDataGrid-columnHeader',
   cellSelector: '.MuiDataGrid-cell',
-  pagination: TableStrategies.clickNext(
-    (root) => root.getByRole("button", { name: "Go to next page" })
-  ),
+  cellSelector: '.MuiDataGrid-cell',
+  strategies: {
+    pagination: PaginationStrategies.clickNext(
+      (root) => root.getByRole("button", { name: "Go to next page" })
+    )
+  },
   maxPages: 5,
   // Transform empty columns (detected as __col_0, __col_1, etc.) to meaningful names
   headerTransformer: ({ text }) => {
@@ -335,6 +343,10 @@ const data = await row.toJSON();
 
 expect(data).toHaveProperty('Name', 'Airi Satou');
 expect(data).toHaveProperty('Position');
+
+// Get specific columns only (faster for large tables)
+const partial = await row.toJSON({ columns: ['Name'] });
+expect(partial).toEqual({ Name: 'Airi Satou' });
 ```
 <!-- /embed: get-by-row-json -->
 
@@ -465,32 +477,38 @@ This library uses the **Strategy Pattern** for pagination. Use built-in strategi
 
 ### Built-in Strategies
 
-#### <a name="tablestrategiesclicknext"></a>`TableStrategies.clickNext(selector)`
+#### <a name="tablestrategiesclicknext"></a>`PaginationStrategies.clickNext(selector)`
 
 Best for standard paginated tables (Datatables, lists). Clicks a button/link and waits for table content to change.
 
 ```typescript
-pagination: TableStrategies.clickNext((root) =>
-  root.page().getByRole('button', { name: 'Next' })
-)
+strategies: {
+  pagination: PaginationStrategies.clickNext((root) =>
+    root.page().getByRole('button', { name: 'Next' })
+  )
+}
 ```
 
-#### <a name="tablestrategiesinfinitescroll"></a>`TableStrategies.infiniteScroll()`
+#### <a name="tablestrategiesinfinitescroll"></a>`PaginationStrategies.infiniteScroll()`
 
 Best for virtualized grids (AG-Grid, HTMX). Aggressively scrolls to trigger data loading.
 
 ```typescript
-pagination: TableStrategies.infiniteScroll()
+strategies: {
+  pagination: PaginationStrategies.infiniteScroll()
+}
 ```
 
-#### <a name="tablestrategiesclickloadmore"></a>`TableStrategies.clickLoadMore(selector)`
+#### <a name="tablestrategiesclickloadmore"></a>`PaginationStrategies.clickLoadMore(selector)`
 
 Best for "Load More" buttons. Clicks and waits for row count to increase.
 
 ```typescript
-pagination: TableStrategies.clickLoadMore((root) =>
-  root.getByRole('button', { name: 'Load More' })
-)
+strategies: {
+  pagination: PaginationStrategies.clickLoadMore((root) =>
+    root.getByRole('button', { name: 'Load More' })
+  )
+}
 ```
 
 ### Custom Strategies
@@ -563,7 +581,7 @@ A `SmartRow` extends Playwright's `Locator` with table-aware methods.
 ```typescript
 export type SmartRow = Locator & {
   getCell(column: string): Locator;
-  toJSON(): Promise<Record<string, string>>;
+  toJSON(options?: { columns?: string[] }): Promise<Record<string, string>>;
   /**
    * Fills the row with data. Automatically detects input types (text input, select, checkbox, etc.).
    */
@@ -589,14 +607,20 @@ export interface TableConfig {
   rowSelector?: Selector;
   headerSelector?: Selector;
   cellSelector?: Selector;
-  pagination?: PaginationStrategy;
-  sorting?: SortingStrategy;
+  cellSelector?: Selector;
+  strategies?: {
+    pagination?: PaginationStrategy;
+    sorting?: SortingStrategy;
+    column?: ColumnStrategy;
+    // ... other strategies
+  };
   maxPages?: number;
   /**
    * Hook to rename columns dynamically.
    * * @param args.text - The default innerText of the header.
    * @param args.index - The column index.
    * @param args.locator - The specific header cell locator.
+   */
    */
   headerTransformer?: (args: { text: string, index: number, locator: Locator }) => string | Promise<string>;
   autoScroll?: boolean;
@@ -618,7 +642,7 @@ export interface TableConfig {
 - `rowSelector`: CSS selector or function for table rows (default: `"tbody tr"`)
 - `headerSelector`: CSS selector or function for header cells (default: `"th"`)
 - `cellSelector`: CSS selector or function for data cells (default: `"td"`)
-- `pagination`: Strategy function for navigating pages (default: no pagination)
+- `strategies`: Configuration object for interaction strategies (pagination, sorting, etc.)
 - `maxPages`: Maximum pages to scan when searching (default: `1`)
 - `headerTransformer`: Function to transform/rename column headers dynamically
 - `autoScroll`: Automatically scroll table into view (default: `true`)

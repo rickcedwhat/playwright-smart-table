@@ -1,11 +1,10 @@
 
 import { test, expect } from '@playwright/test';
 import { useTable } from '../src/useTable';
-import type { FillStrategy, ColumnStrategy } from '../src/types';
-import { HeaderStrategies } from '../src/strategies/headers';
-import { ColumnStrategies } from '../src/strategies/columns'
+import type { FillStrategy, CellNavigationStrategy } from '../src/types';
+import { Strategies } from '../src/strategies';
 
-test.describe('Live Glide Data Grid - Combined', () => {
+test.describe('Live Glide Data Grid', () => {
     test('should scan headers and write to multiple columns', async ({ page }) => {
         // 1. Setup
         await page.goto('https://glideapps.github.io/glide-data-grid/iframe.html?viewMode=story&id=glide-data-grid-dataeditor-demos--add-data&globals=');
@@ -29,14 +28,18 @@ test.describe('Live Glide Data Grid - Combined', () => {
         // 3. Configure Table
         // Root is the CANVAS itself as per user request
         const table = useTable(page.locator('canvas').first(), {
-            headerStrategy: HeaderStrategies.scrollRight,
-            columnStrategy: ColumnStrategies.keyboard, // Use our refactored keyboard strategy
-            fillStrategy: glideFillStrategy, // Pass the custom fill strategy
-            // Update cellResolver for virtualized columns using ID selector
-            cellResolver: ({ row, columnIndex, rowIndex }) => {
-                // Glide uses 1-based colIndex for data cells (colIndex 0 is row header usually)
-                // rowIndex seems to be 0-based in the ID based on "glide-cell-1-0"
-                return page.locator(`#glide-cell-${columnIndex + 1}-${rowIndex}`);
+            headerSelector: 'thead th',
+            rowSelector: 'tbody tr',
+            cellSelector: 'td',
+            strategies: {
+                header: Strategies.Header.scrollRight,
+                cellNavigation: Strategies.Column.keyboard,
+                fill: glideFillStrategy,
+                getCellLocator: ({ columnIndex, rowIndex }) => {
+                    // Glide uses 1-based colIndex for data cells (colIndex 0 is row header usually)
+                    // rowIndex seems to be 0-based in the ID based on "glide-cell-1-0"
+                    return page.locator(`#glide-cell-${columnIndex + 1}-${rowIndex}`);
+                }
             }
         });
 
@@ -46,8 +49,8 @@ test.describe('Live Glide Data Grid - Combined', () => {
         console.log('Headers found:', headers);
         expect(headers.length).toBeGreaterThan(50); // Verify we found many columns
 
-        // Use getByRow(1) (1-based index) to get the first row with rowIndex context
-        const firstRow = table.getByRow(1);
+        // Use getByRowIndex(1) (1-based index) to get the first row with rowIndex context
+        const firstRow = table.getByRowIndex(1);
 
         const newName = "Antigravity";
         const newTitle = "CEO";

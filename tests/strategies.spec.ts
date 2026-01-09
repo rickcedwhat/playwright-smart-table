@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { useTable } from '../src/useTable';
-import { PaginationStrategies } from '../src/strategies';
+import { Strategies } from '../src/strategies';
 
 test.describe('Real World Strategy Tests', () => {
 
@@ -15,8 +15,10 @@ test.describe('Real World Strategy Tests', () => {
       rowSelector: 'tbody tr',
       headerSelector: 'thead th',
       cellSelector: 'td',
-      pagination: PaginationStrategies.infiniteScroll(),
-      maxPages: 5
+      strategies: {
+        pagination: Strategies.Pagination.infiniteScroll()
+      },
+      maxPages: 5,
     });
     await table.init();
 
@@ -47,9 +49,11 @@ test.describe('Real World Strategy Tests', () => {
       rowSelector: '.MuiDataGrid-row',
       headerSelector: '.MuiDataGrid-columnHeader',
       cellSelector: '.MuiDataGrid-cell', // MUI uses distinct divs for cells
-      pagination: PaginationStrategies.clickNext(
-        (root) => root.getByRole("button", { name: "Go to next page" })
-      ),
+      strategies: {
+        pagination: Strategies.Pagination.clickNext(
+          (root) => root.getByRole("button", { name: "Go to next page" })
+        ),
+      },
       maxPages: 5,
       // ✅ Rename the empty column to "Actions" so we can reference it easily
       headerTransformer: ({ text }) => text.includes('__col_') ? "Actions" : text

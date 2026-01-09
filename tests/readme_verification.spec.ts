@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { useTable } from '../src/useTable';
-import { PaginationStrategies } from '../src/strategies';
+import { Strategies } from '../src/strategies';
 
 test.describe('README.md Examples Verification', () => {
 
@@ -55,9 +55,11 @@ test.describe('README.md Examples Verification', () => {
       headerSelector: 'thead th',
       cellSelector: 'td',
       // Strategy: Tell it how to find the next page
-      pagination: PaginationStrategies.clickNext(() =>
-        page.getByRole('link', { name: 'Next' })
-      ),
+      strategies: {
+        pagination: Strategies.Pagination.clickNext(() =>
+          page.getByRole('link', { name: 'Next' })
+        )
+      },
       maxPages: 5 // Allow scanning up to 5 pages
     });
     await table.init();
@@ -122,9 +124,11 @@ test.describe('README.md Examples Verification', () => {
       rowSelector: '.MuiDataGrid-row',
       headerSelector: '.MuiDataGrid-columnHeader',
       cellSelector: '.MuiDataGrid-cell',
-      pagination: PaginationStrategies.clickNext(
-        (root) => root.getByRole("button", { name: "Go to next page" })
-      ),
+      strategies: {
+        pagination: Strategies.Pagination.clickNext(
+          (root) => root.getByRole("button", { name: "Go to next page" })
+        )
+      },
       maxPages: 5,
       // Transform empty columns (detected as __col_0, __col_1, etc.) to meaningful names
       headerTransformer: ({ text }) => {
@@ -195,9 +199,11 @@ test.describe('README.md Examples Verification', () => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
     const table = useTable(page.locator('#example'), {
       headerSelector: 'thead th',
-      pagination: PaginationStrategies.clickNext(() =>
-        page.getByRole('link', { name: 'Next' })
-      ),
+      strategies: {
+        pagination: Strategies.Pagination.clickNext(() =>
+          page.getByRole('link', { name: 'Next' })
+        )
+      },
       maxPages: 5,
       onReset: async ({ page }) => {
         // Return to first page by clicking "First" link if available
@@ -230,9 +236,11 @@ test.describe('README.md Examples Verification', () => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
     const table = useTable(page.locator('#example'), {
       headerSelector: 'thead th',
-      pagination: PaginationStrategies.clickNext(() =>
-        page.getByRole('link', { name: 'Next' })
-      ),
+      strategies: {
+        pagination: Strategies.Pagination.clickNext(() =>
+          page.getByRole('link', { name: 'Next' })
+        )
+      },
       maxPages: 3
     });
     await table.init();
@@ -268,9 +276,11 @@ test.describe('README.md Examples Verification', () => {
 
     const table = useTable(page.locator('#example'), {
       headerSelector: 'thead th',
-      pagination: PaginationStrategies.clickNext(() =>
-        page.getByRole('link', { name: 'Next' })
-      ),
+      strategies: {
+        pagination: Strategies.Pagination.clickNext(() =>
+          page.getByRole('link', { name: 'Next' })
+        )
+      },
       maxPages: 3
     });
     await table.init();
@@ -295,7 +305,9 @@ test.describe('README.md Examples Verification', () => {
       rowSelector: 'tbody tr',
       headerSelector: 'thead th',
       cellSelector: 'td',
-      pagination: PaginationStrategies.infiniteScroll(),
+      strategies: {
+        pagination: Strategies.Pagination.infiniteScroll()
+      },
       maxPages: 3
     });
     await table.init();
@@ -328,9 +340,11 @@ test.describe('README.md Examples Verification', () => {
 
     const table = useTable(page.locator('#example'), {
       headerSelector: 'thead th',
-      pagination: PaginationStrategies.clickNext(() =>
-        page.getByRole('link', { name: 'Next' })
-      ),
+      strategies: {
+        pagination: Strategies.Pagination.clickNext(() =>
+          page.getByRole('link', { name: 'Next' })
+        )
+      },
       maxPages: 3
     });
     await table.init();
@@ -427,11 +441,11 @@ test.describe('README.md Examples Verification', () => {
           function renderTable() {
             const tbody = document.getElementById('table-body');
             tbody.innerHTML = '';
-            
+
             const start = currentPage * rowsPerPage;
             const end = start + rowsPerPage;
             const pageData = filteredData.slice(start, end);
-            
+
             pageData.forEach(vehicle => {
               const tr = document.createElement('tr');
               tr.innerHTML = \`
@@ -442,7 +456,7 @@ test.describe('README.md Examples Verification', () => {
               \`;
               tbody.appendChild(tr);
             });
-            
+
             const totalPages = Math.ceil(filteredData.length / rowsPerPage);
             const nextBtn = document.getElementById('next-btn');
             nextBtn.disabled = currentPage >= totalPages - 1;
@@ -490,9 +504,11 @@ test.describe('README.md Examples Verification', () => {
       rowSelector: 'tbody tr',
       headerSelector: 'thead th',
       cellSelector: 'td',
-      pagination: PaginationStrategies.clickNext(() =>
-        page.getByRole('button', { name: '›' })
-      ),
+      strategies: {
+        pagination: Strategies.Pagination.clickNext(() =>
+          page.getByRole('button', { name: '›' })
+        )
+      },
       maxPages: 10
     });
     await table.init();
