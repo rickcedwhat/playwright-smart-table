@@ -5,6 +5,7 @@ import type { FillStrategy, CellNavigationStrategy } from '../src/types';
 import { Strategies } from '../src/strategies';
 
 test.describe('Live Glide Data Grid', () => {
+    test.setTimeout(60000); // Increase timeout for CI
     test('should scan headers and write to multiple columns', async ({ page }) => {
         // 1. Setup
         await page.goto('https://glideapps.github.io/glide-data-grid/iframe.html?viewMode=story&id=glide-data-grid-dataeditor-demos--add-data&globals=');
