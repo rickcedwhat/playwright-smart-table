@@ -92,4 +92,78 @@ test.describe('Real World Strategy Tests', () => {
     await actionsCell.getByLabel("Select row").click();
   });
 
+  test.describe('RowType Generic Support', () => {
+    test('should provide typed row data with generic', async ({ page }) => {
+      await page.goto('https://datatables.net/examples/data_sources/dom');
+
+      interface Employee {
+        Name: string;
+        Position: string;
+        Office: string;
+        Age: string;
+        'Start date': string;
+        Salary: string;
+      }
+
+      const table = useTable<Employee>(page.locator('#example'), {
+        headerSelector: 'thead th'
+      });
+      await table.init();
+
+      const row = table.getByRowIndex(1);
+      const data = await row.toJSON();
+
+      // TypeScript should infer data as Employee
+      expect(data.Name).toBeDefined();
+      expect(data.Position).toBeDefined();
+      expect(data.Office).toBeDefined();
+      expect(typeof data.Name).toBe('string');
+    });
+
+    test('should support Partial<T> in filters', async ({ page }) => {
+      await page.goto('https://datatables.net/examples/data_sources/dom');
+
+      interface Employee {
+        Name: string;
+        Position: string;
+        Office: string;
+      }
+
+      const table = useTable<Employee>(page.locator('#example'), {
+        headerSelector: 'thead th'
+      });
+      await table.init();
+
+      // Should accept Partial<Employee> - only Name field
+      const row = table.getByRow({ Name: 'Airi Satou' });
+      await expect(row).toBeVisible();
+
+      // Should also work with searchForRow
+      const searchedRow = await table.searchForRow({ Office: 'Tokyo' });
+      await expect(searchedRow).toBeVisible();
+    });
+
+    test('should work with getAllCurrentRows and asJSON', async ({ page }) => {
+      await page.goto('https://datatables.net/examples/data_sources/dom');
+
+      interface Employee {
+        Name: string;
+        Office: string;
+      }
+
+      const table = useTable<Employee>(page.locator('#example'), {
+        headerSelector: 'thead th'
+      });
+      await table.init();
+
+      // Get typed data
+      const data = await table.getAllCurrentRows({ asJSON: true });
+
+      // TypeScript should infer data as Employee[]
+      expect(data.length).toBeGreaterThan(0);
+      expect(data[0].Name).toBeDefined();
+      expect(data[0].Office).toBeDefined();
+    });
+  });
+
 });

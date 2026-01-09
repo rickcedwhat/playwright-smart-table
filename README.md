@@ -85,7 +85,7 @@ const table = useTable(page.locator('#example'), {
   cellSelector: 'td',
   // Strategy: Tell it how to find the next page
   strategies: {
-    pagination: PaginationStrategies.clickNext(() =>
+    pagination: Strategies.Pagination.clickNext(() =>
       page.getByRole('link', { name: 'Next' })
     )
   },
@@ -238,7 +238,7 @@ const table = useTable(page.locator('.MuiDataGrid-root').first(), {
   cellSelector: '.MuiDataGrid-cell',
   cellSelector: '.MuiDataGrid-cell',
   strategies: {
-    pagination: PaginationStrategies.clickNext(
+    pagination: Strategies.Pagination.clickNext(
       (root) => root.getByRole("button", { name: "Go to next page" })
     )
   },
@@ -477,35 +477,35 @@ This library uses the **Strategy Pattern** for pagination. Use built-in strategi
 
 ### Built-in Strategies
 
-#### <a name="tablestrategiesclicknext"></a>`PaginationStrategies.clickNext(selector)`
+#### <a name="tablestrategiesclicknext"></a>`Strategies.Pagination.clickNext(selector)`
 
 Best for standard paginated tables (Datatables, lists). Clicks a button/link and waits for table content to change.
 
 ```typescript
 strategies: {
-  pagination: PaginationStrategies.clickNext((root) =>
+  pagination: Strategies.Pagination.clickNext((root) =>
     root.page().getByRole('button', { name: 'Next' })
   )
 }
 ```
 
-#### <a name="tablestrategiesinfinitescroll"></a>`PaginationStrategies.infiniteScroll()`
+#### <a name="tablestrategiesinfinitescroll"></a>`Strategies.Pagination.infiniteScroll()`
 
 Best for virtualized grids (AG-Grid, HTMX). Aggressively scrolls to trigger data loading.
 
 ```typescript
 strategies: {
-  pagination: PaginationStrategies.infiniteScroll()
+  pagination: Strategies.Pagination.infiniteScroll()
 }
 ```
 
-#### <a name="tablestrategiesclickloadmore"></a>`PaginationStrategies.clickLoadMore(selector)`
+#### <a name="tablestrategiesclickloadmore"></a>`Strategies.Pagination.clickLoadMore(selector)`
 
 Best for "Load More" buttons. Clicks and waits for row count to increase.
 
 ```typescript
 strategies: {
-  pagination: PaginationStrategies.clickLoadMore((root) =>
+  pagination: Strategies.Pagination.clickLoadMore((root) =>
     root.getByRole('button', { name: 'Load More' })
   )
 }
@@ -679,8 +679,67 @@ Function signature for custom pagination logic.
 export type PaginationStrategy = (context: TableContext) => Promise<boolean>;
 ```
 <!-- /embed-type: PaginationStrategy -->
-
 Returns `true` if more data was loaded, `false` if pagination should stop.
+
+---
+
+## 🔄 Migration Guide
+
+### Upgrading from v3.x to v4.0
+
+**Breaking Change**: Strategy imports are now consolidated under the `Strategies` object.
+
+#### Import Changes
+```typescript
+// ❌ Old (v3.x)
+import { PaginationStrategies, SortingStrategies } from '../src/useTable';
+
+// ✅ New (v4.0)
+import { Strategies } from '../src/strategies';
+// or
+import { useTable, Strategies } from '../src/useTable';
+```
+
+#### Strategy Usage
+```typescript
+// ❌ Old (v3.x)
+strategies: {
+  pagination: PaginationStrategies.clickNext(() => page.locator('#next')),
+  sorting: SortingStrategies.AriaSort(),
+  header: HeaderStrategies.scrollRight,
+  cellNavigation: ColumnStrategies.keyboard
+}
+
+// ✅ New (v4.0)
+strategies: {
+  pagination: Strategies.Pagination.clickNext(() => page.locator('#next')),
+  sorting: Strategies.Sorting.AriaSort(),
+  header: Strategies.Header.scrollRight,
+  cellNavigation: Strategies.Column.keyboard
+}
+```
+
+#### New Features (Optional)
+
+**Generic Type Support:**
+```typescript
+interface User {
+  Name: string;
+  Email: string;
+  Office: string;
+}
+
+const table = useTable<User>(page.locator('#table'), config);
+const data = await row.toJSON(); // Type: User (not Record<string, string>)
+```
+
+**Revalidate Method:**
+```typescript
+// Refresh column mappings when table structure changes
+await table.revalidate();
+```
+
+For detailed migration instructions optimized for AI code transformation, see the [AI Migration Guide](./MIGRATION_v4.md).
 
 ---
 
