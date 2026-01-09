@@ -16,7 +16,7 @@ export declare const PaginationStrategies: {
 /**
  * @deprecated Use `PaginationStrategies` instead. This alias will be removed in a future major version.
  */
-export declare const TableStrategies: {
+export declare const DeprecatedPaginationStrategies: {
     /**
      * Strategy: Clicks a "Next" button and waits for the first row of data to change.
      */

@@ -9,7 +9,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.TableStrategies = exports.PaginationStrategies = void 0;
+exports.DeprecatedPaginationStrategies = exports.PaginationStrategies = void 0;
 const utils_1 = require("../utils");
 exports.PaginationStrategies = {
     /**
@@ -69,4 +69,4 @@ exports.PaginationStrategies = {
 /**
  * @deprecated Use `PaginationStrategies` instead. This alias will be removed in a future major version.
  */
-exports.TableStrategies = exports.PaginationStrategies;
+exports.DeprecatedPaginationStrategies = exports.PaginationStrategies;
