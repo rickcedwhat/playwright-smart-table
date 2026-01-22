@@ -14,7 +14,7 @@ test.describe('README.md Examples Verification', () => {
     }).init();
 
     // Find the row with Name="Airi Satou", then get the Position cell
-    const row = table.getByRow({ Name: 'Airi Satou' });
+    const row = table.getRow({ Name: 'Airi Satou' });
 
     const positionCell = row.getCell('Position');
     await expect(positionCell).toHaveText('Accountant');
@@ -29,7 +29,7 @@ test.describe('README.md Examples Verification', () => {
     // Example from: https://datatables.net/examples/data_sources/dom
 
     // Get SmartRow via getByRow
-    const row = table.getByRow({ Name: 'Airi Satou' });
+    const row = table.getRow({ Name: 'Airi Satou' });
 
     // Interact with cell using column name (resilient to column reordering)
     const positionCell = row.getCell('Position');
@@ -67,8 +67,8 @@ test.describe('README.md Examples Verification', () => {
     // ✅ Verify Colleen is NOT visible initially
     await expect(page.getByText("Colleen Hurst")).not.toBeVisible();
 
-    // Use searchForRow for pagination
-    await expect(await table.searchForRow({ Name: "Colleen Hurst" })).toBeVisible();
+    // Use findRow for pagination
+    await expect(await table.findRow({ Name: "Colleen Hurst" })).toBeVisible();
     // NOTE: We're now on the page where Colleen Hurst exists (typically Page 2)
     // #endregion pagination
   });
@@ -82,11 +82,11 @@ test.describe('README.md Examples Verification', () => {
     await table.init();
 
     // Find a row where Name is "Airi Satou" AND Office is "Tokyo"
-    const row = table.getByRow({ Name: "Airi Satou", Office: "Tokyo" });
+    const row = table.getRow({ Name: "Airi Satou", Office: "Tokyo" });
     await expect(row).toBeVisible();
 
     // Assert it does NOT exist
-    await expect(table.getByRow({ Name: "Ghost User" })).not.toBeVisible();
+    await expect(table.getRow({ Name: "Ghost User" })).not.toBeVisible();
     // #endregion get-by-row
   });
 
@@ -98,17 +98,17 @@ test.describe('README.md Examples Verification', () => {
     // #region get-all-rows
     // Example from: https://datatables.net/examples/data_sources/dom
     // 1. Get ALL rows on the current page
-    const allRows = await table.getAllCurrentRows();
+    const allRows = await table.getRows();
     expect(allRows.length).toBeGreaterThan(0);
 
     // 2. Get subset of rows (Filtering)
-    const tokyoUsers = await table.getAllCurrentRows({
+    const tokyoUsers = await table.getRows({
       filter: { Office: 'Tokyo' }
     });
     expect(tokyoUsers.length).toBeGreaterThan(0);
 
     // 3. Dump data to JSON
-    const data = await table.getAllCurrentRows({ asJSON: true });
+    const data = await table.getRows({ asJSON: true });
     console.log(data); // [{ Name: "Airi Satou", ... }, ...]
     expect(data.length).toBeGreaterThan(0);
     expect(data[0]).toHaveProperty('Name');
@@ -147,11 +147,11 @@ test.describe('README.md Examples Verification', () => {
 
     // Use the renamed column
     // First check it's not on the current page
-    const currentPageRow = table.getByRow({ "Last name": "Melisandre" });
+    const currentPageRow = table.getRow({ "Last name": "Melisandre" });
     await expect(currentPageRow).not.toBeVisible();
 
     // Then find it across pages
-    const row = await table.searchForRow({ "Last name": "Melisandre" });
+    const row = await table.findRow({ "Last name": "Melisandre" });
     const actionsCell = row.getCell('Actions');
     await actionsCell.getByLabel("Select row").click();
     // #endregion header-transformer
@@ -173,7 +173,7 @@ test.describe('README.md Examples Verification', () => {
     await table.init();
 
     // Now column names are consistent
-    const row = table.getByRow({ "Last Name": "Doe" });
+    const row = table.getRow({ "Last Name": "Doe" });
     const emailCell = row.getCell("Email");
     await expect(emailCell).toHaveText("jdoe@hotmail.com");
     // #endregion header-transformer-normalize
@@ -190,7 +190,7 @@ test.describe('README.md Examples Verification', () => {
     });
     await table.init();
 
-    const row = table.getByRow({ Name: 'Airi Satou' });
+    const row = table.getRow({ Name: 'Airi Satou' });
     await expect(row).toBeVisible();
     // #endregion advanced-debug
   });
@@ -219,7 +219,7 @@ test.describe('README.md Examples Verification', () => {
     // Example from: https://datatables.net/examples/data_sources/dom
     // Navigate deep into the table by searching for a row on a later page
     try {
-      await table.searchForRow({ Name: 'Angelica Ramos' });
+      await table.findRow({ Name: 'Angelica Ramos' });
     } catch (e) { }
 
     // Reset internal state (and potentially UI) to initial page
@@ -227,7 +227,7 @@ test.describe('README.md Examples Verification', () => {
     await table.init(); // Re-init after reset
 
     // Now subsequent searches start from the beginning
-    const currentPageRow = table.getByRow({ Name: 'Airi Satou' });
+    const currentPageRow = table.getRow({ Name: 'Airi Satou' });
     await expect(currentPageRow).toBeVisible();
     // #endregion advanced-reset
   });
@@ -261,7 +261,7 @@ test.describe('README.md Examples Verification', () => {
 
     // #region get-all-rows-exact
     // Get rows with exact match (default is fuzzy/contains match)
-    const exactMatches = await table.getAllCurrentRows({
+    const exactMatches = await table.getRows({
       filter: { Office: 'Tokyo' },
       exact: true // Requires exact string match
     });
@@ -600,7 +600,7 @@ test.describe('README.md Examples Verification', () => {
 
     // #region fill-basic
     // Find a row and fill it with new data
-    const row = table.getByRow({ ID: '1' });
+    const row = table.getRow({ ID: '1' });
 
     await row.smartFill({
       Name: 'John Updated',
@@ -656,7 +656,7 @@ test.describe('README.md Examples Verification', () => {
     const table = useTable(page.locator('#custom-table'));
     await table.init();
 
-    const row = table.getByRow({ ID: '1' });
+    const row = table.getRow({ ID: '1' });
 
     // #region fill-custom-mappers
     // Use custom input mappers for specific columns

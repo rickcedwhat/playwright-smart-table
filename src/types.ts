@@ -1,5 +1,14 @@
 import type { Locator, Page } from '@playwright/test';
 
+/**
+ * Flexible selector type - can be a CSS string, function returning a Locator, or Locator itself.
+ * @example
+ * // String selector
+ * rowSelector: 'tbody tr'
+ * 
+ * // Function selector
+ * rowSelector: (root) => root.locator('[role="row"]')
+ */
 export type Selector = string | ((root: Locator | Page) => Locator);
 
 /**
@@ -26,22 +35,69 @@ export type GetActiveCellFn = (args: TableContext) => Promise<{
 } | null>;
 
 
+/**
+ * SmartRow - A Playwright Locator with table-aware methods.
+ * 
+ * Extends all standard Locator methods (click, isVisible, etc.) with table-specific functionality.
+ * 
+ * @example
+ * const row = table.getRow({ Name: 'John Doe' });
+ * await row.click(); // Standard Locator method
+ * const email = row.getCell('Email'); // Table-aware method
+ * const data = await row.toJSON(); // Extract all row data
+ * await row.smartFill({ Name: 'Jane', Status: 'Active' }); // Fill form fields
+ */
 export type SmartRow<T = any> = Locator & {
-  getRequestIndex(): number | undefined;
+  /** Optional row index (0-based) if known */
   rowIndex?: number;
+
+  /**
+   * Get a cell locator by column name.
+   * @param column - Column name (case-sensitive)
+   * @returns Locator for the cell
+   * @example
+   * const emailCell = row.getCell('Email');
+   * await expect(emailCell).toHaveText('john@example.com');
+   */
   getCell(column: string): Locator;
+
+  /**
+   * Extract all cell data as a key-value object.
+   * @param options - Optional configuration
+   * @param options.columns - Specific columns to extract (extracts all if not specified)
+   * @returns Promise resolving to row data
+   * @example
+   * const data = await row.toJSON();
+   * // { Name: 'John', Email: 'john@example.com', ... }
+   * 
+   * const partial = await row.toJSON({ columns: ['Name', 'Email'] });
+   * // { Name: 'John', Email: 'john@example.com' }
+   */
   toJSON(options?: { columns?: string[] }): Promise<T>;
+
   /**
    * Scrolls/paginates to bring this row into view.
-   * Only works if rowIndex is known.
+   * Only works if rowIndex is known (e.g., from getRowByIndex).
+   * @throws Error if rowIndex is unknown
    */
   bringIntoView(): Promise<void>;
+
   /**
-   * Fills the row with data. Automatically detects input types.
-   */
-  fill: (data: Partial<T> | Record<string, any>, options?: FillOptions) => Promise<void>;
-  /**
-   * Alias for fill() to avoid conflict with Locator.fill()
+   * Intelligently fills form fields in the row.
+   * Automatically detects input types (text, select, checkbox, contenteditable).
+   * 
+   * @param data - Column-value pairs to fill
+   * @param options - Optional configuration
+   * @param options.inputMappers - Custom input selectors per column
+   * @example
+   * // Auto-detection
+   * await row.smartFill({ Name: 'John', Status: 'Active', Subscribe: true });
+   * 
+   * // Custom input mappers
+   * await row.smartFill(
+   *   { Name: 'John' },
+   *   { inputMappers: { Name: (cell) => cell.locator('.custom-input') } }
+   * );
    */
   smartFill: (data: Partial<T> | Record<string, any>, options?: FillOptions) => Promise<void>;
 };
@@ -197,6 +253,12 @@ export interface TableResult<T = any> {
    */
   init(options?: { timeout?: number }): Promise<TableResult>;
 
+  /**
+   * SYNC: Checks if the table has been initialized.
+   * @returns true if init() has been called and completed, false otherwise
+   */
+  isInitialized(): boolean;
+
   getHeaders: () => Promise<string[]>;
   getHeaderCell: (columnName: string) => Promise<Locator>;
 
@@ -204,7 +266,7 @@ export interface TableResult<T = any> {
    * Finds a row by filters on the current page only. Returns immediately (sync).
    * Throws error if table is not initialized.
    */
-  getByRow: (
+  getRow: (
     filters: Record<string, string | RegExp | number>,
     options?: { exact?: boolean }
   ) => SmartRow;
@@ -215,38 +277,46 @@ export interface TableResult<T = any> {
    * @param index 1-based row index
    * @param options Optional settings including bringIntoView
    */
-  getByRowIndex: (
+  getRowByIndex: (
     index: number,
     options?: { bringIntoView?: boolean }
   ) => SmartRow;
 
   /**
-   * Searches for a row across all available data using the configured strategy (pagination, scroll, etc.).
-   * Auto-initializes if needed.
+   * ASYNC: Searches for a single row across pages using pagination.
+   * Auto-initializes the table if not already initialized.
+   * @param filters - The filter criteria to match
+   * @param options - Search options including exact match and max pages
    */
-  searchForRow: (
+  findRow: (
     filters: Record<string, string | RegExp | number>,
     options?: { exact?: boolean, maxPages?: number }
   ) => Promise<SmartRow>;
+
+  /**
+   * ASYNC: Searches for all matching rows across pages using pagination.
+   * Auto-initializes the table if not already initialized.
+   * @param filters - The filter criteria to match
+   * @param options - Search options including exact match, max pages, and asJSON
+   */
+  findRows: <R extends { asJSON?: boolean }>(
+    filters: Record<string, string | RegExp | number>,
+    options?: { exact?: boolean, maxPages?: number } & R
+  ) => Promise<R['asJSON'] extends true ? Record<string, string>[] : SmartRow[]>;
 
   /**
    * Navigates to a specific column using the configured CellNavigationStrategy.
    */
   scrollToColumn: (columnName: string) => Promise<void>;
 
-  getAllCurrentRows: <T extends { asJSON?: boolean }>(
-    options?: { filter?: Record<string, any>, exact?: boolean } & T
-  ) => Promise<T['asJSON'] extends true ? Record<string, string>[] : SmartRow[]>;
-
   /**
-   * @deprecated Use getAllCurrentRows instead. This method will be removed in a future major version.
+   * ASYNC: Gets all rows on the current page only (does not paginate).
+   * Auto-initializes the table if not already initialized.
+   * @param options - Filter and formatting options
    */
-  getAllRows: <T extends { asJSON?: boolean }>(
-    options?: { filter?: Record<string, any>, exact?: boolean } & T
-  ) => Promise<T['asJSON'] extends true ? Record<string, string>[] : SmartRow[]>;
-
-  generateConfigPrompt: (options?: PromptOptions) => Promise<void>;
-  generateStrategyPrompt: (options?: PromptOptions) => Promise<void>;
+  getRows: <R extends { asJSON?: boolean }>(
+    options?: { filter?: Record<string, any>, exact?: boolean } & R
+  ) => Promise<R['asJSON'] extends true ? Record<string, string>[] : SmartRow[]>;
 
   /**
    * Resets the table state (clears cache, flags) and invokes the onReset strategy.
@@ -310,4 +380,4 @@ export interface TableResult<T = any> {
 /**
  * Restricted table result that excludes methods that shouldn't be called during iteration.
  */
-export type RestrictedTableResult<T = any> = Omit<TableResult<T>, 'searchForRow' | 'iterateThroughTable' | 'reset' | 'getAllRows'>;
+export type RestrictedTableResult<T = any> = Omit<TableResult<T>, 'searchForRow' | 'iterateThroughTable' | 'reset'>;

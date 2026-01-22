@@ -5,6 +5,127 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [5.0.0] - 2026-01-22
+
+### 🚀 Major Changes
+
+#### API Simplification & Consistency
+- **BREAKING**: Method naming standardized for clarity
+  - `getByRow()` → `getRow()` - Removed `By` for consistency
+  - `getByRowIndex()` → `getRowByIndex()` - Clearer "by index" phrasing
+  - `getAllCurrentRows()` → `getRows()` - Simpler, shorter
+  - `searchForRow()` → `findRow()` - Clearer intent
+- **BREAKING**: Removed `fill()` from SmartRow - use `smartFill()` only
+- **BREAKING**: Removed `getRequestIndex()` from public API (internal use only)
+
+#### Clear Naming Pattern
+**New mental model:**
+- `get*()` - Sync or async, current page only (fast)
+- `find*()` - Async, searches across pages (uses pagination)
+
+**Examples:**
+- `getRow()` - Sync, current page
+- `getRowByIndex()` - Sync, current page
+- `getRows()` - Async, current page
+- `findRow()` - Async, paginated search
+- `findRows()` - Async, all matching rows across pages
+
+#### Removed Deprecated Code
+- **BREAKING**: Removed `getAllRows()` (was deprecated in v3.x)
+- **BREAKING**: Removed `generateStrategyPrompt()` (use `generateConfigPrompt()` or plugin docs)
+- **BREAKING**: Removed `DeprecatedTableStrategies` exports
+- **BREAKING**: Removed specialized strategies (moved to examples):
+  - `Strategies.Header.scrollRight` → See `examples/glide-strategies/`
+  - `Strategies.Column.keyboard` → See `examples/glide-strategies/`
+
+#### Strategy Validation
+- **NEW**: Runtime validation for pagination strategies
+- Catches common mistakes (returning `undefined` instead of `boolean`)
+- Clear error messages guide users to fix issues
+- Prevents infinite loops from malformed strategies
+
+### ✨ Added
+
+- `findRows()` - Find all matching rows across pages (symmetric with `findRow()`)
+- `isInitialized()` - Check if table has been initialized
+- Strategy validation with helpful error messages
+- Method comparison table in README
+- Comprehensive JSDoc comments for JavaScript users
+- Examples directory with Glide-specific strategies
+
+### 🔄 Changed
+
+- **BREAKING**: All method names updated for consistency (see above)
+- **BREAKING**: `smartFill()` is now the only fill method on SmartRow
+- Error messages improved to suggest async alternatives
+- README completely rewritten with:
+  - Method comparison table
+  - Clear sync vs async distinction
+  - Hook timing documentation (`onFirst`, `onLast`)
+  - Comprehensive `iterateThroughTable` examples
+
+### 🗑️ Removed
+
+- **BREAKING**: `getAllRows()` - Use `getRows()` instead
+- **BREAKING**: `generateStrategyPrompt()` - Use `generateConfigPrompt()` or see plugin docs
+- **BREAKING**: `fill()` from SmartRow - Use `smartFill()` instead
+- **BREAKING**: `getRequestIndex()` from SmartRow - Internal use only
+- **BREAKING**: Specialized strategies - See `examples/` directory
+
+### 📚 Documentation
+
+- Complete README rewrite with v5 API
+- Method comparison table showing async/sync and pagination behavior
+- Hook timing clarification (onFirst runs before first page, onLast runs after last page)
+- Plugin development guide for custom strategies
+- Comprehensive examples for `iterateThroughTable()`
+
+### 🔧 Migration from v4.x
+
+**Method Renames:**
+```typescript
+// ❌ v4.x
+const row = table.getByRow({ Name: 'John' });
+const rows = await table.getAllCurrentRows();
+const found = await table.searchForRow({ Name: 'John' });
+
+// ✅ v5.0
+const row = table.getRow({ Name: 'John' });
+const rows = await table.getRows();
+const found = await table.findRow({ Name: 'John' });
+```
+
+**SmartRow Changes:**
+```typescript
+// ❌ v4.x
+await row.fill({ Name: 'John' });
+const index = row.getRequestIndex();
+
+// ✅ v5.0
+await row.smartFill({ Name: 'John' });
+// getRequestIndex removed (was internal only)
+```
+
+**Removed Methods:**
+```typescript
+// ❌ v4.x
+await table.getAllRows(); // Deprecated
+await table.generateStrategyPrompt();
+
+// ✅ v5.0
+await table.getRows(); // Use this instead
+await table.generateConfigPrompt(); // Or see plugin docs
+```
+
+### 🧪 Testing
+
+- All 63 tests passing
+- Updated all tests to use new API
+- Added compatibility tests for method existence
+- Verified all examples work with new naming
+
+---
+
 ## [4.0.0] - 2026-01-09
 
 ### 🚀 Major Changes

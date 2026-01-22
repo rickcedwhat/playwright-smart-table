@@ -8,7 +8,7 @@ test('The Internet Herokuapp - Standard Table', async ({ page }) => {
   await table.init();
 
   // ✅ v2.0 FIX: Use .getCell() from the row
-  const row = table.getByRow({ "Last Name": "Doe" });
+  const row = table.getRow({ "Last Name": "Doe" });
   const emailCell = row.getCell("Email");
   await expect(emailCell).toHaveText("jdoe@hotmail.com");
 
