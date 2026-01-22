@@ -24,14 +24,13 @@ test.describe('Backwards Compatibility Tests', () => {
     await table.init();
 
     // Table should have all expected methods
-    expect(table).toHaveProperty('getByRow');
-    expect(table).toHaveProperty('getAllCurrentRows');
+    expect(table).toHaveProperty('getRow');
+    expect(table).toHaveProperty('getRowByIndex');
+    expect(table).toHaveProperty('getRows');
     expect(table).toHaveProperty('getHeaders');
     expect(table).toHaveProperty('getHeaderCell');
     expect(table).toHaveProperty('reset');
     expect(table).toHaveProperty('getColumnValues');
-    expect(table).toHaveProperty('generateConfigPrompt');
-    expect(table).toHaveProperty('generateStrategyPrompt');
   });
 
   test('Core: getByRow returns SmartRow with getCell method', async ({ page }) => {
@@ -42,7 +41,7 @@ test.describe('Backwards Compatibility Tests', () => {
     });
     await table.init();
 
-    const row = table.getByRow({ Name: 'Airi Satou' });
+    const row = table.getRow({ Name: 'Airi Satou' });
 
     // SmartRow should have getCell method
     expect(typeof row.getCell).toBe('function');
@@ -61,7 +60,7 @@ test.describe('Backwards Compatibility Tests', () => {
     });
     await table.init();
 
-    const row = table.getByRow({ Name: 'Airi Satou', Office: 'Tokyo' });
+    const row = table.getRow({ Name: 'Airi Satou', Office: 'Tokyo' });
     await expect(row).toBeVisible();
   });
 
@@ -73,11 +72,11 @@ test.describe('Backwards Compatibility Tests', () => {
     });
     await table.init();
 
-    const row = table.getByRow({ Name: 'NonExistentUser' });
+    const row = table.getRow({ Name: 'NonExistentUser' });
     await expect(row).not.toBeVisible();
   });
 
-  test('Core: getAllCurrentRows returns array of SmartRows', async ({ page }) => {
+  test('Core: getRows returns array of SmartRows', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
 
     const table = useTable(page.locator('#example'), {
@@ -85,14 +84,14 @@ test.describe('Backwards Compatibility Tests', () => {
     });
     await table.init();
 
-    const rows = await table.getAllCurrentRows();
+    const rows = await table.getRows();
 
     expect(Array.isArray(rows)).toBe(true);
     expect(rows.length).toBeGreaterThan(0);
     expect(typeof rows[0].getCell).toBe('function');
   });
 
-  test('Core: getAllCurrentRows with filter option', async ({ page }) => {
+  test('Core: getRows with filter option', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
 
     const table = useTable(page.locator('#example'), {
@@ -100,7 +99,7 @@ test.describe('Backwards Compatibility Tests', () => {
     });
     await table.init();
 
-    const filtered = await table.getAllCurrentRows({
+    const filtered = await table.getRows({
       filter: { Office: 'Tokyo' }
     });
 
@@ -108,7 +107,7 @@ test.describe('Backwards Compatibility Tests', () => {
     expect(filtered.length).toBeGreaterThan(0);
   });
 
-  test('Core: getAllCurrentRows with asJSON option', async ({ page }) => {
+  test('Core: getRows with asJSON option', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
 
     const table = useTable(page.locator('#example'), {
@@ -116,7 +115,7 @@ test.describe('Backwards Compatibility Tests', () => {
     });
     await table.init();
 
-    const data = await table.getAllCurrentRows({ asJSON: true });
+    const data = await table.getRows({ asJSON: true });
 
     expect(Array.isArray(data)).toBe(true);
     expect(data.length).toBeGreaterThan(0);
@@ -132,7 +131,7 @@ test.describe('Backwards Compatibility Tests', () => {
     });
     await table.init();
 
-    const row = table.getByRow({ Name: 'Airi Satou' });
+    const row = table.getRow({ Name: 'Airi Satou' });
     const data = await row.toJSON();
 
     expect(typeof data).toBe('object');
@@ -148,7 +147,7 @@ test.describe('Backwards Compatibility Tests', () => {
     });
     await table.init();
 
-    const row = table.getByRow({ Name: 'Airi Satou' });
+    const row = table.getRow({ Name: 'Airi Satou' });
     const data = await row.toJSON();
 
     expect(typeof data).toBe('object');
@@ -228,8 +227,8 @@ test.describe('Backwards Compatibility Tests', () => {
     await table.init();
 
     // Should be able to find a row (even if it requires pagination)
-    // Use searchForRow for pagination
-    const row = await table.searchForRow({ Name: 'Airi Satou' });
+    // Use findRow for pagination
+    const row = await table.findRow({ Name: 'Airi Satou' });
     await expect(row).toBeVisible();
   });
 
@@ -254,7 +253,7 @@ test.describe('Backwards Compatibility Tests', () => {
     });
     await table.init();
 
-    const row = table.getByRow({ Name: 'Airi Satou' });
+    const row = table.getRow({ Name: 'Airi Satou' });
 
     // Should have standard Locator methods
     await expect(row).toBeVisible();
@@ -282,7 +281,7 @@ test.describe('Backwards Compatibility Tests', () => {
     await table.init();
 
     // Call getByRow - should return immediately (sync)
-    const row = table.getByRow({ Name: 'John' });
+    const row = table.getRow({ Name: 'John' });
 
     // getCell should work (returns lazy locator)
     const nameCell = row.getCell('Name');
@@ -312,11 +311,11 @@ test.describe('Backwards Compatibility Tests', () => {
     const table = useTable(page.locator('#test-table'));
 
     // getByRow should throw if not initialized
-    expect(() => table.getByRow({ Name: 'John' })).toThrow('Table not initialized');
+    expect(() => table.getRow({ Name: 'John' })).toThrow('Table not initialized');
 
     // getCell should throw if not initialized (via getByRow)
     await table.init();
-    const row = table.getByRow({ Name: 'John' });
+    const row = table.getRow({ Name: 'John' });
     // getCell itself doesn't need init check since it's called on an already-created SmartRow
     // But let's verify getHeaders throws
     const table2 = useTable(page.locator('#test-table'));
@@ -333,16 +332,16 @@ test.describe('Backwards Compatibility Tests', () => {
 
     const table = useTable(page.locator('#test-table'));
 
-    // getAllCurrentRows should auto-init
-    const rows = await table.getAllCurrentRows();
+    // getRows should auto-init
+    const rows = await table.getRows();
     expect(rows.length).toBeGreaterThan(0);
 
     // getColumnValues should auto-init
     const names = await table.getColumnValues('Name');
     expect(names).toContain('John');
 
-    // searchForRow should auto-init
-    const row = await table.searchForRow({ Name: 'John' });
+    // findRow should auto-init
+    const row = await table.findRow({ Name: 'John' });
     await expect(row).toBeVisible();
   });
 
@@ -368,7 +367,7 @@ test.describe('Backwards Compatibility Tests', () => {
     await table.init({ timeout: 5000 });
 
     // Should be able to use sync methods after init
-    const row = table.getByRow({ Name: 'John' });
+    const row = table.getRow({ Name: 'John' });
     await expect(row).toBeVisible();
   });
 
@@ -384,11 +383,11 @@ test.describe('Backwards Compatibility Tests', () => {
     const table = await useTable(page.locator('#test-table')).init();
 
     // Should be able to use sync methods immediately
-    const row = table.getByRow({ Name: 'John' });
+    const row = table.getRow({ Name: 'John' });
     await expect(row).toBeVisible();
   });
 
-  test('New API: getByRow vs searchForRow', async ({ page }) => {
+  test('New API: getByRow vs findRow', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
     await page.waitForSelector('#example_wrapper');
 
@@ -404,15 +403,15 @@ test.describe('Backwards Compatibility Tests', () => {
     await table.init();
 
     // First, verify Colleen is NOT on current page using getByRow (current page only)
-    const currentPageColleen = table.getByRow({ Name: 'Colleen Hurst' });
+    const currentPageColleen = table.getRow({ Name: 'Colleen Hurst' });
     await expect(currentPageColleen).not.toBeVisible();
 
     // Verify Airi IS on current page using getByRow
-    const currentPageRow = table.getByRow({ Name: 'Airi Satou' });
+    const currentPageRow = table.getRow({ Name: 'Airi Satou' });
     await expect(currentPageRow).toBeVisible();
 
-    // Now use searchForRow to find Colleen (searches across pages)
-    const secondPageRow = await table.searchForRow({ Name: 'Colleen Hurst' });
+    // Now use findRow to find Colleen (searches across pages)
+    const secondPageRow = await table.findRow({ Name: 'Colleen Hurst' });
     await expect(secondPageRow).toBeVisible();
   });
 
@@ -614,13 +613,14 @@ test.describe('Backwards Compatibility Tests', () => {
 
     await table.iterateThroughTable(async ({ table: restrictedTable }) => {
       // Should have safe methods
-      expect(restrictedTable).toHaveProperty('getByRow');
-      expect(restrictedTable).toHaveProperty('getAllCurrentRows');
+      expect(restrictedTable).toHaveProperty('getRow');
+      expect(restrictedTable).toHaveProperty('getRows');
       expect(restrictedTable).toHaveProperty('getHeaders');
-      expect(restrictedTable).toHaveProperty('getByRowIndex');
+      expect(restrictedTable).toHaveProperty('getRowByIndex');
 
       // Should NOT have problematic methods
-      expect(restrictedTable).not.toHaveProperty('searchForRow');
+      // findRow IS allowed now (change from previous design)
+      // iterateThroughTable is NOT
       expect(restrictedTable).not.toHaveProperty('iterateThroughTable');
       expect(restrictedTable).not.toHaveProperty('reset');
 

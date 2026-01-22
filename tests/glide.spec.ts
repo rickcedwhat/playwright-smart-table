@@ -2,6 +2,8 @@ import { test, expect, Locator, Page } from '@playwright/test';
 import { useTable } from '../src/useTable';
 import type { FillStrategy, TableConfig, TableContext } from '../src/types';
 import { Strategies } from '../src/strategies';
+import { keyboardCellNavigation } from '../examples/glide-strategies/columns';
+import { scrollRightHeader } from '../examples/glide-strategies/headers';
 
 test.describe('Live Glide Data Grid', () => {
     test.setTimeout(60000); // Increase timeout for CI
@@ -57,8 +59,8 @@ test.describe('Live Glide Data Grid', () => {
         rowSelector: 'tbody tr',
         cellSelector: 'td',
         strategies: {
-            header: Strategies.Header.scrollRight,
-            cellNavigation: Strategies.Column.keyboard,
+            header: scrollRightHeader,
+            cellNavigation: keyboardCellNavigation,
             fill: glideFillStrategy,
             pagination: glidePaginationStrategy,
             getCellLocator: ({ page, columnIndex, rowIndex }) => {
@@ -120,16 +122,16 @@ test.describe('Live Glide Data Grid', () => {
         expect(headers.length).toBeGreaterThan(50); // Verify we found many columns
 
         // Use getByRowIndex(1) (1-based index) to get the first row with rowIndex context
-        const firstRow = table.getByRowIndex(1);
+        const firstRow = table.getRowByIndex(1);
 
         const newName = "Antigravity";
         const newTitle = "CEO";
 
         console.log(`Writing Name: ${newName}`);
-        await firstRow.fill({ "First name": newName });
+        await firstRow.smartFill({ "First name": newName });
 
         console.log(`Writing Title: ${newTitle}`);
-        await firstRow.fill({ "Title": newTitle });
+        await firstRow.smartFill({ "Title": newTitle });
 
         // 5. Verify using table helpers
 

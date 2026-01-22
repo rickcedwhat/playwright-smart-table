@@ -2,14 +2,15 @@ import type { Locator, Page } from '@playwright/test';
 import { TableConfig, TableContext, Selector, TableResult, SmartRow as SmartRowType, PromptOptions, FinalTableConfig, DedupeStrategy, RestrictedTableResult, PaginationStrategy, StrategyContext, TableStrategies as ITableStrategies } from './types';
 import { TYPE_CONTEXT } from './typeContext';
 import { SortingStrategies as ImportedSortingStrategies } from './strategies/sorting';
-import { PaginationStrategies as ImportedPaginationStrategies, DeprecatedPaginationStrategies } from './strategies/pagination';
+import { PaginationStrategies as ImportedPaginationStrategies } from './strategies/pagination';
 import { FillStrategies } from './strategies/fill';
 import { HeaderStrategies } from './strategies/headers';
-import { CellNavigationStrategies, ColumnStrategies } from './strategies/columns';
+import { CellNavigationStrategies } from './strategies/columns';
 import { createSmartRow } from './smartRow';
 import { FilterEngine } from './filterEngine';
 import { ResolutionStrategies } from './strategies/resolution';
 import { Strategies } from './strategies';
+import { validatePaginationResult, validatePaginationStrategy, validateSortingStrategy } from './strategies/validation';
 
 /**
  * Main hook to interact with a table.
@@ -175,7 +176,8 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
           resolve: resolve
         };
 
-        const didLoadMore = await config.strategies.pagination!(context);
+        const paginationResult = await config.strategies.pagination!(context);
+        const didLoadMore = validatePaginationResult(paginationResult, 'Pagination Strategy');
         if (didLoadMore) {
           _hasPaginated = true;
           currentPage++;
@@ -259,7 +261,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     },
 
     getHeaders: async () => {
-      if (!_isInitialized || !_headerMap) throw new Error('Table not initialized. Call await table.init() first.');
+      if (!_isInitialized || !_headerMap) throw new Error('Table not initialized. Call await table.init() first, or use async methods like table.findRow() or table.getRows() which auto-initialize.');
       return Array.from(_headerMap.keys());
     },
 
@@ -319,8 +321,8 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       return results;
     },
 
-    getByRow: (filters: Partial<T> | Record<string, string | RegExp | number>, options: { exact?: boolean } = { exact: false }): SmartRowType<T> => {
-      if (!_isInitialized || !_headerMap) throw new Error('Table not initialized. Call await table.init() first.');
+    getRow: (filters: Partial<T> | Record<string, string | RegExp | number>, options: { exact?: boolean } = { exact: false }): SmartRowType<T> => {
+      if (!_isInitialized || !_headerMap) throw new Error('Table not initialized. Call await table.init() first, or use async methods like table.findRow() or table.getRows() which auto-initialize.');
 
       const allRows = resolve(config.rowSelector, rootLocator);
       const matchedRows = filterEngine.applyFilters(allRows, filters as Record<string, string | RegExp | number>, _headerMap, options.exact || false, rootLocator.page());
@@ -328,15 +330,15 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       return _makeSmart(rowLocator, _headerMap, 0); // fallback index 0
     },
 
-    getByRowIndex: (index: number, options: { bringIntoView?: boolean } = {}): SmartRowType<T> => {
-      if (!_isInitialized || !_headerMap) throw new Error('Table not initialized. Call await table.init() first.');
+    getRowByIndex: (index: number, options: { bringIntoView?: boolean } = {}): SmartRowType<T> => {
+      if (!_isInitialized || !_headerMap) throw new Error('Table not initialized. Call await table.init() first, or use async methods like table.findRow() or table.getRows() which auto-initialize.');
 
       const rowIndex = index - 1; // Convert 1-based to 0-based
       const rowLocator = resolve(config.rowSelector, rootLocator).nth(rowIndex);
       return _makeSmart(rowLocator, _headerMap, rowIndex);
     },
 
-    searchForRow: async (filters: Partial<T> | Record<string, string | RegExp | number>, options?: { exact?: boolean, maxPages?: number }): Promise<SmartRowType<T>> => {
+    findRow: async (filters: Partial<T> | Record<string, string | RegExp | number>, options?: { exact?: boolean, maxPages?: number }): Promise<SmartRowType<T>> => {
       await _ensureInitialized();
       let row = await _findRowLocator(filters as Record<string, string | RegExp | number>, options);
       if (!row) {
@@ -345,7 +347,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       return _makeSmart(row, _headerMap!, 0);
     },
 
-    getAllCurrentRows: async <R extends { asJSON?: boolean }>(options?: { filter?: Partial<T> | Record<string, any>, exact?: boolean } & R): Promise<any> => {
+    getRows: async <R extends { asJSON?: boolean }>(options?: { filter?: Partial<T> | Record<string, any>, exact?: boolean } & R): Promise<any> => {
       await _ensureInitialized();
       let rowLocators = resolve(config.rowSelector, rootLocator);
       if (options?.filter) {
@@ -359,23 +361,47 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       return smartRows;
     },
 
-    getAllRows: async <R extends { asJSON?: boolean }>(options?: { filter?: Partial<T> | Record<string, any>, exact?: boolean } & R): Promise<any> => {
-      console.warn("⚠️ [SmartTable] getAllRows is deprecated. Use getAllCurrentRows instead.");
-      return result.getAllCurrentRows(options);
+    findRows: async <R extends { asJSON?: boolean }>(filters: Partial<T> | Record<string, string | RegExp | number>, options?: { exact?: boolean, maxPages?: number } & R): Promise<any> => {
+      await _ensureInitialized();
+      const allRows: SmartRowType<T>[] = [];
+      const effectiveMaxPages = options?.maxPages ?? config.maxPages ?? Infinity;
+      let pageCount = 0;
+
+      // Collect rows from current page
+      let rowLocators = resolve(config.rowSelector, rootLocator);
+      rowLocators = filterEngine.applyFilters(rowLocators, filters as Record<string, any>, _headerMap!, options?.exact ?? false, rootLocator.page());
+      let rows = await rowLocators.all();
+      allRows.push(...rows.map((loc, i) => _makeSmart(loc, _headerMap!, i)));
+
+      // Paginate and collect more rows
+      while (pageCount < effectiveMaxPages && config.strategies.pagination) {
+        const paginationResult = await config.strategies.pagination({
+          root: rootLocator,
+          config,
+          resolve,
+          page: rootLocator.page()
+        });
+
+        const didPaginate = validatePaginationResult(paginationResult, 'Pagination Strategy');
+        if (!didPaginate) break;
+        pageCount++;
+        _hasPaginated = true;
+
+        // Collect rows from new page
+        rowLocators = resolve(config.rowSelector, rootLocator);
+        rowLocators = filterEngine.applyFilters(rowLocators, filters as Record<string, any>, _headerMap!, options?.exact ?? false, rootLocator.page());
+        rows = await rowLocators.all();
+        allRows.push(...rows.map((loc, i) => _makeSmart(loc, _headerMap!, i)));
+      }
+
+      if (options?.asJSON) {
+        return Promise.all(allRows.map(r => r.toJSON()));
+      }
+      return allRows;
     },
 
-    generateConfigPrompt: async (options?: PromptOptions) => {
-      const html = await _getCleanHtml(rootLocator);
-      const separator = "=".repeat(50);
-      const content = `\n${separator}\n🤖 COPY INTO GEMINI/ChatGPT 🤖\n${separator}\nI am using 'playwright-smart-table'.\nTarget Table Locator: ${rootLocator.toString()}\nGenerate config for:\n\`\`\`html\n${html.substring(0, 10000)} ...\n\`\`\`\n${separator}\n`;
-      await _handlePrompt('Smart Table Config', content, options);
-    },
-
-    generateStrategyPrompt: async (options?: PromptOptions) => {
-      const container = rootLocator.locator('xpath=..');
-      const html = await _getCleanHtml(container);
-      const content = `\n==================================================\n🤖 COPY INTO GEMINI/ChatGPT TO WRITE A STRATEGY 🤖\n==================================================\nI need a custom Pagination Strategy for 'playwright-smart-table'.\nContainer HTML:\n\`\`\`html\n${html.substring(0, 10000)} ...\n\`\`\`\n`;
-      await _handlePrompt('Smart Table Strategy', content, options);
+    isInitialized: (): boolean => {
+      return _isInitialized;
     },
 
     sorting: {
@@ -425,12 +451,13 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
         init: result.init,
         getHeaders: result.getHeaders,
         getHeaderCell: result.getHeaderCell,
-        getByRow: result.getByRow,
-        getByRowIndex: result.getByRowIndex,
-        getAllCurrentRows: result.getAllCurrentRows,
+        getRow: result.getRow,
+        getRowByIndex: result.getRowByIndex,
+        findRow: result.findRow,
+        getRows: result.getRows,
+        findRows: result.findRows,
         getColumnValues: result.getColumnValues,
-        generateConfigPrompt: result.generateConfigPrompt,
-        generateStrategyPrompt: result.generateStrategyPrompt,
+        isInitialized: result.isInitialized,
         sorting: result.sorting,
         scrollToColumn: result.scrollToColumn,
         revalidate: result.revalidate,
@@ -496,7 +523,5 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
 };
 
 export const PaginationStrategies = ImportedPaginationStrategies;
-/** @deprecated Use Strategies.Pagination instead */
-export const DeprecatedTableStrategies = DeprecatedPaginationStrategies;
 export const SortingStrategies = ImportedSortingStrategies;
-export { FillStrategies, HeaderStrategies, CellNavigationStrategies, ColumnStrategies, ResolutionStrategies, Strategies };
+export { FillStrategies, HeaderStrategies, CellNavigationStrategies, ResolutionStrategies, Strategies };
