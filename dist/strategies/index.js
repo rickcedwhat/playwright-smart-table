@@ -30,11 +30,8 @@ __exportStar(require("./resolution"), exports);
 exports.Strategies = {
     Pagination: pagination_1.PaginationStrategies,
     Sorting: sorting_1.SortingStrategies,
-    Column: columns_1.ColumnStrategies,
     CellNavigation: columns_1.CellNavigationStrategies,
     Header: headers_1.HeaderStrategies,
     Fill: fill_1.FillStrategies,
     Resolution: resolution_1.ResolutionStrategies,
-    // Alias for backward compatibility if needed, though we are encouraging the new structure
-    DeprecatedPagination: pagination_1.DeprecatedPaginationStrategies
 };

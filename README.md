@@ -26,7 +26,7 @@ const table = await useTable(page.locator('#example'), {
 }).init();
 
 // Find the row with Name="Airi Satou", then get the Position cell
-const row = table.getByRow({ Name: 'Airi Satou' });
+const row = table.getRow({ Name: 'Airi Satou' });
 
 const positionCell = row.getCell('Position');
 await expect(positionCell).toHaveText('Accountant');
@@ -35,7 +35,7 @@ await expect(positionCell).toHaveText('Accountant');
 
 **What's happening here?**
 - `useTable()` creates a smart table wrapper around your table locator
-- `getByRow()` finds a specific row by column values
+- `getRow()` finds a specific row by column values
 - The returned `SmartRow` knows its column structure, so `.getCell('Position')` works directly
 
 ### Step 2: Understanding SmartRow
@@ -47,7 +47,7 @@ The `SmartRow` is the core power of this library. Unlike a standard Playwright `
 // Example from: https://datatables.net/examples/data_sources/dom
 
 // Get SmartRow via getByRow
-const row = table.getByRow({ Name: 'Airi Satou' });
+const row = table.getRow({ Name: 'Airi Satou' });
 
 // Interact with cell using column name (resilient to column reordering)
 const positionCell = row.getCell('Position');
@@ -93,8 +93,8 @@ await table.init();
 // ✅ Verify Colleen is NOT visible initially
 await expect(page.getByText("Colleen Hurst")).not.toBeVisible();
 
-// Use searchForRow for pagination
-await expect(await table.searchForRow({ Name: "Colleen Hurst" })).toBeVisible();
+// Use findRow for pagination
+await expect(await table.findRow({ Name: "Colleen Hurst" })).toBeVisible();
 // NOTE: We're now on the page where Colleen Hurst exists (typically Page 2)
 ```
 <!-- /embed: pagination -->
@@ -112,7 +112,7 @@ const table = useTable(page.locator('#example'), {
 });
 await table.init();
 
-const row = table.getByRow({ Name: 'Airi Satou' });
+const row = table.getRow({ Name: 'Airi Satou' });
 await expect(row).toBeVisible();
 ```
 <!-- /embed: advanced-debug -->
@@ -121,14 +121,14 @@ This will log header mappings, row scans, and pagination triggers to help troubl
 
 ### Resetting Table State
 
-If your tests navigate deep into a paginated table, use `.reset()` to return to the first page:
+If your tests navigate deep into a paginated table, use `.reset()` to return to the first page. You can also configure an `onReset` hook to define custom reset behavior (e.g., clicking a "First Page" button):
 
 <!-- embed: advanced-reset -->
 ```typescript
 // Example from: https://datatables.net/examples/data_sources/dom
 // Navigate deep into the table by searching for a row on a later page
 try {
-  await table.searchForRow({ Name: 'Angelica Ramos' });
+  await table.findRow({ Name: 'Angelica Ramos' });
 } catch (e) { }
 
 // Reset internal state (and potentially UI) to initial page
@@ -136,10 +136,27 @@ await table.reset();
 await table.init(); // Re-init after reset
 
 // Now subsequent searches start from the beginning
-const currentPageRow = table.getByRow({ Name: 'Airi Satou' });
+const currentPageRow = table.getRow({ Name: 'Airi Satou' });
 await expect(currentPageRow).toBeVisible();
 ```
 <!-- /embed: advanced-reset -->
+
+**Custom Reset Behavior:**
+
+Use the `onReset` configuration option to define what happens when `table.reset()` is called:
+
+```typescript
+const table = useTable(page.locator('#example'), {
+  strategies: {
+    pagination: Strategies.Pagination.clickNext(() => page.getByRole('link', { name: 'Next' }))
+  },
+  // Define custom reset logic
+  onReset: async ({ page }) => {
+    // Click "First" button to return to page 1
+    await page.getByRole('link', { name: 'First' }).click();
+  }
+});
+```
 
 ### Column Scanning
 
@@ -162,7 +179,7 @@ Use `smartFill()` to intelligently populate form fields in a table row. The meth
 <!-- embed: fill-basic -->
 ```typescript
 // Find a row and fill it with new data
-const row = table.getByRow({ ID: '1' });
+const row = table.getRow({ ID: '1' });
 
 await row.smartFill({
   Name: 'John Updated',
@@ -254,11 +271,11 @@ expect(headers).toContain('Actions');
 
 // Use the renamed column
 // First check it's not on the current page
-const currentPageRow = table.getByRow({ "Last name": "Melisandre" });
+const currentPageRow = table.getRow({ "Last name": "Melisandre" });
 await expect(currentPageRow).not.toBeVisible();
 
 // Then find it across pages
-const row = await table.searchForRow({ "Last name": "Melisandre" });
+const row = await table.findRow({ "Last name": "Melisandre" });
 const actionsCell = row.getCell('Actions');
 await actionsCell.getByLabel("Select row").click();
 ```
@@ -282,34 +299,119 @@ const table = useTable(page.locator('#table1'), {
 await table.init();
 
 // Now column names are consistent
-const row = table.getByRow({ "Last Name": "Doe" });
+const row = table.getRow({ "Last Name": "Doe" });
 const emailCell = row.getCell("Email");
 await expect(emailCell).toHaveText("jdoe@hotmail.com");
 ```
 <!-- /embed: header-transformer-normalize -->
 
+### Iterating Through Paginated Tables
+
+Use `iterateThroughTable()` to process all rows across multiple pages. This is perfect for data scraping, validation, or bulk operations.
+
+<!-- embed: iterate-through-table -->
+```typescript
+// Iterate through all pages and collect data
+const allNames = await table.iterateThroughTable(async ({ rows, index }) => {
+  // Return names from this iteration - automatically appended to allData
+  return await Promise.all(rows.map(r => r.getCell('Name').innerText()));
+});
+
+// allNames contains all names from all iterations
+// Verify sorting across allNames
+expect(allNames.flat().length).toBeGreaterThan(10);
+```
+<!-- /embed: iterate-through-table -->
+
+**With Deduplication (for infinite scroll):**
+
+<!-- embed: iterate-through-table-dedupe -->
+```typescript
+// Scrape all data with deduplication (useful for infinite scroll)
+const allData = await table.iterateThroughTable(
+  async ({ rows }) => {
+    // Return row data - automatically appended to allData
+    return await Promise.all(rows.map(r => r.toJSON()));
+  },
+  {
+    dedupeStrategy: (row) => row.getCell(dedupeColumn).innerText(),
+    getIsLast: ({ paginationResult }) => !paginationResult
+  }
+);
+
+// allData contains all row data from all iterations (deduplicated at row level)
+expect(allData.flat().length).toBeGreaterThan(0);
+```
+<!-- /embed: iterate-through-table-dedupe -->
+
+**With Hooks:**
+
+<!-- embed: iterate-through-table-hooks -->
+```typescript
+const allData = await table.iterateThroughTable(
+  async ({ rows, index, isFirst, isLast }) => {
+    // Normal logic for each iteration - return value appended to allData
+    return await Promise.all(rows.map(r => r.toJSON()));
+  },
+  {
+    getIsLast: ({ paginationResult }) => !paginationResult,
+    onFirst: async ({ allData }) => {
+      console.log('Starting data collection...');
+      // Could perform setup actions
+    },
+    onLast: async ({ allData }) => {
+      console.log(`Collected ${allData.length} total items`);
+      // Could perform cleanup or final actions
+    }
+  }
+);
+```
+<!-- /embed: iterate-through-table-hooks -->
+
+**Hook Timing:**
+- `onFirst`: Runs **before** your callback processes the first page
+- `onLast`: Runs **after** your callback processes the last page
+- Both are optional and receive `{ index, rows, allData }`
+
 ---
 
 ## 📖 API Reference
 
+### Method Comparison
+
+Quick reference for choosing the right method:
+
+| Method | Async/Sync | Paginates? | Returns | Use When |
+|--------|------------|------------|---------|----------|
+| `getRow()` | **Sync** | ❌ No | Single `SmartRow` | Finding row on current page only |
+| `findRow()` | **Async** | ✅ Yes | Single `SmartRow` | Searching across pages |
+| `getRows()` | **Async** | ❌ No | `SmartRow[]` | Getting all rows on current page |
+| `findRows()` | **Async** | ✅ Yes | `SmartRow[]` | Getting all matching rows across pages |
+| `iterateThroughTable()` | **Async** | ✅ Yes | `T[]` | Processing/scraping all pages with custom logic |
+
+**Naming Pattern:**
+- `get*` = Current page only (fast, no pagination)
+- `find*` = Search across pages (slower, uses pagination)
+
 ### Table Methods
 
-#### <a name="getbyrow"></a>`getByRow(filters, options?)`
+#### <a name="getrow"></a>`getRow(filters, options?)`
 
-**Purpose:** Strict retrieval - finds exactly one row matching the filters.
+**Purpose:** Strict retrieval - finds exactly one row matching the filters on the **current page**.
 
 **Behavior:**
 - ✅ Returns `SmartRow` if exactly one match
 - ❌ Throws error if multiple matches (ambiguous query)
 - 👻 Returns sentinel locator if no match (allows `.not.toBeVisible()` assertions)
-- 🔄 Auto-paginates if row isn't on current page (when `maxPages > 1` and pagination strategy is configured)
+- ℹ️ **Sync method**: Returns immediate locator result.
+- 🔍 **Filtering**: Uses "contains" matching by default (e.g., "Tokyo" matches "Tokyo Office"). Set `exact: true` for strict equality.
 
 **Type Signature:**
 ```typescript
-getByRow: <T extends { asJSON?: boolean }>(
+getRow: <T extends { asJSON?: boolean }>(
   filters: Record<string, string | RegExp | number>, 
-  options?: { exact?: boolean, maxPages?: number } & T
-) => Promise<T['asJSON'] extends true ? Record<string, string> : SmartRow>;
+  options?: { exact?: boolean } & T
+) => SmartRow;
 ```
 
 <!-- embed: get-by-row -->
@@ -319,11 +421,11 @@ const table = useTable(page.locator('#example'), { headerSelector: 'thead th' })
 await table.init();
 
 // Find a row where Name is "Airi Satou" AND Office is "Tokyo"
-const row = table.getByRow({ Name: "Airi Satou", Office: "Tokyo" });
+const row = table.getRow({ Name: "Airi Satou", Office: "Tokyo" });
 await expect(row).toBeVisible();
 
 // Assert it does NOT exist
-await expect(table.getByRow({ Name: "Ghost User" })).not.toBeVisible();
+await expect(table.getRow({ Name: "Ghost User" })).not.toBeVisible();
 ```
 <!-- /embed: get-by-row -->
 
@@ -331,7 +433,7 @@ Get row data as JSON:
 <!-- embed: get-by-row-json -->
 ```typescript
 // Get row data as JSON object
-const row = table.getByRow({ Name: 'Airi Satou' });
+const row = table.getRow({ Name: 'Airi Satou' });
 const data = await row.toJSON();
 // Returns: { Name: "Airi Satou", Position: "Accountant", Office: "Tokyo", ... }
 
@@ -344,17 +446,33 @@ expect(partial).toEqual({ Name: 'Airi Satou' });
 ```
 <!-- /embed: get-by-row-json -->
 
-#### <a name="getallcurrentrows"></a>`getAllCurrentRows(options?)`
+#### <a name="findrow"></a>`findRow(filters, options?)`
 
-**Purpose:** Inclusive retrieval - gets all rows on the current page matching optional filters.
+**Purpose:** Async retrieval - finds exactly one row matching the filters **across multiple pages** (pagination).
 
-**Best for:** Checking existence, validating sort order, bulk data extraction on the current page.
-
-> **Note:** `getAllRows` is deprecated and will be removed in a future major version. Use `getAllCurrentRows` instead. The deprecated method still works for backwards compatibility.
+**Behavior:**
+- 🔄 Auto-initializes table if needed
+- 🔎 Paginates through data until match is found or `maxPages` reached
+- ✅ Returns `SmartRow` if found
+- 👻 Returns sentinel locator if not found
 
 **Type Signature:**
 ```typescript
-getAllCurrentRows: <T extends { asJSON?: boolean }>(
+findRow: (
+  filters: Record<string, string | RegExp | number>,
+  options?: { exact?: boolean, maxPages?: number }
+) => Promise<SmartRow>;
+```
+
+#### <a name="getrows"></a>`getRows(options?)`
+
+**Purpose:** Inclusive retrieval - gets all rows on the **current page** matching optional filters.
+
+**Best for:** Checking existence, validating sort order, bulk data extraction on the current page.
+
+**Type Signature:**
+```typescript
+getRows: <T extends { asJSON?: boolean }>(
   options?: { filter?: Record<string, any>, exact?: boolean } & T
 ) => Promise<T['asJSON'] extends true ? Record<string, string>[] : SmartRow[]>;
 ```
@@ -363,17 +481,17 @@ getAllCurrentRows: <T extends { asJSON?: boolean }>(
 ```typescript
 // Example from: https://datatables.net/examples/data_sources/dom
 // 1. Get ALL rows on the current page
-const allRows = await table.getAllCurrentRows();
+const allRows = await table.getRows();
 expect(allRows.length).toBeGreaterThan(0);
 
 // 2. Get subset of rows (Filtering)
-const tokyoUsers = await table.getAllCurrentRows({
+const tokyoUsers = await table.getRows({
   filter: { Office: 'Tokyo' }
 });
 expect(tokyoUsers.length).toBeGreaterThan(0);
 
 // 3. Dump data to JSON
-const data = await table.getAllCurrentRows({ asJSON: true });
+const data = await table.getRows({ asJSON: true });
 console.log(data); // [{ Name: "Airi Satou", ... }, ...]
 expect(data.length).toBeGreaterThan(0);
 expect(data[0]).toHaveProperty('Name');
@@ -384,7 +502,7 @@ Filter rows with exact match:
 <!-- embed: get-all-rows-exact -->
 ```typescript
 // Get rows with exact match (default is fuzzy/contains match)
-const exactMatches = await table.getAllCurrentRows({
+const exactMatches = await table.getRows({
   filter: { Office: 'Tokyo' },
   exact: true // Requires exact string match
 });
@@ -392,6 +510,22 @@ const exactMatches = await table.getAllCurrentRows({
 expect(exactMatches.length).toBeGreaterThan(0);
 ```
 <!-- /embed: get-all-rows-exact -->
+
+#### <a name="findrows"></a>`findRows(filters, options?)`
+
+**Purpose:** Async retrieval - finds **all** rows matching filters **across multiple pages**.
+
+**Behavior:**
+- 🔄 Paginates and accumulates matches
+- ⚠️ Can be slow on large datasets, use `maxPages` to limit scope
+
+**Type Signature:**
+```typescript
+findRows: (
+  filters: Record<string, string | RegExp | number>,
+  options?: { exact?: boolean, maxPages?: number }
+) => Promise<SmartRow[]>;
+```
 
 #### <a name="getcolumnvalues"></a>`getColumnValues(column, options?)`
 
@@ -463,6 +597,44 @@ Resets table state (clears cache, pagination flags) and invokes the `onReset` st
 reset: () => Promise<void>;
 ```
 
+#### <a name="sorting"></a>`sorting.apply(column, direction)` & `sorting.getState(column)`
+
+If you've configured a sorting strategy, use these methods to sort columns and check their current sort state.
+
+**Apply Sort:**
+```typescript
+// Configure table with sorting strategy
+const table = useTable(page.locator('#sortable-table'), {
+  strategies: {
+    sorting: Strategies.Sorting.AriaSort()
+  }
+});
+await table.init();
+
+// Sort by Name column (ascending)
+await table.sorting.apply('Name', 'asc');
+
+// Sort by Age column (descending)
+await table.sorting.apply('Age', 'desc');
+```
+
+**Check Sort State:**
+```typescript
+// Get current sort state of a column
+const nameSort = await table.sorting.getState('Name');
+// Returns: 'asc' | 'desc' | 'none'
+
+expect(nameSort).toBe('asc');
+```
+
+**Type Signatures:**
+```typescript
+sorting: {
+  apply: (columnName: string, direction: 'asc' | 'desc') => Promise<void>;
+  getState: (columnName: string) => Promise<'asc' | 'desc' | 'none'>;
+}
+```
+
 ---
 
 ## 🧩 Pagination Strategies
@@ -495,12 +667,12 @@ strategies: {
 
 #### <a name="tablestrategiesclickloadmore"></a>`Strategies.Pagination.clickLoadMore(selector)`
 
-Best for "Load More" buttons. Clicks and waits for row count to increase.
+Best for "Load More" buttons that may not be part of the table. Clicks and waits for row count to increase.
 
 ```typescript
 strategies: {
-  pagination: Strategies.Pagination.clickLoadMore((root) =>
-    root.getByRole('button', { name: 'Load More' })
+  pagination: Strategies.Pagination.clickLoadMore((page) =>
+    page.getByRole('button', { name: 'Load More' })
   )
 }
 ```
@@ -573,22 +745,81 @@ A `SmartRow` extends Playwright's `Locator` with table-aware methods.
 
 <!-- embed-type: SmartRow -->
 ```typescript
+/**
+ * Function to get the currently active/focused cell.
+ * Returns null if no cell is active.
+ */
+export type GetActiveCellFn = (args: TableContext) => Promise<{
+  rowIndex: number;
+  columnIndex: number;
+  columnName?: string;
+  locator: Locator;
+} | null>;
+
+
+/**
+ * SmartRow - A Playwright Locator with table-aware methods.
+ * 
+ * Extends all standard Locator methods (click, isVisible, etc.) with table-specific functionality.
+ * 
+ * @example
+ * const row = table.getRow({ Name: 'John Doe' });
+ * await row.click(); // Standard Locator method
+ * const email = row.getCell('Email'); // Table-aware method
+ * const data = await row.toJSON(); // Extract all row data
+ * await row.smartFill({ Name: 'Jane', Status: 'Active' }); // Fill form fields
+ */
 export type SmartRow<T = any> = Locator & {
-  getRequestIndex(): number | undefined;
+  /** Optional row index (0-based) if known */
   rowIndex?: number;
+
+  /**
+   * Get a cell locator by column name.
+   * @param column - Column name (case-sensitive)
+   * @returns Locator for the cell
+   * @example
+   * const emailCell = row.getCell('Email');
+   * await expect(emailCell).toHaveText('john@example.com');
+   */
   getCell(column: string): Locator;
+
+  /**
+   * Extract all cell data as a key-value object.
+   * @param options - Optional configuration
+   * @param options.columns - Specific columns to extract (extracts all if not specified)
+   * @returns Promise resolving to row data
+   * @example
+   * const data = await row.toJSON();
+   * // { Name: 'John', Email: 'john@example.com', ... }
+   * 
+   * const partial = await row.toJSON({ columns: ['Name', 'Email'] });
+   * // { Name: 'John', Email: 'john@example.com' }
+   */
   toJSON(options?: { columns?: string[] }): Promise<T>;
+
   /**
    * Scrolls/paginates to bring this row into view.
-   * Only works if rowIndex is known.
+   * Only works if rowIndex is known (e.g., from getRowByIndex).
+   * @throws Error if rowIndex is unknown
    */
   bringIntoView(): Promise<void>;
+
   /**
-   * Fills the row with data. Automatically detects input types.
-   */
-  fill: (data: Partial<T> | Record<string, any>, options?: FillOptions) => Promise<void>;
-  /**
-   * Alias for fill() to avoid conflict with Locator.fill()
+   * Intelligently fills form fields in the row.
+   * Automatically detects input types (text, select, checkbox, contenteditable).
+   * 
+   * @param data - Column-value pairs to fill
+   * @param options - Optional configuration
+   * @param options.inputMappers - Custom input selectors per column
+   * @example
+   * // Auto-detection
+   * await row.smartFill({ Name: 'John', Status: 'Active', Subscribe: true });
+   * 
+   * // Custom input mappers
+   * await row.smartFill(
+   *   { Name: 'John' },
+   *   { inputMappers: { Name: (cell) => cell.locator('.custom-input') } }
+   * );
    */
   smartFill: (data: Partial<T> | Record<string, any>, options?: FillOptions) => Promise<void>;
 };
@@ -598,9 +829,11 @@ export type SmartRow<T = any> = Locator & {
 **Methods:**
 - `getCell(column: string)`: Returns a `Locator` for the specified cell in this row
 - `toJSON()`: Extracts all cell data as a key-value object
-- `smartFill(data, options?)`: Intelligently fills form fields in the row. Automatically detects input types or use `inputMappers` for custom control. Use Locator's standard `fill()` for single-input scenarios.
+- `smartFill(data, options?)`: Intelligently fills form fields in the row. Automatically detects input types (text, select, checkbox) or use `inputMappers` option for custom control.
 
 All standard Playwright `Locator` methods (`.click()`, `.isVisible()`, `.textContent()`, etc.) are also available.
+
+**Note**: `getRequestIndex()` is an internal method for row tracking - you typically won't need it.
 
 #### <a name="tableconfig"></a>`TableConfig`
 
@@ -684,6 +917,15 @@ Flexible selector type supporting strings, functions, or existing locators.
 
 <!-- embed-type: Selector -->
 ```typescript
+/**
+ * Flexible selector type - can be a CSS string, function returning a Locator, or Locator itself.
+ * @example
+ * // String selector
+ * rowSelector: 'tbody tr'
+ * 
+ * // Function selector
+ * rowSelector: (root) => root.locator('[role="row"]')
+ */
 export type Selector = string | ((root: Locator | Page) => Locator);
 
 /**
@@ -717,66 +959,6 @@ Returns `true` if more data was loaded, `false` if pagination should stop.
 
 ---
 
-## 🔄 Migration Guide
-
-### Upgrading from v3.x to v4.0
-
-**Breaking Change**: Strategy imports are now consolidated under the `Strategies` object.
-
-#### Import Changes
-```typescript
-// ❌ Old (v3.x)
-import { PaginationStrategies, SortingStrategies } from '../src/useTable';
-
-// ✅ New (v4.0)
-import { Strategies } from '../src/strategies';
-// or
-import { useTable, Strategies } from '../src/useTable';
-```
-
-#### Strategy Usage
-```typescript
-// ❌ Old (v3.x)
-strategies: {
-  pagination: PaginationStrategies.clickNext(() => page.locator('#next')),
-  sorting: SortingStrategies.AriaSort(),
-  header: HeaderStrategies.scrollRight,
-  cellNavigation: ColumnStrategies.keyboard
-}
-
-// ✅ New (v4.0)
-strategies: {
-  pagination: Strategies.Pagination.clickNext(() => page.locator('#next')),
-  sorting: Strategies.Sorting.AriaSort(),
-  header: Strategies.Header.scrollRight,
-  cellNavigation: Strategies.Column.keyboard
-}
-```
-
-#### New Features (Optional)
-
-**Generic Type Support:**
-```typescript
-interface User {
-  Name: string;
-  Email: string;
-  Office: string;
-}
-
-const table = useTable<User>(page.locator('#table'), config);
-const data = await row.toJSON(); // Type: User (not Record<string, string>)
-```
-
-**Revalidate Method:**
-```typescript
-// Refresh column mappings when table structure changes
-await table.revalidate();
-```
-
-For detailed migration instructions optimized for AI code transformation, see the [AI Migration Guide](./MIGRATION_v4.md).
-
----
-
 ## 🚀 Tips & Best Practices
 
 1. **Start Simple**: Try the defaults first - they work for most standard HTML tables
@@ -784,6 +966,8 @@ For detailed migration instructions optimized for AI code transformation, see th
 3. **Leverage SmartRow**: Use `.getCell()` instead of manual column indices - your tests will be more maintainable
 4. **Type Safety**: All methods are fully typed - use TypeScript for the best experience
 5. **Pagination Strategies**: Create reusable strategies for tables with similar pagination patterns
+6. **Async vs Sync**: Use `findRow()` for paginated searches and `getRow()` for strict, single-page assertions.
+7. **Sorting**: Use `table.sorting.apply()` to sort columns and `table.sorting.getState()` to check sort state.
 
 ---
 

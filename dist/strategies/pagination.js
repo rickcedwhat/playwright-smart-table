@@ -9,7 +9,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.DeprecatedPaginationStrategies = exports.PaginationStrategies = void 0;
+exports.PaginationStrategies = void 0;
 const utils_1 = require("../utils");
 exports.PaginationStrategies = {
     /**
@@ -32,24 +32,6 @@ exports.PaginationStrategies = {
         });
     },
     /**
-     * Strategy: Clicks a "Load More" button and waits for the row count to increase.
-     */
-    clickLoadMore: (buttonSelector, timeout = 5000) => {
-        return (_a) => __awaiter(void 0, [_a], void 0, function* ({ root, config, resolve, page }) {
-            const loadMoreBtn = resolve(buttonSelector, root).first();
-            if (!(yield loadMoreBtn.isVisible()) || !(yield loadMoreBtn.isEnabled())) {
-                return false;
-            }
-            const rows = resolve(config.rowSelector, root);
-            const oldCount = yield rows.count();
-            yield loadMoreBtn.click();
-            return yield (0, utils_1.waitForCondition)(() => __awaiter(void 0, void 0, void 0, function* () {
-                const newCount = yield rows.count();
-                return newCount > oldCount;
-            }), timeout, page);
-        });
-    },
-    /**
      * Strategy: Scrolls to the bottom and waits for more rows to appear.
      */
     infiniteScroll: (timeout = 5000) => {
@@ -66,7 +48,3 @@ exports.PaginationStrategies = {
         });
     }
 };
-/**
- * @deprecated Use `PaginationStrategies` instead. This alias will be removed in a future major version.
- */
-exports.DeprecatedPaginationStrategies = exports.PaginationStrategies;

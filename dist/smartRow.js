@@ -19,7 +19,6 @@ const createSmartRow = (rowLocator, map, rowIndex, config, rootLocator, resolve,
     const smart = rowLocator;
     // Attach State
     smart.rowIndex = rowIndex;
-    smart.getRequestIndex = () => rowIndex;
     // Attach Methods
     smart.getCell = (colName) => {
         const idx = map.get(colName);
@@ -112,8 +111,7 @@ const createSmartRow = (rowLocator, map, rowIndex, config, rootLocator, resolve,
         }
         return result;
     });
-    // @ts-ignore
-    smart.fill = (data, fillOptions) => __awaiter(void 0, void 0, void 0, function* () {
+    smart.smartFill = (data, fillOptions) => __awaiter(void 0, void 0, void 0, function* () {
         for (const [colName, value] of Object.entries(data)) {
             const colIdx = map.get(colName);
             if (colIdx === undefined) {
@@ -144,12 +142,11 @@ const createSmartRow = (rowLocator, map, rowIndex, config, rootLocator, resolve,
     });
     smart.bringIntoView = () => __awaiter(void 0, void 0, void 0, function* () {
         if (rowIndex === undefined) {
-            throw new Error('Cannot bring row into view - row index is unknown. Use getByRowIndex() instead of getByRow().');
+            throw new Error('Cannot bring row into view - row index is unknown. Use getRowByIndex() instead of getRow().');
         }
         // Scroll row into view using Playwright's built-in method
         yield rowLocator.scrollIntoViewIfNeeded();
     });
-    smart.smartFill = smart.fill;
     return smart;
 };
 exports.createSmartRow = createSmartRow;

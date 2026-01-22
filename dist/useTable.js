@@ -9,7 +9,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.Strategies = exports.ResolutionStrategies = exports.ColumnStrategies = exports.CellNavigationStrategies = exports.HeaderStrategies = exports.FillStrategies = exports.SortingStrategies = exports.DeprecatedTableStrategies = exports.PaginationStrategies = exports.useTable = void 0;
+exports.Strategies = exports.ResolutionStrategies = exports.CellNavigationStrategies = exports.HeaderStrategies = exports.FillStrategies = exports.SortingStrategies = exports.PaginationStrategies = exports.useTable = void 0;
 const typeContext_1 = require("./typeContext");
 const sorting_1 = require("./strategies/sorting");
 const pagination_1 = require("./strategies/pagination");
@@ -19,13 +19,13 @@ const headers_1 = require("./strategies/headers");
 Object.defineProperty(exports, "HeaderStrategies", { enumerable: true, get: function () { return headers_1.HeaderStrategies; } });
 const columns_1 = require("./strategies/columns");
 Object.defineProperty(exports, "CellNavigationStrategies", { enumerable: true, get: function () { return columns_1.CellNavigationStrategies; } });
-Object.defineProperty(exports, "ColumnStrategies", { enumerable: true, get: function () { return columns_1.ColumnStrategies; } });
 const smartRow_1 = require("./smartRow");
 const filterEngine_1 = require("./filterEngine");
 const resolution_1 = require("./strategies/resolution");
 Object.defineProperty(exports, "ResolutionStrategies", { enumerable: true, get: function () { return resolution_1.ResolutionStrategies; } });
 const strategies_1 = require("./strategies");
 Object.defineProperty(exports, "Strategies", { enumerable: true, get: function () { return strategies_1.Strategies; } });
+const validation_1 = require("./strategies/validation");
 /**
  * Main hook to interact with a table.
  */
@@ -162,7 +162,8 @@ const useTable = (rootLocator, configOptions = {}) => {
                     page: rootLocator.page(),
                     resolve: resolve
                 };
-                const didLoadMore = yield config.strategies.pagination(context);
+                const paginationResult = yield config.strategies.pagination(context);
+                const didLoadMore = (0, validation_1.validatePaginationResult)(paginationResult, 'Pagination Strategy');
                 if (didLoadMore) {
                     _hasPaginated = true;
                     currentPage++;
@@ -242,7 +243,7 @@ const useTable = (rootLocator, configOptions = {}) => {
         }),
         getHeaders: () => __awaiter(void 0, void 0, void 0, function* () {
             if (!_isInitialized || !_headerMap)
-                throw new Error('Table not initialized. Call await table.init() first.');
+                throw new Error('Table not initialized. Call await table.init() first, or use async methods like table.findRow() or table.getRows() which auto-initialize.');
             return Array.from(_headerMap.keys());
         }),
         getHeaderCell: (columnName) => __awaiter(void 0, void 0, void 0, function* () {
@@ -299,22 +300,22 @@ const useTable = (rootLocator, configOptions = {}) => {
             }
             return results;
         }),
-        getByRow: (filters, options = { exact: false }) => {
+        getRow: (filters, options = { exact: false }) => {
             if (!_isInitialized || !_headerMap)
-                throw new Error('Table not initialized. Call await table.init() first.');
+                throw new Error('Table not initialized. Call await table.init() first, or use async methods like table.findRow() or table.getRows() which auto-initialize.');
             const allRows = resolve(config.rowSelector, rootLocator);
             const matchedRows = filterEngine.applyFilters(allRows, filters, _headerMap, options.exact || false, rootLocator.page());
             const rowLocator = matchedRows.first();
             return _makeSmart(rowLocator, _headerMap, 0); // fallback index 0
         },
-        getByRowIndex: (index, options = {}) => {
+        getRowByIndex: (index, options = {}) => {
             if (!_isInitialized || !_headerMap)
-                throw new Error('Table not initialized. Call await table.init() first.');
+                throw new Error('Table not initialized. Call await table.init() first, or use async methods like table.findRow() or table.getRows() which auto-initialize.');
             const rowIndex = index - 1; // Convert 1-based to 0-based
             const rowLocator = resolve(config.rowSelector, rootLocator).nth(rowIndex);
             return _makeSmart(rowLocator, _headerMap, rowIndex);
         },
-        searchForRow: (filters, options) => __awaiter(void 0, void 0, void 0, function* () {
+        findRow: (filters, options) => __awaiter(void 0, void 0, void 0, function* () {
             yield _ensureInitialized();
             let row = yield _findRowLocator(filters, options);
             if (!row) {
@@ -322,7 +323,7 @@ const useTable = (rootLocator, configOptions = {}) => {
             }
             return _makeSmart(row, _headerMap, 0);
         }),
-        getAllCurrentRows: (options) => __awaiter(void 0, void 0, void 0, function* () {
+        getRows: (options) => __awaiter(void 0, void 0, void 0, function* () {
             yield _ensureInitialized();
             let rowLocators = resolve(config.rowSelector, rootLocator);
             if (options === null || options === void 0 ? void 0 : options.filter) {
@@ -335,22 +336,44 @@ const useTable = (rootLocator, configOptions = {}) => {
             }
             return smartRows;
         }),
-        getAllRows: (options) => __awaiter(void 0, void 0, void 0, function* () {
-            console.warn("⚠️ [SmartTable] getAllRows is deprecated. Use getAllCurrentRows instead.");
-            return result.getAllCurrentRows(options);
+        findRows: (filters, options) => __awaiter(void 0, void 0, void 0, function* () {
+            var _a, _b, _c, _d;
+            yield _ensureInitialized();
+            const allRows = [];
+            const effectiveMaxPages = (_b = (_a = options === null || options === void 0 ? void 0 : options.maxPages) !== null && _a !== void 0 ? _a : config.maxPages) !== null && _b !== void 0 ? _b : Infinity;
+            let pageCount = 0;
+            // Collect rows from current page
+            let rowLocators = resolve(config.rowSelector, rootLocator);
+            rowLocators = filterEngine.applyFilters(rowLocators, filters, _headerMap, (_c = options === null || options === void 0 ? void 0 : options.exact) !== null && _c !== void 0 ? _c : false, rootLocator.page());
+            let rows = yield rowLocators.all();
+            allRows.push(...rows.map((loc, i) => _makeSmart(loc, _headerMap, i)));
+            // Paginate and collect more rows
+            while (pageCount < effectiveMaxPages && config.strategies.pagination) {
+                const paginationResult = yield config.strategies.pagination({
+                    root: rootLocator,
+                    config,
+                    resolve,
+                    page: rootLocator.page()
+                });
+                const didPaginate = (0, validation_1.validatePaginationResult)(paginationResult, 'Pagination Strategy');
+                if (!didPaginate)
+                    break;
+                pageCount++;
+                _hasPaginated = true;
+                // Collect rows from new page
+                rowLocators = resolve(config.rowSelector, rootLocator);
+                rowLocators = filterEngine.applyFilters(rowLocators, filters, _headerMap, (_d = options === null || options === void 0 ? void 0 : options.exact) !== null && _d !== void 0 ? _d : false, rootLocator.page());
+                rows = yield rowLocators.all();
+                allRows.push(...rows.map((loc, i) => _makeSmart(loc, _headerMap, i)));
+            }
+            if (options === null || options === void 0 ? void 0 : options.asJSON) {
+                return Promise.all(allRows.map(r => r.toJSON()));
+            }
+            return allRows;
         }),
-        generateConfigPrompt: (options) => __awaiter(void 0, void 0, void 0, function* () {
-            const html = yield _getCleanHtml(rootLocator);
-            const separator = "=".repeat(50);
-            const content = `\n${separator}\n🤖 COPY INTO GEMINI/ChatGPT 🤖\n${separator}\nI am using 'playwright-smart-table'.\nTarget Table Locator: ${rootLocator.toString()}\nGenerate config for:\n\`\`\`html\n${html.substring(0, 10000)} ...\n\`\`\`\n${separator}\n`;
-            yield _handlePrompt('Smart Table Config', content, options);
-        }),
-        generateStrategyPrompt: (options) => __awaiter(void 0, void 0, void 0, function* () {
-            const container = rootLocator.locator('xpath=..');
-            const html = yield _getCleanHtml(container);
-            const content = `\n==================================================\n🤖 COPY INTO GEMINI/ChatGPT TO WRITE A STRATEGY 🤖\n==================================================\nI need a custom Pagination Strategy for 'playwright-smart-table'.\nContainer HTML:\n\`\`\`html\n${html.substring(0, 10000)} ...\n\`\`\`\n`;
-            yield _handlePrompt('Smart Table Strategy', content, options);
-        }),
+        isInitialized: () => {
+            return _isInitialized;
+        },
         sorting: {
             apply: (columnName, direction) => __awaiter(void 0, void 0, void 0, function* () {
                 yield _ensureInitialized();
@@ -381,12 +404,13 @@ const useTable = (rootLocator, configOptions = {}) => {
                 init: result.init,
                 getHeaders: result.getHeaders,
                 getHeaderCell: result.getHeaderCell,
-                getByRow: result.getByRow,
-                getByRowIndex: result.getByRowIndex,
-                getAllCurrentRows: result.getAllCurrentRows,
+                getRow: result.getRow,
+                getRowByIndex: result.getRowByIndex,
+                findRow: result.findRow,
+                getRows: result.getRows,
+                findRows: result.findRows,
                 getColumnValues: result.getColumnValues,
-                generateConfigPrompt: result.generateConfigPrompt,
-                generateStrategyPrompt: result.generateStrategyPrompt,
+                isInitialized: result.isInitialized,
                 sorting: result.sorting,
                 scrollToColumn: result.scrollToColumn,
                 revalidate: result.revalidate,
@@ -444,6 +468,4 @@ const useTable = (rootLocator, configOptions = {}) => {
 };
 exports.useTable = useTable;
 exports.PaginationStrategies = pagination_1.PaginationStrategies;
-/** @deprecated Use Strategies.Pagination instead */
-exports.DeprecatedTableStrategies = pagination_1.DeprecatedPaginationStrategies;
 exports.SortingStrategies = sorting_1.SortingStrategies;
