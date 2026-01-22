@@ -1,7 +1,7 @@
 {
   "name": "@rickcedwhat/playwright-smart-table",
-  "version": "4.0.0",
-  "description": "A smart table utility for Playwright with built-in pagination strategies that are fully extensible.",
+  "version": "5.0.0",
+  "description": "Production-ready table testing for Playwright with smart column-aware locators. Core library with plugin support for custom table implementations.",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/rickcedwhat/playwright-smart-table.git"
