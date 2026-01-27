@@ -11,6 +11,7 @@ import { FilterEngine } from './filterEngine';
 import { ResolutionStrategies } from './strategies/resolution';
 import { Strategies } from './strategies';
 import { validatePaginationResult, validatePaginationStrategy, validateSortingStrategy } from './strategies/validation';
+import { addTraceEvent } from './utils/traceUtils';
 
 /**
  * Main hook to interact with a table.
@@ -29,7 +30,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
 
   const config: FinalTableConfig = {
     rowSelector: "tbody tr",
-    headerSelector: "th",
+    headerSelector: "thead th",
     cellSelector: "td",
     maxPages: 1,
     headerTransformer: ({ text, index, locator }) => text,
@@ -242,6 +243,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       if (_isInitialized && _headerMap) return result;
       await _getMap(options?.timeout);
       _isInitialized = true;
+      if (_headerMap) { await addTraceEvent(rootLocator.page(), 'init', { headers: Array.from(_headerMap.keys()), columnCount: _headerMap.size }); }
       return result;
     },
 
