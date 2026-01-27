@@ -26,6 +26,7 @@ Object.defineProperty(exports, "ResolutionStrategies", { enumerable: true, get: 
 const strategies_1 = require("./strategies");
 Object.defineProperty(exports, "Strategies", { enumerable: true, get: function () { return strategies_1.Strategies; } });
 const validation_1 = require("./strategies/validation");
+const traceUtils_1 = require("./utils/traceUtils");
 /**
  * Main hook to interact with a table.
  */
@@ -40,7 +41,7 @@ const useTable = (rootLocator, configOptions = {}) => {
         cellNavigation: columns_1.CellNavigationStrategies.default,
         pagination: () => __awaiter(void 0, void 0, void 0, function* () { return false; }),
     };
-    const config = Object.assign(Object.assign({ rowSelector: "tbody tr", headerSelector: "th", cellSelector: "td", maxPages: 1, headerTransformer: ({ text, index, locator }) => text, autoScroll: true, debug: false, onReset: () => __awaiter(void 0, void 0, void 0, function* () { }) }, configOptions), { strategies: Object.assign(Object.assign({}, defaultStrategies), configOptions.strategies) });
+    const config = Object.assign(Object.assign({ rowSelector: "tbody tr", headerSelector: "thead th", cellSelector: "td", maxPages: 1, headerTransformer: ({ text, index, locator }) => text, autoScroll: true, debug: false, onReset: () => __awaiter(void 0, void 0, void 0, function* () { }) }, configOptions), { strategies: Object.assign(Object.assign({}, defaultStrategies), configOptions.strategies) });
     const resolve = (item, parent) => {
         if (typeof item === 'string')
             return parent.locator(item);
@@ -225,6 +226,9 @@ const useTable = (rootLocator, configOptions = {}) => {
                 return result;
             yield _getMap(options === null || options === void 0 ? void 0 : options.timeout);
             _isInitialized = true;
+            if (_headerMap) {
+                yield (0, traceUtils_1.addTraceEvent)(rootLocator.page(), 'init', { headers: Array.from(_headerMap.keys()), columnCount: _headerMap.size });
+            }
             return result;
         }),
         scrollToColumn: (columnName) => __awaiter(void 0, void 0, void 0, function* () {

@@ -1,6 +1,8 @@
 import type { Locator, Page } from '@playwright/test';
 import { SmartRow as SmartRowType, FillOptions, FinalTableConfig, TableResult } from './types';
 import { FillStrategies } from './strategies/fill';
+import { buildColumnNotFoundError } from './utils/stringUtils';
+import { addTraceEvent } from './utils/traceUtils';
 
 /**
  * Factory to create a SmartRow by extending a Playwright Locator.
@@ -24,8 +26,7 @@ export const createSmartRow = <T = any>(
     smart.getCell = (colName: string): Locator => {
         const idx = map.get(colName);
         if (idx === undefined) {
-            const availableColumns = Array.from(map.keys());
-            throw new Error(`Column "${colName}" not found. Available: ${availableColumns.join(', ')}`);
+            throw new Error(buildColumnNotFoundError(colName, Array.from(map.keys())));
         }
 
         if (config.strategies.getCellLocator) {
@@ -37,6 +38,9 @@ export const createSmartRow = <T = any>(
                 page: rootLocator.page()
             });
         }
+        
+        // Add trace event
+        addTraceEvent(rootLocator.page(), 'getCell', { column: colName, columnIndex: idx, rowIndex }).catch(() => {});
         return resolve(config.cellSelector, rowLocator).nth(idx);
     };
 

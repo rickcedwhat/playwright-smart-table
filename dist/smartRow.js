@@ -11,6 +11,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createSmartRow = void 0;
 const fill_1 = require("./strategies/fill");
+const stringUtils_1 = require("./utils/stringUtils");
+const traceUtils_1 = require("./utils/traceUtils");
 /**
  * Factory to create a SmartRow by extending a Playwright Locator.
  * We avoid Class/Proxy to ensure full compatibility with Playwright's expect(locator) matchers.
@@ -23,8 +25,7 @@ const createSmartRow = (rowLocator, map, rowIndex, config, rootLocator, resolve,
     smart.getCell = (colName) => {
         const idx = map.get(colName);
         if (idx === undefined) {
-            const availableColumns = Array.from(map.keys());
-            throw new Error(`Column "${colName}" not found. Available: ${availableColumns.join(', ')}`);
+            throw new Error((0, stringUtils_1.buildColumnNotFoundError)(colName, Array.from(map.keys())));
         }
         if (config.strategies.getCellLocator) {
             return config.strategies.getCellLocator({
@@ -35,6 +36,8 @@ const createSmartRow = (rowLocator, map, rowIndex, config, rootLocator, resolve,
                 page: rootLocator.page()
             });
         }
+        // Add trace event
+        (0, traceUtils_1.addTraceEvent)(rootLocator.page(), 'getCell', { column: colName, columnIndex: idx, rowIndex }).catch(() => { });
         return resolve(config.cellSelector, rowLocator).nth(idx);
     };
     smart.toJSON = (options) => __awaiter(void 0, void 0, void 0, function* () {
