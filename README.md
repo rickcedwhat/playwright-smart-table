@@ -355,11 +355,11 @@ const allData = await table.iterateThroughTable(
   },
   {
     getIsLast: ({ paginationResult }) => !paginationResult,
-    onFirst: async ({ allData }) => {
+    beforeFirst: async ({ allData }) => {
       console.log('Starting data collection...');
       // Could perform setup actions
     },
-    onLast: async ({ allData }) => {
+    afterLast: async ({ allData }) => {
       console.log(`Collected ${allData.length} total items`);
       // Could perform cleanup or final actions
     }
@@ -369,9 +369,42 @@ const allData = await table.iterateThroughTable(
 <!-- /embed: iterate-through-table-hooks -->
 
 **Hook Timing:**
-- `onFirst`: Runs **before** your callback processes the first page
-- `onLast`: Runs **after** your callback processes the last page
+- `beforeFirst`: Runs **before** your callback processes the first page
+- `afterLast`: Runs **after** your callback processes the last page
 - Both are optional and receive `{ index, rows, allData }`
+
+#### Batching (v5.1+)
+
+Process multiple pages at once for better performance:
+
+```typescript
+const results = await table.iterateThroughTable(
+  async ({ rows, batchInfo }) => {
+    // rows contains data from multiple pages
+    console.log(`Processing pages ${batchInfo.startIndex}-${batchInfo.endIndex}`);
+    console.log(`Batch has ${rows.length} total rows from ${batchInfo.size} pages`);
+    
+    // Bulk process (e.g., batch database insert)
+    await bulkInsert(rows);
+    return rows.length;
+  },
+  { 
+    batchSize: 3  // Process 3 pages at a time
+  }
+);
+
+// With 6 pages total:
+// - Batch 1: pages 0,1,2 (batchInfo.size = 3)
+// - Batch 2: pages 3,4,5 (batchInfo.size = 3)
+// results.length === 2 (fewer callbacks than pages)
+```
+
+**Key Points:**
+- `batchSize` = number of **pages**, not rows
+- `batchInfo` is undefined when not batching (`batchSize` undefined or `1`)
+- Works with deduplication, pagination strategies, and hooks
+- Reduces callback overhead for bulk operations
+- Default: no batching (one callback per page)
 
 ---
 
