@@ -365,15 +365,21 @@ export interface TableResult<T = any> {
       rows: SmartRow[];
       allData: T[];
       table: RestrictedTableResult;
+      batchInfo?: {
+        startIndex: number;
+        endIndex: number;
+        size: number;
+      };
     }) => T | Promise<T>,
     options?: {
       pagination?: PaginationStrategy;
       dedupeStrategy?: DedupeStrategy;
       maxIterations?: number;
+      batchSize?: number;
       getIsFirst?: (context: { index: number }) => boolean;
       getIsLast?: (context: { index: number, paginationResult: boolean }) => boolean;
-      onFirst?: (context: { index: number, rows: SmartRow[], allData: any[] }) => void | Promise<void>;
-      onLast?: (context: { index: number, rows: SmartRow[], allData: any[] }) => void | Promise<void>;
+      beforeFirst?: (context: { index: number, rows: SmartRow[], allData: any[] }) => void | Promise<void>;
+      afterLast?: (context: { index: number, rows: SmartRow[], allData: any[] }) => void | Promise<void>;
     }
   ) => Promise<T[]>;
 }

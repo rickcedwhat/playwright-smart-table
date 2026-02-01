@@ -551,7 +551,7 @@ test.describe('Backwards Compatibility Tests', () => {
     expect(flags.length).toBeGreaterThan(1);
   });
 
-  test('iterateThroughTable: onFirst/onLast hooks', async ({ page }) => {
+  test('iterateThroughTable: beforeFirst/afterLast hooks', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
     await page.waitForSelector('#example_wrapper');
 
@@ -566,8 +566,8 @@ test.describe('Backwards Compatibility Tests', () => {
     });
     await table.init();
 
-    let onFirstCalled = false;
-    let onLastCalled = false;
+    let beforeFirstCalled = false;
+    let afterLastCalled = false;
     let iterationCount = 0;
 
     await table.iterateThroughTable(
@@ -577,22 +577,22 @@ test.describe('Backwards Compatibility Tests', () => {
       },
       {
         getIsLast: ({ paginationResult }) => !paginationResult,
-        onFirst: async ({ index, rows }) => {
-          onFirstCalled = true;
+        beforeFirst: async ({ index, rows }) => {
+          beforeFirstCalled = true;
           expect(index).toBe(0);
           expect(rows.length).toBeGreaterThan(0);
         },
-        onLast: async ({ index, rows }) => {
-          onLastCalled = true;
+        afterLast: async ({ index, rows }) => {
+          afterLastCalled = true;
           expect(rows.length).toBeGreaterThan(0);
-          // onLast should be called on the last iteration (when pagination fails or maxIterations reached)
-          console.log(`onLast called at index ${index}, iterationCount: ${iterationCount}`);
+          // afterLast should be called on the last iteration (when pagination fails or maxIterations reached)
+          console.log(`afterLast called at index ${index}, iterationCount: ${iterationCount}`);
         }
       }
     );
 
-    expect(onFirstCalled).toBe(true);
-    expect(onLastCalled).toBe(true);
+    expect(beforeFirstCalled).toBe(true);
+    expect(afterLastCalled).toBe(true);
     expect(iterationCount).toBeGreaterThan(0);
   });
 

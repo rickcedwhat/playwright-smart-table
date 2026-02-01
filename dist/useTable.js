@@ -423,10 +423,14 @@ const useTable = (rootLocator, configOptions = {}) => {
             const getIsLast = (_c = options === null || options === void 0 ? void 0 : options.getIsLast) !== null && _c !== void 0 ? _c : (() => false);
             const allData = [];
             const effectiveMaxIterations = (_d = options === null || options === void 0 ? void 0 : options.maxIterations) !== null && _d !== void 0 ? _d : config.maxPages;
+            const batchSize = options === null || options === void 0 ? void 0 : options.batchSize;
+            const isBatching = batchSize !== undefined && batchSize > 1;
             let index = 0;
             let paginationResult = true;
             let seenKeys = null;
-            logDebug(`Starting iterateThroughTable (maxIterations: ${effectiveMaxIterations})`);
+            let batchRows = [];
+            let batchStartIndex = 0;
+            logDebug(`Starting iterateThroughTable (maxIterations: ${effectiveMaxIterations}, batchSize: ${batchSize !== null && batchSize !== void 0 ? batchSize : 'none'})`);
             while (index < effectiveMaxIterations) {
                 const rowLocators = yield resolve(config.rowSelector, rootLocator).all();
                 let rows = rowLocators.map((loc, i) => _makeSmart(loc, _headerMap, i));
@@ -444,21 +448,91 @@ const useTable = (rootLocator, configOptions = {}) => {
                     rows = deduplicated;
                     logDebug(`Deduplicated ${rowLocators.length} rows to ${rows.length} unique rows (total seen: ${seenKeys.size})`);
                 }
-                const isFirst = getIsFirst({ index });
-                let isLast = getIsLast({ index, paginationResult });
-                const isLastDueToMax = index === effectiveMaxIterations - 1;
-                if (isFirst && (options === null || options === void 0 ? void 0 : options.onFirst))
-                    yield options.onFirst({ index, rows, allData });
-                const returnValue = yield callback({ index, isFirst, isLast, rows, allData, table: restrictedTable });
-                allData.push(returnValue);
-                const context = { root: rootLocator, config, page: rootLocator.page(), resolve };
-                paginationResult = yield paginationStrategy(context);
-                isLast = getIsLast({ index, paginationResult }) || isLastDueToMax;
-                if (isLast && (options === null || options === void 0 ? void 0 : options.onLast))
-                    yield options.onLast({ index, rows, allData });
-                if (isLast || !paginationResult) {
-                    logDebug(`Reached last iteration (index: ${index}, paginationResult: ${paginationResult})`);
-                    break;
+                // Add rows to batch if batching is enabled
+                if (isBatching) {
+                    batchRows.push(...rows);
+                }
+                const isLastIteration = index === effectiveMaxIterations - 1;
+                // Determine if we should invoke the callback
+                const batchComplete = isBatching && (index - batchStartIndex + 1) >= batchSize;
+                const shouldInvokeCallback = !isBatching || batchComplete || isLastIteration;
+                if (shouldInvokeCallback) {
+                    const callbackRows = isBatching ? batchRows : rows;
+                    const callbackIndex = isBatching ? batchStartIndex : index;
+                    const isFirst = getIsFirst({ index: callbackIndex });
+                    let isLast = getIsLast({ index: callbackIndex, paginationResult });
+                    const isLastDueToMax = index === effectiveMaxIterations - 1;
+                    if (isFirst && (options === null || options === void 0 ? void 0 : options.beforeFirst)) {
+                        yield options.beforeFirst({ index: callbackIndex, rows: callbackRows, allData });
+                    }
+                    const batchInfo = isBatching ? {
+                        startIndex: batchStartIndex,
+                        endIndex: index,
+                        size: index - batchStartIndex + 1
+                    } : undefined;
+                    const returnValue = yield callback({
+                        index: callbackIndex,
+                        isFirst,
+                        isLast,
+                        rows: callbackRows,
+                        allData,
+                        table: restrictedTable,
+                        batchInfo
+                    });
+                    allData.push(returnValue);
+                    // Determine if this is truly the last iteration
+                    let finalIsLast = isLastDueToMax;
+                    if (!isLastIteration) {
+                        const context = { root: rootLocator, config, page: rootLocator.page(), resolve };
+                        paginationResult = yield paginationStrategy(context);
+                        finalIsLast = getIsLast({ index: callbackIndex, paginationResult }) || !paginationResult;
+                    }
+                    if (finalIsLast && (options === null || options === void 0 ? void 0 : options.afterLast)) {
+                        yield options.afterLast({ index: callbackIndex, rows: callbackRows, allData });
+                    }
+                    if (finalIsLast || !paginationResult) {
+                        logDebug(`Reached last iteration (index: ${index}, paginationResult: ${paginationResult})`);
+                        break;
+                    }
+                    // Reset batch
+                    if (isBatching) {
+                        batchRows = [];
+                        batchStartIndex = index + 1;
+                    }
+                }
+                else {
+                    // Continue paginating even when batching
+                    const context = { root: rootLocator, config, page: rootLocator.page(), resolve };
+                    paginationResult = yield paginationStrategy(context);
+                    if (!paginationResult) {
+                        // Pagination failed, invoke callback with current batch
+                        const callbackIndex = batchStartIndex;
+                        const isFirst = getIsFirst({ index: callbackIndex });
+                        const isLast = true;
+                        if (isFirst && (options === null || options === void 0 ? void 0 : options.beforeFirst)) {
+                            yield options.beforeFirst({ index: callbackIndex, rows: batchRows, allData });
+                        }
+                        const batchInfo = {
+                            startIndex: batchStartIndex,
+                            endIndex: index,
+                            size: index - batchStartIndex + 1
+                        };
+                        const returnValue = yield callback({
+                            index: callbackIndex,
+                            isFirst,
+                            isLast,
+                            rows: batchRows,
+                            allData,
+                            table: restrictedTable,
+                            batchInfo
+                        });
+                        allData.push(returnValue);
+                        if (options === null || options === void 0 ? void 0 : options.afterLast) {
+                            yield options.afterLast({ index: callbackIndex, rows: batchRows, allData });
+                        }
+                        logDebug(`Pagination failed mid-batch (index: ${index})`);
+                        break;
+                    }
                 }
                 index++;
                 logDebug(`Iteration ${index} completed, continuing...`);

@@ -357,11 +357,11 @@ test.describe('README.md Examples Verification', () => {
       },
       {
         getIsLast: ({ paginationResult }) => !paginationResult,
-        onFirst: async ({ allData }) => {
+        beforeFirst: async ({ allData }) => {
           console.log('Starting data collection...');
           // Could perform setup actions
         },
-        onLast: async ({ allData }) => {
+        afterLast: async ({ allData }) => {
           console.log(`Collected ${allData.length} total items`);
           // Could perform cleanup or final actions
         }
