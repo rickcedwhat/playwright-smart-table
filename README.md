@@ -117,7 +117,7 @@ await expect(row).toBeVisible();
 ```
 <!-- /embed: advanced-debug -->
 
-This will log header mappings, row scans, and pagination triggers to help troubleshoot issues.
+This will log header mappings, row scans, and pagination triggers to the console, and slow down operations to help you see what's happening.
 
 ### Resetting Table State
 
@@ -922,8 +922,8 @@ export interface TableConfig {
   headerTransformer?: (args: { text: string, index: number, locator: Locator }) => string | Promise<string>;
   /** Automatically scroll to table on init */
   autoScroll?: boolean;
-  /** Enable debug logs */
-  debug?: boolean;
+  /** Debug options for development and troubleshooting */
+  debug?: DebugConfig;
   /** Reset hook */
   onReset?: (context: TableContext) => Promise<void>;
   /** All interaction strategies */

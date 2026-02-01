@@ -12,7 +12,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.createSmartRow = void 0;
 const fill_1 = require("./strategies/fill");
 const stringUtils_1 = require("./utils/stringUtils");
-const traceUtils_1 = require("./utils/traceUtils");
+const debugUtils_1 = require("./utils/debugUtils");
 /**
  * Factory to create a SmartRow by extending a Playwright Locator.
  * We avoid Class/Proxy to ensure full compatibility with Playwright's expect(locator) matchers.
@@ -36,8 +36,6 @@ const createSmartRow = (rowLocator, map, rowIndex, config, rootLocator, resolve,
                 page: rootLocator.page()
             });
         }
-        // Add trace event
-        (0, traceUtils_1.addTraceEvent)(rootLocator.page(), 'getCell', { column: colName, columnIndex: idx, rowIndex }).catch(() => { });
         return resolve(config.cellSelector, rowLocator).nth(idx);
     };
     smart.toJSON = (options) => __awaiter(void 0, void 0, void 0, function* () {
@@ -115,10 +113,13 @@ const createSmartRow = (rowLocator, map, rowIndex, config, rootLocator, resolve,
         return result;
     });
     smart.smartFill = (data, fillOptions) => __awaiter(void 0, void 0, void 0, function* () {
+        (0, debugUtils_1.logDebug)(config, 'info', 'Filling row', data);
         for (const [colName, value] of Object.entries(data)) {
+            if (value === undefined)
+                continue;
             const colIdx = map.get(colName);
             if (colIdx === undefined) {
-                throw new Error(`Column "${colName}" not found in fill data.`);
+                throw new Error((0, stringUtils_1.buildColumnNotFoundError)(colName, Array.from(map.keys())));
             }
             yield config.strategies.cellNavigation({
                 config: config,
@@ -131,6 +132,7 @@ const createSmartRow = (rowLocator, map, rowIndex, config, rootLocator, resolve,
                 rowIndex: rowIndex
             });
             const strategy = config.strategies.fill || fill_1.FillStrategies.default;
+            (0, debugUtils_1.logDebug)(config, 'verbose', `Filling cell "${colName}" with value`, value);
             yield strategy({
                 row: smart,
                 columnName: colName,
@@ -141,7 +143,10 @@ const createSmartRow = (rowLocator, map, rowIndex, config, rootLocator, resolve,
                 table: table,
                 fillOptions
             });
+            // Delay after filling
+            yield (0, debugUtils_1.debugDelay)(config, 'getCell');
         }
+        (0, debugUtils_1.logDebug)(config, 'info', 'Row fill complete');
     });
     smart.bringIntoView = () => __awaiter(void 0, void 0, void 0, function* () {
         if (rowIndex === undefined) {

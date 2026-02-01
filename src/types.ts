@@ -126,6 +126,31 @@ export interface SortingStrategy {
   }): Promise<'asc' | 'desc' | 'none'>;
 }
 
+/**
+ * Debug configuration for development and troubleshooting
+ */
+export type DebugConfig = {
+  /**
+   * Slow down operations for debugging
+   * - number: Apply same delay to all operations (ms)
+   * - object: Granular delays per operation type
+   */
+  slow?: number | {
+    pagination?: number;
+    getCell?: number;
+    findRow?: number;
+    default?: number;
+  };
+  /**
+   * Log level for debug output
+   * - 'verbose': All logs (verbose, info, error)
+   * - 'info': Info and error logs only
+   * - 'error': Error logs only
+   * - 'none': No logs
+   */
+  logLevel?: 'verbose' | 'info' | 'error' | 'none';
+};
+
 export interface TableContext {
   root: Locator;
   config: FinalTableConfig;
@@ -217,8 +242,8 @@ export interface TableConfig {
   headerTransformer?: (args: { text: string, index: number, locator: Locator }) => string | Promise<string>;
   /** Automatically scroll to table on init */
   autoScroll?: boolean;
-  /** Enable debug logs */
-  debug?: boolean;
+  /** Debug options for development and troubleshooting */
+  debug?: DebugConfig;
   /** Reset hook */
   onReset?: (context: TableContext) => Promise<void>;
   /** All interaction strategies */
@@ -231,7 +256,7 @@ export interface FinalTableConfig extends TableConfig {
   cellSelector: string;
   maxPages: number;
   autoScroll: boolean;
-  debug: boolean;
+  debug?: TableConfig['debug'];
   headerTransformer: (args: { text: string, index: number, locator: Locator }) => string | Promise<string>;
   onReset: (context: TableContext) => Promise<void>;
   strategies: TableStrategies;

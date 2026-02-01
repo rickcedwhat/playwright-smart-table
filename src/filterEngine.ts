@@ -1,5 +1,6 @@
 import { Locator, Page } from "@playwright/test";
 import { FinalTableConfig, TableContext, FilterStrategy } from "./types";
+import { buildColumnNotFoundError } from "./utils/stringUtils";
 
 export class FilterEngine {
     constructor(
@@ -26,7 +27,7 @@ export class FilterEngine {
 
             // TODO: Use ColumnStrategy for better resolution error handling
             if (colIndex === undefined) {
-                throw new Error(`Filter Error: Column "${colName}" not found.`);
+                throw new Error(buildColumnNotFoundError(colName, Array.from(map.keys())));
             }
 
             const filterVal = typeof value === 'number' ? String(value) : value;

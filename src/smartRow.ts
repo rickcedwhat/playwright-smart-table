@@ -2,7 +2,7 @@ import type { Locator, Page } from '@playwright/test';
 import { SmartRow as SmartRowType, FillOptions, FinalTableConfig, TableResult } from './types';
 import { FillStrategies } from './strategies/fill';
 import { buildColumnNotFoundError } from './utils/stringUtils';
-import { addTraceEvent } from './utils/traceUtils';
+import { debugDelay, logDebug } from './utils/debugUtils';
 
 /**
  * Factory to create a SmartRow by extending a Playwright Locator.
@@ -38,9 +38,7 @@ export const createSmartRow = <T = any>(
                 page: rootLocator.page()
             });
         }
-        
-        // Add trace event
-        addTraceEvent(rootLocator.page(), 'getCell', { column: colName, columnIndex: idx, rowIndex }).catch(() => {});
+
         return resolve(config.cellSelector, rowLocator).nth(idx);
     };
 
@@ -130,11 +128,15 @@ export const createSmartRow = <T = any>(
         return result as unknown as T;
     };
 
-    smart.smartFill = async (data: Record<string, any>, fillOptions?: FillOptions): Promise<void> => {
+    smart.smartFill = async (data: Partial<T> | Record<string, any>, fillOptions?: FillOptions): Promise<void> => {
+        logDebug(config, 'info', 'Filling row', data);
+
         for (const [colName, value] of Object.entries(data)) {
+            if (value === undefined) continue;
+
             const colIdx = map.get(colName);
             if (colIdx === undefined) {
-                throw new Error(`Column "${colName}" not found in fill data.`);
+                throw new Error(buildColumnNotFoundError(colName, Array.from(map.keys())));
             }
 
             await config.strategies.cellNavigation!({
@@ -150,6 +152,8 @@ export const createSmartRow = <T = any>(
 
             const strategy = config.strategies.fill || FillStrategies.default;
 
+            logDebug(config, 'verbose', `Filling cell "${colName}" with value`, value);
+
             await strategy({
                 row: smart,
                 columnName: colName,
@@ -160,7 +164,12 @@ export const createSmartRow = <T = any>(
                 table: table as TableResult,
                 fillOptions
             });
+
+            // Delay after filling
+            await debugDelay(config, 'getCell');
         }
+
+        logDebug(config, 'info', 'Row fill complete');
     };
 
     smart.bringIntoView = async (): Promise<void> => {
