@@ -1,6 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.FilterEngine = void 0;
+const stringUtils_1 = require("./utils/stringUtils");
 class FilterEngine {
     constructor(config, resolve) {
         this.config = config;
@@ -17,7 +18,7 @@ class FilterEngine {
             const colIndex = map.get(colName);
             // TODO: Use ColumnStrategy for better resolution error handling
             if (colIndex === undefined) {
-                throw new Error(`Filter Error: Column "${colName}" not found.`);
+                throw new Error((0, stringUtils_1.buildColumnNotFoundError)(colName, Array.from(map.keys())));
             }
             const filterVal = typeof value === 'number' ? String(value) : value;
             // Use strategy if provided (For future: configured filter strategies)

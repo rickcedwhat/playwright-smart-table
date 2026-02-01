@@ -11,7 +11,7 @@ import { FilterEngine } from './filterEngine';
 import { ResolutionStrategies } from './strategies/resolution';
 import { Strategies } from './strategies';
 import { validatePaginationResult, validatePaginationStrategy, validateSortingStrategy } from './strategies/validation';
-import { addTraceEvent } from './utils/traceUtils';
+import { debugDelay, logDebug, warnIfDebugInCI } from './utils/debugUtils';
 
 /**
  * Main hook to interact with a table.
@@ -35,7 +35,6 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     maxPages: 1,
     headerTransformer: ({ text, index, locator }) => text,
     autoScroll: true,
-    debug: false,
     onReset: async () => { /* no-op default */ },
     ...configOptions,
     strategies: {
@@ -56,8 +55,8 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
   let _isInitialized = false;
 
   // Helpers
-  const logDebug = (msg: string) => {
-    if (config.debug) console.log(`🔎 [SmartTable Debug] ${msg}`);
+  const log = (msg: string) => {
+    logDebug(config, 'verbose', msg); // Legacy(`🔎 [SmartTable Debug] ${msg}`);
   };
 
   const _createColumnError = (colName: string, map: Map<string, number>, context?: string): Error => {
@@ -84,7 +83,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
 
   const _getMap = async (timeout?: number) => {
     if (_headerMap) return _headerMap;
-    logDebug('Mapping headers...');
+    log('Mapping headers...');
     const headerTimeout = timeout ?? 3000;
 
     if (config.autoScroll) {
@@ -118,8 +117,28 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       return [text, i] as [string, number];
     }));
 
+    // Validation: Check for empty table
+    if (entries.length === 0) {
+      throw new Error(`Initialization Error: No columns found using selector "${config.headerSelector}". Check your selector or ensure the table is visible.`);
+    }
+
+    // Validation: Check for duplicates
+    const seen = new Set<string>();
+    const duplicates = new Set<string>();
+    for (const [name] of entries) {
+      if (seen.has(name)) {
+        duplicates.add(name);
+      }
+      seen.add(name);
+    }
+
+    if (duplicates.size > 0) {
+      const dupList = Array.from(duplicates).map(d => `"${d}"`).join(', ');
+      throw new Error(`Initialization Error: Duplicate column names found: ${dupList}. Use 'headerTransformer' to rename duplicate columns.`);
+    }
+
     _headerMap = new Map(entries);
-    logDebug(`Mapped ${entries.length} columns: ${JSON.stringify(entries.map(e => e[0]))}`);
+    log(`Mapped ${entries.length} columns: ${JSON.stringify(entries.map(e => e[0]))}`);
     return _headerMap;
   };
 
@@ -138,7 +157,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     const effectiveMaxPages = options.maxPages ?? config.maxPages;
     let currentPage = 1;
 
-    logDebug(`Looking for row: ${JSON.stringify(filters)} (MaxPages: ${effectiveMaxPages})`);
+    log(`Looking for row: ${JSON.stringify(filters)} (MaxPages: ${effectiveMaxPages})`);
 
     while (true) {
       const allRows = resolve(config.rowSelector, rootLocator);
@@ -146,7 +165,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       const matchedRows = filterEngine.applyFilters(allRows, filters, map, options.exact || false, rootLocator.page());
 
       const count = await matchedRows.count();
-      logDebug(`Page ${currentPage}: Found ${count} matches.`);
+      log(`Page ${currentPage}: Found ${count} matches.`);
 
       if (count > 1) {
         // Sample data logic (simplified for refactor, kept inline or moved to util if needed)
@@ -169,7 +188,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       if (count === 1) return matchedRows.first();
 
       if (currentPage < effectiveMaxPages) {
-        logDebug(`Page ${currentPage}: Not found. Attempting pagination...`);
+        log(`Page ${currentPage}: Not found. Attempting pagination...`);
         const context: TableContext = {
           root: rootLocator,
           config: config,
@@ -184,7 +203,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
           currentPage++;
           continue;
         } else {
-          logDebug(`Page ${currentPage}: Pagination failed (end of data).`);
+          log(`Page ${currentPage}: Pagination failed (end of data).`);
         }
       }
 
@@ -241,9 +260,19 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
   const result: TableResult<T> = {
     init: async (options?: { timeout?: number }): Promise<TableResult<T>> => {
       if (_isInitialized && _headerMap) return result;
+
+      warnIfDebugInCI(config);
+      logDebug(config, 'info', 'Initializing table');
+
       await _getMap(options?.timeout);
       _isInitialized = true;
-      if (_headerMap) { await addTraceEvent(rootLocator.page(), 'init', { headers: Array.from(_headerMap.keys()), columnCount: _headerMap.size }); }
+
+      if (_headerMap) {
+        logDebug(config, 'info', `Table initialized with ${_headerMap.size} columns`, Array.from(_headerMap.keys()));
+        // Trace event removed - redundant with debug logging
+      }
+
+      await debugDelay(config, 'default');
       return result;
     },
 
@@ -275,20 +304,20 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     },
 
     reset: async () => {
-      logDebug("Resetting table...");
+      log("Resetting table...");
       const context: TableContext = { root: rootLocator, config, page: rootLocator.page(), resolve };
       await config.onReset(context);
       _hasPaginated = false;
       _headerMap = null;
       _isInitialized = false;
-      logDebug("Table reset complete.");
+      log("Table reset complete.");
     },
 
     revalidate: async () => {
-      logDebug("Revalidating table structure...");
+      log("Revalidating table structure...");
       _headerMap = null; // Clear the map to force re-scanning
       await _getMap(); // Re-scan headers
-      logDebug("Table revalidated.");
+      log("Table revalidated.");
     },
 
     getColumnValues: async <V = string>(column: string, options?: { mapper?: (cell: Locator) => Promise<V> | V, maxPages?: number }) => {
@@ -300,7 +329,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       const effectiveMaxPages = options?.maxPages ?? config.maxPages;
       let currentPage = 1;
       const results: V[] = [];
-      logDebug(`Getting column values for '${column}' (Pages: ${effectiveMaxPages})`);
+      log(`Getting column values for '${column}' (Pages: ${effectiveMaxPages})`);
 
       while (true) {
         const rows = await resolve(config.rowSelector, rootLocator).all();
@@ -341,11 +370,22 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     },
 
     findRow: async (filters: Partial<T> | Record<string, string | RegExp | number>, options?: { exact?: boolean, maxPages?: number }): Promise<SmartRowType<T>> => {
+      logDebug(config, 'info', 'Searching for row', filters);
       await _ensureInitialized();
+
       let row = await _findRowLocator(filters as Record<string, string | RegExp | number>, options);
-      if (!row) {
-        row = resolve(config.rowSelector, rootLocator).filter({ hasText: "___SENTINEL_ROW_NOT_FOUND___" + Date.now() });
+
+      if (row) {
+        logDebug(config, 'info', 'Row found');
+        await debugDelay(config, 'findRow');
+        return _makeSmart(row, _headerMap!, 0);
       }
+
+      logDebug(config, 'error', 'Row not found', filters);
+      await debugDelay(config, 'findRow');
+
+      // Return sentinel row
+      row = resolve(config.rowSelector, rootLocator).filter({ hasText: "___SENTINEL_ROW_NOT_FOUND___" + Date.now() });
       return _makeSmart(row, _headerMap!, 0);
     },
 
@@ -410,7 +450,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       apply: async (columnName: string, direction: 'asc' | 'desc'): Promise<void> => {
         await _ensureInitialized();
         if (!config.strategies.sorting) throw new Error('No sorting strategy has been configured.');
-        logDebug(`Applying sort for column "${columnName}" (${direction})`);
+        log(`Applying sort for column "${columnName}" (${direction})`);
         const context: StrategyContext = { root: rootLocator, config, page: rootLocator.page(), resolve };
         await config.strategies.sorting.doSort({ columnName, direction, context });
       },
@@ -484,7 +524,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       let batchRows: SmartRowType[] = [];
       let batchStartIndex = 0;
 
-      logDebug(`Starting iterateThroughTable (maxIterations: ${effectiveMaxIterations}, batchSize: ${batchSize ?? 'none'})`);
+      log(`Starting iterateThroughTable (maxIterations: ${effectiveMaxIterations}, batchSize: ${batchSize ?? 'none'})`);
 
       while (index < effectiveMaxIterations) {
         const rowLocators = await resolve(config.rowSelector, rootLocator).all();
@@ -501,7 +541,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
             }
           }
           rows = deduplicated;
-          logDebug(`Deduplicated ${rowLocators.length} rows to ${rows.length} unique rows (total seen: ${seenKeys.size})`);
+          log(`Deduplicated ${rowLocators.length} rows to ${rows.length} unique rows (total seen: ${seenKeys.size})`);
         }
 
         // Add rows to batch if batching is enabled
@@ -548,6 +588,8 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
           if (!isLastIteration) {
             const context: TableContext = { root: rootLocator, config, page: rootLocator.page(), resolve };
             paginationResult = await paginationStrategy(context);
+            logDebug(config, 'info', `Pagination ${paginationResult ? 'succeeded' : 'failed'}`);
+            await debugDelay(config, 'pagination');
             finalIsLast = getIsLast({ index: callbackIndex, paginationResult }) || !paginationResult;
           }
 
@@ -556,7 +598,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
           }
 
           if (finalIsLast || !paginationResult) {
-            logDebug(`Reached last iteration (index: ${index}, paginationResult: ${paginationResult})`);
+            log(`Reached last iteration (index: ${index}, paginationResult: ${paginationResult})`);
             break;
           }
 
@@ -569,6 +611,8 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
           // Continue paginating even when batching
           const context: TableContext = { root: rootLocator, config, page: rootLocator.page(), resolve };
           paginationResult = await paginationStrategy(context);
+          logDebug(config, 'info', `Pagination ${paginationResult ? 'succeeded' : 'failed'} (batching mode)`);
+          await debugDelay(config, 'pagination');
 
           if (!paginationResult) {
             // Pagination failed, invoke callback with current batch
@@ -601,15 +645,15 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
               await options.afterLast({ index: callbackIndex, rows: batchRows, allData });
             }
 
-            logDebug(`Pagination failed mid-batch (index: ${index})`);
+            log(`Pagination failed mid-batch (index: ${index})`);
             break;
           }
         }
 
         index++;
-        logDebug(`Iteration ${index} completed, continuing...`);
+        log(`Iteration ${index} completed, continuing...`);
       }
-      logDebug(`iterateThroughTable completed after ${index + 1} iterations, collected ${allData.length} items`);
+      log(`iterateThroughTable completed after ${index + 1} iterations, collected ${allData.length} items`);
       return allData;
     },
   };

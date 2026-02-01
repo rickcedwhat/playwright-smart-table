@@ -154,7 +154,11 @@ test.describe('Live Glide Data Grid', () => {
 
         // 3. Configure Table
         // Root is the CANVAS itself as per user request for this test
-        const table = useTable(page.locator('canvas').first(), { ...glideConfig, debug: true });
+        const table = useTable(page.locator('canvas').first(), {
+            ...glideConfig, debug: {
+                logLevel: 'verbose'
+            }
+        });
         await table.init();
 
         // Collect data using iterateThroughTable

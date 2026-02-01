@@ -26,7 +26,7 @@ Object.defineProperty(exports, "ResolutionStrategies", { enumerable: true, get: 
 const strategies_1 = require("./strategies");
 Object.defineProperty(exports, "Strategies", { enumerable: true, get: function () { return strategies_1.Strategies; } });
 const validation_1 = require("./strategies/validation");
-const traceUtils_1 = require("./utils/traceUtils");
+const debugUtils_1 = require("./utils/debugUtils");
 /**
  * Main hook to interact with a table.
  */
@@ -41,7 +41,7 @@ const useTable = (rootLocator, configOptions = {}) => {
         cellNavigation: columns_1.CellNavigationStrategies.default,
         pagination: () => __awaiter(void 0, void 0, void 0, function* () { return false; }),
     };
-    const config = Object.assign(Object.assign({ rowSelector: "tbody tr", headerSelector: "thead th", cellSelector: "td", maxPages: 1, headerTransformer: ({ text, index, locator }) => text, autoScroll: true, debug: false, onReset: () => __awaiter(void 0, void 0, void 0, function* () { }) }, configOptions), { strategies: Object.assign(Object.assign({}, defaultStrategies), configOptions.strategies) });
+    const config = Object.assign(Object.assign({ rowSelector: "tbody tr", headerSelector: "thead th", cellSelector: "td", maxPages: 1, headerTransformer: ({ text, index, locator }) => text, autoScroll: true, onReset: () => __awaiter(void 0, void 0, void 0, function* () { }) }, configOptions), { strategies: Object.assign(Object.assign({}, defaultStrategies), configOptions.strategies) });
     const resolve = (item, parent) => {
         if (typeof item === 'string')
             return parent.locator(item);
@@ -54,9 +54,8 @@ const useTable = (rootLocator, configOptions = {}) => {
     let _hasPaginated = false;
     let _isInitialized = false;
     // Helpers
-    const logDebug = (msg) => {
-        if (config.debug)
-            console.log(`🔎 [SmartTable Debug] ${msg}`);
+    const log = (msg) => {
+        (0, debugUtils_1.logDebug)(config, 'verbose', msg); // Legacy(`🔎 [SmartTable Debug] ${msg}`);
     };
     const _createColumnError = (colName, map, context) => {
         const availableColumns = Array.from(map.keys());
@@ -81,7 +80,7 @@ const useTable = (rootLocator, configOptions = {}) => {
     const _getMap = (timeout) => __awaiter(void 0, void 0, void 0, function* () {
         if (_headerMap)
             return _headerMap;
-        logDebug('Mapping headers...');
+        log('Mapping headers...');
         const headerTimeout = timeout !== null && timeout !== void 0 ? timeout : 3000;
         if (config.autoScroll) {
             try {
@@ -113,8 +112,25 @@ const useTable = (rootLocator, configOptions = {}) => {
             }
             return [text, i];
         })));
+        // Validation: Check for empty table
+        if (entries.length === 0) {
+            throw new Error(`Initialization Error: No columns found using selector "${config.headerSelector}". Check your selector or ensure the table is visible.`);
+        }
+        // Validation: Check for duplicates
+        const seen = new Set();
+        const duplicates = new Set();
+        for (const [name] of entries) {
+            if (seen.has(name)) {
+                duplicates.add(name);
+            }
+            seen.add(name);
+        }
+        if (duplicates.size > 0) {
+            const dupList = Array.from(duplicates).map(d => `"${d}"`).join(', ');
+            throw new Error(`Initialization Error: Duplicate column names found: ${dupList}. Use 'headerTransformer' to rename duplicate columns.`);
+        }
         _headerMap = new Map(entries);
-        logDebug(`Mapped ${entries.length} columns: ${JSON.stringify(entries.map(e => e[0]))}`);
+        log(`Mapped ${entries.length} columns: ${JSON.stringify(entries.map(e => e[0]))}`);
         return _headerMap;
     });
     // Placeholder for the final table object
@@ -130,13 +146,13 @@ const useTable = (rootLocator, configOptions = {}) => {
         const map = yield _getMap();
         const effectiveMaxPages = (_a = options.maxPages) !== null && _a !== void 0 ? _a : config.maxPages;
         let currentPage = 1;
-        logDebug(`Looking for row: ${JSON.stringify(filters)} (MaxPages: ${effectiveMaxPages})`);
+        log(`Looking for row: ${JSON.stringify(filters)} (MaxPages: ${effectiveMaxPages})`);
         while (true) {
             const allRows = resolve(config.rowSelector, rootLocator);
             // Use FilterEngine
             const matchedRows = filterEngine.applyFilters(allRows, filters, map, options.exact || false, rootLocator.page());
             const count = yield matchedRows.count();
-            logDebug(`Page ${currentPage}: Found ${count} matches.`);
+            log(`Page ${currentPage}: Found ${count} matches.`);
             if (count > 1) {
                 // Sample data logic (simplified for refactor, kept inline or moved to util if needed)
                 const sampleData = [];
@@ -156,7 +172,7 @@ const useTable = (rootLocator, configOptions = {}) => {
             if (count === 1)
                 return matchedRows.first();
             if (currentPage < effectiveMaxPages) {
-                logDebug(`Page ${currentPage}: Not found. Attempting pagination...`);
+                log(`Page ${currentPage}: Not found. Attempting pagination...`);
                 const context = {
                     root: rootLocator,
                     config: config,
@@ -171,7 +187,7 @@ const useTable = (rootLocator, configOptions = {}) => {
                     continue;
                 }
                 else {
-                    logDebug(`Page ${currentPage}: Pagination failed (end of data).`);
+                    log(`Page ${currentPage}: Pagination failed (end of data).`);
                 }
             }
             if (_hasPaginated) {
@@ -224,11 +240,15 @@ const useTable = (rootLocator, configOptions = {}) => {
         init: (options) => __awaiter(void 0, void 0, void 0, function* () {
             if (_isInitialized && _headerMap)
                 return result;
+            (0, debugUtils_1.warnIfDebugInCI)(config);
+            (0, debugUtils_1.logDebug)(config, 'info', 'Initializing table');
             yield _getMap(options === null || options === void 0 ? void 0 : options.timeout);
             _isInitialized = true;
             if (_headerMap) {
-                yield (0, traceUtils_1.addTraceEvent)(rootLocator.page(), 'init', { headers: Array.from(_headerMap.keys()), columnCount: _headerMap.size });
+                (0, debugUtils_1.logDebug)(config, 'info', `Table initialized with ${_headerMap.size} columns`, Array.from(_headerMap.keys()));
+                // Trace event removed - redundant with debug logging
             }
+            yield (0, debugUtils_1.debugDelay)(config, 'default');
             return result;
         }),
         scrollToColumn: (columnName) => __awaiter(void 0, void 0, void 0, function* () {
@@ -259,19 +279,19 @@ const useTable = (rootLocator, configOptions = {}) => {
             return resolve(config.headerSelector, rootLocator).nth(idx);
         }),
         reset: () => __awaiter(void 0, void 0, void 0, function* () {
-            logDebug("Resetting table...");
+            log("Resetting table...");
             const context = { root: rootLocator, config, page: rootLocator.page(), resolve };
             yield config.onReset(context);
             _hasPaginated = false;
             _headerMap = null;
             _isInitialized = false;
-            logDebug("Table reset complete.");
+            log("Table reset complete.");
         }),
         revalidate: () => __awaiter(void 0, void 0, void 0, function* () {
-            logDebug("Revalidating table structure...");
+            log("Revalidating table structure...");
             _headerMap = null; // Clear the map to force re-scanning
             yield _getMap(); // Re-scan headers
-            logDebug("Table revalidated.");
+            log("Table revalidated.");
         }),
         getColumnValues: (column, options) => __awaiter(void 0, void 0, void 0, function* () {
             var _a, _b;
@@ -283,7 +303,7 @@ const useTable = (rootLocator, configOptions = {}) => {
             const effectiveMaxPages = (_b = options === null || options === void 0 ? void 0 : options.maxPages) !== null && _b !== void 0 ? _b : config.maxPages;
             let currentPage = 1;
             const results = [];
-            logDebug(`Getting column values for '${column}' (Pages: ${effectiveMaxPages})`);
+            log(`Getting column values for '${column}' (Pages: ${effectiveMaxPages})`);
             while (true) {
                 const rows = yield resolve(config.rowSelector, rootLocator).all();
                 for (const row of rows) {
@@ -320,11 +340,18 @@ const useTable = (rootLocator, configOptions = {}) => {
             return _makeSmart(rowLocator, _headerMap, rowIndex);
         },
         findRow: (filters, options) => __awaiter(void 0, void 0, void 0, function* () {
+            (0, debugUtils_1.logDebug)(config, 'info', 'Searching for row', filters);
             yield _ensureInitialized();
             let row = yield _findRowLocator(filters, options);
-            if (!row) {
-                row = resolve(config.rowSelector, rootLocator).filter({ hasText: "___SENTINEL_ROW_NOT_FOUND___" + Date.now() });
+            if (row) {
+                (0, debugUtils_1.logDebug)(config, 'info', 'Row found');
+                yield (0, debugUtils_1.debugDelay)(config, 'findRow');
+                return _makeSmart(row, _headerMap, 0);
             }
+            (0, debugUtils_1.logDebug)(config, 'error', 'Row not found', filters);
+            yield (0, debugUtils_1.debugDelay)(config, 'findRow');
+            // Return sentinel row
+            row = resolve(config.rowSelector, rootLocator).filter({ hasText: "___SENTINEL_ROW_NOT_FOUND___" + Date.now() });
             return _makeSmart(row, _headerMap, 0);
         }),
         getRows: (options) => __awaiter(void 0, void 0, void 0, function* () {
@@ -383,7 +410,7 @@ const useTable = (rootLocator, configOptions = {}) => {
                 yield _ensureInitialized();
                 if (!config.strategies.sorting)
                     throw new Error('No sorting strategy has been configured.');
-                logDebug(`Applying sort for column "${columnName}" (${direction})`);
+                log(`Applying sort for column "${columnName}" (${direction})`);
                 const context = { root: rootLocator, config, page: rootLocator.page(), resolve };
                 yield config.strategies.sorting.doSort({ columnName, direction, context });
             }),
@@ -430,7 +457,7 @@ const useTable = (rootLocator, configOptions = {}) => {
             let seenKeys = null;
             let batchRows = [];
             let batchStartIndex = 0;
-            logDebug(`Starting iterateThroughTable (maxIterations: ${effectiveMaxIterations}, batchSize: ${batchSize !== null && batchSize !== void 0 ? batchSize : 'none'})`);
+            log(`Starting iterateThroughTable (maxIterations: ${effectiveMaxIterations}, batchSize: ${batchSize !== null && batchSize !== void 0 ? batchSize : 'none'})`);
             while (index < effectiveMaxIterations) {
                 const rowLocators = yield resolve(config.rowSelector, rootLocator).all();
                 let rows = rowLocators.map((loc, i) => _makeSmart(loc, _headerMap, i));
@@ -446,7 +473,7 @@ const useTable = (rootLocator, configOptions = {}) => {
                         }
                     }
                     rows = deduplicated;
-                    logDebug(`Deduplicated ${rowLocators.length} rows to ${rows.length} unique rows (total seen: ${seenKeys.size})`);
+                    log(`Deduplicated ${rowLocators.length} rows to ${rows.length} unique rows (total seen: ${seenKeys.size})`);
                 }
                 // Add rows to batch if batching is enabled
                 if (isBatching) {
@@ -485,13 +512,15 @@ const useTable = (rootLocator, configOptions = {}) => {
                     if (!isLastIteration) {
                         const context = { root: rootLocator, config, page: rootLocator.page(), resolve };
                         paginationResult = yield paginationStrategy(context);
+                        (0, debugUtils_1.logDebug)(config, 'info', `Pagination ${paginationResult ? 'succeeded' : 'failed'}`);
+                        yield (0, debugUtils_1.debugDelay)(config, 'pagination');
                         finalIsLast = getIsLast({ index: callbackIndex, paginationResult }) || !paginationResult;
                     }
                     if (finalIsLast && (options === null || options === void 0 ? void 0 : options.afterLast)) {
                         yield options.afterLast({ index: callbackIndex, rows: callbackRows, allData });
                     }
                     if (finalIsLast || !paginationResult) {
-                        logDebug(`Reached last iteration (index: ${index}, paginationResult: ${paginationResult})`);
+                        log(`Reached last iteration (index: ${index}, paginationResult: ${paginationResult})`);
                         break;
                     }
                     // Reset batch
@@ -504,6 +533,8 @@ const useTable = (rootLocator, configOptions = {}) => {
                     // Continue paginating even when batching
                     const context = { root: rootLocator, config, page: rootLocator.page(), resolve };
                     paginationResult = yield paginationStrategy(context);
+                    (0, debugUtils_1.logDebug)(config, 'info', `Pagination ${paginationResult ? 'succeeded' : 'failed'} (batching mode)`);
+                    yield (0, debugUtils_1.debugDelay)(config, 'pagination');
                     if (!paginationResult) {
                         // Pagination failed, invoke callback with current batch
                         const callbackIndex = batchStartIndex;
@@ -530,14 +561,14 @@ const useTable = (rootLocator, configOptions = {}) => {
                         if (options === null || options === void 0 ? void 0 : options.afterLast) {
                             yield options.afterLast({ index: callbackIndex, rows: batchRows, allData });
                         }
-                        logDebug(`Pagination failed mid-batch (index: ${index})`);
+                        log(`Pagination failed mid-batch (index: ${index})`);
                         break;
                     }
                 }
                 index++;
-                logDebug(`Iteration ${index} completed, continuing...`);
+                log(`Iteration ${index} completed, continuing...`);
             }
-            logDebug(`iterateThroughTable completed after ${index + 1} iterations, collected ${allData.length} items`);
+            log(`iterateThroughTable completed after ${index + 1} iterations, collected ${allData.length} items`);
             return allData;
         }),
     };
