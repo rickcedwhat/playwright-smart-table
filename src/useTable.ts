@@ -12,6 +12,7 @@ import { ResolutionStrategies } from './strategies/resolution';
 import { Strategies } from './strategies';
 import { validatePaginationResult, validatePaginationStrategy, validateSortingStrategy } from './strategies/validation';
 import { debugDelay, logDebug, warnIfDebugInCI } from './utils/debugUtils';
+import { createSmartRowArray, SmartRowArray } from './utils/smartRowArray';
 
 /**
  * Main hook to interact with a table.
@@ -215,18 +216,6 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     }
   };
 
-  const _handlePrompt = async (promptName: string, content: string, options: PromptOptions = {}) => {
-    // ... same logic ...
-    const { output = 'console', includeTypes = true } = options;
-    let finalPrompt = content;
-    if (includeTypes) finalPrompt += `\n\n👇 Useful TypeScript Definitions 👇\n\`\`\`typescript\n${TYPE_CONTEXT}\n\`\`\`\n`;
-    if (output === 'error') {
-      console.log(`⚠️ Throwing error to display [${promptName}] cleanly...`);
-      throw new Error(finalPrompt);
-    }
-    console.log(finalPrompt);
-  };
-
   const _getCleanHtml = async (loc: Locator): Promise<string> => {
     return loc.evaluate((el) => {
       const clone = el.cloneNode(true) as Element;
@@ -248,6 +237,19 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       }
       return clone.outerHTML;
     });
+  };
+
+  const _handlePrompt = async (promptName: string, content: string, options: PromptOptions = {}) => {
+    const { output = 'console', includeTypes = true } = options;
+    let finalPrompt = content;
+    if (includeTypes) {
+      finalPrompt += `\n\n👇 Useful TypeScript Definitions 👇\n\`\`\`typescript\n${TYPE_CONTEXT}\n\`\`\`\n`;
+    }
+    if (output === 'error') {
+      console.log(`⚠️ Throwing error to display [${promptName}] cleanly...`);
+      throw new Error(finalPrompt);
+    }
+    console.log(finalPrompt);
   };
 
   const _ensureInitialized = async () => {
@@ -389,7 +391,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       return _makeSmart(row, _headerMap!, 0);
     },
 
-    getRows: async <R extends { asJSON?: boolean }>(options?: { filter?: Partial<T> | Record<string, any>, exact?: boolean } & R): Promise<any> => {
+    getRows: async (options?: { filter?: Partial<T> | Record<string, any>, exact?: boolean }): Promise<SmartRowArray<T>> => {
       await _ensureInitialized();
       let rowLocators = resolve(config.rowSelector, rootLocator);
       if (options?.filter) {
@@ -397,10 +399,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       }
       const rows = await rowLocators.all();
       const smartRows = rows.map((loc, i) => _makeSmart(loc, _headerMap!, i));
-      if (options?.asJSON) {
-        return Promise.all(smartRows.map(r => r.toJSON()));
-      }
-      return smartRows;
+      return createSmartRowArray(smartRows);
     },
 
     findRows: async <R extends { asJSON?: boolean }>(filters: Partial<T> | Record<string, string | RegExp | number>, options?: { exact?: boolean, maxPages?: number } & R): Promise<any> => {
@@ -509,6 +508,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
         sorting: result.sorting,
         scrollToColumn: result.scrollToColumn,
         revalidate: result.revalidate,
+        generateConfigPrompt: result.generateConfigPrompt,
       };
 
       const getIsFirst = options?.getIsFirst ?? (({ index }) => index === 0);
@@ -655,6 +655,13 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       }
       log(`iterateThroughTable completed after ${index + 1} iterations, collected ${allData.length} items`);
       return allData;
+    },
+
+    generateConfigPrompt: async (options?: PromptOptions) => {
+      const html = await _getCleanHtml(rootLocator);
+      const separator = "=".repeat(50);
+      const content = `\n${separator}\n🤖 COPY INTO GEMINI/ChatGPT 🤖\n${separator}\nI am using 'playwright-smart-table'.\nTarget Table Locator: ${rootLocator.toString()}\nGenerate config for:\n\`\`\`html\n${html.substring(0, 10000)} ...\n\`\`\`\n${separator}\n`;
+      await _handlePrompt('Smart Table Config', content, options);
     },
   };
 

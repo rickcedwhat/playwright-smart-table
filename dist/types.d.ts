@@ -1,4 +1,5 @@
 import type { Locator, Page } from '@playwright/test';
+import type { SmartRowArray } from './utils/smartRowArray';
 /**
  * Flexible selector type - can be a CSS string, function returning a Locator, or Locator itself.
  * @example
@@ -259,6 +260,22 @@ export interface FillOptions {
      */
     inputMappers?: Record<string, (cell: Locator) => Locator>;
 }
+/**
+ * Options for generateConfigPrompt
+ */
+export interface PromptOptions {
+    /**
+     * Output Strategy:
+     * - 'error': Throws an error with the prompt (useful for platforms that capture error output cleanly).
+     * - 'console': Standard console logs (Default).
+     */
+    output?: 'console' | 'error';
+    /**
+     * Include TypeScript type definitions in the prompt
+     * @default true
+     */
+    includeTypes?: boolean;
+}
 export interface TableResult<T = any> {
     /**
      * Initializes the table by resolving headers. Must be called before using sync methods.
@@ -317,16 +334,15 @@ export interface TableResult<T = any> {
      */
     scrollToColumn: (columnName: string) => Promise<void>;
     /**
-     * ASYNC: Gets all rows on the current page only (does not paginate).
+     * Gets all rows on the current page only (does not paginate).
      * Auto-initializes the table if not already initialized.
-     * @param options - Filter and formatting options
+     * Returns a SmartRowArray which extends Array with a toJSON() helper method.
+     * @param options - Filter options
      */
-    getRows: <R extends {
-        asJSON?: boolean;
-    }>(options?: {
+    getRows: (options?: {
         filter?: Record<string, any>;
         exact?: boolean;
-    } & R) => Promise<R['asJSON'] extends true ? Record<string, string>[] : SmartRow[]>;
+    }) => Promise<SmartRowArray>;
     /**
      * Resets the table state (clears cache, flags) and invokes the onReset strategy.
      */
@@ -399,6 +415,11 @@ export interface TableResult<T = any> {
             allData: any[];
         }) => void | Promise<void>;
     }) => Promise<T[]>;
+    /**
+     * Generate an AI-friendly configuration prompt for debugging.
+     * Outputs table HTML and TypeScript definitions to help AI assistants generate config.
+     */
+    generateConfigPrompt: (options?: PromptOptions) => Promise<void>;
 }
 /**
  * Restricted table result that excludes methods that shouldn't be called during iteration.

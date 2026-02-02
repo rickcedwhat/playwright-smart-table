@@ -108,7 +108,9 @@ Enable debug logging to see exactly what the library is doing:
 // Example from: https://datatables.net/examples/data_sources/dom
 const table = useTable(page.locator('#example'), {
   headerSelector: 'thead th',
-  debug: true // Enables verbose logging of internal operations
+  debug: {
+    logLevel: 'verbose' // Enables verbose logging of internal operations
+  }
 });
 await table.init();
 
@@ -524,7 +526,8 @@ const tokyoUsers = await table.getRows({
 expect(tokyoUsers.length).toBeGreaterThan(0);
 
 // 3. Dump data to JSON
-const data = await table.getRows({ asJSON: true });
+const rows = await table.getRows();
+const data = await rows.toJSON();
 console.log(data); // [{ Name: "Airi Satou", ... }, ...]
 expect(data.length).toBeGreaterThan(0);
 expect(data[0]).toHaveProperty('Name');
@@ -761,6 +764,10 @@ export interface PromptOptions {
    * - 'console': Standard console logs (Default).
    */
   output?: 'console' | 'error';
+  /**
+   * Include TypeScript type definitions in the prompt
+   * @default true
+   */
   includeTypes?: boolean;
 }
 ```

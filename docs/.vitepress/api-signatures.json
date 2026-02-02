@@ -1,0 +1,149 @@
+[
+  {
+    "name": "init(options?",
+    "description": "*",
+    "signature": "init(options?: { timeout?: number }):\n  Promise<TableResult>",
+    "params": [
+      {
+        "name": "options",
+        "desc": "Optional timeout for header resolution (default: 3000ms)"
+      }
+    ],
+    "returns": ""
+  },
+  {
+    "name": "isInitialized()",
+    "description": "*",
+    "signature": "isInitialized():\n  boolean",
+    "params": [],
+    "returns": "true if init() has been called and completed, false otherwise"
+  },
+  {
+    "name": "getHeaders",
+    "description": "",
+    "signature": "getHeaders: () => Promise<string[]>",
+    "params": [],
+    "returns": ""
+  },
+  {
+    "name": "getHeaderCell",
+    "description": "",
+    "signature": "getHeaderCell: (columnName: string) => Promise<Locator>",
+    "params": [],
+    "returns": ""
+  },
+  {
+    "name": "getRow",
+    "description": "*",
+    "signature": "getRow: (\n  filters: Record<string, string | RegExp | number>,\n  options?: { exact?: boolean }",
+    "params": [],
+    "returns": ""
+  },
+  {
+    "name": "getRowByIndex",
+    "description": "*",
+    "signature": "getRowByIndex: (\n  index: number,\n  options?: { bringIntoView?: boolean }",
+    "params": [
+      {
+        "name": "index",
+        "desc": "1-based row index"
+      },
+      {
+        "name": "options",
+        "desc": "Optional settings including bringIntoView"
+      }
+    ],
+    "returns": ""
+  },
+  {
+    "name": "findRow",
+    "description": "*",
+    "signature": "findRow: (\n  filters: Record<string, string | RegExp | number>,\n  options?: { exact?: boolean, maxPages?: number }",
+    "params": [
+      {
+        "name": "filters",
+        "desc": "The filter criteria to match"
+      },
+      {
+        "name": "options",
+        "desc": "Search options including exact match and max pages"
+      }
+    ],
+    "returns": ""
+  },
+  {
+    "name": "findRows",
+    "description": "*",
+    "signature": "findRows: <R extends { asJSON?: boolean }>(\n  filters: Record<string, string | RegExp | number>,\n  options?: { exact?: boolean, maxPages?: number } & R\n  ) => Promise<R['asJSON'] extends true ? Record<string, string>[] : SmartRow[]>",
+    "params": [
+      {
+        "name": "filters",
+        "desc": "The filter criteria to match"
+      },
+      {
+        "name": "options",
+        "desc": "Search options including exact match, max pages, and asJSON"
+      }
+    ],
+    "returns": ""
+  },
+  {
+    "name": "scrollToColumn",
+    "description": "*",
+    "signature": "scrollToColumn: (columnName: string) => Promise<void>",
+    "params": [],
+    "returns": ""
+  },
+  {
+    "name": "getRows",
+    "description": "*",
+    "signature": "getRows: (options?: { filter?: Record<string, any>, exact?: boolean }) => Promise<SmartRowArray>",
+    "params": [
+      {
+        "name": "options",
+        "desc": "Filter options"
+      }
+    ],
+    "returns": ""
+  },
+  {
+    "name": "reset",
+    "description": "*",
+    "signature": "reset: () => Promise<void>",
+    "params": [],
+    "returns": ""
+  },
+  {
+    "name": "revalidate",
+    "description": "*",
+    "signature": "revalidate: () => Promise<void>",
+    "params": [],
+    "returns": ""
+  },
+  {
+    "name": "getColumnValues",
+    "description": "*",
+    "signature": "getColumnValues: <V = string>(column: string, options?: { mapper?: (cell: Locator) => Promise<V> | V, maxPages?: number }) => Promise<V[]>",
+    "params": [],
+    "returns": ""
+  },
+  {
+    "name": "sorting",
+    "description": "*",
+    "signature": "sorting: {\n  apply(columnName: string, direction: 'asc' | 'desc'):\n  Promise<void>;\n  getState(columnName: string",
+    "params": [
+      {
+        "name": "columnName",
+        "desc": "The name of the column to check."
+      }
+    ],
+    "returns": "A promise that resolves to 'asc', 'desc', or 'none'."
+  },
+  {
+    "name": "iterateThroughTable",
+    "description": "*",
+    "signature": "iterateThroughTable: <T = any>(\n  callback: (context: {\n  index: number;\n  isFirst: boolean;\n  isLast: boolean;\n  rows: SmartRow[];\n  allData: T[];\n  table: RestrictedTableResult;\n  batchInfo?: {\n  startIndex: number;\n  endIndex: number;\n  size: number;\n  };\n  }) => T | Promise<T>,\n  options?: {\n  pagination?: PaginationStrategy;\n  dedupeStrategy?: DedupeStrategy;\n  maxIterations?: number;\n  batchSize?: number;\n  getIsFirst?: (context: { index: number }) => boolean;\n  getIsLast?: (context: { index: number, paginationResult: boolean }) => boolean;\n  beforeFirst?: (context: { index: number, rows: SmartRow[], allData: any[] }) => void | Promise<void>;\n  afterLast?: (context: { index: number, rows: SmartRow[], allData: any[] }) => void | Promise<void>;\n  }",
+    "params": [],
+    "returns": ""
+  }
+]

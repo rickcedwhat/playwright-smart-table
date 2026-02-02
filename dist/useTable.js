@@ -27,6 +27,7 @@ const strategies_1 = require("./strategies");
 Object.defineProperty(exports, "Strategies", { enumerable: true, get: function () { return strategies_1.Strategies; } });
 const validation_1 = require("./strategies/validation");
 const debugUtils_1 = require("./utils/debugUtils");
+const smartRowArray_1 = require("./utils/smartRowArray");
 /**
  * Main hook to interact with a table.
  */
@@ -196,18 +197,6 @@ const useTable = (rootLocator, configOptions = {}) => {
             return null;
         }
     });
-    const _handlePrompt = (promptName_1, content_1, ...args_1) => __awaiter(void 0, [promptName_1, content_1, ...args_1], void 0, function* (promptName, content, options = {}) {
-        // ... same logic ...
-        const { output = 'console', includeTypes = true } = options;
-        let finalPrompt = content;
-        if (includeTypes)
-            finalPrompt += `\n\n👇 Useful TypeScript Definitions 👇\n\`\`\`typescript\n${typeContext_1.TYPE_CONTEXT}\n\`\`\`\n`;
-        if (output === 'error') {
-            console.log(`⚠️ Throwing error to display [${promptName}] cleanly...`);
-            throw new Error(finalPrompt);
-        }
-        console.log(finalPrompt);
-    });
     const _getCleanHtml = (loc) => __awaiter(void 0, void 0, void 0, function* () {
         return loc.evaluate((el) => {
             const clone = el.cloneNode(true);
@@ -229,6 +218,18 @@ const useTable = (rootLocator, configOptions = {}) => {
             }
             return clone.outerHTML;
         });
+    });
+    const _handlePrompt = (promptName_1, content_1, ...args_1) => __awaiter(void 0, [promptName_1, content_1, ...args_1], void 0, function* (promptName, content, options = {}) {
+        const { output = 'console', includeTypes = true } = options;
+        let finalPrompt = content;
+        if (includeTypes) {
+            finalPrompt += `\n\n👇 Useful TypeScript Definitions 👇\n\`\`\`typescript\n${typeContext_1.TYPE_CONTEXT}\n\`\`\`\n`;
+        }
+        if (output === 'error') {
+            console.log(`⚠️ Throwing error to display [${promptName}] cleanly...`);
+            throw new Error(finalPrompt);
+        }
+        console.log(finalPrompt);
     });
     const _ensureInitialized = () => __awaiter(void 0, void 0, void 0, function* () {
         if (!_isInitialized) {
@@ -362,10 +363,7 @@ const useTable = (rootLocator, configOptions = {}) => {
             }
             const rows = yield rowLocators.all();
             const smartRows = rows.map((loc, i) => _makeSmart(loc, _headerMap, i));
-            if (options === null || options === void 0 ? void 0 : options.asJSON) {
-                return Promise.all(smartRows.map(r => r.toJSON()));
-            }
-            return smartRows;
+            return (0, smartRowArray_1.createSmartRowArray)(smartRows);
         }),
         findRows: (filters, options) => __awaiter(void 0, void 0, void 0, function* () {
             var _a, _b, _c, _d;
@@ -445,6 +443,7 @@ const useTable = (rootLocator, configOptions = {}) => {
                 sorting: result.sorting,
                 scrollToColumn: result.scrollToColumn,
                 revalidate: result.revalidate,
+                generateConfigPrompt: result.generateConfigPrompt,
             };
             const getIsFirst = (_b = options === null || options === void 0 ? void 0 : options.getIsFirst) !== null && _b !== void 0 ? _b : (({ index }) => index === 0);
             const getIsLast = (_c = options === null || options === void 0 ? void 0 : options.getIsLast) !== null && _c !== void 0 ? _c : (() => false);
@@ -570,6 +569,12 @@ const useTable = (rootLocator, configOptions = {}) => {
             }
             log(`iterateThroughTable completed after ${index + 1} iterations, collected ${allData.length} items`);
             return allData;
+        }),
+        generateConfigPrompt: (options) => __awaiter(void 0, void 0, void 0, function* () {
+            const html = yield _getCleanHtml(rootLocator);
+            const separator = "=".repeat(50);
+            const content = `\n${separator}\n🤖 COPY INTO GEMINI/ChatGPT 🤖\n${separator}\nI am using 'playwright-smart-table'.\nTarget Table Locator: ${rootLocator.toString()}\nGenerate config for:\n\`\`\`html\n${html.substring(0, 10000)} ...\n\`\`\`\n${separator}\n`;
+            yield _handlePrompt('Smart Table Config', content, options);
         }),
     };
     finalTable = result;

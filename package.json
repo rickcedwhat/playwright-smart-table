@@ -1,10 +1,12 @@
 {
   "name": "@rickcedwhat/playwright-smart-table",
-  "version": "5.3.0",
-  "description": "Production-ready table testing for Playwright with smart column-aware locators. Core library with plugin support for custom table implementations.",
+  "version": "5.4.0",
+  "description": "Smart, column-aware table interactions for Playwright",
+  "author": "Cedrick Catalan",
+  "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/rickcedwhat/playwright-smart-table.git"
+    "url": "https://github.com/rickcedwhat/playwright-smart-table.git"
   },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -14,9 +16,11 @@
   "scripts": {
     "generate-types": "node scripts/embed-types.mjs",
     "generate-docs": "node scripts/generate-readme.mjs",
+    "generate-all-api-docs": "node scripts/generate-all-api-docs.mjs",
+    "update-all-api-signatures": "node scripts/update-all-api-signatures.mjs",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
-    "build": "npm run generate-types && npm run generate-docs && tsc",
+    "build": "npm run generate-types && npm run generate-docs && npm run generate-all-api-docs && npm run update-all-api-signatures && tsc",
     "prepublishOnly": "npm run build",
     "test": "npx playwright test",
     "test:compatibility": "npx playwright test compatibility",
@@ -28,23 +32,17 @@
     "table",
     "automation"
   ],
-  "author": "",
-  "license": "ISC",
   "peerDependencies": {
-    "@playwright/test": "*"
-  },
-  "peerDependenciesMeta": {
-    "@playwright/test": {
-      "optional": true
-    }
+    "@playwright/test": "^1.40.0"
   },
   "devDependencies": {
-    "@playwright/test": "^1.50.0",
-    "@types/node": "^20.0.0",
-    "husky": "^8.0.0",
-    "ts-node": "^10.9.0",
-    "typescript": "^5.0.0",
-    "vitepress": "^1.6.4",
-    "vue": "^3.5.27"
+    "@playwright/test": "^1.49.1",
+    "@types/node": "^22.10.5",
+    "husky": "^9.1.7",
+    "typescript": "^5.7.2",
+    "vitepress": "^1.6.4"
+  },
+  "dependencies": {
+    "string-similarity": "^4.0.4"
   }
 }
