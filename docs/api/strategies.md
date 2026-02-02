@@ -294,4 +294,3 @@ await table.init();
 
 - [TableConfig](/api/table-config) - Full configuration options
 - [Examples](/examples/) - Real-world strategy examples
-- [Custom Strategies](/recipes/custom-strategies) - Building your own
