@@ -1,0 +1,82 @@
+[
+  {
+    "name": "init",
+    "signature": "init(options?: { timeout?: number }): Promise<TableResult>",
+    "comment": "/**\n* Initializes the table by resolving headers. Must be called before using sync methods.\n* @param options Optional timeout for header resolution (default: 3000ms)\n*/"
+  },
+  {
+    "name": "isInitialized",
+    "signature": "isInitialized(): boolean",
+    "comment": "/**\n* SYNC: Checks if the table has been initialized.\n* @returns true if init() has been called and completed, false otherwise\n*/"
+  },
+  {
+    "name": "getHeaders",
+    "signature": "getHeaders: () => Promise<string[]>",
+    "comment": ""
+  },
+  {
+    "name": "getHeaderCell",
+    "signature": "getHeaderCell: (columnName: string) => Promise<Locator>",
+    "comment": ""
+  },
+  {
+    "name": "getRow",
+    "signature": "getRow: (\n  filters: Record<string, string | RegExp | number>,\n  options?: { exact?: boolean }",
+    "comment": "/**\n* Finds a row by filters on the current page only. Returns immediately (sync).\n* Throws error if table is not initialized.\n*/"
+  },
+  {
+    "name": "getRowByIndex",
+    "signature": "getRowByIndex: (\n  index: number,\n  options?: { bringIntoView?: boolean }",
+    "comment": "/**\n* Gets a row by 1-based index on the current page.\n* Throws error if table is not initialized.\n* @param index 1-based row index\n* @param options Optional settings including bringIntoView\n*/"
+  },
+  {
+    "name": "findRow",
+    "signature": "findRow: (\n  filters: Record<string, string | RegExp | number>,\n  options?: { exact?: boolean, maxPages?: number }",
+    "comment": "/**\n* ASYNC: Searches for a single row across pages using pagination.\n* Auto-initializes the table if not already initialized.\n* @param filters - The filter criteria to match\n* @param options - Search options including exact match and max pages\n*/"
+  },
+  {
+    "name": "findRows",
+    "signature": "findRows: <R extends { asJSON?: boolean }>(\n  filters: Record<string, string | RegExp | number>,\n  options?: { exact?: boolean, maxPages?: number } & R\n  ) => Promise<R['asJSON'] extends true ? Record<string, string>[] : SmartRow[]>",
+    "comment": "/**\n* ASYNC: Searches for all matching rows across pages using pagination.\n* Auto-initializes the table if not already initialized.\n* @param filters - The filter criteria to match\n* @param options - Search options including exact match, max pages, and asJSON\n*/"
+  },
+  {
+    "name": "scrollToColumn",
+    "signature": "scrollToColumn: (columnName: string) => Promise<void>",
+    "comment": "/**\n* Navigates to a specific column using the configured CellNavigationStrategy.\n*/"
+  },
+  {
+    "name": "getRows",
+    "signature": "getRows: (options?: { filter?: Record<string, any>, exact?: boolean }) => Promise<SmartRowArray>",
+    "comment": "/**\n* Gets all rows on the current page only (does not paginate).\n* Auto-initializes the table if not already initialized.\n* Returns a SmartRowArray which extends Array with a toJSON() helper method.\n* @param options - Filter options\n*/"
+  },
+  {
+    "name": "reset",
+    "signature": "reset: () => Promise<void>",
+    "comment": "/**\n* Resets the table state (clears cache, flags) and invokes the onReset strategy.\n*/"
+  },
+  {
+    "name": "revalidate",
+    "signature": "revalidate: () => Promise<void>",
+    "comment": "/**\n* Revalidates the table's structure (headers, columns) without resetting pagination or state.\n* Useful when columns change visibility or order dynamically.\n*/"
+  },
+  {
+    "name": "getColumnValues",
+    "signature": "getColumnValues: <V = string>(column: string, options?: { mapper?: (cell: Locator) => Promise<V> | V, maxPages?: number }) => Promise<V[]>",
+    "comment": "/**\n* Scans a specific column across all pages and returns the values.\n*/"
+  },
+  {
+    "name": "sorting",
+    "signature": "sorting: {\n  apply(columnName: string, direction: 'asc' | 'desc'): Promise<void>;\n  getState(columnName: string): Promise<'asc' | 'desc' | 'none'>;\n  }",
+    "comment": "/**\n* Gets the current sort state of a column using the configured sorting strategy.\n* @param columnName The name of the column to check.\n* @returns A promise that resolves to 'asc', 'desc', or 'none'.\n*/"
+  },
+  {
+    "name": "iterateThroughTable",
+    "signature": "iterateThroughTable: <T = any>(\n  callback: (context: {\n  index: number;\n  isFirst: boolean;\n  isLast: boolean;\n  rows: SmartRow[];\n  allData: T[];\n  table: RestrictedTableResult;\n  batchInfo?: {\n  startIndex: number;\n  endIndex: number;\n  size: number;\n  };\n  }) => T | Promise<T>,\n  options?: {\n  pagination?: PaginationStrategy;\n  dedupeStrategy?: DedupeStrategy;\n  maxIterations?: number;\n  batchSize?: number;\n  getIsFirst?: (context: { index: number }) => boolean;\n  getIsLast?: (context: { index: number, paginationResult: boolean }) => boolean;\n  beforeFirst?: (context: { index: number, rows: SmartRow[], allData: any[] }) => void | Promise<void>;\n  afterLast?: (context: { index: number, rows: SmartRow[], allData: any[] }) => void | Promise<void>;\n  }",
+    "comment": "/**\n* Iterates through paginated table data, calling the callback for each iteration.\n* Callback return values are automatically appended to allData, which is returned.\n*/"
+  },
+  {
+    "name": "generateConfigPrompt",
+    "signature": "generateConfigPrompt: (options?: PromptOptions) => Promise<void>",
+    "comment": "/**\n* Generate an AI-friendly configuration prompt for debugging.\n* Outputs table HTML and TypeScript definitions to help AI assistants generate config.\n*/"
+  }
+]

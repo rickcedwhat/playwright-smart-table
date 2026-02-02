@@ -115,7 +115,8 @@ test.describe('Backwards Compatibility Tests', () => {
     });
     await table.init();
 
-    const data = await table.getRows({ asJSON: true });
+    const rows = await table.getRows();
+    const data = await rows.toJSON();
 
     expect(Array.isArray(data)).toBe(true);
     expect(data.length).toBeGreaterThan(0);

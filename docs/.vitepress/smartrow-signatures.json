@@ -1,0 +1,22 @@
+[
+  {
+    "name": "getCell",
+    "signature": "getCell(column: string): Locator",
+    "comment": "/**\n* Get a cell locator by column name.\n* @param column - Column name (case-sensitive)\n* @returns Locator for the cell\n* @example\n* const emailCell = row.getCell('Email');\n* await expect(emailCell).toHaveText('john@example.com');\n*/"
+  },
+  {
+    "name": "toJSON",
+    "signature": "toJSON(options?: { columns?: string[] }): Promise<T>",
+    "comment": "/**\n* Extract all cell data as a key-value object.\n* @param options - Optional configuration\n* @param options.columns - Specific columns to extract (extracts all if not specified)\n* @returns Promise resolving to row data\n* @example\n* const data = await row.toJSON();\n* // { Name: 'John', Email: 'john@example.com', ... }\n*\n* const partial = await row.toJSON({ columns: ['Name', 'Email'] });\n* // { Name: 'John', Email: 'john@example.com' }\n*/"
+  },
+  {
+    "name": "bringIntoView",
+    "signature": "bringIntoView(): Promise<void>",
+    "comment": "/**\n* Scrolls/paginates to bring this row into view.\n* Only works if rowIndex is known (e.g., from getRowByIndex).\n* @throws Error if rowIndex is unknown\n*/"
+  },
+  {
+    "name": "smartFill",
+    "signature": "smartFill: (data: Partial<T> | Record<string, any>, options?: FillOptions) => Promise<void>",
+    "comment": "/**\n* Intelligently fills form fields in the row.\n* Automatically detects input types (text, select, checkbox, contenteditable).\n*\n* @param data - Column-value pairs to fill\n* @param options - Optional configuration\n* @param options.inputMappers - Custom input selectors per column\n* @example\n* // Auto-detection\n* await row.smartFill({ Name: 'John', Status: 'Active', Subscribe: true });\n*\n* // Custom input mappers\n* await row.smartFill(\n*   { Name: 'John' },\n*   { inputMappers: { Name: (cell) => cell.locator('.custom-input') } }\n* );\n*/"
+  }
+]

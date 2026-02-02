@@ -157,7 +157,8 @@ test.describe('Real World Strategy Tests', () => {
       await table.init();
 
       // Get typed data
-      const data = await table.getRows({ asJSON: true });
+      const rows = await table.getRows();
+      const data = await rows.toJSON();
 
       // TypeScript should infer data as Employee[]
       expect(data.length).toBeGreaterThan(0);
