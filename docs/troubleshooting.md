@@ -328,5 +328,4 @@ Smart errors are automatic for:
 
 - Check [Examples](/examples/) for working code
 - Review [API Reference](/api/) for method details
-- See [Recipes](/recipes/) for advanced patterns
 - Open an issue on [GitHub](https://github.com/rickcedwhat/playwright-smart-table/issues)

@@ -119,7 +119,7 @@ debug: {
 }
 ```
 
-See [Debugging Guide](/advanced/debugging) for more details.
+See the debug configuration options above for more details.
 
 ---
 
