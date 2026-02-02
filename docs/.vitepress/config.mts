@@ -3,6 +3,7 @@ import { defineConfig } from 'vitepress'
 export default defineConfig({
     title: "Playwright Smart Table",
     description: "Production-ready table testing for Playwright",
+    base: '/playwright-smart-table/',
     themeConfig: {
         nav: [
             { text: 'Home', link: '/' },
