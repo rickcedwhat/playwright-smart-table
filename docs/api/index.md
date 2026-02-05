@@ -1,3 +1,4 @@
+<!-- NEEDS REVIEW -->
 # API Reference
 
 Welcome to the Playwright Smart Table API documentation. This library provides a powerful, type-safe way to interact with HTML tables in Playwright tests.

@@ -1,3 +1,4 @@
+<!-- NEEDS REVIEW -->
 # Core Concepts
 
 Understanding the key concepts of Playwright Smart Table.

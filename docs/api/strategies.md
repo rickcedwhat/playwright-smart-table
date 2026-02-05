@@ -1,6 +1,17 @@
+<!-- NEEDS REVIEW -->
 # Strategies
 
 Strategies define how the library interacts with different table implementations. They handle pagination, sorting, filling, and more.
+
+## Strategy Types & Usage
+
+| Strategy Type | Used By Methods | Description |
+|--------------|----------------|-------------|
+| **Pagination** | `findRow()`, `findRows()`, `iterateThroughTable()` | Navigating to next pages |
+| **Sorting** | `sorting.apply()` | applying sort order |
+| **Fill** | `row.smartFill()` | Entering data into cells |
+| **Header** | `init()`, `revalidate()` | Finding and parsing column headers |
+| **Resolution** | `getCell()`, `column navigation` | Locating specific cells within a row |
 
 ## Overview
 
@@ -91,15 +102,18 @@ strategies: {
     const nextBtn = page.locator('.custom-next');
     
     if (await nextBtn.isDisabled()) {
-      return { hasMore: false };
+      return false; // Stop pagination
     }
     
     await nextBtn.click();
     await page.waitForLoadState('networkidle');
     
-    return { hasMore: true };
+    return true; // Continue pagination
   }
 }
+
+> [!NOTE]
+> Return `true` if a new page was loaded successfully, or `false` if there are no more pages.
 ```
 
 ---
@@ -140,6 +154,36 @@ strategies: {
       return { column: 'Name', direction: 'asc' };
     }
   }
+}
+```
+
+---
+
+## Cell Navigation Strategies
+
+Control how to move focus to a specific column, especially in virtualized tables where horizontal scrolling is required.
+
+### Keyboard
+
+Uses keyboard arrow keys to navigate.
+
+```typescript
+Strategies.CellNavigation.Keyboard(options?: {
+    rootSelector?: string // Container to focus before pressing keys
+})
+```
+
+### Custom Navigation
+
+```typescript
+strategies: {
+    cellNavigation: async ({ page, currentColumn, targetColumn }) => {
+        // Calculate difference and press Right/Left keys
+        const diff = targetColumnIndex - currentColumnIndex;
+        for (let i = 0; i < Math.abs(diff); i++) {
+            await page.keyboard.press(diff > 0 ? 'ArrowRight' : 'ArrowLeft');
+        }
+    }
 }
 ```
 

@@ -1,0 +1,73 @@
+name: Bug Report
+description: Report a bug or issue
+title: "[Bug]: "
+labels: ["bug", "needs-triage"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug! Please fill out the information below.
+
+  - type: input
+    id: version
+    attributes:
+      label: Library Version
+      description: What version of playwright-smart-table are you using?
+      placeholder: "5.4.0"
+    validations:
+      required: true
+
+  - type: input
+    id: playwright-version
+    attributes:
+      label: Playwright Version
+      description: What version of @playwright/test are you using?
+      placeholder: "1.49.0"
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of the bug
+      placeholder: When I try to...
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal Reproduction
+      description: Please provide a minimal code example that reproduces the issue
+      placeholder: |
+        ```typescript
+        const table = useTable(page.locator('#table'));
+        await table.findRow({ Name: 'John' }); // Throws error
+        ```
+      render: typescript
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happened? Include error messages if applicable.
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Any other context, screenshots, or information

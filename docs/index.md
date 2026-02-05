@@ -1,3 +1,4 @@
+<!-- NEEDS REVIEW -->
 # Introduction
 
 ## Why Playwright Smart Table?
@@ -110,9 +111,10 @@ const table = useTable(page.locator('#table'), {
 
 **You might not need this library if:**
 
-- ❌ You don't interact with tables at all
-- ❌ You don't need to find a row based on a value in a cell
-- ❌ You don't need to find a cell based on a value in another cell in the same row
+- ❌ You don't deal with tables
+- ❌ You don't need to handle pagination or virtualization
+- ❌ You enjoy writing complex CSS selectors manually
+- ❌ You like doing things the hard way
 
 ## Quick Comparison
 

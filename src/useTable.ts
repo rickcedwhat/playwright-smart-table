@@ -75,7 +75,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     } else if (availableColumns.length > 0 && availableColumns.length <= 10) {
       suggestion = `. Available columns: ${availableColumns.map(c => `"${c}"`).join(', ')}`;
     } else if (availableColumns.length > 0) {
-      suggestion = `. Available columns (first 5): ${availableColumns.slice(0, 5).map(c => `"${c}"`).join(', ')}, ...`;
+      suggestion = `. Available columns (first 10 of ${availableColumns.length}): ${availableColumns.slice(0, 10).map(c => `"${c}"`).join(', ')}, ...`;
     }
 
     const contextMsg = context ? ` (${context})` : '';
