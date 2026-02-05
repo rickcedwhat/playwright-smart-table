@@ -1,3 +1,4 @@
+<!-- NEEDS REVIEW -->
 # SmartRow
 
 A SmartRow is a Playwright Locator enhanced with column-aware methods. It extends the native Locator, so all Playwright methods work.

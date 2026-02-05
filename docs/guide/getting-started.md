@@ -1,3 +1,4 @@
+<!-- NEEDS REVIEW -->
 # Getting Started
 
 Learn how to install and use Playwright Smart Table in your tests.
@@ -19,12 +20,11 @@ test('find and verify employee', async ({ page }) => {
   
   // Initialize table
   const table = useTable(page.locator('#example'));
-  await table.init();
   
-  // Find a row by content
+  // Find a row by content (auto-initializes!)
   const row = await table.findRow({ Name: 'Airi Satou' });
   
-  // Verify cell values
+  // Verify cell values (returns Locator)
   await expect(row.getCell('Position')).toHaveText('Accountant');
   await expect(row.getCell('Office')).toHaveText('Tokyo');
 });

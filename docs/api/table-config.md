@@ -1,3 +1,4 @@
+<!-- NEEDS REVIEW -->
 # TableConfig
 
 Configuration options for initializing a table with `useTable()`.

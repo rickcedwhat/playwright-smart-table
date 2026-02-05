@@ -70,6 +70,10 @@ export default defineConfig({
                         ]
                     },
                     {
+                        text: 'SmartRowArray',
+                        link: '/api/smart-row-array'
+                    },
+                    {
                         text: 'Strategies',
                         link: '/api/strategies',
                         collapsed: true,
@@ -97,6 +101,7 @@ export default defineConfig({
             {
                 text: 'Recipes',
                 items: [
+                    { text: 'Overview', link: '/recipes/' },
                     { text: 'Data Scraping', link: '/recipes/data-scraping' },
                     { text: 'Custom Strategies', link: '/recipes/custom-strategies' },
                     { text: 'Performance Tips', link: '/recipes/performance' }
@@ -105,6 +110,7 @@ export default defineConfig({
             {
                 text: 'Advanced',
                 items: [
+                    { text: 'Overview', link: '/advanced/' },
                     { text: 'Debugging', link: '/advanced/debugging' },
                     { text: 'Custom Resolution', link: '/advanced/custom-resolution' },
                     { text: 'TypeScript Tips', link: '/advanced/typescript' }

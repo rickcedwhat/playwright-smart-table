@@ -1,6 +1,5 @@
-# Pagination
-
-Examples of handling paginated tables.
+<!-- NEEDS REVIEW -->
+# Pagination Examples of handling paginated tables.
 
 ## Basic Pagination
 

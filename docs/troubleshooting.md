@@ -1,3 +1,4 @@
+<!-- NEEDS REVIEW -->
 # Troubleshooting
 
 Common issues and solutions when using Playwright Smart Table.

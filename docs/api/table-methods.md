@@ -1,6 +1,10 @@
+<!-- NEEDS REVIEW -->
 # Table Methods
 
 Methods available on the `TableResult` object returned by `useTable()`.
+
+> [!NOTE]
+> See [TableResult in types.ts](https://github.com/rickcedwhat/playwright-smart-table/blob/main/src/types.ts) for the full interface definition.
 
 ## init()
 
@@ -27,6 +31,9 @@ init(options?: { timeout?: number }): Promise<TableResult>
 ## isInitialized()
 
 Check if the table has been initialized.
+
+> [!TIP]
+> This is mostly used internally or for advanced debugging. Async methods like `findRow` call `init()` automatically, so you rarely need to check this manually.
 
 <!-- api-signature: isInitialized -->
 
@@ -58,7 +65,9 @@ console.log(table.isInitialized()); // true
 
 ## getRow()
 
-Get the first row matching the filter criteria on the current page.
+Get the first row matching the filter criteria on the current **page**. This is a synchronous-like operation that requires the table to be initialized.
+
+If you need to search across multiple pages, use [findRow()](#findrow) instead.
 
 
 <!-- api-signature: getRow -->
@@ -74,11 +83,29 @@ getRow(
 
 <!-- /api-signature: getRow -->
 
+### Example
+
+```typescript
+// ✅ Simple single-column filter
+const row = table.getRow({ Name: 'John' });
+
+// ✅ Multi-column filter (must match ALL)
+const adminRow = table.getRow({ 
+  Role: 'Admin',
+  Status: 'Active'
+});
+
+// ✅ Regex matching
+const gmailRow = table.getRow({ 
+  Email: /@gmail\.com$/ 
+});
+```
+
 ---
 
 ## getRows()
 
-Get all rows on the current page (does not paginate).
+Get all rows on the current page (does not paginate). Returns a `SmartRowArray` which adds helper methods like `toJSON()`.
 
 
 <!-- api-signature: getRows -->
@@ -98,11 +125,30 @@ getRows(options?: {
 
 <!-- /api-signature: getRows -->
 
+### Example
+
+```typescript
+const rows = await table.getRows();
+
+// Filter in memory
+const activeRows = rows.filter(async row => 
+  await row.getCell('Status').innerText() === 'Active'
+);
+
+// Convert all to JSON
+const data = await rows.toJSON();
+console.log(data); 
+// [{ Name: 'John', Status: 'Active' }, ...]
+```
+
 ---
 
 ## getRowByIndex()
 
 Get a row by its index on the current page.
+
+> [!TIP]
+> Use this when you need stable iteration or access by position, which is faster than filtering by content.
 
 
 <!-- api-signature: getRowByIndex -->
@@ -182,7 +228,7 @@ Find all rows matching the filter across multiple pages.
 findRows(
   filters: Record<string, string | RegExp | number>,
   options?: { exact?: boolean, maxPages?: number }
-): Promise<SmartRow[]>
+): Promise<SmartRowArray>
 ```
 
 ### Parameters
@@ -231,6 +277,14 @@ getColumnValues<V = string>(
   }
 ): Promise<V[]>
 ```
+
+### Parameters
+
+- `column` - Name of the column to extract
+- `options.mapper` - **Optional** function to transform the cell locator into a value (default: `innerText`). Use this to parse numbers, dates, or extract attributes.
+```
+
+
 
 <!-- /api-signature: getColumnValues -->
 
@@ -340,7 +394,9 @@ await row.getCell('Email').click();
 
 ## reset()
 
-Reset table state and invoke onReset strategy.
+Reset table state and invoke onReset strategy. 
+
+Use this when the table state matches what is in the DOM but appropriate cleanup (like clearing filters) needs to happen before a new test.
 
 
 <!-- api-signature: reset -->
@@ -359,6 +415,8 @@ reset(): Promise<void>
 ## revalidate()
 
 Revalidate the table's structure without resetting pagination or state.
+
+Use this when the DOM has changed (e.g. columns toggled) but you want to keep the current pagination/filter state.
 
 <!-- api-signature: revalidate -->
 

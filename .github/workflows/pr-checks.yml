@@ -1,0 +1,76 @@
+name: Pull Request Checks
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run TypeScript Check
+        run: npx tsc --noEmit
+
+      - name: Cache Playwright Browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
+      - name: Install Playwright Browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps
+
+      - name: Run Tests
+        run: npm test
+
+      - name: Build Project
+        run: npm run build
+
+      - name: Build Documentation
+        run: npm run docs:build
+
+      - name: Check for TODO/FIXME
+        run: |
+          if grep -r "TODO\|FIXME" src/ --exclude-dir=node_modules; then
+            echo "⚠️ Found TODO/FIXME comments. Please resolve before merging."
+            exit 1
+          fi
+        continue-on-error: true
+
+  lint-commits:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check Commit Messages
+        run: |
+          # Check if commits follow conventional commits
+          git log origin/main..HEAD --pretty=format:"%s" | while read msg; do
+            if ! echo "$msg" | grep -qE "^(feat|fix|docs|test|refactor|perf|chore|style|ci|build|revert)(\(.+\))?: .+"; then
+              echo "❌ Invalid commit message: $msg"
+              echo "Must follow: type(scope?): description"
+              exit 1
+            fi
+          done
