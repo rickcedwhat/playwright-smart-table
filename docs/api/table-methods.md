@@ -228,7 +228,7 @@ Find all rows matching the filter across multiple pages.
 findRows(
   filters: Record<string, string | RegExp | number>,
   options?: { exact?: boolean, maxPages?: number }
-): Promise<SmartRowArray>
+): Promise<SmartRow[]>
 ```
 
 ### Parameters
@@ -277,14 +277,6 @@ getColumnValues<V = string>(
   }
 ): Promise<V[]>
 ```
-
-### Parameters
-
-- `column` - Name of the column to extract
-- `options.mapper` - **Optional** function to transform the cell locator into a value (default: `innerText`). Use this to parse numbers, dates, or extract attributes.
-```
-
-
 
 <!-- /api-signature: getColumnValues -->
 
