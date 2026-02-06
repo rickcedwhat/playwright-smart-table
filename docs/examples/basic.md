@@ -3,10 +3,12 @@
 
 Simple examples of common table interactions.
 
-[![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/github/rickcedwhat/playwright-smart-table/tree/main/examples/playground?file=tests%2Fdemo.spec.ts&title=Playwright%20Smart%20Table%20Demo)
+Simple examples of common table interactions.
+
+[![Run on Replit](https://replit.com/badge/github/rickcedwhat/playwright-smart-table)](https://replit.com/github/rickcedwhat/playwright-smart-table)
 
 > [!TIP]
-> **Try it now**: Click the button above to run this code in your browser, or open the [Live Demo](https://datatables.net/examples/data_sources/dom) to interpret the table structure manually.
+> **Try it now**: Click the button above to run this code in a real browser environment.
 
 ## Setup
 
