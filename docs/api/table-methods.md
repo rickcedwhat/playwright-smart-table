@@ -345,32 +345,31 @@ Iterate through all rows across all pages with callbacks.
 ### Signature
 
 ```typescript
-iterateThroughTable<T = any>(
-  callback: (context: IterationContext) => T | Promise<T>,
-  options?: IterationOptions
-): Promise<T[]>
+iterateThroughTable: <T = any>(
+  callback: (context: {
+  index: number;
+  isFirst: boolean;
+  isLast: boolean;
+  rows: SmartRow[];
+  allData: T[];
+  table: RestrictedTableResult;
+  batchInfo?: {
+  startIndex: number;
+  endIndex: number;
+  size: number;
+  };
+  }) => T | Promise<T>,
+  options?: {
+  pagination?: PaginationStrategy;
+  dedupeStrategy?: DedupeStrategy;
+  maxIterations?: number;
+  batchSize?: number;
+  getIsFirst?: (context: { index: number }) => boolean;
+  getIsLast?: (context: { index: number, paginationResult: boolean }) => boolean;
+  beforeFirst?: (context: { index: number, rows: SmartRow[], allData: any[] }) => void | Promise<void>;
+  afterLast?: (context: { index: number, rows: SmartRow[], allData: any[] }) => void | Promise<void>;
+  }
 ```
-
-### Parameters
-
-#### `callback`
-Function called for every row in the table.
-
-**Context Object:**
-- `index` - Global index of the current row (0-based)
-- `rows` - Array of `SmartRow` objects for the current page/batch
-- `allData` - Accumulating array of results returned so far
-- `table` - Reference to the table instance
-- `isFirst` - True if this is the first batch/page
-- `isLast` - True if this is the last batch/page
-
-#### `options`
-- `pagination` - Override pagination strategy
-- `dedupeStrategy` - Strategy to handle duplicate rows across pages
-- `maxIterations` - Safety limit for number of pages to process
-- `batchSize` - Number of rows to process per batch (for infinite scroll)
-- `beforeFirst` - Hook to run before the first iteration
-- `afterLast` - Hook to run after the last iteration
 
 <!-- /api-signature: iterateThroughTable -->
 
