@@ -1,7 +1,12 @@
-<!-- NEEDS REVIEW -->
+<!-- Last Reviewed: 02/06/2026 -->
 # Basic Usage
 
 Simple examples of common table interactions.
+
+[![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/github/rickcedwhat/playwright-smart-table/tree/main/examples/playground?file=tests%2Fdemo.spec.ts&title=Playwright%20Smart%20Table%20Demo)
+
+> [!TIP]
+> **Try it now**: Click the button above to run this code in your browser, or open the [Live Demo](https://datatables.net/examples/data_sources/dom) to interpret the table structure manually.
 
 ## Setup
 
