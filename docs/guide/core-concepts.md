@@ -1,4 +1,4 @@
-<!-- NEEDS REVIEW -->
+<!-- Last Reviewed: 02/06/2026 -->
 # Core Concepts
 
 Understanding the key concepts of Playwright Smart Table.
@@ -72,6 +72,16 @@ const row = await table.findRow({
   InvalidColumn: 'x' // ❌ TypeScript error
 });
 ```
+
+## Parallel Execution
+
+Playwright Smart Table is fully compatible with Playwright's parallel execution.
+
+- **Stateless**: `SmartRow` and `TableResult` objects are stateless wrappers around Playwright Locators.
+- **Safe**: No global state is shared between tests or workers.
+- **Independent**: Each `useTable` call creates a fresh instance scoped to the specific `page` object.
+
+You can safely run tests in parallel using `fullyParallel: true` in your Playwright config.
 
 ## Next Steps
 

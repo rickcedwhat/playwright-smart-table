@@ -1,3 +1,6 @@
+<!-- Last Reviewed: 02/06/2026 
+Needs Fix for Mermaid Diagrams
+-->
 # Custom Resolution Logic
 
 For complex scenarios where the standard `header -> column index -> cell` mapping isn't enough.
@@ -12,6 +15,23 @@ Complex tables (grids, virtual lists, accessibility structures) might not:
 - Headers might be in a separate `<div>` structure
 - Cells might use `aria-colindex` or `data-field` instead of DOM order
 - Duplicate headers might exist (e.g., "Actions" column at start and end)
+
+## Logic Flow
+
+```mermaid
+graph TD
+    A[Table Init] --> B{Header Transformer?}
+    B -- Yes --> C[Apply Transformer]
+    B -- No --> D[Use InnerText]
+    C --> E[Map: Header Name -> Column Index]
+    D --> E
+    E --> F[Find Row]
+    F --> G{Custom Cell Locator?}
+    G -- Yes --> H[Executing Strategy]
+    G -- No --> I[Standard Cell Strategy]
+    H --> J[Return Cell Locator]
+    I --> J
+```
 
 ## Header Transformers
 

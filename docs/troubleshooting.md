@@ -1,4 +1,4 @@
-<!-- NEEDS REVIEW -->
+<!-- Last Reviewed: 02/06/2026 -->
 # Troubleshooting
 
 Common issues and solutions when using Playwright Smart Table.
@@ -322,6 +322,33 @@ Smart errors are automatic for:
 - `getCell()` - Column not found
 - `findRow()` - No matching rows
 - `init()` - Empty or duplicate columns
+
+---
+
+## Responsive / Mobile Tables
+
+### Problem
+
+Table transforms into a list or card view on mobile screens (responsive design).
+
+### Solution
+
+The library works on the *visible* DOM. If the table structure changes significantly (e.g., `<table>` becomes `<div>` cards), you may need conditional logic.
+
+```typescript
+if (isMobile) {
+  // Mobile strategy (cards)
+  const cards = page.locator('.card');
+  // ... customized logic for cards
+} else {
+  // Desktop strategy (table)
+  const table = useTable(page.locator('#table'));
+  await table.findRow({ ... });
+}
+```
+
+> [!NOTE]
+> `SmartRow` locators are resilient to minor layout shifts, but fundamental structure changes require different selectors.
 
 ---
 

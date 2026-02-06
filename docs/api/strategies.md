@@ -1,4 +1,4 @@
-<!-- NEEDS REVIEW -->
+<!-- Last Reviewed: 02/06/2026 -->
 # Strategies
 
 Strategies define how the library interacts with different table implementations. They handle pagination, sorting, filling, and more.
@@ -334,7 +334,8 @@ const table = useTable(page.locator('#complex-table'), {
 await table.init();
 ```
 
-## See Also
+## Next Steps
 
-- [TableConfig](/api/table-config) - Full configuration options
-- [Examples](/examples/) - Real-world strategy examples
+See how these strategies are applied in real-world scenarios.
+
+[Go to Examples >](/examples/)

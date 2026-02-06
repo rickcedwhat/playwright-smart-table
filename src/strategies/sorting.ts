@@ -14,15 +14,15 @@ export const SortingStrategies = {
       async doSort({ columnName, direction, context }) {
         const { resolve, config, root } = context;
         const headerLoc = resolve(config.headerSelector, root);
-        
+
         const headers = await headerLoc.all();
         const headerTexts = await Promise.all(headers.map(h => h.innerText()));
-        
+
         const columnIndex = headerTexts.findIndex(text => text.trim() === columnName);
         if (columnIndex === -1) {
           throw new Error(`[AriaSort] Header with text "${columnName}" not found.`);
         }
-        
+
         const targetHeader = headers[columnIndex];
 
         // Click repeatedly to cycle through sort states
