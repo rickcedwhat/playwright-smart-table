@@ -1,10 +1,9 @@
-<!-- NEEDS REVIEW -->
+<!-- Last Reviewed: 02/06/2026 -->
 # Table Methods
 
 Methods available on the `TableResult` object returned by `useTable()`.
 
-> [!NOTE]
-> See [TableResult in types.ts](https://github.com/rickcedwhat/playwright-smart-table/blob/main/src/types.ts) for the full interface definition.
+
 
 ## init()
 
@@ -24,6 +23,8 @@ init(options?: { timeout?: number }): Promise<TableResult>
 - `options` - Optional timeout for header resolution (default: 3000ms)
 
 <!-- /api-signature: init -->
+
+[Back to Top](#table-methods)
 
 ---
 
@@ -60,6 +61,8 @@ await table.init();
 
 console.log(table.isInitialized()); // true
 ```
+
+[Back to Top](#table-methods)
 
 ---
 
@@ -101,6 +104,8 @@ const gmailRow = table.getRow({
 });
 ```
 
+[Back to Top](#table-methods)
+
 ---
 
 ## getRows()
@@ -141,6 +146,8 @@ console.log(data);
 // [{ Name: 'John', Status: 'Active' }, ...]
 ```
 
+[Back to Top](#table-methods)
+
 ---
 
 ## getRowByIndex()
@@ -168,6 +175,8 @@ getRowByIndex(
 - `options` - Optional settings including bringIntoView
 
 <!-- /api-signature: getRowByIndex -->
+
+[Back to Top](#table-methods)
 
 ---
 
@@ -213,6 +222,8 @@ const exactRow = await table.findRow(
 );
 ```
 
+[Back to Top](#table-methods)
+
 ---
 
 ## findRows()
@@ -257,6 +268,8 @@ const exactRows = await table.findRows(
 );
 ```
 
+[Back to Top](#table-methods)
+
 ---
 
 ## getColumnValues()
@@ -280,6 +293,8 @@ getColumnValues<V = string>(
 
 <!-- /api-signature: getColumnValues -->
 
+[Back to Top](#table-methods)
+
 ---
 
 ## getHeaders()
@@ -296,6 +311,8 @@ getHeaders(): Promise<string[]>
 ```
 
 <!-- /api-signature: getHeaders -->
+
+[Back to Top](#table-methods)
 
 ---
 
@@ -314,6 +331,8 @@ getHeaderCell(columnName: string): Promise<Locator>
 
 <!-- /api-signature: getHeaderCell -->
 
+[Back to Top](#table-methods)
+
 ---
 
 ## iterateThroughTable()
@@ -326,33 +345,36 @@ Iterate through all rows across all pages with callbacks.
 ### Signature
 
 ```typescript
-iterateThroughTable: <T = any>(
-  callback: (context: {
-  index: number;
-  isFirst: boolean;
-  isLast: boolean;
-  rows: SmartRow[];
-  allData: T[];
-  table: RestrictedTableResult;
-  batchInfo?: {
-  startIndex: number;
-  endIndex: number;
-  size: number;
-  };
-  }) => T | Promise<T>,
-  options?: {
-  pagination?: PaginationStrategy;
-  dedupeStrategy?: DedupeStrategy;
-  maxIterations?: number;
-  batchSize?: number;
-  getIsFirst?: (context: { index: number }) => boolean;
-  getIsLast?: (context: { index: number, paginationResult: boolean }) => boolean;
-  beforeFirst?: (context: { index: number, rows: SmartRow[], allData: any[] }) => void | Promise<void>;
-  afterLast?: (context: { index: number, rows: SmartRow[], allData: any[] }) => void | Promise<void>;
-  }
+iterateThroughTable<T = any>(
+  callback: (context: IterationContext) => T | Promise<T>,
+  options?: IterationOptions
+): Promise<T[]>
 ```
 
+### Parameters
+
+#### `callback`
+Function called for every row in the table.
+
+**Context Object:**
+- `index` - Global index of the current row (0-based)
+- `rows` - Array of `SmartRow` objects for the current page/batch
+- `allData` - Accumulating array of results returned so far
+- `table` - Reference to the table instance
+- `isFirst` - True if this is the first batch/page
+- `isLast` - True if this is the last batch/page
+
+#### `options`
+- `pagination` - Override pagination strategy
+- `dedupeStrategy` - Strategy to handle duplicate rows across pages
+- `maxIterations` - Safety limit for number of pages to process
+- `batchSize` - Number of rows to process per batch (for infinite scroll)
+- `beforeFirst` - Hook to run before the first iteration
+- `afterLast` - Hook to run after the last iteration
+
 <!-- /api-signature: iterateThroughTable -->
+
+[Back to Top](#table-methods)
 
 
 ## scrollToColumn()
@@ -382,6 +404,8 @@ await row.getCell('Email').click();
 
 ---
 
+[Back to Top](#table-methods)
+
 ---
 
 ## reset()
@@ -400,6 +424,8 @@ reset(): Promise<void>
 ```
 
 <!-- /api-signature: reset -->
+
+[Back to Top](#table-methods)
 
 ---
 
@@ -440,6 +466,8 @@ await row.getCell('NewColumn').click();
 - Does not reset pagination state
 - Does not clear row cache
 
+[Back to Top](#table-methods)
+
 ---
 
 ## sorting
@@ -463,6 +491,8 @@ Get current sort state.
 const state = await table.sorting.getState();
 console.log(state); // { column: 'Name', direction: 'asc' }
 ```
+
+[Back to Top](#table-methods)
 
 ---
 

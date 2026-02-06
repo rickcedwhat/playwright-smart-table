@@ -1,4 +1,4 @@
-<!-- NEEDS REVIEW -->
+<!-- Last Reviewed: 02/06/2026 -->
 # Getting Started
 
 Learn how to install and use Playwright Smart Table in your tests.
@@ -7,6 +7,10 @@ Learn how to install and use Playwright Smart Table in your tests.
 
 ```bash
 npm install @rickcedwhat/playwright-smart-table
+# or
+yarn add @rickcedwhat/playwright-smart-table
+# or
+pnpm add @rickcedwhat/playwright-smart-table
 ```
 
 ## Quick Start
