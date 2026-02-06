@@ -1,0 +1,2 @@
+language = "nodejs"
+run = "cd examples/playground && npm install && npx playwright install && npx playwright test"
