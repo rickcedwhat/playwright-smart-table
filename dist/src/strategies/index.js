@@ -22,6 +22,7 @@ const headers_1 = require("./headers");
 const fill_1 = require("./fill");
 const resolution_1 = require("./resolution");
 const dedupe_1 = require("./dedupe");
+const loading_1 = require("./loading");
 __exportStar(require("./pagination"), exports);
 __exportStar(require("./sorting"), exports);
 __exportStar(require("./columns"), exports);
@@ -29,6 +30,7 @@ __exportStar(require("./headers"), exports);
 __exportStar(require("./fill"), exports);
 __exportStar(require("./resolution"), exports);
 __exportStar(require("./dedupe"), exports);
+__exportStar(require("./loading"), exports);
 exports.Strategies = {
     Pagination: pagination_1.PaginationStrategies,
     Sorting: sorting_1.SortingStrategies,
@@ -37,4 +39,5 @@ exports.Strategies = {
     Fill: fill_1.FillStrategies,
     Resolution: resolution_1.ResolutionStrategies,
     Dedupe: dedupe_1.DedupeStrategies,
+    Loading: loading_1.LoadingStrategies,
 };

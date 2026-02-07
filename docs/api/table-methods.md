@@ -350,7 +350,7 @@ iterateThroughTable: <T = any>(
   index: number;
   isFirst: boolean;
   isLast: boolean;
-  rows: SmartRow[];
+  rows: SmartRowArray;
   allData: T[];
   table: RestrictedTableResult;
   batchInfo?: {
@@ -358,7 +358,7 @@ iterateThroughTable: <T = any>(
   endIndex: number;
   size: number;
   };
-  }) => T | Promise<T>,
+  }) => T | T[] | Promise<T | T[]>,
   options?: {
   pagination?: PaginationStrategy;
   dedupeStrategy?: DedupeStrategy;

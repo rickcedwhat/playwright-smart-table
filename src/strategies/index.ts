@@ -5,6 +5,7 @@ import { HeaderStrategies } from './headers';
 import { FillStrategies } from './fill';
 import { ResolutionStrategies } from './resolution';
 import { DedupeStrategies } from './dedupe';
+import { LoadingStrategies } from './loading';
 
 export * from './pagination';
 export * from './sorting';
@@ -13,6 +14,7 @@ export * from './headers';
 export * from './fill';
 export * from './resolution';
 export * from './dedupe';
+export * from './loading';
 
 export const Strategies = {
     Pagination: PaginationStrategies,
@@ -22,4 +24,5 @@ export const Strategies = {
     Fill: FillStrategies,
     Resolution: ResolutionStrategies,
     Dedupe: DedupeStrategies,
+    Loading: LoadingStrategies,
 };
