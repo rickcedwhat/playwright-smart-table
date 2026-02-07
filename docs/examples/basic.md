@@ -5,10 +5,7 @@ Simple examples of common table interactions.
 
 Simple examples of common table interactions.
 
-[![Run on Replit](https://replit.com/badge/github/rickcedwhat/playwright-smart-table)](https://replit.com/github/rickcedwhat/playwright-smart-table)
-
-> [!TIP]
-> **Try it now**: Click the button above to run this code in a real browser environment.
+Simple examples of common table interactions.
 
 ## Setup
 
