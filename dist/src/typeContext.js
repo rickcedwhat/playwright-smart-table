@@ -224,10 +224,18 @@ export interface TableStrategies {
   pagination?: PaginationStrategy;
   /** Strategy for sorting columns */
   sorting?: SortingStrategy;
+  /** Strategy for deduplicating rows during iteration/scrolling */
+  dedupe?: DedupeStrategy;
   /** Function to get a cell locator */
   getCellLocator?: GetCellLocatorFn;
   /** Function to get the currently active/focused cell */
   getActiveCell?: GetActiveCellFn;
+  /** Custom helper to check if a table is fully loaded/ready */
+  isTableLoaded?: (args: TableContext) => Promise<boolean>;
+  /** Custom helper to check if a row is fully loaded/ready */
+  isRowLoaded?: (args: { row: Locator, index: number }) => Promise<boolean>;
+  /** Custom helper to check if a cell is fully loaded/ready (e.g. for editing) */
+  isCellLoaded?: (args: { cell: Locator, column: string, row: Locator }) => Promise<boolean>;
 }
 
 /**
@@ -243,9 +251,11 @@ export interface TableConfig {
   /** Number of pages to scan for verification */
   maxPages?: number;
   /** Hook to rename columns dynamically */
-  headerTransformer?: (args: { text: string, index: number, locator: Locator }) => string | Promise<string>;
+  headerTransformer?: (args: { text: string, index: number, locator: Locator, seenHeaders: Set<string> }) => string | Promise<string>;
   /** Automatically scroll to table on init */
   autoScroll?: boolean;
+  /** Enforce strict mode (default: true). If false, finding multiple rows returns first match instead of throwing. */
+  strict?: boolean;
   /** Debug options for development and troubleshooting */
   debug?: DebugConfig;
   /** Reset hook */
@@ -260,8 +270,9 @@ export interface FinalTableConfig extends TableConfig {
   cellSelector: string;
   maxPages: number;
   autoScroll: boolean;
+  strict: boolean;
   debug?: TableConfig['debug'];
-  headerTransformer: (args: { text: string, index: number, locator: Locator }) => string | Promise<string>;
+  headerTransformer: (args: { text: string, index: number, locator: Locator, seenHeaders: Set<string> }) => string | Promise<string>;
   onReset: (context: TableContext) => Promise<void>;
   strategies: TableStrategies;
 }
@@ -406,7 +417,7 @@ export interface TableResult<T = any> {
       index: number;
       isFirst: boolean;
       isLast: boolean;
-      rows: SmartRow[];
+      rows: SmartRowArray;
       allData: T[];
       table: RestrictedTableResult;
       batchInfo?: {
@@ -414,7 +425,8 @@ export interface TableResult<T = any> {
         endIndex: number;
         size: number;
       };
-    }) => T | Promise<T>,
+
+    }) => T | T[] | Promise<T | T[]>,
     options?: {
       pagination?: PaginationStrategy;
       dedupeStrategy?: DedupeStrategy;

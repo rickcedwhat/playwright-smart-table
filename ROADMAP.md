@@ -100,7 +100,54 @@ const row = await table.findRow({ Name: 'Grafana' });
 // 3. Scroll & Wait for mutation? handle...
 ```
 
-## Implementation Phases
-1. **Phase 1**: Define `LoadingStrategy` types and `DedupeStrategies` module.
-2. **Phase 2**: Implement `DedupeStrategies.byTopPosition` and add tests.
-3. **Phase 3**: Integrate `loading` strategy into `useTable` core loop (`_findRowLocator`, `iterateThroughTable`).
+## Implementation Phases (Prioritized)
+
+### Phase 1: Interactive Test Playground (Infrastructure)
+**Goal:** Create a controlled environment to reproduce "loading", "flakiness", and "virtualization" issues reliably.
+- **Action**: Create `/playground` (React + Vite).
+- **Features**:
+    - Control Panel: Inject delays, trigger errors, simulate network flakiness.
+    - Virtualized Table: Use `react-window` to test deduplication.
+    - "Chaos" Mode: Randomize attributes/IDs.
+
+### Phase 2: Ease of Use & Quick Wins
+**Goal:** Improve Developer Experience (DX) with high-value, low-risk changes.
+1.  **Header Transformer "Seen" State**: Pass `seenHeaders` Set to transformer for easy deduplication.
+2.  **Auto-Initialization**: `getHeaders` and `getHeaderCell` call `init()` automatically.
+3.  **Iteration Improvements**:
+    - Pass `SmartRowArray` to callback.
+    - Add `autoFlatten: boolean` option.
+4.  **Strict Mode Config**: Add `strict: boolean` (default `true`). If `false`, `findRow` returns the first match instead of throwing on duplicates.
+
+### Phase 3: Core Strategy Engine (Loading & Dedupe)
+**Goal:** Robustly handle unstable and virtualized tables.
+1.  **Loading Strategies**: Implement `isTableLoading`, `isRowLoading`, `isCellLoading`.
+2.  **Advanced Dedupe**: Implement `DedupeStrategies.byTopPosition` for virtualized tables.
+3.  **Core Integration**: Update `findRow`, `getRows`, and `iterateThroughTable` to respect these strategies.
+
+### Phase 4: Documentation Recipes
+**Goal:** Provide copy-paste solutions for complex scenarios.
+- Create `docs/recipes/virtualized-tables.md`
+- Create `docs/recipes/loading-states.md`
+- Create `docs/recipes/complex-filtering.md`
+
+
+
+## 6. Interactive Test Playground (Infrastructure)
+To robustly test advanced features (virtualization, loading states, flakiness), we need a controlled environment. Static HTML files are insufficient for testing dynamic behaviors.
+
+### Proposal: `playground` App
+Create a small React + Vite application within the repo (`/playground`) that serves as a testbed.
+
+**Features:**
+1.  **State Controller**: A "Control Panel" to inject specific states into the test table.
+    - [ ] `Inject 2s Loading Delay`
+    - [ ] `Trigger Error State`
+    - [ ] `Simulate Network Flakiness`
+2.  **Virtualized Table**: A table implementation using `react-window` or similar to test `dedupeStrategy` and scrolling.
+3.  **"Chaos" Mode**: A table that randomly changes attributes/IDs to test library robustness.
+
+**Usage:**
+- `playwright.config.ts` will launch this app via `webServer`.
+
+

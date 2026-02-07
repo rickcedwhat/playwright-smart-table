@@ -31,4 +31,12 @@ export default defineConfig({
     // Take screenshot on failure
     screenshot: 'only-on-failure',
   },
+
+  /* Run your local dev server before starting the tests */
+  webServer: {
+    command: 'npm run dev',
+    cwd: 'playground',
+    port: 3000,
+    reuseExistingServer: !process.env.CI,
+  },
 });

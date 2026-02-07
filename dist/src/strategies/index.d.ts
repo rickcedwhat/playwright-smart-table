@@ -4,6 +4,7 @@ export * from './columns';
 export * from './headers';
 export * from './fill';
 export * from './resolution';
+export * from './dedupe';
 export declare const Strategies: {
     Pagination: {
         clickNext: (nextButtonSelector: import("..").Selector, timeout?: number) => import("..").PaginationStrategy;
@@ -23,5 +24,8 @@ export declare const Strategies: {
     };
     Resolution: {
         default: import("./resolution").ColumnResolutionStrategy;
+    };
+    Dedupe: {
+        byTopPosition: (tolerance?: number) => import("..").DedupeStrategy;
     };
 };

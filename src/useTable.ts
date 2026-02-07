@@ -3,6 +3,7 @@ import { TableConfig, TableContext, Selector, TableResult, SmartRow as SmartRowT
 import { TYPE_CONTEXT } from './typeContext';
 import { SortingStrategies as ImportedSortingStrategies } from './strategies/sorting';
 import { PaginationStrategies as ImportedPaginationStrategies } from './strategies/pagination';
+import { DedupeStrategies as ImportedDedupeStrategies } from './strategies/dedupe';
 import { FillStrategies } from './strategies/fill';
 import { HeaderStrategies } from './strategies/headers';
 import { CellNavigationStrategies } from './strategies/columns';
@@ -34,8 +35,9 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     headerSelector: "thead th",
     cellSelector: "td",
     maxPages: 1,
-    headerTransformer: ({ text, index, locator }) => text,
+    headerTransformer: ({ text }) => text,
     autoScroll: true,
+    strict: true,
     onReset: async () => { /* no-op default */ },
     ...configOptions,
     strategies: {
@@ -106,17 +108,22 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
 
     const rawHeaders = await strategy(context);
 
-    const entries = await Promise.all(rawHeaders.map(async (t, i) => {
-      let text = t.trim() || `__col_${i}`;
+    const seenHeaders = new Set<string>();
+    const entries: [string, number][] = [];
+
+    for (let i = 0; i < rawHeaders.length; i++) {
+      let text = rawHeaders[i].trim() || `__col_${i}`;
       if (config.headerTransformer) {
         text = await config.headerTransformer({
           text,
           index: i,
-          locator: rootLocator.locator(config.headerSelector as string).nth(i)
+          locator: rootLocator.locator(config.headerSelector as string).nth(i),
+          seenHeaders
         });
       }
-      return [text, i] as [string, number];
-    }));
+      entries.push([text, i]);
+      seenHeaders.add(text);
+    }
 
     // Validation: Check for empty table
     if (entries.length === 0) {
@@ -169,6 +176,11 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       log(`Page ${currentPage}: Found ${count} matches.`);
 
       if (count > 1) {
+        if (config.strict === false) {
+          log(`Strict mode disabled. Found ${count} matches, returning first.`);
+          return matchedRows.first();
+        }
+
         // Sample data logic (simplified for refactor, kept inline or moved to util if needed)
         const sampleData: string[] = [];
         try {
@@ -294,14 +306,14 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     },
 
     getHeaders: async () => {
-      if (!_isInitialized || !_headerMap) throw new Error('Table not initialized. Call await table.init() first, or use async methods like table.findRow() or table.getRows() which auto-initialize.');
-      return Array.from(_headerMap.keys());
+      await _ensureInitialized();
+      return Array.from(_headerMap!.keys());
     },
 
     getHeaderCell: async (columnName: string) => {
-      if (!_isInitialized || !_headerMap) throw new Error('Table not initialized. Call await table.init() first.');
-      const idx = _headerMap.get(columnName);
-      if (idx === undefined) throw _createColumnError(columnName, _headerMap, 'header cell');
+      await _ensureInitialized();
+      const idx = _headerMap!.get(columnName);
+      if (idx === undefined) throw _createColumnError(columnName, _headerMap!, 'header cell');
       return resolve(config.headerSelector, rootLocator).nth(idx);
     },
 
@@ -466,7 +478,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
         index: number;
         isFirst: boolean;
         isLast: boolean;
-        rows: SmartRowType[];
+        rows: SmartRowArray;
         allData: T[];
         table: RestrictedTableResult;
         batchInfo?: {
@@ -474,7 +486,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
           endIndex: number;
           size: number;
         };
-      }) => T | Promise<T>,
+      }) => T | T[] | Promise<T | T[]>,
       options?: {
         pagination?: PaginationStrategy;
         dedupeStrategy?: DedupeStrategy;
@@ -528,19 +540,21 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
 
       while (index < effectiveMaxIterations) {
         const rowLocators = await resolve(config.rowSelector, rootLocator).all();
-        let rows = rowLocators.map((loc, i) => _makeSmart(loc, _headerMap!, i));
+        let rows = createSmartRowArray(rowLocators.map((loc, i) => _makeSmart(loc, _headerMap!, i)));
 
-        if (options?.dedupeStrategy && rows.length > 0) {
+        const dedupeStrategy = options?.dedupeStrategy ?? config.strategies.dedupe;
+        if (dedupeStrategy && rows.length > 0) {
           if (!seenKeys) seenKeys = new Set<string | number>();
           const deduplicated: SmartRowType[] = [];
           for (const row of rows) {
-            const key = await options.dedupeStrategy(row);
+            const key = await dedupeStrategy(row);
+
             if (!seenKeys.has(key)) {
               seenKeys.add(key);
               deduplicated.push(row);
             }
           }
-          rows = deduplicated;
+          rows = createSmartRowArray(deduplicated);
           log(`Deduplicated ${rowLocators.length} rows to ${rows.length} unique rows (total seen: ${seenKeys.size})`);
         }
 
@@ -576,12 +590,17 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
             index: callbackIndex,
             isFirst,
             isLast,
-            rows: callbackRows,
+            rows: createSmartRowArray(callbackRows),
             allData,
             table: restrictedTable,
             batchInfo
           });
-          allData.push(returnValue);
+
+          if (Array.isArray(returnValue)) {
+            allData.push(...returnValue);
+          } else {
+            allData.push(returnValue as T);
+          }
 
           // Determine if this is truly the last iteration
           let finalIsLast = isLastDueToMax;
@@ -634,12 +653,16 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
               index: callbackIndex,
               isFirst,
               isLast,
-              rows: batchRows,
+              rows: createSmartRowArray(batchRows),
               allData,
               table: restrictedTable,
               batchInfo
             });
-            allData.push(returnValue);
+            if (Array.isArray(returnValue)) {
+              allData.push(...returnValue);
+            } else {
+              allData.push(returnValue as T);
+            }
 
             if (options?.afterLast) {
               await options.afterLast({ index: callbackIndex, rows: batchRows, allData });
@@ -653,14 +676,15 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
         index++;
         log(`Iteration ${index} completed, continuing...`);
       }
-      log(`iterateThroughTable completed after ${index + 1} iterations, collected ${allData.length} items`);
+      log(`iterateThroughTable completed after ${index + 1
+        } iterations, collected ${allData.length} items`);
       return allData;
     },
 
     generateConfigPrompt: async (options?: PromptOptions) => {
       const html = await _getCleanHtml(rootLocator);
       const separator = "=".repeat(50);
-      const content = `\n${separator}\n🤖 COPY INTO GEMINI/ChatGPT 🤖\n${separator}\nI am using 'playwright-smart-table'.\nTarget Table Locator: ${rootLocator.toString()}\nGenerate config for:\n\`\`\`html\n${html.substring(0, 10000)} ...\n\`\`\`\n${separator}\n`;
+      const content = `\n${separator} \n🤖 COPY INTO GEMINI / ChatGPT 🤖\n${separator} \nI am using 'playwright-smart-table'.\nTarget Table Locator: ${rootLocator.toString()} \nGenerate config for: \n\`\`\`html\n${html.substring(0, 10000)} ...\n\`\`\`\n${separator}\n`;
       await _handlePrompt('Smart Table Config', content, options);
     },
   };
@@ -671,4 +695,5 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
 
 export const PaginationStrategies = ImportedPaginationStrategies;
 export const SortingStrategies = ImportedSortingStrategies;
+export const DedupeStrategies = ImportedDedupeStrategies;
 export { FillStrategies, HeaderStrategies, CellNavigationStrategies, ResolutionStrategies, Strategies };

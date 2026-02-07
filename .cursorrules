@@ -10,7 +10,7 @@ The library is a wrapper around Playwright locators that simplifies testing comp
 
 Core Logic: Uses a factory function useTable(rootLocator, config) returning a TableResult.
 
-SmartRow Pattern: getByRow returns a SmartRow (Locator + .getCell() + .toJSON()).
+SmartRow Pattern: getRow returns a SmartRow (Locator + .getCell() + .toJSON()).
 
 Sentinel Rows: Returns a sentinel locator if a row isn't found, enabling expect(row).not.toBeVisible().
 

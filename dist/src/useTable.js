@@ -9,10 +9,11 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.Strategies = exports.ResolutionStrategies = exports.CellNavigationStrategies = exports.HeaderStrategies = exports.FillStrategies = exports.SortingStrategies = exports.PaginationStrategies = exports.useTable = void 0;
+exports.Strategies = exports.ResolutionStrategies = exports.CellNavigationStrategies = exports.HeaderStrategies = exports.FillStrategies = exports.DedupeStrategies = exports.SortingStrategies = exports.PaginationStrategies = exports.useTable = void 0;
 const typeContext_1 = require("./typeContext");
 const sorting_1 = require("./strategies/sorting");
 const pagination_1 = require("./strategies/pagination");
+const dedupe_1 = require("./strategies/dedupe");
 const fill_1 = require("./strategies/fill");
 Object.defineProperty(exports, "FillStrategies", { enumerable: true, get: function () { return fill_1.FillStrategies; } });
 const headers_1 = require("./strategies/headers");
@@ -42,7 +43,7 @@ const useTable = (rootLocator, configOptions = {}) => {
         cellNavigation: columns_1.CellNavigationStrategies.default,
         pagination: () => __awaiter(void 0, void 0, void 0, function* () { return false; }),
     };
-    const config = Object.assign(Object.assign({ rowSelector: "tbody tr", headerSelector: "thead th", cellSelector: "td", maxPages: 1, headerTransformer: ({ text, index, locator }) => text, autoScroll: true, onReset: () => __awaiter(void 0, void 0, void 0, function* () { }) }, configOptions), { strategies: Object.assign(Object.assign({}, defaultStrategies), configOptions.strategies) });
+    const config = Object.assign(Object.assign({ rowSelector: "tbody tr", headerSelector: "thead th", cellSelector: "td", maxPages: 1, headerTransformer: ({ text }) => text, autoScroll: true, strict: true, onReset: () => __awaiter(void 0, void 0, void 0, function* () { }) }, configOptions), { strategies: Object.assign(Object.assign({}, defaultStrategies), configOptions.strategies) });
     const resolve = (item, parent) => {
         if (typeof item === 'string')
             return parent.locator(item);
@@ -102,17 +103,21 @@ const useTable = (rootLocator, configOptions = {}) => {
             resolve: resolve
         };
         const rawHeaders = yield strategy(context);
-        const entries = yield Promise.all(rawHeaders.map((t, i) => __awaiter(void 0, void 0, void 0, function* () {
-            let text = t.trim() || `__col_${i}`;
+        const seenHeaders = new Set();
+        const entries = [];
+        for (let i = 0; i < rawHeaders.length; i++) {
+            let text = rawHeaders[i].trim() || `__col_${i}`;
             if (config.headerTransformer) {
                 text = yield config.headerTransformer({
                     text,
                     index: i,
-                    locator: rootLocator.locator(config.headerSelector).nth(i)
+                    locator: rootLocator.locator(config.headerSelector).nth(i),
+                    seenHeaders
                 });
             }
-            return [text, i];
-        })));
+            entries.push([text, i]);
+            seenHeaders.add(text);
+        }
         // Validation: Check for empty table
         if (entries.length === 0) {
             throw new Error(`Initialization Error: No columns found using selector "${config.headerSelector}". Check your selector or ensure the table is visible.`);
@@ -155,6 +160,10 @@ const useTable = (rootLocator, configOptions = {}) => {
             const count = yield matchedRows.count();
             log(`Page ${currentPage}: Found ${count} matches.`);
             if (count > 1) {
+                if (config.strict === false) {
+                    log(`Strict mode disabled. Found ${count} matches, returning first.`);
+                    return matchedRows.first();
+                }
                 // Sample data logic (simplified for refactor, kept inline or moved to util if needed)
                 const sampleData = [];
                 try {
@@ -267,13 +276,11 @@ const useTable = (rootLocator, configOptions = {}) => {
             });
         }),
         getHeaders: () => __awaiter(void 0, void 0, void 0, function* () {
-            if (!_isInitialized || !_headerMap)
-                throw new Error('Table not initialized. Call await table.init() first, or use async methods like table.findRow() or table.getRows() which auto-initialize.');
+            yield _ensureInitialized();
             return Array.from(_headerMap.keys());
         }),
         getHeaderCell: (columnName) => __awaiter(void 0, void 0, void 0, function* () {
-            if (!_isInitialized || !_headerMap)
-                throw new Error('Table not initialized. Call await table.init() first.');
+            yield _ensureInitialized();
             const idx = _headerMap.get(columnName);
             if (idx === undefined)
                 throw _createColumnError(columnName, _headerMap, 'header cell');
@@ -421,7 +428,7 @@ const useTable = (rootLocator, configOptions = {}) => {
             })
         },
         iterateThroughTable: (callback, options) => __awaiter(void 0, void 0, void 0, function* () {
-            var _a, _b, _c, _d;
+            var _a, _b, _c, _d, _e;
             yield _ensureInitialized();
             const paginationStrategy = (_a = options === null || options === void 0 ? void 0 : options.pagination) !== null && _a !== void 0 ? _a : config.strategies.pagination;
             const hasPaginationInOptions = (options === null || options === void 0 ? void 0 : options.pagination) !== undefined;
@@ -459,19 +466,20 @@ const useTable = (rootLocator, configOptions = {}) => {
             log(`Starting iterateThroughTable (maxIterations: ${effectiveMaxIterations}, batchSize: ${batchSize !== null && batchSize !== void 0 ? batchSize : 'none'})`);
             while (index < effectiveMaxIterations) {
                 const rowLocators = yield resolve(config.rowSelector, rootLocator).all();
-                let rows = rowLocators.map((loc, i) => _makeSmart(loc, _headerMap, i));
-                if ((options === null || options === void 0 ? void 0 : options.dedupeStrategy) && rows.length > 0) {
+                let rows = (0, smartRowArray_1.createSmartRowArray)(rowLocators.map((loc, i) => _makeSmart(loc, _headerMap, i)));
+                const dedupeStrategy = (_e = options === null || options === void 0 ? void 0 : options.dedupeStrategy) !== null && _e !== void 0 ? _e : config.strategies.dedupe;
+                if (dedupeStrategy && rows.length > 0) {
                     if (!seenKeys)
                         seenKeys = new Set();
                     const deduplicated = [];
                     for (const row of rows) {
-                        const key = yield options.dedupeStrategy(row);
+                        const key = yield dedupeStrategy(row);
                         if (!seenKeys.has(key)) {
                             seenKeys.add(key);
                             deduplicated.push(row);
                         }
                     }
-                    rows = deduplicated;
+                    rows = (0, smartRowArray_1.createSmartRowArray)(deduplicated);
                     log(`Deduplicated ${rowLocators.length} rows to ${rows.length} unique rows (total seen: ${seenKeys.size})`);
                 }
                 // Add rows to batch if batching is enabled
@@ -500,12 +508,17 @@ const useTable = (rootLocator, configOptions = {}) => {
                         index: callbackIndex,
                         isFirst,
                         isLast,
-                        rows: callbackRows,
+                        rows: (0, smartRowArray_1.createSmartRowArray)(callbackRows),
                         allData,
                         table: restrictedTable,
                         batchInfo
                     });
-                    allData.push(returnValue);
+                    if (Array.isArray(returnValue)) {
+                        allData.push(...returnValue);
+                    }
+                    else {
+                        allData.push(returnValue);
+                    }
                     // Determine if this is truly the last iteration
                     let finalIsLast = isLastDueToMax;
                     if (!isLastIteration) {
@@ -551,12 +564,17 @@ const useTable = (rootLocator, configOptions = {}) => {
                             index: callbackIndex,
                             isFirst,
                             isLast,
-                            rows: batchRows,
+                            rows: (0, smartRowArray_1.createSmartRowArray)(batchRows),
                             allData,
                             table: restrictedTable,
                             batchInfo
                         });
-                        allData.push(returnValue);
+                        if (Array.isArray(returnValue)) {
+                            allData.push(...returnValue);
+                        }
+                        else {
+                            allData.push(returnValue);
+                        }
                         if (options === null || options === void 0 ? void 0 : options.afterLast) {
                             yield options.afterLast({ index: callbackIndex, rows: batchRows, allData });
                         }
@@ -573,7 +591,7 @@ const useTable = (rootLocator, configOptions = {}) => {
         generateConfigPrompt: (options) => __awaiter(void 0, void 0, void 0, function* () {
             const html = yield _getCleanHtml(rootLocator);
             const separator = "=".repeat(50);
-            const content = `\n${separator}\n🤖 COPY INTO GEMINI/ChatGPT 🤖\n${separator}\nI am using 'playwright-smart-table'.\nTarget Table Locator: ${rootLocator.toString()}\nGenerate config for:\n\`\`\`html\n${html.substring(0, 10000)} ...\n\`\`\`\n${separator}\n`;
+            const content = `\n${separator} \n🤖 COPY INTO GEMINI / ChatGPT 🤖\n${separator} \nI am using 'playwright-smart-table'.\nTarget Table Locator: ${rootLocator.toString()} \nGenerate config for: \n\`\`\`html\n${html.substring(0, 10000)} ...\n\`\`\`\n${separator}\n`;
             yield _handlePrompt('Smart Table Config', content, options);
         }),
     };
@@ -583,3 +601,4 @@ const useTable = (rootLocator, configOptions = {}) => {
 exports.useTable = useTable;
 exports.PaginationStrategies = pagination_1.PaginationStrategies;
 exports.SortingStrategies = sorting_1.SortingStrategies;
+exports.DedupeStrategies = dedupe_1.DedupeStrategies;
