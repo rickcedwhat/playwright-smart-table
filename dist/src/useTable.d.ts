@@ -1,5 +1,5 @@
 import type { Locator } from '@playwright/test';
-import { TableConfig, Selector, TableResult, PaginationStrategy } from './types';
+import { TableConfig, Selector, TableResult, DedupeStrategy, PaginationStrategy } from './types';
 import { FillStrategies } from './strategies/fill';
 import { HeaderStrategies } from './strategies/headers';
 import { CellNavigationStrategies } from './strategies/columns';
@@ -15,5 +15,8 @@ export declare const PaginationStrategies: {
 };
 export declare const SortingStrategies: {
     AriaSort: () => import("./types").SortingStrategy;
+};
+export declare const DedupeStrategies: {
+    byTopPosition: (tolerance?: number) => DedupeStrategy;
 };
 export { FillStrategies, HeaderStrategies, CellNavigationStrategies, ResolutionStrategies, Strategies };

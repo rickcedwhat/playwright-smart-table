@@ -28,7 +28,7 @@ test.describe('README.md Examples Verification', () => {
     // #region smart-row
     // Example from: https://datatables.net/examples/data_sources/dom
 
-    // Get SmartRow via getByRow
+    // Get SmartRow via getRow
     const row = table.getRow({ Name: 'Airi Satou' });
 
     // Interact with cell using column name (resilient to column reordering)
@@ -73,7 +73,7 @@ test.describe('README.md Examples Verification', () => {
     // #endregion pagination
   });
 
-  test('getByRow: Strict Retrieval & Negative Assertion', async ({ page }) => {
+  test('getRow: Strict Retrieval & Negative Assertion', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
 
     // #region get-by-row

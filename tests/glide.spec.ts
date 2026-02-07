@@ -31,7 +31,7 @@ test.describe('Live Glide Data Grid', () => {
         console.log('Headers found:', headers);
         expect(headers.length).toBeGreaterThan(50); // Verify we found many columns
 
-        // Use getByRowIndex(1) (1-based index) to get the first row with rowIndex context
+        // Use getRowByIndex(1) (1-based index) to get the first row with rowIndex context
         const firstRow = table.getRowByIndex(1);
 
         const newName = "Antigravity";
