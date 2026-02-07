@@ -5,6 +5,7 @@ export * from './headers';
 export * from './fill';
 export * from './resolution';
 export * from './dedupe';
+export * from './loading';
 export declare const Strategies: {
     Pagination: {
         clickNext: (nextButtonSelector: import("..").Selector, timeout?: number) => import("..").PaginationStrategy;
@@ -27,5 +28,18 @@ export declare const Strategies: {
     };
     Dedupe: {
         byTopPosition: (tolerance?: number) => import("..").DedupeStrategy;
+    };
+    Loading: {
+        Table: {
+            hasSpinner: (selector?: string) => ({ root }: import("..").TableContext) => Promise<boolean>;
+            custom: (fn: (context: import("..").TableContext) => Promise<boolean>) => (context: import("..").TableContext) => Promise<boolean>;
+            never: () => Promise<boolean>;
+        };
+        Row: {
+            hasClass: (className?: string) => (row: import("..").SmartRow) => Promise<boolean>;
+            hasText: (text?: string | RegExp) => (row: import("..").SmartRow) => Promise<boolean>;
+            hasEmptyCells: () => (row: import("..").SmartRow) => Promise<boolean>;
+            never: () => Promise<boolean>;
+        };
     };
 };
