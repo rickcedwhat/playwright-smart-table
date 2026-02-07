@@ -3,13 +3,6 @@
 
 AG Grid is a high-performance table library that is fully virtualized and uses a complex DOM structure.
 
-AG Grid is a high-performance table library that is fully virtualized and uses a complex DOM structure.
-
-[![Run on Replit](https://replit.com/badge/github/rickcedwhat/playwright-smart-table)](https://replit.com/github/rickcedwhat/playwright-smart-table)
-
-> [!TIP]
-> **Try it now**: Click the button above to start a playground. Open the [Live Demo](https://www.ag-grid.com/example/) to see the grid in action.
-
 ## Configuration
 
 > [!WARNING]

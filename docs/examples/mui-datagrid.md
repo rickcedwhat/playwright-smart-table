@@ -3,13 +3,6 @@
 
 Material UI (MUI) DataGrid is a popular React table library. It uses a virtualized `div` structure instead of standard HTML tables.
 
-Material UI (MUI) DataGrid is a popular React table library. It uses a virtualized `div` structure instead of standard HTML tables.
-
-[![Run on Replit](https://replit.com/badge/github/rickcedwhat/playwright-smart-table)](https://replit.com/github/rickcedwhat/playwright-smart-table)
-
-> [!TIP]
-> **Try it now**: Click the button above to start a playground. Open the [Live Demo](https://mui.com/x/react-data-grid/) to inspect the structure.
-
 ## Configuration
 
 > [!WARNING]
