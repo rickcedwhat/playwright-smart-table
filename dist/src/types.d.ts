@@ -193,6 +193,13 @@ export interface FilterStrategy {
     }): Locator;
 }
 /**
+ * Strategy to check if the table or rows are loading.
+ */
+export interface LoadingStrategy {
+    isTableLoading?: (context: TableContext) => Promise<boolean>;
+    isRowLoading?: (row: SmartRow) => Promise<boolean>;
+}
+/**
  * Organized container for all table interaction strategies.
  */
 export interface TableStrategies {
@@ -225,6 +232,8 @@ export interface TableStrategies {
         column: string;
         row: Locator;
     }) => Promise<boolean>;
+    /** Strategy for detecting loading states */
+    loading?: LoadingStrategy;
 }
 /**
  * Configuration options for useTable.

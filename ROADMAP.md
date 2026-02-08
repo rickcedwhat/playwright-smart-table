@@ -121,9 +121,9 @@ const row = await table.findRow({ Name: 'Grafana' });
 
 ### Phase 3: Core Strategy Engine (Loading & Dedupe)
 **Goal:** Robustly handle unstable and virtualized tables.
-1.  **Loading Strategies**: Implement `isTableLoading`, `isRowLoading`, `isCellLoading`.
-2.  **Advanced Dedupe**: Implement `DedupeStrategies.byTopPosition` for virtualized tables.
-3.  **Core Integration**: Update `findRow`, `getRows`, and `iterateThroughTable` to respect these strategies.
+1.  [x] **Loading Strategies**: Implement `isTableLoading`, `isRowLoading`.
+2.  [ ] **Advanced Dedupe**: Implement `DedupeStrategies.byTopPosition` for virtualized tables.
+3.  [x] **Core Integration**: Update `findRow`, `getRows`, and `iterateThroughTable` to respect these strategies.
 
 ### Phase 4: Documentation Recipes
 **Goal:** Provide copy-paste solutions for complex scenarios.

@@ -3,7 +3,9 @@ import { TableConfig, TableContext, Selector, TableResult, SmartRow as SmartRowT
 import { TYPE_CONTEXT } from './typeContext';
 import { SortingStrategies as ImportedSortingStrategies } from './strategies/sorting';
 import { PaginationStrategies as ImportedPaginationStrategies } from './strategies/pagination';
+import { VirtualizedPaginationStrategies as ImportedVirtualizedPaginationStrategies } from './strategies/virtualizedPagination';
 import { DedupeStrategies as ImportedDedupeStrategies } from './strategies/dedupe';
+import { LoadingStrategies as ImportedLoadingStrategies } from './strategies/loading';
 import { FillStrategies } from './strategies/fill';
 import { HeaderStrategies } from './strategies/headers';
 import { CellNavigationStrategies } from './strategies/columns';
@@ -168,6 +170,16 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     log(`Looking for row: ${JSON.stringify(filters)} (MaxPages: ${effectiveMaxPages})`);
 
     while (true) {
+      // Check for table loading
+      if (config.strategies.loading?.isTableLoading) {
+        const isLoading = await config.strategies.loading.isTableLoading({ root: rootLocator, config, page: rootLocator.page(), resolve });
+        if (isLoading) {
+          log('Table is loading... waiting');
+          await rootLocator.page().waitForTimeout(200);
+          continue;
+        }
+      }
+
       const allRows = resolve(config.rowSelector, rootLocator);
       // Use FilterEngine
       const matchedRows = filterEngine.applyFilters(allRows, filters, map, options.exact || false, rootLocator.page());
@@ -409,8 +421,19 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       if (options?.filter) {
         rowLocators = filterEngine.applyFilters(rowLocators, options.filter as Record<string, any>, _headerMap!, options.exact || false, rootLocator.page());
       }
-      const rows = await rowLocators.all();
-      const smartRows = rows.map((loc, i) => _makeSmart(loc, _headerMap!, i));
+      const allRowLocs = await rowLocators.all();
+
+      const smartRows: SmartRowType<T>[] = [];
+      const isRowLoading = config.strategies.loading?.isRowLoading;
+
+      for (let i = 0; i < allRowLocs.length; i++) {
+        const smartRow = _makeSmart(allRowLocs[i], _headerMap!, i);
+        if (isRowLoading) {
+          const loading = await isRowLoading(smartRow);
+          if (loading) continue;
+        }
+        smartRows.push(smartRow);
+      }
       return createSmartRowArray(smartRows);
     },
 
@@ -423,8 +446,14 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       // Collect rows from current page
       let rowLocators = resolve(config.rowSelector, rootLocator);
       rowLocators = filterEngine.applyFilters(rowLocators, filters as Record<string, any>, _headerMap!, options?.exact ?? false, rootLocator.page());
-      let rows = await rowLocators.all();
-      allRows.push(...rows.map((loc, i) => _makeSmart(loc, _headerMap!, i)));
+      let currentRows = await rowLocators.all();
+      const isRowLoading = config.strategies.loading?.isRowLoading;
+
+      for (let i = 0; i < currentRows.length; i++) {
+        const smartRow = _makeSmart(currentRows[i], _headerMap!, i);
+        if (isRowLoading && await isRowLoading(smartRow)) continue;
+        allRows.push(smartRow);
+      }
 
       // Paginate and collect more rows
       while (pageCount < effectiveMaxPages && config.strategies.pagination) {
@@ -443,8 +472,13 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
         // Collect rows from new page
         rowLocators = resolve(config.rowSelector, rootLocator);
         rowLocators = filterEngine.applyFilters(rowLocators, filters as Record<string, any>, _headerMap!, options?.exact ?? false, rootLocator.page());
-        rows = await rowLocators.all();
-        allRows.push(...rows.map((loc, i) => _makeSmart(loc, _headerMap!, i)));
+        const newRows = await rowLocators.all();
+
+        for (let i = 0; i < newRows.length; i++) {
+          const smartRow = _makeSmart(newRows[i], _headerMap!, i);
+          if (isRowLoading && await isRowLoading(smartRow)) continue;
+          allRows.push(smartRow);
+        }
       }
 
       if (options?.asJSON) {
@@ -540,7 +574,15 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
 
       while (index < effectiveMaxIterations) {
         const rowLocators = await resolve(config.rowSelector, rootLocator).all();
-        let rows = createSmartRowArray(rowLocators.map((loc, i) => _makeSmart(loc, _headerMap!, i)));
+        const smartRowsArray: SmartRowType[] = [];
+        const isRowLoading = config.strategies.loading?.isRowLoading;
+
+        for (let i = 0; i < rowLocators.length; i++) {
+          const smartRow = _makeSmart(rowLocators[i], _headerMap!, i);
+          if (isRowLoading && await isRowLoading(smartRow)) continue;
+          smartRowsArray.push(smartRow);
+        }
+        let rows = createSmartRowArray(smartRowsArray);
 
         const dedupeStrategy = options?.dedupeStrategy ?? config.strategies.dedupe;
         if (dedupeStrategy && rows.length > 0) {
@@ -693,7 +735,11 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
   return result;
 };
 
-export const PaginationStrategies = ImportedPaginationStrategies;
+export const PaginationStrategies = {
+  ...ImportedPaginationStrategies,
+  ...ImportedVirtualizedPaginationStrategies
+};
+export const LoadingStrategies = ImportedLoadingStrategies;
 export const SortingStrategies = ImportedSortingStrategies;
 export const DedupeStrategies = ImportedDedupeStrategies;
 export { FillStrategies, HeaderStrategies, CellNavigationStrategies, ResolutionStrategies, Strategies };

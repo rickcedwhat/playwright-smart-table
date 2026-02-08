@@ -16,34 +16,11 @@ async function setPlaygroundConfig(page: Page, config: any) {
     await expect(page.locator('.spinner')).not.toBeVisible();
 }
 
-// Custom strategy for Virtualized Tables (recycled rows)
-const virtualizedPagination = async ({ root, config, page }: any) => {
-    const rows = root.locator(config.rowSelector);
-    if (await rows.count() === 0) return false;
 
-    // Snapshot the first row's text to detect movement
-    const firstRowText = await rows.first().innerText();
-
-    // Scroll by interacting with the list
-    const box = await root.boundingBox();
-    if (box) {
-        // Move mouse to center of table
-        await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-        // Scroll down
-        await page.mouse.wheel(0, 500);
-        // Wait for virtualization to update the DOM
-        await page.waitForTimeout(500);
-    }
-
-    // Check if the first visible row has changed
-    const newFirstRowText = await rows.first().innerText();
-
-    return firstRowText !== newFirstRowText;
-};
 
 test.describe('Playground: Virtualized Table', () => {
     test.beforeEach(async ({ page }) => {
-        await page.goto('/virtualized');
+        await page.goto('http://localhost:3000/virtualized');
         // Ensure ready
         await expect(page.getByRole('heading', { name: 'Virtualized Table Scenario' })).toBeVisible();
     });
@@ -65,7 +42,10 @@ test.describe('Playground: Virtualized Table', () => {
             headerSelector: '.header [role="columnheader"]',
             cellSelector: '[role="cell"]',
             strategies: {
-                pagination: virtualizedPagination
+                pagination: PaginationStrategies.virtualInfiniteScroll({
+                    scrollTarget: '[data-testid="virtuoso-scroller"]',
+                    scrollAmount: 500
+                })
             }
         });
 
@@ -80,11 +60,9 @@ test.describe('Playground: Virtualized Table', () => {
         expect(firstRowData).toEqual(expect.objectContaining({ ID: '1', Name: 'Item 1' }));
     });
 
-    test.skip('should find specific row by filtering (deep scroll)', async ({ page }) => {
-        // TODO: This test requires a robust strategy for virtualized scrolling that guarantees
-        // finding a row by precise index. Currently standard scrolling might skip rows or
-        // fail to trigger Virtuoso's render cycler perfectly.
-        // Skipping for now as basic infinite scroll and delay handling are verified.
+    test('should find specific row by filtering (deep scroll)', async ({ page }) => {
+        test.setTimeout(60000);
+
         // 1. Setup: 100 rows
         await setPlaygroundConfig(page, {
             rowCount: 100,
@@ -95,12 +73,24 @@ test.describe('Playground: Virtualized Table', () => {
             }
         });
 
+        // Add safety wait
+        await page.waitForTimeout(500);
+
         const table = useTable(page.locator('.virtual-table-container'), {
             rowSelector: '.virtual-row',
             headerSelector: '.header [role="columnheader"]',
             cellSelector: '[role="cell"]',
             strategies: {
-                pagination: virtualizedPagination
+                pagination: PaginationStrategies.virtualInfiniteScroll({
+                    scrollTarget: '[data-testid="virtuoso-scroller"]',
+                    scrollAmount: 1000,
+                    stabilityTimeout: 500,
+                    retries: 5,
+                    useJsScroll: true
+                })
+            },
+            debug: {
+                logLevel: 'verbose'
             }
         });
 
@@ -116,10 +106,10 @@ test.describe('Playground: Virtualized Table', () => {
     test('should handle random stutter delays', async ({ page }) => {
         // 1. Setup: Stutter (Base 200, Jitter 50)
         await setPlaygroundConfig(page, {
-            rowCount: 20,
+            rowCount: 100,
             defaults: {
                 tableInitDelay: 0,
-                rowDelay: { base: 2000, stutter: 50 },
+                rowDelay: { base: 2000, stutter: 500 },
                 generator: "users"
             }
         });
@@ -128,6 +118,14 @@ test.describe('Playground: Virtualized Table', () => {
             rowSelector: '.virtual-row',
             headerSelector: '.header [role="columnheader"]',
             cellSelector: '[role="cell"]',
+            strategies: {
+                pagination: PaginationStrategies.virtualInfiniteScroll({
+                    scrollTarget: '[data-testid="virtuoso-scroller"]',
+                    scrollAmount: 1000,
+                    stabilityTimeout: 500,
+                    useJsScroll: true
+                })
+            }
         });
 
         // 2. Fetch all
@@ -135,11 +133,75 @@ test.describe('Playground: Virtualized Table', () => {
 
         // Just verify we can fetch rows despite delays
         // Filter by "ID" (User 20 is last item)
-        const row = await table.findRow({ ID: '20' });
+        const row = await table.findRow({ ID: '100' });
 
         const duration = Date.now() - start;
 
         expect(row).toBeTruthy();
         expect(duration).toBeGreaterThan(0);
+    });
+
+    test('should iterate through 100 rows with late-loading cells', async ({ page }) => {
+        test.setTimeout(120000); // Allow time for slow iteration
+
+        // 1. Setup: 100 rows with delay
+        await setPlaygroundConfig(page, {
+            rowCount: 100,
+            defaults: {
+                tableInitDelay: 500,
+                rowDelay: { base: 500, stutter: 200 },
+                generator: "simple"
+            }
+        });
+
+        await page.waitForTimeout(1000);
+
+        const table = useTable(page.locator('.virtual-table-container'), {
+            rowSelector: '.virtual-row',
+            headerSelector: '.header [role="columnheader"]',
+            cellSelector: '[role="cell"]',
+            strategies: {
+                pagination: PaginationStrategies.virtualInfiniteScroll({
+                    scrollTarget: '[data-testid="virtuoso-scroller"]',
+                    scrollAmount: 300,
+                    stabilityTimeout: 1000,
+                    useJsScroll: true
+                })
+            }
+        });
+
+        // 2. Iterate and collect all data
+        const results = await table.iterateThroughTable(
+            async ({ rows }) => {
+                return await rows.toJSON();
+            },
+            {
+                maxIterations: 30,
+                dedupeStrategy: async (row) => {
+                    // Use ID or unique content as key
+                    const data = await row.toJSON();
+                    return data.ID;
+                }
+            }
+        );
+
+        // Flatten if needed (iterateThroughTable returns T[])
+        // But our callback returns Promise<any[]> (toJSON returns object array?)
+        // Wait, rows.toJSON() returns Promise<any[]>.
+        // iterateThroughTable collects results.
+        // If callback returns array, iterateThroughTable flattens result if T[] matches?
+        // Let's check iterateThroughTable implementation.
+        // If callback returns T[], allData.push(...returnValue).
+        // So results will be array of ROW OBJECTS.
+
+        console.log(`Collected ${results.length} rows.`);
+
+        expect(results.length).toBeGreaterThanOrEqual(100);
+
+        const hasId1 = results.some((r: any) => r.ID === '1');
+        const hasId100 = results.some((r: any) => r.ID === '100');
+
+        expect(hasId1).toBe(true);
+        expect(hasId100).toBe(true);
     });
 });

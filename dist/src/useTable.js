@@ -9,11 +9,13 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.Strategies = exports.ResolutionStrategies = exports.CellNavigationStrategies = exports.HeaderStrategies = exports.FillStrategies = exports.DedupeStrategies = exports.SortingStrategies = exports.PaginationStrategies = exports.useTable = void 0;
+exports.Strategies = exports.ResolutionStrategies = exports.CellNavigationStrategies = exports.HeaderStrategies = exports.FillStrategies = exports.DedupeStrategies = exports.SortingStrategies = exports.LoadingStrategies = exports.PaginationStrategies = exports.useTable = void 0;
 const typeContext_1 = require("./typeContext");
 const sorting_1 = require("./strategies/sorting");
 const pagination_1 = require("./strategies/pagination");
+const virtualizedPagination_1 = require("./strategies/virtualizedPagination");
 const dedupe_1 = require("./strategies/dedupe");
+const loading_1 = require("./strategies/loading");
 const fill_1 = require("./strategies/fill");
 Object.defineProperty(exports, "FillStrategies", { enumerable: true, get: function () { return fill_1.FillStrategies; } });
 const headers_1 = require("./strategies/headers");
@@ -148,12 +150,21 @@ const useTable = (rootLocator, configOptions = {}) => {
         return (0, smartRow_1.createSmartRow)(rowLocator, map, rowIndex, config, rootLocator, resolve, finalTable);
     };
     const _findRowLocator = (filters_1, ...args_1) => __awaiter(void 0, [filters_1, ...args_1], void 0, function* (filters, options = {}) {
-        var _a;
+        var _a, _b;
         const map = yield _getMap();
         const effectiveMaxPages = (_a = options.maxPages) !== null && _a !== void 0 ? _a : config.maxPages;
         let currentPage = 1;
         log(`Looking for row: ${JSON.stringify(filters)} (MaxPages: ${effectiveMaxPages})`);
         while (true) {
+            // Check for table loading
+            if ((_b = config.strategies.loading) === null || _b === void 0 ? void 0 : _b.isTableLoading) {
+                const isLoading = yield config.strategies.loading.isTableLoading({ root: rootLocator, config, page: rootLocator.page(), resolve });
+                if (isLoading) {
+                    log('Table is loading... waiting');
+                    yield rootLocator.page().waitForTimeout(200);
+                    continue;
+                }
+            }
             const allRows = resolve(config.rowSelector, rootLocator);
             // Use FilterEngine
             const matchedRows = filterEngine.applyFilters(allRows, filters, map, options.exact || false, rootLocator.page());
@@ -363,17 +374,28 @@ const useTable = (rootLocator, configOptions = {}) => {
             return _makeSmart(row, _headerMap, 0);
         }),
         getRows: (options) => __awaiter(void 0, void 0, void 0, function* () {
+            var _a;
             yield _ensureInitialized();
             let rowLocators = resolve(config.rowSelector, rootLocator);
             if (options === null || options === void 0 ? void 0 : options.filter) {
                 rowLocators = filterEngine.applyFilters(rowLocators, options.filter, _headerMap, options.exact || false, rootLocator.page());
             }
-            const rows = yield rowLocators.all();
-            const smartRows = rows.map((loc, i) => _makeSmart(loc, _headerMap, i));
+            const allRowLocs = yield rowLocators.all();
+            const smartRows = [];
+            const isRowLoading = (_a = config.strategies.loading) === null || _a === void 0 ? void 0 : _a.isRowLoading;
+            for (let i = 0; i < allRowLocs.length; i++) {
+                const smartRow = _makeSmart(allRowLocs[i], _headerMap, i);
+                if (isRowLoading) {
+                    const loading = yield isRowLoading(smartRow);
+                    if (loading)
+                        continue;
+                }
+                smartRows.push(smartRow);
+            }
             return (0, smartRowArray_1.createSmartRowArray)(smartRows);
         }),
         findRows: (filters, options) => __awaiter(void 0, void 0, void 0, function* () {
-            var _a, _b, _c, _d;
+            var _a, _b, _c, _d, _e;
             yield _ensureInitialized();
             const allRows = [];
             const effectiveMaxPages = (_b = (_a = options === null || options === void 0 ? void 0 : options.maxPages) !== null && _a !== void 0 ? _a : config.maxPages) !== null && _b !== void 0 ? _b : Infinity;
@@ -381,8 +403,14 @@ const useTable = (rootLocator, configOptions = {}) => {
             // Collect rows from current page
             let rowLocators = resolve(config.rowSelector, rootLocator);
             rowLocators = filterEngine.applyFilters(rowLocators, filters, _headerMap, (_c = options === null || options === void 0 ? void 0 : options.exact) !== null && _c !== void 0 ? _c : false, rootLocator.page());
-            let rows = yield rowLocators.all();
-            allRows.push(...rows.map((loc, i) => _makeSmart(loc, _headerMap, i)));
+            let currentRows = yield rowLocators.all();
+            const isRowLoading = (_d = config.strategies.loading) === null || _d === void 0 ? void 0 : _d.isRowLoading;
+            for (let i = 0; i < currentRows.length; i++) {
+                const smartRow = _makeSmart(currentRows[i], _headerMap, i);
+                if (isRowLoading && (yield isRowLoading(smartRow)))
+                    continue;
+                allRows.push(smartRow);
+            }
             // Paginate and collect more rows
             while (pageCount < effectiveMaxPages && config.strategies.pagination) {
                 const paginationResult = yield config.strategies.pagination({
@@ -398,9 +426,14 @@ const useTable = (rootLocator, configOptions = {}) => {
                 _hasPaginated = true;
                 // Collect rows from new page
                 rowLocators = resolve(config.rowSelector, rootLocator);
-                rowLocators = filterEngine.applyFilters(rowLocators, filters, _headerMap, (_d = options === null || options === void 0 ? void 0 : options.exact) !== null && _d !== void 0 ? _d : false, rootLocator.page());
-                rows = yield rowLocators.all();
-                allRows.push(...rows.map((loc, i) => _makeSmart(loc, _headerMap, i)));
+                rowLocators = filterEngine.applyFilters(rowLocators, filters, _headerMap, (_e = options === null || options === void 0 ? void 0 : options.exact) !== null && _e !== void 0 ? _e : false, rootLocator.page());
+                const newRows = yield rowLocators.all();
+                for (let i = 0; i < newRows.length; i++) {
+                    const smartRow = _makeSmart(newRows[i], _headerMap, i);
+                    if (isRowLoading && (yield isRowLoading(smartRow)))
+                        continue;
+                    allRows.push(smartRow);
+                }
             }
             if (options === null || options === void 0 ? void 0 : options.asJSON) {
                 return Promise.all(allRows.map(r => r.toJSON()));
@@ -428,7 +461,7 @@ const useTable = (rootLocator, configOptions = {}) => {
             })
         },
         iterateThroughTable: (callback, options) => __awaiter(void 0, void 0, void 0, function* () {
-            var _a, _b, _c, _d, _e;
+            var _a, _b, _c, _d, _e, _f;
             yield _ensureInitialized();
             const paginationStrategy = (_a = options === null || options === void 0 ? void 0 : options.pagination) !== null && _a !== void 0 ? _a : config.strategies.pagination;
             const hasPaginationInOptions = (options === null || options === void 0 ? void 0 : options.pagination) !== undefined;
@@ -466,8 +499,16 @@ const useTable = (rootLocator, configOptions = {}) => {
             log(`Starting iterateThroughTable (maxIterations: ${effectiveMaxIterations}, batchSize: ${batchSize !== null && batchSize !== void 0 ? batchSize : 'none'})`);
             while (index < effectiveMaxIterations) {
                 const rowLocators = yield resolve(config.rowSelector, rootLocator).all();
-                let rows = (0, smartRowArray_1.createSmartRowArray)(rowLocators.map((loc, i) => _makeSmart(loc, _headerMap, i)));
-                const dedupeStrategy = (_e = options === null || options === void 0 ? void 0 : options.dedupeStrategy) !== null && _e !== void 0 ? _e : config.strategies.dedupe;
+                const smartRowsArray = [];
+                const isRowLoading = (_e = config.strategies.loading) === null || _e === void 0 ? void 0 : _e.isRowLoading;
+                for (let i = 0; i < rowLocators.length; i++) {
+                    const smartRow = _makeSmart(rowLocators[i], _headerMap, i);
+                    if (isRowLoading && (yield isRowLoading(smartRow)))
+                        continue;
+                    smartRowsArray.push(smartRow);
+                }
+                let rows = (0, smartRowArray_1.createSmartRowArray)(smartRowsArray);
+                const dedupeStrategy = (_f = options === null || options === void 0 ? void 0 : options.dedupeStrategy) !== null && _f !== void 0 ? _f : config.strategies.dedupe;
                 if (dedupeStrategy && rows.length > 0) {
                     if (!seenKeys)
                         seenKeys = new Set();
@@ -599,6 +640,7 @@ const useTable = (rootLocator, configOptions = {}) => {
     return result;
 };
 exports.useTable = useTable;
-exports.PaginationStrategies = pagination_1.PaginationStrategies;
+exports.PaginationStrategies = Object.assign(Object.assign({}, pagination_1.PaginationStrategies), virtualizedPagination_1.VirtualizedPaginationStrategies);
+exports.LoadingStrategies = loading_1.LoadingStrategies;
 exports.SortingStrategies = sorting_1.SortingStrategies;
 exports.DedupeStrategies = dedupe_1.DedupeStrategies;

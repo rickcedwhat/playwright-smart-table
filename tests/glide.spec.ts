@@ -8,8 +8,8 @@ test.describe('Live Glide Data Grid', () => {
     // Shared Strategies & Configuration
 
     const glideConfig: TableConfig = {
-        headerSelector: 'thead tr th',
-        rowSelector: 'tbody tr',
+        headerSelector: 'table[role="grid"] thead tr th',
+        rowSelector: 'table[role="grid"] tbody tr',
         cellSelector: 'td',
         strategies: Plugins.Glide.Strategies
     };
