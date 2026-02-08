@@ -443,6 +443,11 @@ export interface TableResult<T = any> {
             rows: SmartRow[];
             allData: any[];
         }) => void | Promise<void>;
+        /**
+         * If true, flattens array results from callback into the main data array.
+         * If false (default), pushes the return value as-is (preserves batching/arrays).
+         */
+        autoFlatten?: boolean;
     }) => Promise<T[]>;
     /**
      * Generate an AI-friendly configuration prompt for debugging.

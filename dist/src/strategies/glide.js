@@ -10,9 +10,9 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.GlideStrategies = exports.glideGetActiveCell = exports.glideGetCellLocator = exports.glidePaginationStrategy = exports.glideFillStrategy = void 0;
-const test_1 = require("@playwright/test");
 const columns_1 = require("../../examples/glide-strategies/columns");
 const headers_1 = require("../../examples/glide-strategies/headers");
+const virtualizedPagination_1 = require("./virtualizedPagination");
 const glideFillStrategy = (_a) => __awaiter(void 0, [_a], void 0, function* ({ value, page }) {
     // Edit Cell
     yield page.keyboard.press('Enter');
@@ -43,20 +43,14 @@ const glideFillStrategy = (_a) => __awaiter(void 0, [_a], void 0, function* ({ v
     yield page.waitForTimeout(300);
 });
 exports.glideFillStrategy = glideFillStrategy;
-const glidePaginationStrategy = (_a) => __awaiter(void 0, [_a], void 0, function* ({ root }) {
-    // Strategy: Scroll the overlay container.
-    // We need to find the scroller within the same frame as the root.
-    // Using xpath to go up to body and find the scroller ensures we stay in the frame.
-    const scroller = root.locator('xpath=//ancestor::body//div[contains(@class, "dvn-scroller")]').first();
-    yield (0, test_1.expect)(scroller).toBeAttached();
-    // Force scroll via JS (most reliable for virtual lists)
-    yield scroller.evaluate(div => div.scrollTop += 500);
-    // Wait for virtual rows to render
-    // We use root.page() for timeout which is fine (global timer)
-    yield root.page().waitForTimeout(500);
-    return true;
+exports.glidePaginationStrategy = (0, virtualizedPagination_1.virtualizedInfiniteScroll)({
+    // Use the overlay scroller (found via xpath from canvas root)
+    scrollTarget: 'xpath=//ancestor::body//div[contains(@class, "dvn-scroller")]',
+    scrollAmount: 500,
+    stabilityTimeout: 200, // Wait for virtual rows to update
+    useJsScroll: true, // Canvas/Virtual scrollers often need direct JS manipulation
+    retries: 3 // Allow some time for the A11y layer to catch up
 });
-exports.glidePaginationStrategy = glidePaginationStrategy;
 const glideGetCellLocator = ({ page, columnIndex, rowIndex }) => {
     // Glide uses 1-based colIndex for data cells (colIndex 0 is row header usually)
     // rowIndex seems to be 0-based in the ID based on "glide-cell-1-0"

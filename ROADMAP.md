@@ -112,12 +112,12 @@ const row = await table.findRow({ Name: 'Grafana' });
 
 ### Phase 2: Ease of Use & Quick Wins
 **Goal:** Improve Developer Experience (DX) with high-value, low-risk changes.
-1.  **Header Transformer "Seen" State**: Pass `seenHeaders` Set to transformer for easy deduplication.
-2.  **Auto-Initialization**: `getHeaders` and `getHeaderCell` call `init()` automatically.
-3.  **Iteration Improvements**:
+1.  [x] **Header Transformer "Seen" State**: Pass `seenHeaders` Set to transformer for easy deduplication.
+2.  [x] **Auto-Initialization**: `getHeaders` and `getHeaderCell` call `init()` automatically.
+3.  [x] **Iteration Improvements**:
     - Pass `SmartRowArray` to callback.
     - Add `autoFlatten: boolean` option.
-4.  **Strict Mode Config**: Add `strict: boolean` (default `true`). If `false`, `findRow` returns the first match instead of throwing on duplicates.
+4.  [x] **Strict Mode Config**: Add `strict: boolean` (default `true`). If `false`, `findRow` returns the first match instead of throwing on duplicates.
 
 ### Phase 3: Core Strategy Engine (Loading & Dedupe)
 **Goal:** Robustly handle unstable and virtualized tables.
