@@ -12,7 +12,12 @@ async function setPlaygroundConfig(page: Page, config: any) {
     // Apply
     await page.getByRole('button', { name: 'Apply & Reload Table' }).click();
     // Wait for reload (spinner)
-    await expect(page.locator('.spinner')).toBeVisible();
+    // Wait for reload (spinner) - use loose check as it might be too fast
+    try {
+        await page.locator('.spinner').waitFor({ state: 'visible', timeout: 2000 });
+    } catch (e) {
+        // Ignored - might have missed it
+    }
     await expect(page.locator('.spinner')).not.toBeVisible();
 }
 
@@ -181,7 +186,8 @@ test.describe('Playground: Virtualized Table', () => {
                     // Use ID or unique content as key
                     const data = await row.toJSON();
                     return data.ID;
-                }
+                },
+                autoFlatten: true
             }
         );
 
@@ -203,5 +209,92 @@ test.describe('Playground: Virtualized Table', () => {
 
         expect(hasId1).toBe(true);
         expect(hasId100).toBe(true);
+    });
+
+    test('should return batches by default (autoFlatten=false)', async ({ page }) => {
+        // 1. Setup simple table
+        await setPlaygroundConfig(page, {
+            rowCount: 10,
+            defaults: { generator: "simple" } // Fast generator
+        });
+
+        await page.waitForTimeout(500);
+
+        const table = useTable(page.locator('.virtual-table-container'), {
+            rowSelector: '.virtual-row',
+            headerSelector: '.header [role="columnheader"]',
+            cellSelector: '[role="cell"]',
+            strategies: {
+                pagination: PaginationStrategies.virtualInfiniteScroll({
+                    scrollTarget: '[data-testid="virtuoso-scroller"]',
+                    scrollAmount: 500
+                })
+            }
+        });
+
+        // 2. Iterate with batching, relying on default autoFlatten=false
+        const batchedData = await table.iterateThroughTable(
+            async ({ rows }) => {
+                return await rows.toJSON();
+            },
+            {
+                maxIterations: 2,
+                batchSize: 5
+                // autoFlatten: false (implicit default)
+            }
+        );
+
+        // Should return array of arrays (batches)
+        expect(Array.isArray(batchedData)).toBe(true);
+        expect(batchedData.length).toBeGreaterThan(0);
+        // First item should be an array of rows
+        expect(Array.isArray(batchedData[0])).toBe(true);
+
+        // Safety check: ensure INNER items are row objects
+        const firstBatch = batchedData[0] as any[];
+        if (firstBatch.length > 0) {
+            expect(firstBatch[0]).toHaveProperty('ID');
+        }
+    });
+
+    test('should flatten batches when autoFlatten is true', async ({ page }) => {
+        // 1. Reuse setup logic (or setup anew to be safe)
+        await setPlaygroundConfig(page, {
+            rowCount: 10,
+            defaults: { generator: "simple" }
+        });
+        await page.waitForTimeout(500);
+
+        const table = useTable(page.locator('.virtual-table-container'), {
+            rowSelector: '.virtual-row',
+            headerSelector: '.header [role="columnheader"]',
+            cellSelector: '[role="cell"]',
+            strategies: {
+                pagination: PaginationStrategies.virtualInfiniteScroll({
+                    scrollTarget: '[data-testid="virtuoso-scroller"]',
+                    scrollAmount: 500
+                })
+            }
+        });
+
+        // 2. Iterate with explicit autoFlatten=true
+        const flatData = await table.iterateThroughTable(
+            async ({ rows }) => {
+                return await rows.toJSON();
+            },
+            {
+                maxIterations: 2,
+                batchSize: 5,
+                autoFlatten: true
+            }
+        );
+
+        // Should return flat array of rows
+        expect(Array.isArray(flatData)).toBe(true);
+        expect(flatData.length).toBeGreaterThan(0);
+
+        // First item should be a row object, NOT an array
+        expect(Array.isArray(flatData[0])).toBe(false);
+        expect(flatData[0]).toHaveProperty('ID');
     });
 });

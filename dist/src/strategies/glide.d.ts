@@ -1,6 +1,6 @@
-import { TableContext, FillStrategy } from '../types';
+import { FillStrategy } from '../types';
 export declare const glideFillStrategy: FillStrategy;
-export declare const glidePaginationStrategy: ({ root }: TableContext) => Promise<boolean>;
+export declare const glidePaginationStrategy: import("../types").PaginationStrategy;
 export declare const glideGetCellLocator: ({ page, columnIndex, rowIndex }: any) => any;
 export declare const glideGetActiveCell: ({ page }: any) => Promise<{
     rowIndex: number;
@@ -9,7 +9,7 @@ export declare const glideGetActiveCell: ({ page }: any) => Promise<{
 } | null>;
 export declare const GlideStrategies: {
     fill: FillStrategy;
-    pagination: ({ root }: TableContext) => Promise<boolean>;
+    pagination: import("../types").PaginationStrategy;
     header: (context: import("../types").StrategyContext, options?: {
         limit?: number;
         selector?: string;

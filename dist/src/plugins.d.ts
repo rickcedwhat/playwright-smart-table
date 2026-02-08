@@ -10,7 +10,7 @@ export declare const Plugins: {
     Glide: {
         Strategies: {
             fill: import("./types").FillStrategy;
-            pagination: ({ root }: import("./types").TableContext) => Promise<boolean>;
+            pagination: import("./types").PaginationStrategy;
             header: (context: import("./types").StrategyContext, options?: {
                 limit?: number;
                 selector?: string;

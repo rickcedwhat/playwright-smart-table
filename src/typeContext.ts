@@ -443,6 +443,11 @@ export interface TableResult<T = any> {
       getIsLast?: (context: { index: number, paginationResult: boolean }) => boolean;
       beforeFirst?: (context: { index: number, rows: SmartRow[], allData: any[] }) => void | Promise<void>;
       afterLast?: (context: { index: number, rows: SmartRow[], allData: any[] }) => void | Promise<void>;
+      /**
+       * If true, flattens array results from callback into the main data array.
+       * If false (default), pushes the return value as-is (preserves batching/arrays).
+       */
+      autoFlatten?: boolean;
     }
   ) => Promise<T[]>;
 

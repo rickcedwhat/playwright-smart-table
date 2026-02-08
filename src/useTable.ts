@@ -530,6 +530,11 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
         getIsLast?: (context: { index: number, paginationResult: boolean }) => boolean;
         beforeFirst?: (context: { index: number, rows: SmartRowType[], allData: any[] }) => void | Promise<void>;
         afterLast?: (context: { index: number, rows: SmartRowType[], allData: any[] }) => void | Promise<void>;
+        /**
+       * If true, flattens array results from callback into the main data array.
+       * If false (default), pushes the return value as-is (preserves batching/arrays).
+       */
+        autoFlatten?: boolean;
       }
     ): Promise<T[]> => {
       await _ensureInitialized();
@@ -563,6 +568,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       const effectiveMaxIterations = options?.maxIterations ?? config.maxPages;
       const batchSize = options?.batchSize;
       const isBatching = batchSize !== undefined && batchSize > 1;
+      const autoFlatten = options?.autoFlatten ?? false;
 
       let index = 0;
       let paginationResult = true;
@@ -638,7 +644,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
             batchInfo
           });
 
-          if (Array.isArray(returnValue)) {
+          if (autoFlatten && Array.isArray(returnValue)) {
             allData.push(...returnValue);
           } else {
             allData.push(returnValue as T);
@@ -700,7 +706,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
               table: restrictedTable,
               batchInfo
             });
-            if (Array.isArray(returnValue)) {
+            if (autoFlatten && Array.isArray(returnValue)) {
               allData.push(...returnValue);
             } else {
               allData.push(returnValue as T);

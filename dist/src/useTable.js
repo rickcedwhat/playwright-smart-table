@@ -461,7 +461,7 @@ const useTable = (rootLocator, configOptions = {}) => {
             })
         },
         iterateThroughTable: (callback, options) => __awaiter(void 0, void 0, void 0, function* () {
-            var _a, _b, _c, _d, _e, _f;
+            var _a, _b, _c, _d, _e, _f, _g;
             yield _ensureInitialized();
             const paginationStrategy = (_a = options === null || options === void 0 ? void 0 : options.pagination) !== null && _a !== void 0 ? _a : config.strategies.pagination;
             const hasPaginationInOptions = (options === null || options === void 0 ? void 0 : options.pagination) !== undefined;
@@ -491,6 +491,7 @@ const useTable = (rootLocator, configOptions = {}) => {
             const effectiveMaxIterations = (_d = options === null || options === void 0 ? void 0 : options.maxIterations) !== null && _d !== void 0 ? _d : config.maxPages;
             const batchSize = options === null || options === void 0 ? void 0 : options.batchSize;
             const isBatching = batchSize !== undefined && batchSize > 1;
+            const autoFlatten = (_e = options === null || options === void 0 ? void 0 : options.autoFlatten) !== null && _e !== void 0 ? _e : false;
             let index = 0;
             let paginationResult = true;
             let seenKeys = null;
@@ -500,7 +501,7 @@ const useTable = (rootLocator, configOptions = {}) => {
             while (index < effectiveMaxIterations) {
                 const rowLocators = yield resolve(config.rowSelector, rootLocator).all();
                 const smartRowsArray = [];
-                const isRowLoading = (_e = config.strategies.loading) === null || _e === void 0 ? void 0 : _e.isRowLoading;
+                const isRowLoading = (_f = config.strategies.loading) === null || _f === void 0 ? void 0 : _f.isRowLoading;
                 for (let i = 0; i < rowLocators.length; i++) {
                     const smartRow = _makeSmart(rowLocators[i], _headerMap, i);
                     if (isRowLoading && (yield isRowLoading(smartRow)))
@@ -508,7 +509,7 @@ const useTable = (rootLocator, configOptions = {}) => {
                     smartRowsArray.push(smartRow);
                 }
                 let rows = (0, smartRowArray_1.createSmartRowArray)(smartRowsArray);
-                const dedupeStrategy = (_f = options === null || options === void 0 ? void 0 : options.dedupeStrategy) !== null && _f !== void 0 ? _f : config.strategies.dedupe;
+                const dedupeStrategy = (_g = options === null || options === void 0 ? void 0 : options.dedupeStrategy) !== null && _g !== void 0 ? _g : config.strategies.dedupe;
                 if (dedupeStrategy && rows.length > 0) {
                     if (!seenKeys)
                         seenKeys = new Set();
@@ -554,7 +555,7 @@ const useTable = (rootLocator, configOptions = {}) => {
                         table: restrictedTable,
                         batchInfo
                     });
-                    if (Array.isArray(returnValue)) {
+                    if (autoFlatten && Array.isArray(returnValue)) {
                         allData.push(...returnValue);
                     }
                     else {
@@ -610,7 +611,7 @@ const useTable = (rootLocator, configOptions = {}) => {
                             table: restrictedTable,
                             batchInfo
                         });
-                        if (Array.isArray(returnValue)) {
+                        if (autoFlatten && Array.isArray(returnValue)) {
                             allData.push(...returnValue);
                         }
                         else {
