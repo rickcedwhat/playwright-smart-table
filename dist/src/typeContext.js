@@ -211,6 +211,14 @@ export interface FilterStrategy {
 }
 
 /**
+ * Strategy to check if the table or rows are loading.
+ */
+export interface LoadingStrategy {
+  isTableLoading?: (context: TableContext) => Promise<boolean>;
+  isRowLoading?: (row: SmartRow) => Promise<boolean>;
+}
+
+/**
  * Organized container for all table interaction strategies.
  */
 export interface TableStrategies {
@@ -236,6 +244,8 @@ export interface TableStrategies {
   isRowLoaded?: (args: { row: Locator, index: number }) => Promise<boolean>;
   /** Custom helper to check if a cell is fully loaded/ready (e.g. for editing) */
   isCellLoaded?: (args: { cell: Locator, column: string, row: Locator }) => Promise<boolean>;
+  /** Strategy for detecting loading states */
+  loading?: LoadingStrategy;
 }
 
 /**
