@@ -4,7 +4,7 @@ export declare const Plugins: {
             header: (context: import("./types").TableContext) => Promise<string[]>;
             getCellLocator: ({ row, columnIndex }: any) => any;
             cellNavigation: ({ root, page, index }: any) => Promise<void>;
-            pagination: ({ root, page }: import("./types").TableContext) => Promise<boolean>;
+            pagination: import("./types").PaginationStrategy;
         };
     };
     Glide: {

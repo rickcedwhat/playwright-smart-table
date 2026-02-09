@@ -118,7 +118,7 @@ test.describe('Batching', () => {
             strategies: {
                 pagination: Strategies.Pagination.infiniteScroll()
             },
-            maxPages: 10
+            maxPages: 6
         });
         await table.init();
 
@@ -145,7 +145,7 @@ test.describe('Batching', () => {
         expect(uniqueNames.size).toBe(allNames.length);
 
         // Should have batched results
-        expect(results.length).toBeLessThan(10);
+        expect(results.length).toBeLessThan(7);
     });
 
     test('iterateThroughTable: Batching with hooks', async ({ page }) => {

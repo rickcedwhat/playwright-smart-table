@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Virtuoso } from 'react-virtuoso';
-import type { PlaygroundConfig, Delay, RowConfig, CellConfig } from './ControlPanel';
+import type { PlaygroundConfig, Delay, RowConfig } from './ControlPanel';
 
 
 // ----------------------------------------------------------------------
@@ -75,9 +75,12 @@ interface CellProps {
     rowConfig?: RowConfig;
     defaultCellDelay: Delay;
     index: number;
+    onCellLoaded?: (index: number, colId: string) => void;
+    isCellCached?: (index: number, colId: string) => boolean;
+    defaultCacheEnabled?: boolean;
 }
 
-const Cell: React.FC<CellProps> = ({ content, columnId, width, rowConfig, defaultCellDelay, index }) => {
+const Cell: React.FC<CellProps> = ({ content, columnId, width, rowConfig, defaultCellDelay, index, onCellLoaded, isCellCached, defaultCacheEnabled }) => {
     const cellOverride = rowConfig?.cells?.[columnId];
 
     // Determine delay: Override -> Default
@@ -90,14 +93,21 @@ const Cell: React.FC<CellProps> = ({ content, columnId, width, rowConfig, defaul
         ? resolveValue(cellOverride.value, index)
         : content;
 
-    const [isLoaded, setIsLoaded] = useState(resolvedDelay <= 0);
+    const cacheEnabled = cellOverride?.cache ?? defaultCacheEnabled;
+    const isCached = cacheEnabled && isCellCached && isCellCached(index, columnId);
+    const [isLoaded, setIsLoaded] = useState(!!isCached || resolvedDelay <= 0);
 
     useEffect(() => {
         if (!isLoaded && resolvedDelay < Infinity && resolvedDelay >= 0) {
-            const timer = setTimeout(() => setIsLoaded(true), resolvedDelay);
+            const timer = setTimeout(() => {
+                setIsLoaded(true);
+                onCellLoaded?.(index, columnId);
+            }, resolvedDelay);
             return () => clearTimeout(timer);
+        } else if (isLoaded) {
+            onCellLoaded?.(index, columnId);
         }
-    }, [isLoaded, resolvedDelay]);
+    }, [isLoaded, resolvedDelay, index, columnId, onCellLoaded]);
 
     if (!isLoaded) {
         return (
@@ -132,24 +142,35 @@ const Cell: React.FC<CellProps> = ({ content, columnId, width, rowConfig, defaul
     );
 };
 
-const RowContent = ({ index, data }: { index: number; data: PlaygroundConfig }) => {
+const RowContent = ({ index, data, onRowLoaded, isRowCached, onCellLoaded, isCellCached }: {
+    index: number;
+    data: PlaygroundConfig;
+    onRowLoaded: (index: number) => void;
+    isRowCached: (index: number) => boolean;
+    onCellLoaded: (index: number, colId: string) => void;
+    isCellCached: (index: number, colId: string) => boolean;
+}) => {
     const config = data; // Rename for clarity
     const rowConfig = config.rows?.[index];
 
     // Determine Row Delay
     const delayConfig = rowConfig?.delay ?? config.defaults.rowDelay;
-    // Use useRef to store delay once calculated per mount to avoid jitter re-calc unless config changes
-    // Actually simplicity is better for now, useMemo on delayConfig object reference or primitives
     const resolvedRowDelay = useMemo(() => resolveDelay(delayConfig), [delayConfig]);
 
-    const [isRowLoaded, setIsRowLoaded] = useState(resolvedRowDelay <= 0);
+    const isCached = (rowConfig?.cache ?? config.defaults.rowCache) && isRowCached(index);
+    const [isRowLoaded, setIsRowLoaded] = useState(isCached || resolvedRowDelay <= 0);
 
     useEffect(() => {
         if (!isRowLoaded && resolvedRowDelay < Infinity && resolvedRowDelay >= 0) {
-            const timer = setTimeout(() => setIsRowLoaded(true), resolvedRowDelay);
+            const timer = setTimeout(() => {
+                setIsRowLoaded(true);
+                onRowLoaded(index);
+            }, resolvedRowDelay);
             return () => clearTimeout(timer);
+        } else if (isRowLoaded) {
+            onRowLoaded(index); // Mark as loaded if 0 delay or cached
         }
-    }, [isRowLoaded, resolvedRowDelay]);
+    }, [isRowLoaded, resolvedRowDelay, index, onRowLoaded]);
 
     // Simple fade-in style
     const style: React.CSSProperties = {
@@ -173,22 +194,47 @@ const RowContent = ({ index, data }: { index: number; data: PlaygroundConfig }) 
     }
 
     const rowData = getRowData(index, config);
+    const cellProps = { index, rowConfig, defaultCellDelay: config.defaults.cellDelay, onCellLoaded, isCellCached, defaultCacheEnabled: config.defaults.cellCache };
 
     return (
         <div className="virtual-row" role="row" style={style}>
-            <Cell index={index} columnId="id" content={rowData.id} width="60px" rowConfig={rowConfig} defaultCellDelay={config.defaults.cellDelay} />
-            <Cell index={index} columnId="name" content={rowData.name || rowData.value} width="150px" rowConfig={rowConfig} defaultCellDelay={config.defaults.cellDelay} />
-            <Cell index={index} columnId="status" content={rowData.status || 'N/A'} width="100px" rowConfig={rowConfig} defaultCellDelay={config.defaults.cellDelay} />
+            <Cell columnId="id" content={rowData.id} width="60px" {...cellProps} />
+            <Cell columnId="name" content={rowData.name || rowData.value} width="150px" {...cellProps} />
+            <Cell columnId="status" content={rowData.status || 'N/A'} width="100px" {...cellProps} />
             <div style={{ flex: 1, display: 'flex' }} role="cell">
-                <Cell index={index} columnId="email" content={rowData.email || rowData.description || ''} width="100%" rowConfig={rowConfig} defaultCellDelay={config.defaults.cellDelay} />
+                <Cell columnId="email" content={rowData.email || rowData.description || ''} width="100%" {...cellProps} />
             </div>
         </div>
     );
 };
 
 export const VirtualizedTable: React.FC<{ config: PlaygroundConfig }> = ({ config }) => {
+    // Cache references (persist as long as this component is mounted)
+    const loadedRows = useRef(new Set<number>());
+    const loadedCells = useRef(new Set<string>());
+
+    const onRowLoaded = useMemo(() => (index: number) => {
+        loadedRows.current.add(index);
+    }, []);
+
+    const isRowCached = useMemo(() => (index: number) => {
+        return loadedRows.current.has(index);
+    }, []);
+
+    const onCellLoaded = useMemo(() => (index: number, colId: string) => {
+        loadedCells.current.add(`${index}:${colId}`);
+    }, []);
+
+    const isCellCached = useMemo(() => (index: number, colId: string) => {
+        return loadedCells.current.has(`${index}:${colId}`);
+    }, []);
+
     return (
-        <div className="virtual-table-container" style={{ height: 500, width: '100%', border: '1px solid var(--color-border)' }}>
+        <div
+            className="virtual-table-container"
+            style={{ height: 500, width: '100%', border: '1px solid var(--color-border)' }}
+            data-debug-row-delay={typeof config.defaults.rowDelay === 'object' ? config.defaults.rowDelay.base : config.defaults.rowDelay}
+        >
             <div className="header" style={{
                 display: 'flex', fontWeight: 600, padding: '12px 16px',
                 borderBottom: '2px solid var(--color-border)', backgroundColor: '#f7fafc',
@@ -204,7 +250,16 @@ export const VirtualizedTable: React.FC<{ config: PlaygroundConfig }> = ({ confi
                 style={{ height: 'calc(100% - 45px)' }} // Subtract header height
                 totalCount={config.rowCount}
                 data={new Array(config.rowCount).fill(null).map((_, i) => i)} // Dummy data array for pure index access or just modify itemContent
-                itemContent={(index) => <RowContent index={index} data={config} />}
+                itemContent={(index) => (
+                    <RowContent
+                        index={index}
+                        data={config}
+                        onRowLoaded={onRowLoaded}
+                        isRowCached={isRowCached}
+                        onCellLoaded={onCellLoaded}
+                        isCellCached={isCellCached}
+                    />
+                )}
             />
         </div>
     );

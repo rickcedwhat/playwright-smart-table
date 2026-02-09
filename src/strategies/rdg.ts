@@ -90,20 +90,17 @@ export const rdgCellNavigation = async ({ root, page, index }: any) => {
 /**
  * Scrolls the grid vertically to load more virtualized rows.
  */
-export const rdgPaginationStrategy = async ({ root, page }: TableContext) => {
-    const scrollInfo = await root.evaluate(el => ({
-        scrollTop: el.scrollTop,
-        maxScroll: el.scrollHeight - el.clientHeight
-    }));
+import { PaginationStrategies } from './pagination';
+import { StabilizationStrategies } from './stabilization';
 
-    if (scrollInfo.scrollTop >= scrollInfo.maxScroll - 10) {
-        return false;
-    }
-
-    await root.evaluate(el => el.scrollTop += 500);
-    await page.waitForTimeout(400);
-    return true;
-};
+/**
+ * Scrolls the grid vertically to load more virtualized rows.
+ */
+export const rdgPaginationStrategy = PaginationStrategies.infiniteScroll({
+    action: 'js-scroll',
+    scrollAmount: 500,
+    stabilization: StabilizationStrategies.contentChanged({ timeout: 5000 })
+});
 
 export const RDGStrategies = {
     header: scrollRightHeaderRDG,

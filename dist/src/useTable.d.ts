@@ -10,15 +10,17 @@ import { Strategies } from './strategies';
  */
 export declare const useTable: <T = any>(rootLocator: Locator, configOptions?: TableConfig) => TableResult<T>;
 export declare const PaginationStrategies: {
-    virtualInfiniteScroll: (options?: {
-        scrollTarget?: string;
-        scrollAmount?: number;
-        stabilityTimeout?: number;
-        retries?: number;
-        useJsScroll?: boolean;
+    clickNext: (nextButtonSelector: Selector, options?: {
+        stabilization?: import("./strategies/stabilization").StabilizationStrategy;
+        timeout?: number;
     }) => PaginationStrategy;
-    clickNext: (nextButtonSelector: Selector, timeout?: number) => PaginationStrategy;
-    infiniteScroll: (timeout?: number) => PaginationStrategy;
+    infiniteScroll: (options?: {
+        action?: "scroll" | "js-scroll";
+        scrollTarget?: Selector;
+        scrollAmount?: number;
+        stabilization?: import("./strategies/stabilization").StabilizationStrategy;
+        timeout?: number;
+    }) => PaginationStrategy;
 };
 export declare const LoadingStrategies: {
     Table: {

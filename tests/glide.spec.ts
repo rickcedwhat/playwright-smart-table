@@ -5,6 +5,7 @@ import type { TableConfig, TableContext } from '../src/types';
 
 test.describe('Live Glide Data Grid', () => {
     test.setTimeout(60000); // Increase timeout for CI
+
     // Shared Strategies & Configuration
 
     const glideConfig: TableConfig = {
@@ -76,10 +77,11 @@ test.describe('Live Glide Data Grid', () => {
             async ({ rows }) => {
                 return Promise.all(rows.map(r => r.toJSON({ columns: ['First name', 'Last name', 'Title', 'Email'] })));
             },
-            { maxIterations: 3 }
+            { maxIterations: 3, autoFlatten: true }
         );
 
-        const flattenedData = allData.flat();
+        // const flattenedData = allData.flat(); // No longer needed with autoFlatten: true
+        const flattenedData = allData;
 
         console.log(`Collected ${flattenedData.length} total rows after scroll`);
         expect(flattenedData.length).toBeGreaterThan(12);
@@ -122,10 +124,11 @@ test.describe('Live Glide Data Grid', () => {
             async ({ rows }) => {
                 return Promise.all(rows.map(r => r.toJSON({ columns })));
             },
-            { maxIterations: 3 }
+            { maxIterations: 3, autoFlatten: true }
         );
 
-        const flattenedData = allData.flat();
+        // const flattenedData = allData.flat(); // No longer needed
+        const flattenedData = allData;
 
         console.log(`Collected ${flattenedData.length} total rows after scroll`);
         expect(flattenedData.length).toBeGreaterThan(12);

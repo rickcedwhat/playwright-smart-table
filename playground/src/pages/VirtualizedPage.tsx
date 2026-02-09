@@ -16,13 +16,18 @@ export const VirtualizedPage = () => {
     const [config, setConfig] = useState<PlaygroundConfig>(DEFAULT_CONFIG);
     const [isTableLoading, setIsTableLoading] = useState(false);
     const [tableKey, setTableKey] = useState(0); // Used to force re-render
+    const [hasLoadedTable, setHasLoadedTable] = useState(false);
 
     const handleReload = () => {
         setIsTableLoading(true);
         // Resolve delay (handle number vs object)
         const delayConfig = config.defaults.tableInitDelay;
         let delay = 0;
-        if (typeof delayConfig === 'number') {
+
+        // Use cache: if loaded once and tableCache is true, skip delay
+        if (config.defaults.tableCache && hasLoadedTable) {
+            delay = 0;
+        } else if (typeof delayConfig === 'number') {
             delay = delayConfig;
         } else if (delayConfig && typeof delayConfig === 'object') {
             delay = delayConfig.base; // Use base for simple table init
@@ -30,6 +35,7 @@ export const VirtualizedPage = () => {
 
         setTimeout(() => {
             setIsTableLoading(false);
+            setHasLoadedTable(true);
             setTableKey(prev => prev + 1); // Force new table instance if needed
         }, delay);
     };

@@ -434,7 +434,7 @@ test.describe('Backwards Compatibility Tests', () => {
       // Return names from this iteration - automatically appended to allData
       const names = await Promise.all(rows.map(r => r.getCell('Name').innerText()));
       return names;
-    },);
+    }, { autoFlatten: true });
 
     // allNames should be a flattened array of strings (collected from all pages)
     expect(allNames.length).toBeGreaterThan(0);

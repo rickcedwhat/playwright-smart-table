@@ -2,6 +2,8 @@ import { expect } from '@playwright/test';
 import { TableContext, FillStrategy } from '../types';
 import { keyboardCellNavigation } from '../../examples/glide-strategies/columns';
 import { scrollRightHeader } from '../../examples/glide-strategies/headers';
+import { PaginationStrategies } from './pagination';
+import { StabilizationStrategies } from './stabilization';
 
 export const glideFillStrategy: FillStrategy = async ({ value, page }) => {
     // Edit Cell
@@ -32,22 +34,14 @@ export const glideFillStrategy: FillStrategy = async ({ value, page }) => {
     await page.waitForTimeout(300);
 };
 
-export const glidePaginationStrategy = async ({ root }: TableContext) => {
-    // Strategy: Scroll the overlay container.
-    // We need to find the scroller within the same frame as the root.
-    // Using xpath to go up to body and find the scroller ensures we stay in the frame.
-    const scroller = root.locator('xpath=//ancestor::body//div[contains(@class, "dvn-scroller")]').first();
-    await expect(scroller).toBeAttached();
 
-    // Force scroll via JS (most reliable for virtual lists)
-    await scroller.evaluate(div => div.scrollTop += 500);
-
-    // Wait for virtual rows to render
-    // We use root.page() for timeout which is fine (global timer)
-    await root.page().waitForTimeout(500);
-
-    return true;
-};
+export const glidePaginationStrategy = PaginationStrategies.infiniteScroll({
+    scrollTarget: 'xpath=//ancestor::body//div[contains(@class, "dvn-scroller")]',
+    scrollAmount: 500,
+    action: 'js-scroll',
+    stabilization: StabilizationStrategies.contentChanged({ timeout: 5000 }),
+    timeout: 5000 // Overall timeout
+});
 
 export const glideGetCellLocator = ({ page, columnIndex, rowIndex }: any) => {
     // Glide uses 1-based colIndex for data cells (colIndex 0 is row header usually)

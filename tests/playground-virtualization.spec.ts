@@ -1,5 +1,6 @@
 import { test, expect, Page } from '@playwright/test';
 import { useTable, PaginationStrategies } from '../src/useTable';
+import { StabilizationStrategies } from '../src/strategies/stabilization';
 
 // Helper to set config
 async function setPlaygroundConfig(page: Page, config: any) {
@@ -47,9 +48,11 @@ test.describe('Playground: Virtualized Table', () => {
             headerSelector: '.header [role="columnheader"]',
             cellSelector: '[role="cell"]',
             strategies: {
-                pagination: PaginationStrategies.virtualInfiniteScroll({
+                pagination: PaginationStrategies.infiniteScroll({
                     scrollTarget: '[data-testid="virtuoso-scroller"]',
-                    scrollAmount: 500
+                    scrollAmount: 500,
+                    action: 'js-scroll',
+                    stabilization: StabilizationStrategies.contentChanged()
                 })
             }
         });
@@ -86,12 +89,11 @@ test.describe('Playground: Virtualized Table', () => {
             headerSelector: '.header [role="columnheader"]',
             cellSelector: '[role="cell"]',
             strategies: {
-                pagination: PaginationStrategies.virtualInfiniteScroll({
+                pagination: PaginationStrategies.infiniteScroll({
                     scrollTarget: '[data-testid="virtuoso-scroller"]',
                     scrollAmount: 1000,
-                    stabilityTimeout: 500,
-                    retries: 5,
-                    useJsScroll: true
+                    action: 'js-scroll',
+                    stabilization: StabilizationStrategies.contentChanged({ timeout: 500 })
                 })
             },
             debug: {
@@ -124,11 +126,11 @@ test.describe('Playground: Virtualized Table', () => {
             headerSelector: '.header [role="columnheader"]',
             cellSelector: '[role="cell"]',
             strategies: {
-                pagination: PaginationStrategies.virtualInfiniteScroll({
+                pagination: PaginationStrategies.infiniteScroll({
                     scrollTarget: '[data-testid="virtuoso-scroller"]',
                     scrollAmount: 1000,
-                    stabilityTimeout: 500,
-                    useJsScroll: true
+                    action: 'js-scroll',
+                    stabilization: StabilizationStrategies.contentChanged({ timeout: 500 })
                 })
             }
         });
@@ -166,11 +168,11 @@ test.describe('Playground: Virtualized Table', () => {
             headerSelector: '.header [role="columnheader"]',
             cellSelector: '[role="cell"]',
             strategies: {
-                pagination: PaginationStrategies.virtualInfiniteScroll({
+                pagination: PaginationStrategies.infiniteScroll({
                     scrollTarget: '[data-testid="virtuoso-scroller"]',
                     scrollAmount: 300,
-                    stabilityTimeout: 1000,
-                    useJsScroll: true
+                    action: 'js-scroll',
+                    stabilization: StabilizationStrategies.contentChanged({ timeout: 1000 })
                 })
             }
         });
@@ -225,9 +227,11 @@ test.describe('Playground: Virtualized Table', () => {
             headerSelector: '.header [role="columnheader"]',
             cellSelector: '[role="cell"]',
             strategies: {
-                pagination: PaginationStrategies.virtualInfiniteScroll({
+                pagination: PaginationStrategies.infiniteScroll({
                     scrollTarget: '[data-testid="virtuoso-scroller"]',
-                    scrollAmount: 500
+                    scrollAmount: 500,
+                    action: 'js-scroll',
+                    stabilization: StabilizationStrategies.contentChanged()
                 })
             }
         });
@@ -270,9 +274,11 @@ test.describe('Playground: Virtualized Table', () => {
             headerSelector: '.header [role="columnheader"]',
             cellSelector: '[role="cell"]',
             strategies: {
-                pagination: PaginationStrategies.virtualInfiniteScroll({
+                pagination: PaginationStrategies.infiniteScroll({
                     scrollTarget: '[data-testid="virtuoso-scroller"]',
-                    scrollAmount: 500
+                    scrollAmount: 500,
+                    action: 'js-scroll',
+                    stabilization: StabilizationStrategies.contentChanged()
                 })
             }
         });
@@ -296,5 +302,66 @@ test.describe('Playground: Virtualized Table', () => {
         // First item should be a row object, NOT an array
         expect(Array.isArray(flatData[0])).toBe(false);
         expect(flatData[0]).toHaveProperty('ID');
+    });
+
+    test('should cache previously loaded rows (skip delay)', async ({ page }) => {
+        page.on('console', msg => console.log(`[Browser] ${msg.text()}`));
+        test.setTimeout(60000);
+        // 1. Setup: 2s delay, row caching ON
+        await setPlaygroundConfig(page, {
+            rowCount: 100,
+            defaults: {
+                tableInitDelay: 500,
+                rowDelay: 2000,
+                generator: "simple",
+                rowCache: true
+            }
+        });
+        await page.waitForTimeout(500);
+        // Ensure new config is applied
+        await expect(page.locator('.virtual-table-container')).toHaveAttribute('data-debug-row-delay', '2000');
+
+        const table = useTable(page.locator('.virtual-table-container'), {
+            rowSelector: '.virtual-row',
+            headerSelector: '.header [role="columnheader"]',
+            cellSelector: '[role="cell"]',
+            strategies: {
+                pagination: PaginationStrategies.infiniteScroll({
+                    scrollTarget: '[data-testid="virtuoso-scroller"]',
+                    scrollAmount: 500,
+                    action: 'js-scroll',
+                    stabilization: StabilizationStrategies.contentChanged({ timeout: 200 })
+                }),
+                loading: {
+                    isTableLoading: async ({ root }) => {
+                        return (await root.locator('.skeleton-row').count()) > 0;
+                    }
+                }
+            },
+            maxPages: 20
+        });
+
+        // 2. Find row 20 (First time: should be slow due to delay)
+        // Note: Row 20 might be around 1000px down.
+        const start1 = Date.now();
+        await table.findRow({ ID: '20' });
+        const duration1 = Date.now() - start1;
+
+        expect(duration1).toBeGreaterThan(1200); // At least delay time (minus some jitter/overhead margin) // At least delay time (minus some jitter/overhead margin)
+
+        // 3. Reset scroll to top (destroying row 20)
+        await page.locator('[data-testid="virtuoso-scroller"]').evaluate(el => el.scrollTop = 0);
+        await page.waitForTimeout(500); // Wait for unmount/render
+
+        // 4. Find row 20 again (Second time: should be fast)
+        const start2 = Date.now();
+        await table.findRow({ ID: '20' });
+        const duration2 = Date.now() - start2;
+
+        console.log(`First load: ${duration1}ms, Second load: ${duration2}ms`);
+        // Should be much faster. Allow some buffer for scrolling/rendering (e.g. 1000ms), but definitely less than 2000ms delay + scroll
+        // Actually, without delay, it should be instant (< 1000ms depending on scroll speed).
+        expect(duration2).toBeLessThan(duration1);
+        expect(duration2).toBeLessThan(1500);
     });
 });
