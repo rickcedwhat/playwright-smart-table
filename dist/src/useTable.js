@@ -44,7 +44,7 @@ const useTable = (rootLocator, configOptions = {}) => {
         cellNavigation: columns_1.CellNavigationStrategies.default,
         pagination: () => __awaiter(void 0, void 0, void 0, function* () { return false; }),
     };
-    const config = Object.assign(Object.assign({ rowSelector: "tbody tr", headerSelector: "thead th", cellSelector: "td", maxPages: 1, headerTransformer: ({ text }) => text, autoScroll: true, strict: true, onReset: () => __awaiter(void 0, void 0, void 0, function* () { }) }, configOptions), { strategies: Object.assign(Object.assign({}, defaultStrategies), configOptions.strategies) });
+    const config = Object.assign(Object.assign({ rowSelector: "tbody tr", headerSelector: "thead th", cellSelector: "td", maxPages: 1, headerTransformer: ({ text }) => text, autoScroll: true, onReset: () => __awaiter(void 0, void 0, void 0, function* () { }) }, configOptions), { strategies: Object.assign(Object.assign({}, defaultStrategies), configOptions.strategies) });
     const resolve = (item, parent) => {
         if (typeof item === 'string')
             return parent.locator(item);
@@ -170,10 +170,6 @@ const useTable = (rootLocator, configOptions = {}) => {
             const count = yield matchedRows.count();
             log(`Page ${currentPage}: Found ${count} matches.`);
             if (count > 1) {
-                if (config.strict === false) {
-                    log(`Strict mode disabled. Found ${count} matches, returning first.`);
-                    return matchedRows.first();
-                }
                 // Sample data logic (simplified for refactor, kept inline or moved to util if needed)
                 const sampleData = [];
                 try {
@@ -186,7 +182,7 @@ const useTable = (rootLocator, configOptions = {}) => {
                 }
                 catch (e) { }
                 const sampleMsg = sampleData.length > 0 ? `\nSample matching rows:\n${sampleData.map((d, i) => `  ${i + 1}. ${d}`).join('\n')}` : '';
-                throw new Error(`Strict Mode Violation: Found ${count} rows matching ${JSON.stringify(filters)} on page ${currentPage}. ` +
+                throw new Error(`Ambiguous Row: Found ${count} rows matching ${JSON.stringify(filters)} on page ${currentPage}. ` +
                     `Expected exactly one match. Try adding more filters to make your query unique.${sampleMsg}`);
             }
             if (count === 1)

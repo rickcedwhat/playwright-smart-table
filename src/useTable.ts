@@ -39,7 +39,6 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     maxPages: 1,
     headerTransformer: ({ text }) => text,
     autoScroll: true,
-    strict: true,
     onReset: async () => { /* no-op default */ },
     ...configOptions,
     strategies: {
@@ -188,11 +187,6 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       log(`Page ${currentPage}: Found ${count} matches.`);
 
       if (count > 1) {
-        if (config.strict === false) {
-          log(`Strict mode disabled. Found ${count} matches, returning first.`);
-          return matchedRows.first();
-        }
-
         // Sample data logic (simplified for refactor, kept inline or moved to util if needed)
         const sampleData: string[] = [];
         try {
@@ -206,7 +200,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
         const sampleMsg = sampleData.length > 0 ? `\nSample matching rows:\n${sampleData.map((d, i) => `  ${i + 1}. ${d}`).join('\n')}` : '';
 
         throw new Error(
-          `Strict Mode Violation: Found ${count} rows matching ${JSON.stringify(filters)} on page ${currentPage}. ` +
+          `Ambiguous Row: Found ${count} rows matching ${JSON.stringify(filters)} on page ${currentPage}. ` +
           `Expected exactly one match. Try adding more filters to make your query unique.${sampleMsg}`
         );
       }

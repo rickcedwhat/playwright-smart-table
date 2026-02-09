@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
+## [6.0.0] - 2026-02-08
+
+### 🚀 Major Changes
+
+#### Unified Pagination & Stabilization Architecture
+- **NEW**: `StabilizationStrategy` pattern.
+  - Strategies now **wrap** the action (click/scroll) to capture state *before* and *after*, eliminating race conditions on fast tables.
+  - `Strategies.Stabilization.contentChanged({ scope: 'all' })` - Robust fingerprinting for virtualized tables.
+  - `Strategies.Stabilization.rowCountIncreased()` - Standard check for append-only tables.
+- **NEW**: Unified `infiniteScroll` strategy.
+  - Merged "Simple" and "Virtualized" logic into a single factory.
+  - Configurable `action` ('scroll' vs 'js-scroll') and `stabilization` (content vs count).
+
+#### Interactive Playground
+- **NEW**: Included a `react-virtuoso` based playground in `/playground` for testing complex virtualization scenarios.
+- Used to verify the library against infinite scroll, stuttering networks, and "deep scrolling" (100k+ rows).
+
+### ✨ Added
+- **Strategies**: `Strategies.Loading` module for defining `isTableLoading` / `isRowLoading`.
+- **Developer Experience**:
+  - `headerTransformer` now receives `seenHeaders: Set<string>` for easier deduplication.
+  - `getHeaders()` and `getHeaderCell()` now **auto-initialize** the table (no more "Table not initialized" errors for simple lookups).
+- **Config**: "Strict Mode" configuration option.
+
+### 🔄 Changed
+- **BREAKING**: `StabilizationStrategy` signature changed to `(context, action) => Promise<boolean>`.
+- **BREAKING**: `Strategies.Pagination.virtualizedInfiniteScroll` is removed. Use `infiniteScroll({ action: 'js-scroll', stabilization: contentChanged() })`.
+- **Internal**: `useTable` iteration loop refactored to support new stabilization pattern.
+
+### 🧪 Testing
+- **New Test Suite**: `tests/playground-virtualization.spec.ts` (30+ new tests).
+- Verified compatibility with **Glide Data Grid** and **React Data Grid**.
+- 97/97 tests passing.
+
+---
+
 ## [5.0.0] - 2026-01-22
 
 ### 🚀 Major Changes
