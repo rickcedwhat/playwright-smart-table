@@ -3,7 +3,7 @@ import { TableConfig, TableContext, Selector, TableResult, SmartRow as SmartRowT
 import { TYPE_CONTEXT } from './typeContext';
 import { SortingStrategies as ImportedSortingStrategies } from './strategies/sorting';
 import { PaginationStrategies as ImportedPaginationStrategies } from './strategies/pagination';
-import { VirtualizedPaginationStrategies as ImportedVirtualizedPaginationStrategies } from './strategies/virtualizedPagination';
+
 import { DedupeStrategies as ImportedDedupeStrategies } from './strategies/dedupe';
 import { LoadingStrategies as ImportedLoadingStrategies } from './strategies/loading';
 import { FillStrategies } from './strategies/fill';
@@ -742,8 +742,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
 };
 
 export const PaginationStrategies = {
-  ...ImportedPaginationStrategies,
-  ...ImportedVirtualizedPaginationStrategies
+  ...ImportedPaginationStrategies
 };
 export const LoadingStrategies = ImportedLoadingStrategies;
 export const SortingStrategies = ImportedSortingStrategies;

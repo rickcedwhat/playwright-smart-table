@@ -11,12 +11,14 @@ export type Delay = number | { base: number; stutter: number };
 export interface CellConfig {
     delay?: Delay;
     value?: any;
+    cache?: boolean;
 }
 
 export interface RowConfig {
     delay?: Delay;
     data?: Record<string, any> | string | ((index: number) => any);
     cells?: Record<string, CellConfig>;
+    cache?: boolean;
 }
 
 export interface PlaygroundConfig {
@@ -26,6 +28,9 @@ export interface PlaygroundConfig {
         rowDelay: Delay;
         cellDelay: Delay;
         generator: string | ((index: number) => any);
+        tableCache?: boolean;
+        rowCache?: boolean;
+        cellCache?: boolean;
     };
     rows?: Record<number, RowConfig>;
 }

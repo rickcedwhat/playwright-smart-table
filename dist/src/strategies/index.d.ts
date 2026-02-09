@@ -8,8 +8,17 @@ export * from './dedupe';
 export * from './loading';
 export declare const Strategies: {
     Pagination: {
-        clickNext: (nextButtonSelector: import("..").Selector, timeout?: number) => import("..").PaginationStrategy;
-        infiniteScroll: (timeout?: number) => import("..").PaginationStrategy;
+        clickNext: (nextButtonSelector: import("..").Selector, options?: {
+            stabilization?: import("./stabilization").StabilizationStrategy;
+            timeout?: number;
+        }) => import("..").PaginationStrategy;
+        infiniteScroll: (options?: {
+            action?: "scroll" | "js-scroll";
+            scrollTarget?: import("..").Selector;
+            scrollAmount?: number;
+            stabilization?: import("./stabilization").StabilizationStrategy;
+            timeout?: number;
+        }) => import("..").PaginationStrategy;
     };
     Sorting: {
         AriaSort: () => import("..").SortingStrategy;

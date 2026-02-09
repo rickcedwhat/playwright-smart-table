@@ -13,7 +13,6 @@ exports.Strategies = exports.ResolutionStrategies = exports.CellNavigationStrate
 const typeContext_1 = require("./typeContext");
 const sorting_1 = require("./strategies/sorting");
 const pagination_1 = require("./strategies/pagination");
-const virtualizedPagination_1 = require("./strategies/virtualizedPagination");
 const dedupe_1 = require("./strategies/dedupe");
 const loading_1 = require("./strategies/loading");
 const fill_1 = require("./strategies/fill");
@@ -641,7 +640,7 @@ const useTable = (rootLocator, configOptions = {}) => {
     return result;
 };
 exports.useTable = useTable;
-exports.PaginationStrategies = Object.assign(Object.assign({}, pagination_1.PaginationStrategies), virtualizedPagination_1.VirtualizedPaginationStrategies);
+exports.PaginationStrategies = Object.assign({}, pagination_1.PaginationStrategies);
 exports.LoadingStrategies = loading_1.LoadingStrategies;
 exports.SortingStrategies = sorting_1.SortingStrategies;
 exports.DedupeStrategies = dedupe_1.DedupeStrategies;

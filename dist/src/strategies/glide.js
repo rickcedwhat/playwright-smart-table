@@ -12,7 +12,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.GlideStrategies = exports.glideGetActiveCell = exports.glideGetCellLocator = exports.glidePaginationStrategy = exports.glideFillStrategy = void 0;
 const columns_1 = require("../../examples/glide-strategies/columns");
 const headers_1 = require("../../examples/glide-strategies/headers");
-const virtualizedPagination_1 = require("./virtualizedPagination");
+const pagination_1 = require("./pagination");
+const stabilization_1 = require("./stabilization");
 const glideFillStrategy = (_a) => __awaiter(void 0, [_a], void 0, function* ({ value, page }) {
     // Edit Cell
     yield page.keyboard.press('Enter');
@@ -43,13 +44,12 @@ const glideFillStrategy = (_a) => __awaiter(void 0, [_a], void 0, function* ({ v
     yield page.waitForTimeout(300);
 });
 exports.glideFillStrategy = glideFillStrategy;
-exports.glidePaginationStrategy = (0, virtualizedPagination_1.virtualizedInfiniteScroll)({
-    // Use the overlay scroller (found via xpath from canvas root)
+exports.glidePaginationStrategy = pagination_1.PaginationStrategies.infiniteScroll({
     scrollTarget: 'xpath=//ancestor::body//div[contains(@class, "dvn-scroller")]',
     scrollAmount: 500,
-    stabilityTimeout: 200, // Wait for virtual rows to update
-    useJsScroll: true, // Canvas/Virtual scrollers often need direct JS manipulation
-    retries: 3 // Allow some time for the A11y layer to catch up
+    action: 'js-scroll',
+    stabilization: stabilization_1.StabilizationStrategies.contentChanged({ timeout: 5000 }),
+    timeout: 5000 // Overall timeout
 });
 const glideGetCellLocator = ({ page, columnIndex, rowIndex }) => {
     // Glide uses 1-based colIndex for data cells (colIndex 0 is row header usually)

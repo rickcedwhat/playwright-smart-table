@@ -16,10 +16,10 @@ export declare const rdgCellNavigation: ({ root, page, index }: any) => Promise<
 /**
  * Scrolls the grid vertically to load more virtualized rows.
  */
-export declare const rdgPaginationStrategy: ({ root, page }: TableContext) => Promise<boolean>;
+export declare const rdgPaginationStrategy: import("../types").PaginationStrategy;
 export declare const RDGStrategies: {
     header: (context: TableContext) => Promise<string[]>;
     getCellLocator: ({ row, columnIndex }: any) => any;
     cellNavigation: ({ root, page, index }: any) => Promise<void>;
-    pagination: ({ root, page }: TableContext) => Promise<boolean>;
+    pagination: import("../types").PaginationStrategy;
 };

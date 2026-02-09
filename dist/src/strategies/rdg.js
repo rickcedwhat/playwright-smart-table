@@ -82,19 +82,16 @@ exports.rdgCellNavigation = rdgCellNavigation;
 /**
  * Scrolls the grid vertically to load more virtualized rows.
  */
-const rdgPaginationStrategy = (_a) => __awaiter(void 0, [_a], void 0, function* ({ root, page }) {
-    const scrollInfo = yield root.evaluate(el => ({
-        scrollTop: el.scrollTop,
-        maxScroll: el.scrollHeight - el.clientHeight
-    }));
-    if (scrollInfo.scrollTop >= scrollInfo.maxScroll - 10) {
-        return false;
-    }
-    yield root.evaluate(el => el.scrollTop += 500);
-    yield page.waitForTimeout(400);
-    return true;
+const pagination_1 = require("./pagination");
+const stabilization_1 = require("./stabilization");
+/**
+ * Scrolls the grid vertically to load more virtualized rows.
+ */
+exports.rdgPaginationStrategy = pagination_1.PaginationStrategies.infiniteScroll({
+    action: 'js-scroll',
+    scrollAmount: 500,
+    stabilization: stabilization_1.StabilizationStrategies.contentChanged({ timeout: 5000 })
 });
-exports.rdgPaginationStrategy = rdgPaginationStrategy;
 exports.RDGStrategies = {
     header: exports.scrollRightHeaderRDG,
     getCellLocator: exports.rdgGetCellLocator,

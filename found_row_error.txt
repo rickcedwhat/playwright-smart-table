@@ -1,0 +1,3 @@
+Error: locator.innerText: Test timeout of 60000ms exceeded.
+Call log:
+[2m  - waiting for locator('.virtual-table-container').locator('.virtual-row').filter({ hasText: '___SENTINEL_ROW_NOT_FOUND___1770581575826' }).locator('[role="cell"]').first()[22m
