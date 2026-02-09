@@ -261,8 +261,6 @@ export interface TableConfig {
   headerTransformer?: (args: { text: string, index: number, locator: Locator, seenHeaders: Set<string> }) => string | Promise<string>;
   /** Automatically scroll to table on init */
   autoScroll?: boolean;
-  /** Enforce strict mode (default: true). If false, finding multiple rows returns first match instead of throwing. */
-  strict?: boolean;
   /** Debug options for development and troubleshooting */
   debug?: DebugConfig;
   /** Reset hook */
@@ -277,7 +275,6 @@ export interface FinalTableConfig extends TableConfig {
   cellSelector: string;
   maxPages: number;
   autoScroll: boolean;
-  strict: boolean;
   debug?: TableConfig['debug'];
   headerTransformer: (args: { text: string, index: number, locator: Locator, seenHeaders: Set<string> }) => string | Promise<string>;
   onReset: (context: TableContext) => Promise<void>;
