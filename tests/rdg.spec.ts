@@ -7,7 +7,7 @@ test.describe('React Data Grid (RDG)', () => {
     test.setTimeout(60000);
 
     test('should collect all headers from virtualized columns', async ({ page }) => {
-        await page.goto('https://comcast.github.io/react-data-grid/#/CommonFeatures');
+        await page.goto('https://comcast.github.io/react-data-grid/#/CommonFeatures', { waitUntil: 'domcontentloaded' });
 
         const grid = page.locator('[role="grid"]').first();
         await expect(grid).toBeAttached({ timeout: 10000 });
@@ -32,7 +32,7 @@ test.describe('React Data Grid (RDG)', () => {
     });
 
     test('should read data from all columns including virtualized ones', async ({ page }) => {
-        await page.goto('https://comcast.github.io/react-data-grid/#/CommonFeatures');
+        await page.goto('https://comcast.github.io/react-data-grid/#/CommonFeatures', { waitUntil: 'domcontentloaded' });
 
         const grid = page.locator('[role="grid"]').first();
         await expect(grid).toBeAttached({ timeout: 10000 });
@@ -61,7 +61,7 @@ test.describe('React Data Grid (RDG)', () => {
     });
 
     test('should paginate through virtualized rows', async ({ page }) => {
-        await page.goto('https://comcast.github.io/react-data-grid/#/CommonFeatures');
+        await page.goto('https://comcast.github.io/react-data-grid/#/CommonFeatures', { waitUntil: 'domcontentloaded' });
 
         const grid = page.locator('[role="grid"]').first();
         await expect(grid).toBeAttached({ timeout: 10000 });
@@ -103,7 +103,7 @@ test.describe('React Data Grid (RDG)', () => {
     });
 
     test('should handle reading specific columns from middle of table', async ({ page }) => {
-        await page.goto('https://comcast.github.io/react-data-grid/#/CommonFeatures');
+        await page.goto('https://comcast.github.io/react-data-grid/#/CommonFeatures', { waitUntil: 'domcontentloaded' });
 
         const grid = page.locator('[role="grid"]').first();
         await expect(grid).toBeAttached({ timeout: 10000 });

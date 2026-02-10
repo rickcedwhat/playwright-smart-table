@@ -43,10 +43,10 @@ export const glidePaginationStrategy = PaginationStrategies.infiniteScroll({
     timeout: 5000 // Overall timeout
 });
 
-export const glideGetCellLocator = ({ page, columnIndex, rowIndex }: any) => {
-    // Glide uses 1-based colIndex for data cells (colIndex 0 is row header usually)
-    // rowIndex seems to be 0-based in the ID based on "glide-cell-1-0"
-    return page.locator(`#glide-cell-${columnIndex + 1}-${rowIndex}`);
+export const glideGetCellLocator = ({ row, columnIndex }: any) => {
+    // Use relative locator to support virtualization (where rowIndex resets or is offsets)
+    // The accessibility DOM usually contains 'td' elements with the data.
+    return row.locator('td').nth(columnIndex);
 };
 
 export const glideGetActiveCell = async ({ page }: any) => {

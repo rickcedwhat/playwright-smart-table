@@ -1,7 +1,7 @@
 import { FillStrategy } from '../types';
 export declare const glideFillStrategy: FillStrategy;
 export declare const glidePaginationStrategy: import("../types").PaginationStrategy;
-export declare const glideGetCellLocator: ({ page, columnIndex, rowIndex }: any) => any;
+export declare const glideGetCellLocator: ({ row, columnIndex }: any) => any;
 export declare const glideGetActiveCell: ({ page }: any) => Promise<{
     rowIndex: number;
     columnIndex: number;
@@ -20,7 +20,7 @@ export declare const GlideStrategies: {
         index: number;
         rowIndex?: number;
     }) => Promise<void>;
-    getCellLocator: ({ page, columnIndex, rowIndex }: any) => any;
+    getCellLocator: ({ row, columnIndex }: any) => any;
     getActiveCell: ({ page }: any) => Promise<{
         rowIndex: number;
         columnIndex: number;
