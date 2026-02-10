@@ -51,10 +51,10 @@ exports.glidePaginationStrategy = pagination_1.PaginationStrategies.infiniteScro
     stabilization: stabilization_1.StabilizationStrategies.contentChanged({ timeout: 5000 }),
     timeout: 5000 // Overall timeout
 });
-const glideGetCellLocator = ({ page, columnIndex, rowIndex }) => {
-    // Glide uses 1-based colIndex for data cells (colIndex 0 is row header usually)
-    // rowIndex seems to be 0-based in the ID based on "glide-cell-1-0"
-    return page.locator(`#glide-cell-${columnIndex + 1}-${rowIndex}`);
+const glideGetCellLocator = ({ row, columnIndex }) => {
+    // Use relative locator to support virtualization (where rowIndex resets or is offsets)
+    // The accessibility DOM usually contains 'td' elements with the data.
+    return row.locator('td').nth(columnIndex);
 };
 exports.glideGetCellLocator = glideGetCellLocator;
 const glideGetActiveCell = (_a) => __awaiter(void 0, [_a], void 0, function* ({ page }) {

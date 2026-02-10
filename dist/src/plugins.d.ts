@@ -21,7 +21,7 @@ export declare const Plugins: {
                 index: number;
                 rowIndex?: number;
             }) => Promise<void>;
-            getCellLocator: ({ page, columnIndex, rowIndex }: any) => any;
+            getCellLocator: ({ row, columnIndex }: any) => any;
             getActiveCell: ({ page }: any) => Promise<{
                 rowIndex: number;
                 columnIndex: number;
