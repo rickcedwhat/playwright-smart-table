@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+## [6.0.1] - 2026-02-10
+
+### 🐛 Fixed
+- **Publishing**: Bumped version to ensure all v6.0.0 features (`seenHeaders`, `autoFlatten`) are correctly propagated to npm and clear any potential caching issues.
+
 ## [6.0.0] - 2026-02-08
 
 ### 🚀 Major Changes
