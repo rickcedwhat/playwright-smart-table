@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
+
+## [6.1.0] - 2026-02-11
+
+### ⚠️ Breaking Changes
+- **`getRowByIndex` is now 0-indexed** for consistency with JavaScript arrays.
+  - **Before**: `table.getRowByIndex(1)` returned the first row.
+  - **After**: `table.getRowByIndex(0)` returns the first row.
+  - **Migration**: Subtract 1 from all `getRowByIndex` calls.
+
 ## [6.0.1] - 2026-02-10
 
 ### 🐛 Fixed
