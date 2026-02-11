@@ -110,7 +110,7 @@ test.describe('Real World Strategy Tests', () => {
       });
       await table.init();
 
-      const row = table.getRowByIndex(1);
+      const row = table.getRowByIndex(0);
       const data = await row.toJSON();
 
       // TypeScript should infer data as Employee

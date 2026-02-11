@@ -349,9 +349,8 @@ const useTable = (rootLocator, configOptions = {}) => {
         getRowByIndex: (index, options = {}) => {
             if (!_isInitialized || !_headerMap)
                 throw new Error('Table not initialized. Call await table.init() first, or use async methods like table.findRow() or table.getRows() which auto-initialize.');
-            const rowIndex = index - 1; // Convert 1-based to 0-based
-            const rowLocator = resolve(config.rowSelector, rootLocator).nth(rowIndex);
-            return _makeSmart(rowLocator, _headerMap, rowIndex);
+            const rowLocator = resolve(config.rowSelector, rootLocator).nth(index);
+            return _makeSmart(rowLocator, _headerMap, index);
         },
         findRow: (filters, options) => __awaiter(void 0, void 0, void 0, function* () {
             (0, debugUtils_1.logDebug)(config, 'info', 'Searching for row', filters);
