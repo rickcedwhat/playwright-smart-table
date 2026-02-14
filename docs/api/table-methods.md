@@ -366,8 +366,8 @@ iterateThroughTable: <T = any>(
   batchSize?: number;
   getIsFirst?: (context: { index: number }) => boolean;
   getIsLast?: (context: { index: number, paginationResult: boolean }) => boolean;
-  beforeFirst?: (context: { index: number, rows: SmartRow[], allData: any[] }) => void | Promise<void>;
-  afterLast?: (context: { index: number, rows: SmartRow[], allData: any[] }) => void | Promise<void>;
+  beforeFirst?: (context: { index: number, rows: SmartRowArray, allData: any[] }) => void | Promise<void>;
+  afterLast?: (context: { index: number, rows: SmartRowArray, allData: any[] }) => void | Promise<void>;
   autoFlatten?: boolean;
   }
 ```
