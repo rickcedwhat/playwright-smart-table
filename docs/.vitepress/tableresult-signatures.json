@@ -36,7 +36,7 @@
   },
   {
     "name": "findRows",
-    "signature": "findRows: <R extends { asJSON?: boolean }>(\n  filters: Record<string, string | RegExp | number>,\n  options?: { exact?: boolean, maxPages?: number } & R\n  ) => Promise<R['asJSON'] extends true ? Record<string, string>[] : SmartRow[]>",
+    "signature": "findRows: <R extends { asJSON?: boolean }>(\n  filters: Record<string, string | RegExp | number>,\n  options?: { exact?: boolean, maxPages?: number } & R\n  ) => Promise<R['asJSON'] extends true ? Record<string, string>[] : SmartRowArray>",
     "comment": "/**\n* ASYNC: Searches for all matching rows across pages using pagination.\n* Auto-initializes the table if not already initialized.\n* @param filters - The filter criteria to match\n* @param options - Search options including exact match, max pages, and asJSON\n*/"
   },
   {
@@ -71,7 +71,7 @@
   },
   {
     "name": "iterateThroughTable",
-    "signature": "iterateThroughTable: <T = any>(\n  callback: (context: {\n  index: number;\n  isFirst: boolean;\n  isLast: boolean;\n  rows: SmartRowArray;\n  allData: T[];\n  table: RestrictedTableResult;\n  batchInfo?: {\n  startIndex: number;\n  endIndex: number;\n  size: number;\n  };\n  }) => T | T[] | Promise<T | T[]>,\n  options?: {\n  pagination?: PaginationStrategy;\n  dedupeStrategy?: DedupeStrategy;\n  maxIterations?: number;\n  batchSize?: number;\n  getIsFirst?: (context: { index: number }) => boolean;\n  getIsLast?: (context: { index: number, paginationResult: boolean }) => boolean;\n  beforeFirst?: (context: { index: number, rows: SmartRow[], allData: any[] }) => void | Promise<void>;\n  afterLast?: (context: { index: number, rows: SmartRow[], allData: any[] }) => void | Promise<void>;\n  autoFlatten?: boolean;\n  }",
+    "signature": "iterateThroughTable: <T = any>(\n  callback: (context: {\n  index: number;\n  isFirst: boolean;\n  isLast: boolean;\n  rows: SmartRowArray;\n  allData: T[];\n  table: RestrictedTableResult;\n  batchInfo?: {\n  startIndex: number;\n  endIndex: number;\n  size: number;\n  };\n  }) => T | T[] | Promise<T | T[]>,\n  options?: {\n  pagination?: PaginationStrategy;\n  dedupeStrategy?: DedupeStrategy;\n  maxIterations?: number;\n  batchSize?: number;\n  getIsFirst?: (context: { index: number }) => boolean;\n  getIsLast?: (context: { index: number, paginationResult: boolean }) => boolean;\n  beforeFirst?: (context: { index: number, rows: SmartRowArray, allData: any[] }) => void | Promise<void>;\n  afterLast?: (context: { index: number, rows: SmartRowArray, allData: any[] }) => void | Promise<void>;\n  autoFlatten?: boolean;\n  }",
     "comment": "/**\n* If true, flattens array results from callback into the main data array.\n* If false (default), pushes the return value as-is (preserves batching/arrays).\n*/"
   },
   {
