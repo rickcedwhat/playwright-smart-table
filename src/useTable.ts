@@ -11,9 +11,10 @@ import { HeaderStrategies } from './strategies/headers';
 import { CellNavigationStrategies } from './strategies/columns';
 import { createSmartRow } from './smartRow';
 import { FilterEngine } from './filterEngine';
+import { TableMapper } from './engine/tableMapper';
+import { RowFinder } from './engine/rowFinder';
 import { ResolutionStrategies } from './strategies/resolution';
 import { Strategies } from './strategies';
-import { validatePaginationResult, validatePaginationStrategy, validateSortingStrategy } from './strategies/validation';
 import { debugDelay, logDebug, warnIfDebugInCI } from './utils/debugUtils';
 import { createSmartRowArray, SmartRowArray } from './utils/smartRowArray';
 
@@ -30,6 +31,9 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     header: HeaderStrategies.visible,
     cellNavigation: CellNavigationStrategies.default,
     pagination: async () => false,
+    loading: {
+      isHeaderLoading: ImportedLoadingStrategies.Headers.stable(200)
+    }
   };
 
   const config: FinalTableConfig = {
@@ -54,18 +58,15 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
   };
 
   // Internal State
-  let _headerMap: Map<string, number> | null = null;
   let _hasPaginated = false;
-  let _isInitialized = false;
 
   // Helpers
   const log = (msg: string) => {
-    logDebug(config, 'verbose', msg); // Legacy(`🔎 [SmartTable Debug] ${msg}`);
+    logDebug(config, 'verbose', msg);
   };
 
   const _createColumnError = (colName: string, map: Map<string, number>, context?: string): Error => {
     const availableColumns = Array.from(map.keys());
-    // Use Suggestion Logic from ResolutionStrategy (if we had a fuzzy one, for now manual suggest)
     const lowerCol = colName.toLowerCase();
     const suggestions = availableColumns.filter(col =>
       col.toLowerCase().includes(lowerCol) ||
@@ -85,154 +86,19 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     return new Error(`Column "${colName}" not found${contextMsg}${suggestion}`);
   };
 
-  const _getMap = async (timeout?: number) => {
-    if (_headerMap) return _headerMap;
-    log('Mapping headers...');
-    const headerTimeout = timeout ?? 3000;
-
-    if (config.autoScroll) {
-      try { await rootLocator.scrollIntoViewIfNeeded({ timeout: 1000 }); } catch (e) { }
-    }
-
-    const headerLoc = resolve(config.headerSelector, rootLocator);
-    try {
-      await headerLoc.first().waitFor({ state: 'visible', timeout: headerTimeout });
-    } catch (e) { /* Ignore hydration */ }
-
-    const strategy = config.strategies.header || HeaderStrategies.visible;
-    const context: TableContext = {
-      root: rootLocator,
-      config: config,
-      page: rootLocator.page(),
-      resolve: resolve
-    };
-
-    const rawHeaders = await strategy(context);
-
-    const seenHeaders = new Set<string>();
-    const entries: [string, number][] = [];
-
-    for (let i = 0; i < rawHeaders.length; i++) {
-      let text = rawHeaders[i].trim() || `__col_${i}`;
-      if (config.headerTransformer) {
-        text = await config.headerTransformer({
-          text,
-          index: i,
-          locator: rootLocator.locator(config.headerSelector as string).nth(i),
-          seenHeaders
-        });
-      }
-      entries.push([text, i]);
-      seenHeaders.add(text);
-    }
-
-    // Validation: Check for empty table
-    if (entries.length === 0) {
-      throw new Error(`Initialization Error: No columns found using selector "${config.headerSelector}". Check your selector or ensure the table is visible.`);
-    }
-
-    // Validation: Check for duplicates
-    const seen = new Set<string>();
-    const duplicates = new Set<string>();
-    for (const [name] of entries) {
-      if (seen.has(name)) {
-        duplicates.add(name);
-      }
-      seen.add(name);
-    }
-
-    if (duplicates.size > 0) {
-      const dupList = Array.from(duplicates).map(d => `"${d}"`).join(', ');
-      throw new Error(`Initialization Error: Duplicate column names found: ${dupList}. Use 'headerTransformer' to rename duplicate columns.`);
-    }
-
-    _headerMap = new Map(entries);
-    log(`Mapped ${entries.length} columns: ${JSON.stringify(entries.map(e => e[0]))}`);
-    return _headerMap;
-  };
+  // Engines
+  const filterEngine = new FilterEngine(config, resolve);
+  const tableMapper = new TableMapper(rootLocator, config, resolve);
 
   // Placeholder for the final table object
   let finalTable: TableResult<T> = null as unknown as TableResult<T>;
-  const filterEngine = new FilterEngine(config, resolve);
 
   // Helper factory
   const _makeSmart = (rowLocator: Locator, map: Map<string, number>, rowIndex?: number): SmartRowType => {
-    // Use the wrapped SmartRow logic
     return createSmartRow<T>(rowLocator, map, rowIndex, config, rootLocator, resolve, finalTable);
   };
 
-  const _findRowLocator = async (filters: Record<string, string | RegExp | number>, options: { exact?: boolean, maxPages?: number } = {}) => {
-    const map = await _getMap();
-    const effectiveMaxPages = options.maxPages ?? config.maxPages;
-    let currentPage = 1;
-
-    log(`Looking for row: ${JSON.stringify(filters)} (MaxPages: ${effectiveMaxPages})`);
-
-    while (true) {
-      // Check for table loading
-      if (config.strategies.loading?.isTableLoading) {
-        const isLoading = await config.strategies.loading.isTableLoading({ root: rootLocator, config, page: rootLocator.page(), resolve });
-        if (isLoading) {
-          log('Table is loading... waiting');
-          await rootLocator.page().waitForTimeout(200);
-          continue;
-        }
-      }
-
-      const allRows = resolve(config.rowSelector, rootLocator);
-      // Use FilterEngine
-      const matchedRows = filterEngine.applyFilters(allRows, filters, map, options.exact || false, rootLocator.page());
-
-      const count = await matchedRows.count();
-      log(`Page ${currentPage}: Found ${count} matches.`);
-
-      if (count > 1) {
-        // Sample data logic (simplified for refactor, kept inline or moved to util if needed)
-        const sampleData: string[] = [];
-        try {
-          const firstFewRows = await matchedRows.all();
-          const sampleCount = Math.min(firstFewRows.length, 3);
-          for (let i = 0; i < sampleCount; i++) {
-            const rowData = await _makeSmart(firstFewRows[i], map).toJSON();
-            sampleData.push(JSON.stringify(rowData));
-          }
-        } catch (e) { }
-        const sampleMsg = sampleData.length > 0 ? `\nSample matching rows:\n${sampleData.map((d, i) => `  ${i + 1}. ${d}`).join('\n')}` : '';
-
-        throw new Error(
-          `Ambiguous Row: Found ${count} rows matching ${JSON.stringify(filters)} on page ${currentPage}. ` +
-          `Expected exactly one match. Try adding more filters to make your query unique.${sampleMsg}`
-        );
-      }
-      if (count === 1) return matchedRows.first();
-
-      if (currentPage < effectiveMaxPages) {
-        log(`Page ${currentPage}: Not found. Attempting pagination...`);
-        const context: TableContext = {
-          root: rootLocator,
-          config: config,
-          page: rootLocator.page(),
-          resolve: resolve
-        };
-
-        const paginationResult = await config.strategies.pagination!(context);
-        const didLoadMore = validatePaginationResult(paginationResult, 'Pagination Strategy');
-        if (didLoadMore) {
-          _hasPaginated = true;
-          currentPage++;
-          continue;
-        } else {
-          log(`Page ${currentPage}: Pagination failed (end of data).`);
-        }
-      }
-
-      if (_hasPaginated) {
-        console.warn(`⚠️ [SmartTable] Row not found. The table has been paginated (Current Page: ${currentPage}). You may need to call 'await table.reset()' if the target row is on a previous page.`);
-      }
-
-      return null;
-    }
-  };
+  const rowFinder = new RowFinder<T>(rootLocator, config, resolve, filterEngine, tableMapper, _makeSmart);
 
   const _getCleanHtml = async (loc: Locator): Promise<string> => {
     return loc.evaluate((el) => {
@@ -271,33 +137,25 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
   };
 
   const _ensureInitialized = async () => {
-    if (!_isInitialized) {
-      await _getMap();
-      _isInitialized = true;
-    }
+    await tableMapper.getMap();
   };
 
   const result: TableResult<T> = {
     init: async (options?: { timeout?: number }): Promise<TableResult<T>> => {
-      if (_isInitialized && _headerMap) return result;
+      if (tableMapper.isInitialized()) return result;
 
       warnIfDebugInCI(config);
       logDebug(config, 'info', 'Initializing table');
 
-      await _getMap(options?.timeout);
-      _isInitialized = true;
+      const map = await tableMapper.getMap(options?.timeout);
 
-      if (_headerMap) {
-        logDebug(config, 'info', `Table initialized with ${_headerMap.size} columns`, Array.from(_headerMap.keys()));
-        // Trace event removed - redundant with debug logging
-      }
-
+      logDebug(config, 'info', `Table initialized with ${map.size} columns`, Array.from(map.keys()));
       await debugDelay(config, 'default');
       return result;
     },
 
     scrollToColumn: async (columnName: string) => {
-      const map = await _getMap();
+      const map = await tableMapper.getMap();
       const idx = map.get(columnName);
       if (idx === undefined) throw _createColumnError(columnName, map);
 
@@ -312,14 +170,14 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     },
 
     getHeaders: async () => {
-      await _ensureInitialized();
-      return Array.from(_headerMap!.keys());
+      const map = await tableMapper.getMap();
+      return Array.from(map.keys());
     },
 
     getHeaderCell: async (columnName: string) => {
-      await _ensureInitialized();
-      const idx = _headerMap!.get(columnName);
-      if (idx === undefined) throw _createColumnError(columnName, _headerMap!, 'header cell');
+      const map = await tableMapper.getMap();
+      const idx = map.get(columnName);
+      if (idx === undefined) throw _createColumnError(columnName, map, 'header cell');
       return resolve(config.headerSelector, rootLocator).nth(idx);
     },
 
@@ -328,22 +186,20 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       const context: TableContext = { root: rootLocator, config, page: rootLocator.page(), resolve };
       await config.onReset(context);
       _hasPaginated = false;
-      _headerMap = null;
-      _isInitialized = false;
+      tableMapper.clear();
       log("Table reset complete.");
     },
 
     revalidate: async () => {
       log("Revalidating table structure...");
-      _headerMap = null; // Clear the map to force re-scanning
-      await _getMap(); // Re-scan headers
+      await tableMapper.remapHeaders();
       log("Table revalidated.");
     },
 
     getColumnValues: async <V = string>(column: string, options?: { mapper?: (cell: Locator) => Promise<V> | V, maxPages?: number }) => {
-      await _ensureInitialized();
-      const colIdx = _headerMap!.get(column);
-      if (colIdx === undefined) throw _createColumnError(column, _headerMap!);
+      const map = await tableMapper.getMap();
+      const colIdx = map.get(column);
+      if (colIdx === undefined) throw _createColumnError(column, map);
 
       const mapper = options?.mapper ?? ((c: Locator) => c.innerText() as any as V);
       const effectiveMaxPages = options?.maxPages ?? config.maxPages;
@@ -373,115 +229,38 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     },
 
     getRow: (filters: Partial<T> | Record<string, string | RegExp | number>, options: { exact?: boolean } = { exact: false }): SmartRowType<T> => {
-      if (!_isInitialized || !_headerMap) throw new Error('Table not initialized. Call await table.init() first, or use async methods like table.findRow() or table.getRows() which auto-initialize.');
+      const map = tableMapper.getMapSync();
+      if (!map) throw new Error('Table not initialized. Call await table.init() first, or use async methods like table.findRow() or table.getRows() which auto-initialize.');
 
       const allRows = resolve(config.rowSelector, rootLocator);
-      const matchedRows = filterEngine.applyFilters(allRows, filters as Record<string, string | RegExp | number>, _headerMap, options.exact || false, rootLocator.page());
+      const matchedRows = filterEngine.applyFilters(allRows, filters as Record<string, string | RegExp | number>, map, options.exact || false, rootLocator.page());
       const rowLocator = matchedRows.first();
-      return _makeSmart(rowLocator, _headerMap, 0); // fallback index 0
+      return _makeSmart(rowLocator, map, 0); // fallback index 0
     },
 
     getRowByIndex: (index: number, options: { bringIntoView?: boolean } = {}): SmartRowType<T> => {
-      if (!_isInitialized || !_headerMap) throw new Error('Table not initialized. Call await table.init() first, or use async methods like table.findRow() or table.getRows() which auto-initialize.');
+      const map = tableMapper.getMapSync();
+      if (!map) throw new Error('Table not initialized. Call await table.init() first, or use async methods like table.findRow() or table.getRows() which auto-initialize.');
 
       const rowLocator = resolve(config.rowSelector, rootLocator).nth(index);
-      return _makeSmart(rowLocator, _headerMap, index);
+      return _makeSmart(rowLocator, map, index);
     },
 
     findRow: async (filters: Partial<T> | Record<string, string | RegExp | number>, options?: { exact?: boolean, maxPages?: number }): Promise<SmartRowType<T>> => {
-      logDebug(config, 'info', 'Searching for row', filters);
-      await _ensureInitialized();
-
-      let row = await _findRowLocator(filters as Record<string, string | RegExp | number>, options);
-
-      if (row) {
-        logDebug(config, 'info', 'Row found');
-        await debugDelay(config, 'findRow');
-        return _makeSmart(row, _headerMap!, 0);
-      }
-
-      logDebug(config, 'error', 'Row not found', filters);
-      await debugDelay(config, 'findRow');
-
-      // Return sentinel row
-      row = resolve(config.rowSelector, rootLocator).filter({ hasText: "___SENTINEL_ROW_NOT_FOUND___" + Date.now() });
-      return _makeSmart(row, _headerMap!, 0);
+      return rowFinder.findRow(filters as Record<string, any>, options);
     },
 
     getRows: async (options?: { filter?: Partial<T> | Record<string, any>, exact?: boolean }): Promise<SmartRowArray<T>> => {
-      await _ensureInitialized();
-      let rowLocators = resolve(config.rowSelector, rootLocator);
-      if (options?.filter) {
-        rowLocators = filterEngine.applyFilters(rowLocators, options.filter as Record<string, any>, _headerMap!, options.exact || false, rootLocator.page());
-      }
-      const allRowLocs = await rowLocators.all();
-
-      const smartRows: SmartRowType<T>[] = [];
-      const isRowLoading = config.strategies.loading?.isRowLoading;
-
-      for (let i = 0; i < allRowLocs.length; i++) {
-        const smartRow = _makeSmart(allRowLocs[i], _headerMap!, i);
-        if (isRowLoading) {
-          const loading = await isRowLoading(smartRow);
-          if (loading) continue;
-        }
-        smartRows.push(smartRow);
-      }
-      return createSmartRowArray(smartRows);
+      console.warn('DEPRECATED: table.getRows() is deprecated and will be removed in a future version. Use table.findRows() instead.');
+      return rowFinder.findRows(options?.filter || {}, { ...options, maxPages: 1 });
     },
 
-    findRows: async <R extends { asJSON?: boolean }>(filters: Partial<T> | Record<string, string | RegExp | number>, options?: { exact?: boolean, maxPages?: number } & R): Promise<any> => {
-      await _ensureInitialized();
-      const allRows: SmartRowType<T>[] = [];
-      const effectiveMaxPages = options?.maxPages ?? config.maxPages ?? Infinity;
-      let pageCount = 0;
-
-      // Collect rows from current page
-      let rowLocators = resolve(config.rowSelector, rootLocator);
-      rowLocators = filterEngine.applyFilters(rowLocators, filters as Record<string, any>, _headerMap!, options?.exact ?? false, rootLocator.page());
-      let currentRows = await rowLocators.all();
-      const isRowLoading = config.strategies.loading?.isRowLoading;
-
-      for (let i = 0; i < currentRows.length; i++) {
-        const smartRow = _makeSmart(currentRows[i], _headerMap!, i);
-        if (isRowLoading && await isRowLoading(smartRow)) continue;
-        allRows.push(smartRow);
-      }
-
-      // Paginate and collect more rows
-      while (pageCount < effectiveMaxPages && config.strategies.pagination) {
-        const paginationResult = await config.strategies.pagination({
-          root: rootLocator,
-          config,
-          resolve,
-          page: rootLocator.page()
-        });
-
-        const didPaginate = validatePaginationResult(paginationResult, 'Pagination Strategy');
-        if (!didPaginate) break;
-        pageCount++;
-        _hasPaginated = true;
-
-        // Collect rows from new page
-        rowLocators = resolve(config.rowSelector, rootLocator);
-        rowLocators = filterEngine.applyFilters(rowLocators, filters as Record<string, any>, _headerMap!, options?.exact ?? false, rootLocator.page());
-        const newRows = await rowLocators.all();
-
-        for (let i = 0; i < newRows.length; i++) {
-          const smartRow = _makeSmart(newRows[i], _headerMap!, i);
-          if (isRowLoading && await isRowLoading(smartRow)) continue;
-          allRows.push(smartRow);
-        }
-      }
-
-      if (options?.asJSON) {
-        return Promise.all(allRows.map(r => r.toJSON()));
-      }
-      return allRows;
+    findRows: async (filters: Partial<T> | Record<string, any>, options?: { exact?: boolean, maxPages?: number } & { asJSON?: boolean }): Promise<any> => {
+      return rowFinder.findRows(filters, options);
     },
 
     isInitialized: (): boolean => {
-      return _isInitialized;
+      return tableMapper.isInitialized();
     },
 
     sorting: {
@@ -521,8 +300,8 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
         batchSize?: number;
         getIsFirst?: (context: { index: number }) => boolean;
         getIsLast?: (context: { index: number, paginationResult: boolean }) => boolean;
-        beforeFirst?: (context: { index: number, rows: SmartRowType[], allData: any[] }) => void | Promise<void>;
-        afterLast?: (context: { index: number, rows: SmartRowType[], allData: any[] }) => void | Promise<void>;
+        beforeFirst?: (context: { index: number, rows: SmartRowArray, allData: any[] }) => void | Promise<void>;
+        afterLast?: (context: { index: number, rows: SmartRowArray, allData: any[] }) => void | Promise<void>;
         /**
        * If true, flattens array results from callback into the main data array.
        * If false (default), pushes the return value as-is (preserves batching/arrays).
@@ -537,6 +316,8 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
 
       await result.reset();
       await result.init();
+
+      const map = tableMapper.getMapSync()!;
 
       const restrictedTable: RestrictedTableResult = {
         init: result.init,
@@ -577,7 +358,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
         const isRowLoading = config.strategies.loading?.isRowLoading;
 
         for (let i = 0; i < rowLocators.length; i++) {
-          const smartRow = _makeSmart(rowLocators[i], _headerMap!, i);
+          const smartRow = _makeSmart(rowLocators[i], map, i);
           if (isRowLoading && await isRowLoading(smartRow)) continue;
           smartRowsArray.push(smartRow);
         }
@@ -618,7 +399,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
           const isLastDueToMax = index === effectiveMaxIterations - 1;
 
           if (isFirst && options?.beforeFirst) {
-            await options.beforeFirst({ index: callbackIndex, rows: callbackRows, allData });
+            await options.beforeFirst({ index: callbackIndex, rows: createSmartRowArray(callbackRows), allData });
           }
 
           const batchInfo = isBatching ? {
@@ -654,7 +435,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
           }
 
           if (finalIsLast && options?.afterLast) {
-            await options.afterLast({ index: callbackIndex, rows: callbackRows, allData });
+            await options.afterLast({ index: callbackIndex, rows: createSmartRowArray(callbackRows), allData });
           }
 
           if (finalIsLast || !paginationResult) {
@@ -681,7 +462,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
             const isLast = true;
 
             if (isFirst && options?.beforeFirst) {
-              await options.beforeFirst({ index: callbackIndex, rows: batchRows, allData });
+              await options.beforeFirst({ index: callbackIndex, rows: createSmartRowArray(batchRows), allData });
             }
 
             const batchInfo = {
@@ -706,7 +487,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
             }
 
             if (options?.afterLast) {
-              await options.afterLast({ index: callbackIndex, rows: batchRows, allData });
+              await options.afterLast({ index: callbackIndex, rows: createSmartRowArray(batchRows), allData });
             }
 
             log(`Pagination failed mid-batch (index: ${index})`);

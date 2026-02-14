@@ -22,7 +22,7 @@ test.describe('Real World Strategy Tests', () => {
     });
     await table.init();
 
-    const initialRows = await table.getRows();
+    const initialRows = await table.findRows({}, { maxPages: 1 });
     console.log(`Initial Row Count: ${initialRows.length}`);
 
     console.log("🔎 Triggering Scroll...");
@@ -32,7 +32,7 @@ test.describe('Real World Strategy Tests', () => {
     await expect(missing).not.toBeVisible();
 
     // ✅ UPDATE: getRows -> getRows
-    const finalRows = await table.getRows();
+    const finalRows = await table.findRows({}, { maxPages: 1 });
     console.log(`Final Row Count: ${finalRows.length}`);
 
     expect(finalRows.length).toBeGreaterThan(initialRows.length);
@@ -157,7 +157,7 @@ test.describe('Real World Strategy Tests', () => {
       await table.init();
 
       // Get typed data
-      const rows = await table.getRows();
+      const rows = await table.findRows({}, { maxPages: 1 });
       const data = await rows.toJSON();
 
       // TypeScript should infer data as Employee[]

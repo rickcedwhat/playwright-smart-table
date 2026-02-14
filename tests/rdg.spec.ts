@@ -47,7 +47,7 @@ test.describe('React Data Grid (RDG)', () => {
         await table.init();
 
         // Get first few rows
-        const rows = await table.getRows();
+        const rows = await table.findRows({}, { maxPages: 1 });
         const firstRow = rows[0];
 
         const rowData = await firstRow.toJSON();
@@ -120,7 +120,7 @@ test.describe('React Data Grid (RDG)', () => {
         console.log('All headers:', headers);
 
         // Get a row and read specific columns
-        const rows = await table.getRows();
+        const rows = await table.findRows({}, { maxPages: 1 });
         const firstRow = rows[0];
 
         // Read columns from different positions (left, middle, right)

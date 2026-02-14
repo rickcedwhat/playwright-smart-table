@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 
+## [6.2.0] - 2026-02-14
+
+### ⚡ Smart Initialization
+- **New Feature**: Tables now intelligently handle "progressive loading" (when headers load one by one).
+- **Strategy**: Added `isHeaderLoading` to `LoadingStrategies`.
+- **Logic**: `TableMapper` now retries mapping if headers are detected as unstable/loading.
+
+### 🧠 Smarter Fuzzy Matching
+- **Refinement**: `levenshteinDistance` now weights case mismatches as **0.1** edits (instead of 1.0).
+- **Result**: "Firstname" is now considered a ~97% match for "First Name", prioritizing it over other typos.
+
+### 🧪 Unit Testing Framework
+- **New Infrastructure**: Added `vitest` for robust unit testing of core logic.
+- **Coverage**: Added unit tests for:
+  - `stringUtils` (Fuzzy matching, Levenshtein)
+  - `resolution` (Column name resolution)
+  - `TableMapper` (Header mapping logic)
+  - `FilterEngine` (Row filtering logic)
+- **CI**: `npm test` now runs both Unit Tests (Vitest) and E2E Tests (Playwright).
+
+### ♻️ Internal Refactoring
+- **Modularization**: Split the monolithic `useTable.ts` into dedicated engines:
+  - `TableMapper`: Handles header discovery and mapping.
+  - `RowFinder`: Handles row searching and pagination.
+  - `FilterEngine`: Handles filter application.
+- **Type Safety**: Standardized `SmartRowArray` usage throughout the codebase.
+
 ## [6.1.0] - 2026-02-11
 
 ### ⚠️ Breaking Changes

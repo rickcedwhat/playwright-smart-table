@@ -213,6 +213,7 @@ export interface FilterStrategy {
 export interface LoadingStrategy {
   isTableLoading?: (context: TableContext) => Promise<boolean>;
   isRowLoading?: (row: SmartRow) => Promise<boolean>;
+  isHeaderLoading?: (context: TableContext) => Promise<boolean>;
 }
 
 /**
@@ -363,7 +364,7 @@ export interface TableResult<T = any> {
   findRows: <R extends { asJSON?: boolean }>(
     filters: Record<string, string | RegExp | number>,
     options?: { exact?: boolean, maxPages?: number } & R
-  ) => Promise<R['asJSON'] extends true ? Record<string, string>[] : SmartRow[]>;
+  ) => Promise<R['asJSON'] extends true ? Record<string, string>[] : SmartRowArray>;
 
   /**
    * Navigates to a specific column using the configured CellNavigationStrategy.
@@ -438,8 +439,8 @@ export interface TableResult<T = any> {
       batchSize?: number;
       getIsFirst?: (context: { index: number }) => boolean;
       getIsLast?: (context: { index: number, paginationResult: boolean }) => boolean;
-      beforeFirst?: (context: { index: number, rows: SmartRow[], allData: any[] }) => void | Promise<void>;
-      afterLast?: (context: { index: number, rows: SmartRow[], allData: any[] }) => void | Promise<void>;
+      beforeFirst?: (context: { index: number, rows: SmartRowArray, allData: any[] }) => void | Promise<void>;
+      afterLast?: (context: { index: number, rows: SmartRowArray, allData: any[] }) => void | Promise<void>;
       /**
        * If true, flattens array results from callback into the main data array.
        * If false (default), pushes the return value as-is (preserves batching/arrays).
