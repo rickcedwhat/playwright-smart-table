@@ -34,6 +34,10 @@ export declare const LoadingStrategies: {
         hasEmptyCells: () => (row: SmartRowType) => Promise<boolean>;
         never: () => Promise<boolean>;
     };
+    Headers: {
+        stable: (duration?: number) => (context: TableContext) => Promise<boolean>;
+        never: () => Promise<boolean>;
+    };
 };
 export declare const SortingStrategies: {
     AriaSort: () => import("./types").SortingStrategy;

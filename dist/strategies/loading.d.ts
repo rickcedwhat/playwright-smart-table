@@ -45,4 +45,18 @@ export declare const LoadingStrategies: {
          */
         never: () => Promise<boolean>;
     };
+    /**
+     * Strategies for detecting if headers are loading/stable.
+     */
+    Headers: {
+        /**
+         * Checks if the headers are stable (count and text) for a specified duration.
+         * @param duration Duration in ms for headers to remain unchanged to be considered stable (default: 200).
+         */
+        stable: (duration?: number) => (context: TableContext) => Promise<boolean>;
+        /**
+         * Assume headers are never loading (immediate snapshot).
+         */
+        never: () => Promise<boolean>;
+    };
 };

@@ -58,7 +58,7 @@ test.describe('Playground: Virtualized Table', () => {
         });
 
         // 3. Get Rows (First batch)
-        const rows = await table.getRows();
+        const rows = await table.findRows({}, { maxPages: 1 });
 
         expect(rows.length).toBeGreaterThan(0);
         expect(rows.length).toBeLessThan(100);

@@ -98,17 +98,15 @@ test.describe('README.md Examples Verification', () => {
     // #region get-all-rows
     // Example from: https://datatables.net/examples/data_sources/dom
     // 1. Get ALL rows on the current page
-    const allRows = await table.getRows();
+    const allRows = await table.findRows({}, { maxPages: 1 });
     expect(allRows.length).toBeGreaterThan(0);
 
     // 2. Get subset of rows (Filtering)
-    const tokyoUsers = await table.getRows({
-      filter: { Office: 'Tokyo' }
-    });
+    const tokyoUsers = await table.findRows({ Office: 'Tokyo' }, { maxPages: 1 });
     expect(tokyoUsers.length).toBeGreaterThan(0);
 
     // 3. Dump data to JSON
-    const rows = await table.getRows();
+    const rows = await table.findRows({}, { maxPages: 1 });
     const data = await rows.toJSON();
     console.log(data); // [{ Name: "Airi Satou", ... }, ...]
     expect(data.length).toBeGreaterThan(0);
@@ -264,9 +262,9 @@ test.describe('README.md Examples Verification', () => {
 
     // #region get-all-rows-exact
     // Get rows with exact match (default is fuzzy/contains match)
-    const exactMatches = await table.getRows({
-      filter: { Office: 'Tokyo' },
-      exact: true // Requires exact string match
+    const exactMatches = await table.findRows({ Office: 'Tokyo' }, {
+      exact: true, // Requires exact string match
+      maxPages: 1
     });
 
     expect(exactMatches.length).toBeGreaterThan(0);

@@ -198,6 +198,7 @@ export interface FilterStrategy {
 export interface LoadingStrategy {
     isTableLoading?: (context: TableContext) => Promise<boolean>;
     isRowLoading?: (row: SmartRow) => Promise<boolean>;
+    isHeaderLoading?: (context: TableContext) => Promise<boolean>;
 }
 /**
  * Organized container for all table interaction strategies.
@@ -354,7 +355,7 @@ export interface TableResult<T = any> {
     }>(filters: Record<string, string | RegExp | number>, options?: {
         exact?: boolean;
         maxPages?: number;
-    } & R) => Promise<R['asJSON'] extends true ? Record<string, string>[] : SmartRow[]>;
+    } & R) => Promise<R['asJSON'] extends true ? Record<string, string>[] : SmartRowArray>;
     /**
      * Navigates to a specific column using the configured CellNavigationStrategy.
      */
@@ -432,12 +433,12 @@ export interface TableResult<T = any> {
         }) => boolean;
         beforeFirst?: (context: {
             index: number;
-            rows: SmartRow[];
+            rows: SmartRowArray;
             allData: any[];
         }) => void | Promise<void>;
         afterLast?: (context: {
             index: number;
-            rows: SmartRow[];
+            rows: SmartRowArray;
             allData: any[];
         }) => void | Promise<void>;
         /**

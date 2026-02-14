@@ -76,7 +76,7 @@ test.describe('Backwards Compatibility Tests', () => {
     await expect(row).not.toBeVisible();
   });
 
-  test('Core: getRows returns array of SmartRows', async ({ page }) => {
+  test('Core: findRows (current page) returns array of SmartRows', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
 
     const table = useTable(page.locator('#example'), {
@@ -84,14 +84,14 @@ test.describe('Backwards Compatibility Tests', () => {
     });
     await table.init();
 
-    const rows = await table.getRows();
+    const rows = await table.findRows({}, { maxPages: 1 });
 
     expect(Array.isArray(rows)).toBe(true);
     expect(rows.length).toBeGreaterThan(0);
     expect(typeof rows[0].getCell).toBe('function');
   });
 
-  test('Core: getRows with filter option', async ({ page }) => {
+  test('Core: findRows with filter option', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
 
     const table = useTable(page.locator('#example'), {
@@ -99,15 +99,13 @@ test.describe('Backwards Compatibility Tests', () => {
     });
     await table.init();
 
-    const filtered = await table.getRows({
-      filter: { Office: 'Tokyo' }
-    });
+    const filtered = await table.findRows({ Office: 'Tokyo' }, { maxPages: 1 });
 
     expect(Array.isArray(filtered)).toBe(true);
     expect(filtered.length).toBeGreaterThan(0);
   });
 
-  test('Core: getRows with asJSON option', async ({ page }) => {
+  test('Core: findRows with asJSON option', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
 
     const table = useTable(page.locator('#example'), {
@@ -115,7 +113,7 @@ test.describe('Backwards Compatibility Tests', () => {
     });
     await table.init();
 
-    const rows = await table.getRows();
+    const rows = await table.findRows({}, { maxPages: 1 });
     const data = await rows.toJSON();
 
     expect(Array.isArray(data)).toBe(true);
@@ -333,7 +331,7 @@ test.describe('Backwards Compatibility Tests', () => {
     const table = useTable(page.locator('#test-table'));
 
     // getRows should auto-init
-    const rows = await table.getRows();
+    const rows = await table.findRows({}, { maxPages: 1 });
     expect(rows.length).toBeGreaterThan(0);
 
     // getColumnValues should auto-init

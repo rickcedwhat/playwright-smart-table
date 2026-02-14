@@ -15,13 +15,23 @@ export function levenshteinDistance(a: string, b: string): number {
 
     for (let i = 1; i <= b.length; i++) {
         for (let j = 1; j <= a.length; j++) {
-            if (b.charAt(i - 1) === a.charAt(j - 1)) {
+            const charB = b.charAt(i - 1);
+            const charA = a.charAt(j - 1);
+
+            if (charB === charA) {
+                // Exact match
                 matrix[i][j] = matrix[i - 1][j - 1];
             } else {
+                let cost = 1;
+                // If characters match ignoring case, cost is only 0.1 (almost identical)
+                if (charB.toLowerCase() === charA.toLowerCase()) {
+                    cost = 0.1;
+                }
+
                 matrix[i][j] = Math.min(
-                    matrix[i - 1][j - 1] + 1, // substitution
-                    matrix[i][j - 1] + 1,     // insertion
-                    matrix[i - 1][j] + 1      // deletion
+                    matrix[i - 1][j - 1] + cost,    // substitution
+                    matrix[i][j - 1] + 1,           // insertion
+                    matrix[i - 1][j] + 1            // deletion
                 );
             }
         }
@@ -35,7 +45,8 @@ export function levenshteinDistance(a: string, b: string): number {
  * 1 = identical, 0 = completely different
  */
 export function stringSimilarity(a: string, b: string): number {
-    const distance = levenshteinDistance(a.toLowerCase(), b.toLowerCase());
+    // We do NOT modify case here anymore, because levenshteinDistance now handles case weighting
+    const distance = levenshteinDistance(a, b);
     const maxLen = Math.max(a.length, b.length);
     return maxLen === 0 ? 1 : 1 - (distance / maxLen);
 }

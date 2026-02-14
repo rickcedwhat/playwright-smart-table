@@ -72,5 +72,37 @@ export const LoadingStrategies = {
          * Assume row is never loading (default).
          */
         never: async () => false
+    },
+    /**
+     * Strategies for detecting if headers are loading/stable.
+     */
+    Headers: {
+        /**
+         * Checks if the headers are stable (count and text) for a specified duration.
+         * @param duration Duration in ms for headers to remain unchanged to be considered stable (default: 200).
+         */
+        stable: (duration: number = 200) => async (context: TableContext): Promise<boolean> => {
+            const { config, resolve, root } = context;
+            const getHeaderTexts = async () => {
+                const headers = await resolve(config.headerSelector, root).all();
+                return Promise.all(headers.map(h => h.innerText()));
+            };
+
+            const initial = await getHeaderTexts();
+            // Wait for duration
+            await context.page.waitForTimeout(duration);
+            const current = await getHeaderTexts();
+
+            if (initial.length !== current.length) return true; // Count changed, still loading
+            for (let i = 0; i < initial.length; i++) {
+                if (initial[i] !== current[i]) return true; // Content changed, still loading
+            }
+            return false; // Stable
+        },
+
+        /**
+         * Assume headers are never loading (immediate snapshot).
+         */
+        never: async () => false
     }
 };

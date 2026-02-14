@@ -50,5 +50,9 @@ export declare const Strategies: {
             hasEmptyCells: () => (row: import("..").SmartRow) => Promise<boolean>;
             never: () => Promise<boolean>;
         };
+        Headers: {
+            stable: (duration?: number) => (context: import("..").TableContext) => Promise<boolean>;
+            never: () => Promise<boolean>;
+        };
     };
 };

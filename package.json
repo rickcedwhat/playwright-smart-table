@@ -1,6 +1,6 @@
 {
   "name": "@rickcedwhat/playwright-smart-table",
-  "version": "6.1.1",
+  "version": "6.2.0",
   "description": "Smart, column-aware table interactions for Playwright",
   "author": "Cedrick Catalan",
   "license": "MIT",
@@ -22,7 +22,10 @@
     "docs:build": "vitepress build docs",
     "build": "npm run generate-types && npm run generate-docs && npm run generate-all-api-docs && npm run update-all-api-signatures && tsc",
     "prepublishOnly": "npm run build",
-    "test": "npx playwright test",
+    "test": "npm run test:unit && npx playwright test",
+    "test:unit": "vitest run --reporter=verbose --reporter=html",
+    "test:unit:ui": "vitest --ui",
+    "test:e2e": "npx playwright test",
     "test:compatibility": "npx playwright test compatibility",
     "prepare": "husky install"
   },
@@ -38,9 +41,11 @@
   "devDependencies": {
     "@playwright/test": "^1.49.1",
     "@types/node": "^22.10.5",
+    "@vitest/ui": "^4.0.18",
+    "happy-dom": "^20.6.1",
     "husky": "^9.1.7",
     "typescript": "^5.7.2",
-    "vitepress": "^1.6.4"
-  },
-  "dependencies": {}
+    "vitepress": "^1.6.4",
+    "vitest": "^4.0.18"
+  }
 }

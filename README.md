@@ -79,6 +79,8 @@ const allActive = await table.findRows({ Status: 'Active' });
 ## Key Features
 
 - 🎯 **Smart Locators** - Find rows by content, not position
+- 🧠 **Fuzzy Matching** - Smart suggestions for typos (e.g., incorrectly typed "Firstname" suggests "First Name" in error messages)
+- ⚡ **Smart Initialization** - Handles loading states and dynamic headers automatically
 - 📄 **Auto-Pagination** - Search across all pages automatically
 - 🔍 **Column-Aware Access** - Access cells by column name
 - 🛠️ **Debug Mode** - Visual debugging with slow motion and logging

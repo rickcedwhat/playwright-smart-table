@@ -78,5 +78,36 @@ exports.LoadingStrategies = {
          * Assume row is never loading (default).
          */
         never: () => __awaiter(void 0, void 0, void 0, function* () { return false; })
+    },
+    /**
+     * Strategies for detecting if headers are loading/stable.
+     */
+    Headers: {
+        /**
+         * Checks if the headers are stable (count and text) for a specified duration.
+         * @param duration Duration in ms for headers to remain unchanged to be considered stable (default: 200).
+         */
+        stable: (duration = 200) => (context) => __awaiter(void 0, void 0, void 0, function* () {
+            const { config, resolve, root } = context;
+            const getHeaderTexts = () => __awaiter(void 0, void 0, void 0, function* () {
+                const headers = yield resolve(config.headerSelector, root).all();
+                return Promise.all(headers.map(h => h.innerText()));
+            });
+            const initial = yield getHeaderTexts();
+            // Wait for duration
+            yield context.page.waitForTimeout(duration);
+            const current = yield getHeaderTexts();
+            if (initial.length !== current.length)
+                return true; // Count changed, still loading
+            for (let i = 0; i < initial.length; i++) {
+                if (initial[i] !== current[i])
+                    return true; // Content changed, still loading
+            }
+            return false; // Stable
+        }),
+        /**
+         * Assume headers are never loading (immediate snapshot).
+         */
+        never: () => __awaiter(void 0, void 0, void 0, function* () { return false; })
     }
 };
