@@ -1,7 +1,7 @@
 import { expect } from '@playwright/test';
 import { TableContext, FillStrategy } from '../types';
-import { keyboardCellNavigation } from '../../examples/glide-strategies/columns';
-import { scrollRightHeader } from '../../examples/glide-strategies/headers';
+import { keyboardCellNavigation } from './glide/columns';
+import { scrollRightHeader } from './glide/headers';
 import { PaginationStrategies } from './pagination';
 import { StabilizationStrategies } from './stabilization';
 

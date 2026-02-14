@@ -80,7 +80,20 @@ Then create a Pull Request on GitHub.
 
 Understanding our design principles will help you contribute code that fits naturally with the library.
 
-### 1. Stay Close to Native Playwright
+### 1. Scope: The Table Boundary
+**Rule**: The library manages interactions *within* the table and its direct controls (pagination, specific intra-header filters).
+- **Include**: Sorting headers, clicking pagination buttons next to the table, reading cells, scrolling the viewport.
+- **Exclude**: Managing external state, global page navigation, or inputs outside the table container (e.g., global search bars).
+
+### 2. State Management
+**Rule**: The table is a *reader* of state, not a store. It should reflect what is in the DOM.
+- **Exception**: Structural metadata (like column mapping) can be cached for performance, but data values should be read fresh.
+
+### 3. Config over Convention
+**Rule**: Support standard HTML tables by default, but provide `strategies` for everything else.
+- **Anti-Pattern**: Hardcoding logic for specific libraries (AgGrid, MaterialUI) in the core `useTable.ts`. logic belongs in `strategies/`.
+
+### 4. Stay Close to Native Playwright
 
 **Return Playwright types whenever possible:**
 
@@ -107,7 +120,7 @@ interface TableRow {
 }
 ```
 
-### 2. Naming Conventions
+### 5. Naming Conventions
 
 **`get*` vs `find*` - Follow Playwright's pattern:**
 
@@ -125,7 +138,7 @@ findRows(filters: Record<string, string>): Promise<SmartRow[]>
 - `get*` = Fast, assumes table is ready
 - `find*` = Thorough, handles setup automatically
 
-### 3. Sync vs Async Methods
+### 6. Sync vs Async Methods
 
 **Sync methods require initialization:**
 
@@ -167,7 +180,7 @@ for (let i = 0; i < 10; i++) {
 const row = await table.findRow({ ID: '12345' });  // Handles everything
 ```
 
-### 4. Locator-First Design
+### 7. Locator-First Design
 
 **Always prefer Locator over text content:**
 
@@ -184,7 +197,7 @@ expect(emailText).toBe('john@example.com');  // Can't click anymore
 
 **Why:** Locators are lazy and auto-wait. Text is static and loses Playwright's power.
 
-### 5. Minimal Abstraction
+### 8. Minimal Abstraction
 
 **Don't hide Playwright's capabilities:**
 
@@ -210,7 +223,7 @@ row.clickCell('Email');  // Unnecessary wrapper
 row.getCell('Email').click();  // Use Playwright's click
 ```
 
-### 6. Type Safety Without Overhead
+### 9. Type Safety Without Overhead
 
 **Generic types should enhance, not complicate:**
 
@@ -233,7 +246,7 @@ export interface TableConfig { ... }
 export type PromptOptions = { ... };
 ```
 
-### 7. Fail Fast with Helpful Errors
+### 10. Fail Fast with Helpful Errors
 
 **Errors should guide users to solutions:**
 

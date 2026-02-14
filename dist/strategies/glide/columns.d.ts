@@ -1,4 +1,4 @@
-import { StrategyContext } from '../../src/types';
+import { StrategyContext } from '../../types';
 /**
  * Strategy that clicks into the table to establish focus and then uses the Right Arrow key
  * to navigate to the target CELL (navigates down to the row, then right to the column).

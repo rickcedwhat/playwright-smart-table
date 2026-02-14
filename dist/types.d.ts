@@ -193,6 +193,13 @@ export interface FilterStrategy {
     }): Locator;
 }
 /**
+ * Strategy to check if the table or rows are loading.
+ */
+export interface LoadingStrategy {
+    isTableLoading?: (context: TableContext) => Promise<boolean>;
+    isRowLoading?: (row: SmartRow) => Promise<boolean>;
+}
+/**
  * Organized container for all table interaction strategies.
  */
 export interface TableStrategies {
@@ -206,10 +213,27 @@ export interface TableStrategies {
     pagination?: PaginationStrategy;
     /** Strategy for sorting columns */
     sorting?: SortingStrategy;
+    /** Strategy for deduplicating rows during iteration/scrolling */
+    dedupe?: DedupeStrategy;
     /** Function to get a cell locator */
     getCellLocator?: GetCellLocatorFn;
     /** Function to get the currently active/focused cell */
     getActiveCell?: GetActiveCellFn;
+    /** Custom helper to check if a table is fully loaded/ready */
+    isTableLoaded?: (args: TableContext) => Promise<boolean>;
+    /** Custom helper to check if a row is fully loaded/ready */
+    isRowLoaded?: (args: {
+        row: Locator;
+        index: number;
+    }) => Promise<boolean>;
+    /** Custom helper to check if a cell is fully loaded/ready (e.g. for editing) */
+    isCellLoaded?: (args: {
+        cell: Locator;
+        column: string;
+        row: Locator;
+    }) => Promise<boolean>;
+    /** Strategy for detecting loading states */
+    loading?: LoadingStrategy;
 }
 /**
  * Configuration options for useTable.
@@ -228,6 +252,7 @@ export interface TableConfig {
         text: string;
         index: number;
         locator: Locator;
+        seenHeaders: Set<string>;
     }) => string | Promise<string>;
     /** Automatically scroll to table on init */
     autoScroll?: boolean;
@@ -249,6 +274,7 @@ export interface FinalTableConfig extends TableConfig {
         text: string;
         index: number;
         locator: Locator;
+        seenHeaders: Set<string>;
     }) => string | Promise<string>;
     onReset: (context: TableContext) => Promise<void>;
     strategies: TableStrategies;
@@ -384,7 +410,7 @@ export interface TableResult<T = any> {
         index: number;
         isFirst: boolean;
         isLast: boolean;
-        rows: SmartRow[];
+        rows: SmartRowArray;
         allData: T[];
         table: RestrictedTableResult;
         batchInfo?: {
@@ -392,7 +418,7 @@ export interface TableResult<T = any> {
             endIndex: number;
             size: number;
         };
-    }) => T | Promise<T>, options?: {
+    }) => T | T[] | Promise<T | T[]>, options?: {
         pagination?: PaginationStrategy;
         dedupeStrategy?: DedupeStrategy;
         maxIterations?: number;
@@ -414,6 +440,11 @@ export interface TableResult<T = any> {
             rows: SmartRow[];
             allData: any[];
         }) => void | Promise<void>;
+        /**
+         * If true, flattens array results from callback into the main data array.
+         * If false (default), pushes the return value as-is (preserves batching/arrays).
+         */
+        autoFlatten?: boolean;
     }) => Promise<T[]>;
     /**
      * Generate an AI-friendly configuration prompt for debugging.

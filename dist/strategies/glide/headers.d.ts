@@ -1,4 +1,4 @@
-import { StrategyContext } from '../../src/types';
+import { StrategyContext } from '../../types';
 /**
  * Scans for headers by finding a scrollable container and setting scrollLeft.
  */

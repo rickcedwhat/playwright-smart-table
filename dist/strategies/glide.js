@@ -10,8 +10,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.GlideStrategies = exports.glideGetActiveCell = exports.glideGetCellLocator = exports.glidePaginationStrategy = exports.glideFillStrategy = void 0;
-const columns_1 = require("../../examples/glide-strategies/columns");
-const headers_1 = require("../../examples/glide-strategies/headers");
+const columns_1 = require("./glide/columns");
+const headers_1 = require("./glide/headers");
 const pagination_1 = require("./pagination");
 const stabilization_1 = require("./stabilization");
 const glideFillStrategy = (_a) => __awaiter(void 0, [_a], void 0, function* ({ value, page }) {
