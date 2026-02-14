@@ -2,6 +2,12 @@
 . "$(dirname -- "$0")/_/husky.sh"
 
 echo "🚧 Running build and docs generation..."
+# Check for changelog updates if version bumped
+node scripts/check-version-bump.mjs
+if [ $? -ne 0 ]; then
+  exit 1
+fi
+
 npm run build
 
 # Add all generated/modified files to the commit
