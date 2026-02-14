@@ -20,8 +20,8 @@ test.describe('Debug Mode', () => {
         const row = await table.getRow({ Name: 'Airi Satou' });
         expect(row).toBeDefined();
 
-        // Should be much faster than with delays (typically < 100ms locally)
-        expect(elapsed).toBeLessThan(500);
+        // Should be much faster than with delays (typically < 100ms locally, but can be ~700ms in CI)
+        expect(elapsed).toBeLessThan(1000);
     });
 
     test('Delays work correctly', async ({ page }) => {
