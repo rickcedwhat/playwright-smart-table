@@ -2,7 +2,7 @@
 
 **Production-ready table testing for Playwright with smart column-aware locators.**
 
-[![npm version](https://img.shields.io/github/package-json/v/rickcedwhat/playwright-smart-table?label=npm%20version&logo=npm&color=CB3837)](https://www.npmjs.com/package/@rickcedwhat/playwright-smart-table)
+[![npm version](https://img.shields.io/github/package-json/v/rickcedwhat/playwright-smart-table?label=npm&color=blue&t=2)](https://www.npmjs.com/package/@rickcedwhat/playwright-smart-table)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ---
