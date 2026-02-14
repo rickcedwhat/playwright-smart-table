@@ -10,41 +10,70 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.PaginationStrategies = void 0;
-const utils_1 = require("../utils");
+const stabilization_1 = require("./stabilization");
 exports.PaginationStrategies = {
     /**
-     * Strategy: Clicks a "Next" button and waits for the first row of data to change.
+     * Strategy: Clicks a "Next" button and waits for stabilization.
+     * @param nextButtonSelector Selector for the next page button.
+     * @param options.stabilization Strategy to determine when the page has updated.
+     *        Defaults to `contentChanged({ scope: 'first' })`.
+     * @param options.timeout Timeout for the click action.
      */
-    clickNext: (nextButtonSelector, timeout = 5000) => {
-        return (_a) => __awaiter(void 0, [_a], void 0, function* ({ root, config, resolve, page }) {
+    clickNext: (nextButtonSelector, options = {}) => {
+        return (context) => __awaiter(void 0, void 0, void 0, function* () {
+            var _a;
+            const { root, resolve, page } = context;
             const nextBtn = resolve(nextButtonSelector, root).first();
             if (!(yield nextBtn.isVisible()) || !(yield nextBtn.isEnabled())) {
                 return false;
             }
-            const firstRow = resolve(config.rowSelector, root).first();
-            const oldText = yield firstRow.innerText().catch(() => "");
-            yield nextBtn.click({ timeout: 2000 }).catch(() => { });
-            const success = yield (0, utils_1.waitForCondition)(() => __awaiter(void 0, void 0, void 0, function* () {
-                const newText = yield firstRow.innerText().catch(() => "");
-                return newText !== oldText;
-            }), timeout, page);
+            // Default stabilization: Wait for first row content to change
+            const stabilization = (_a = options.stabilization) !== null && _a !== void 0 ? _a : stabilization_1.StabilizationStrategies.contentChanged({ scope: 'first', timeout: options.timeout });
+            // Stabilization: Wrap action
+            const success = yield stabilization(context, () => __awaiter(void 0, void 0, void 0, function* () {
+                yield nextBtn.click({ timeout: 2000 }).catch(() => { });
+            }));
             return success;
         });
     },
     /**
-     * Strategy: Scrolls to the bottom and waits for more rows to appear.
+     * Strategy: Infinite Scroll (generic).
+     * Supports both simple "Scroll to Bottom" and "Virtualized Scroll".
+     *
+     * @param options.action 'scroll' (mouse wheel) or 'js-scroll' (direct scrollTop).
+     * @param options.scrollTarget Selector for the scroll container (defaults to table root).
+     * @param options.scrollAmount Amount to scroll in pixels (default 500).
+     * @param options.stabilization Strategy to determine if new content loaded.
+     *        Defaults to `rowCountIncreased` (simple append).
+     *        Use `contentChanged` for virtualization.
      */
-    infiniteScroll: (timeout = 5000) => {
-        return (_a) => __awaiter(void 0, [_a], void 0, function* ({ root, config, resolve, page }) {
-            const rows = resolve(config.rowSelector, root);
-            const oldCount = yield rows.count();
-            if (oldCount === 0)
-                return false;
-            yield rows.last().scrollIntoViewIfNeeded();
-            return yield (0, utils_1.waitForCondition)(() => __awaiter(void 0, void 0, void 0, function* () {
-                const newCount = yield rows.count();
-                return newCount > oldCount;
-            }), timeout, page);
+    infiniteScroll: (options = {}) => {
+        return (context) => __awaiter(void 0, void 0, void 0, function* () {
+            var _a, _b;
+            const { root, resolve, page } = context;
+            const scrollTarget = options.scrollTarget
+                ? resolve(options.scrollTarget, root)
+                : root;
+            // Default stabilization: Wait for row count to increase (Append mode)
+            const stabilization = (_a = options.stabilization) !== null && _a !== void 0 ? _a : stabilization_1.StabilizationStrategies.rowCountIncreased({ timeout: options.timeout });
+            const amount = (_b = options.scrollAmount) !== null && _b !== void 0 ? _b : 500;
+            const doScroll = () => __awaiter(void 0, void 0, void 0, function* () {
+                const box = yield scrollTarget.boundingBox();
+                // Action: Scroll
+                if (options.action === 'js-scroll' || !box) {
+                    yield scrollTarget.evaluate((el, y) => {
+                        el.scrollTop += y;
+                    }, amount);
+                }
+                else {
+                    // Mouse Wheel
+                    yield page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+                    yield page.mouse.wheel(0, amount);
+                }
+            });
+            // Stabilization: Wait
+            const success = yield stabilization(context, doScroll);
+            return success;
         });
     }
 };
