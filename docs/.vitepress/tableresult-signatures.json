@@ -21,7 +21,7 @@
   },
   {
     "name": "getRow",
-    "signature": "getRow: (\n  filters: Record<string, string | RegExp | number>,\n  options?: { exact?: boolean }",
+    "signature": "getRow: (\n  filters: Record<string, FilterValue>,\n  options?: { exact?: boolean }",
     "comment": "/**\n* Finds a row by filters on the current page only. Returns immediately (sync).\n* Throws error if table is not initialized.\n*/"
   },
   {
@@ -31,13 +31,13 @@
   },
   {
     "name": "findRow",
-    "signature": "findRow: (\n  filters: Record<string, string | RegExp | number>,\n  options?: { exact?: boolean, maxPages?: number }",
+    "signature": "findRow: (\n  filters: Record<string, FilterValue>,\n  options?: { exact?: boolean, maxPages?: number }",
     "comment": "/**\n* ASYNC: Searches for a single row across pages using pagination.\n* Auto-initializes the table if not already initialized.\n* @param filters - The filter criteria to match\n* @param options - Search options including exact match and max pages\n*/"
   },
   {
     "name": "findRows",
-    "signature": "findRows: <R extends { asJSON?: boolean }>(\n  filters: Record<string, string | RegExp | number>,\n  options?: { exact?: boolean, maxPages?: number } & R\n  ) => Promise<R['asJSON'] extends true ? Record<string, string>[] : SmartRowArray>",
-    "comment": "/**\n* ASYNC: Searches for all matching rows across pages using pagination.\n* Auto-initializes the table if not already initialized.\n* @param filters - The filter criteria to match\n* @param options - Search options including exact match, max pages, and asJSON\n*/"
+    "signature": "findRows: (\n  filters: Record<string, FilterValue>,\n  options?: { exact?: boolean, maxPages?: number }",
+    "comment": "/**\n* ASYNC: Searches for all matching rows across pages using pagination.\n* Auto-initializes the table if not already initialized.\n* @param filters - The filter criteria to match\n* @param options - Search options including exact match and max pages\n*/"
   },
   {
     "name": "scrollToColumn",

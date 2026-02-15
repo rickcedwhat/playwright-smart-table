@@ -20,7 +20,7 @@ class FilterEngine {
             if (colIndex === undefined) {
                 throw new Error((0, stringUtils_1.buildColumnNotFoundError)(colName, Array.from(map.keys())));
             }
-            const filterVal = typeof value === 'number' ? String(value) : value;
+            const filterVal = value;
             // Use strategy if provided (For future: configured filter strategies)
             // But for now, we implement the default logic or use custom if we add it to config later
             // Default Filter Logic
@@ -29,9 +29,20 @@ class FilterEngine {
             // filter({ has: ... }) checks if the row *contains* the matching cell.
             // But we need to be specific about WHICH cell.
             // Locator filtering by `has: locator.nth(index)` works if `locator` search is relative to the row.
-            filtered = filtered.filter({
-                has: cellTemplate.nth(colIndex).getByText(filterVal, { exact }),
-            });
+            const targetCell = cellTemplate.nth(colIndex);
+            if (typeof filterVal === 'function') {
+                // Locator-based filter: (cell) => cell.locator(...)
+                filtered = filtered.filter({
+                    has: filterVal(targetCell)
+                });
+            }
+            else {
+                // Text-based filter
+                const textVal = typeof filterVal === 'number' ? String(filterVal) : filterVal;
+                filtered = filtered.filter({
+                    has: targetCell.getByText(textVal, { exact }),
+                });
+            }
         }
         return filtered;
     }

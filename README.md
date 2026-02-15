@@ -84,7 +84,7 @@ const allActive = await table.findRows({ Status: 'Active' });
 - 📄 **Auto-Pagination** - Search across all pages automatically
 - 🔍 **Column-Aware Access** - Access cells by column name
 - 🛠️ **Debug Mode** - Visual debugging with slow motion and logging
-- 🔌 **Extensible Strategies** - Support any table implementation
+- 🔌 **[Extensible Strategies](docs/concepts/strategies.md)** - Support any table implementation
 - 💪 **Type-Safe** - Full TypeScript support
 - 🚀 **Production-Ready** - Battle-tested in real-world applications
 

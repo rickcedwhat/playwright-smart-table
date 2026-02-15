@@ -13,6 +13,19 @@ import type { SmartRowArray } from './utils/smartRowArray';
 export type Selector = string | ((root: Locator | Page) => Locator);
 
 /**
+ * Value used to filter rows.
+ * - string/number/RegExp: filter by text content of the cell.
+ * - function: filter by custom locator logic within the cell.
+ * @example
+ * // Text filter
+ * { Name: 'John' }
+ * 
+ * // Custom locator filter (e.g. checkbox is checked)
+ * { Status: (cell) => cell.locator('input:checked') }
+ */
+export type FilterValue = string | RegExp | number | ((cell: Locator) => Locator);
+
+/**
  * Function to get a cell locator given row, column info.
  * Replaces the old cellResolver.
  */
@@ -152,9 +165,9 @@ export type DebugConfig = {
   logLevel?: 'verbose' | 'info' | 'error' | 'none';
 };
 
-export interface TableContext {
+export interface TableContext<T = any> {
   root: Locator;
-  config: FinalTableConfig;
+  config: FinalTableConfig<T>;
   page: Page;
   resolve: (selector: Selector, parent: Locator | Page) => Locator;
 }
@@ -201,7 +214,7 @@ export type { ColumnResolutionStrategy } from './strategies/resolution';
 export interface FilterStrategy {
   apply(options: {
     rows: Locator;
-    filter: { column: string, value: string | RegExp | number };
+    filter: { column: string, value: FilterValue };
     colIndex: number;
     tableContext: TableContext;
   }): Locator;
@@ -249,7 +262,10 @@ export interface TableStrategies {
 /**
  * Configuration options for useTable.
  */
-export interface TableConfig {
+/**
+ * Configuration options for useTable.
+ */
+export interface TableConfig<T = any> {
   /** Selector for the table headers */
   headerSelector?: string;
   /** Selector for the table rows */
@@ -268,9 +284,14 @@ export interface TableConfig {
   onReset?: (context: TableContext) => Promise<void>;
   /** All interaction strategies */
   strategies?: TableStrategies;
+  /**
+   * Custom data mappers for specific columns.
+   * Allows extracting complex data types (boolean, number) instead of just string.
+   */
+  dataMapper?: Partial<Record<keyof T, (cell: Locator) => Promise<T[keyof T]> | T[keyof T]>>;
 }
 
-export interface FinalTableConfig extends TableConfig {
+export interface FinalTableConfigLike<T = any> extends TableConfig<T> {
   headerSelector: string;
   rowSelector: string;
   cellSelector: string;
@@ -281,6 +302,8 @@ export interface FinalTableConfig extends TableConfig {
   onReset: (context: TableContext) => Promise<void>;
   strategies: TableStrategies;
 }
+// Alias for backward compatibility if needed, or update usages
+export type FinalTableConfig<T = any> = FinalTableConfigLike<T>;
 
 
 export interface FillOptions {
@@ -329,7 +352,7 @@ export interface TableResult<T = any> {
    * Throws error if table is not initialized.
    */
   getRow: (
-    filters: Record<string, string | RegExp | number>,
+    filters: Record<string, FilterValue>,
     options?: { exact?: boolean }
   ) => SmartRow;
 
@@ -351,7 +374,7 @@ export interface TableResult<T = any> {
    * @param options - Search options including exact match and max pages
    */
   findRow: (
-    filters: Record<string, string | RegExp | number>,
+    filters: Record<string, FilterValue>,
     options?: { exact?: boolean, maxPages?: number }
   ) => Promise<SmartRow>;
 
@@ -359,12 +382,12 @@ export interface TableResult<T = any> {
    * ASYNC: Searches for all matching rows across pages using pagination.
    * Auto-initializes the table if not already initialized.
    * @param filters - The filter criteria to match
-   * @param options - Search options including exact match, max pages, and asJSON
+   * @param options - Search options including exact match and max pages
    */
-  findRows: <R extends { asJSON?: boolean }>(
-    filters: Record<string, string | RegExp | number>,
-    options?: { exact?: boolean, maxPages?: number } & R
-  ) => Promise<R['asJSON'] extends true ? Record<string, string>[] : SmartRowArray>;
+  findRows: (
+    filters: Record<string, FilterValue>,
+    options?: { exact?: boolean, maxPages?: number }
+  ) => Promise<SmartRowArray<T>>;
 
   /**
    * Navigates to a specific column using the configured CellNavigationStrategy.

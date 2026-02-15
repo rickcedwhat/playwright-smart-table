@@ -1,5 +1,5 @@
 import type { Locator, Page } from '@playwright/test';
-import { TableConfig, TableContext, Selector, TableResult, SmartRow as SmartRowType, PromptOptions, FinalTableConfig, DedupeStrategy, RestrictedTableResult, PaginationStrategy, StrategyContext, TableStrategies as ITableStrategies } from './types';
+import { TableConfig, TableContext, Selector, TableResult, SmartRow as SmartRowType, PromptOptions, FinalTableConfig, DedupeStrategy, RestrictedTableResult, PaginationStrategy, StrategyContext, TableStrategies as ITableStrategies, FilterValue } from './types';
 import { TYPE_CONTEXT } from './typeContext';
 import { SortingStrategies as ImportedSortingStrategies } from './strategies/sorting';
 import { PaginationStrategies as ImportedPaginationStrategies } from './strategies/pagination';
@@ -21,7 +21,7 @@ import { createSmartRowArray, SmartRowArray } from './utils/smartRowArray';
 /**
  * Main hook to interact with a table.
  */
-export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConfig = {}): TableResult<T> => {
+export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConfig<T> = {}): TableResult<T> => {
   // Store whether pagination was explicitly provided in config
   const hasPaginationInConfig = configOptions.strategies?.pagination !== undefined;
 
@@ -36,7 +36,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     }
   };
 
-  const config: FinalTableConfig = {
+  const config: FinalTableConfig<T> = {
     rowSelector: "tbody tr",
     headerSelector: "thead th",
     cellSelector: "td",
@@ -228,12 +228,12 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       return results;
     },
 
-    getRow: (filters: Partial<T> | Record<string, string | RegExp | number>, options: { exact?: boolean } = { exact: false }): SmartRowType<T> => {
+    getRow: (filters: Partial<T> | Record<string, FilterValue>, options: { exact?: boolean } = { exact: false }): SmartRowType<T> => {
       const map = tableMapper.getMapSync();
       if (!map) throw new Error('Table not initialized. Call await table.init() first, or use async methods like table.findRow() or table.getRows() which auto-initialize.');
 
       const allRows = resolve(config.rowSelector, rootLocator);
-      const matchedRows = filterEngine.applyFilters(allRows, filters as Record<string, string | RegExp | number>, map, options.exact || false, rootLocator.page());
+      const matchedRows = filterEngine.applyFilters(allRows, filters as Record<string, FilterValue>, map, options.exact || false, rootLocator.page());
       const rowLocator = matchedRows.first();
       return _makeSmart(rowLocator, map, 0); // fallback index 0
     },
@@ -246,16 +246,18 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       return _makeSmart(rowLocator, map, index);
     },
 
-    findRow: async (filters: Partial<T> | Record<string, string | RegExp | number>, options?: { exact?: boolean, maxPages?: number }): Promise<SmartRowType<T>> => {
-      return rowFinder.findRow(filters as Record<string, any>, options);
+    findRow: async (filters: Partial<T> | Record<string, FilterValue>, options?: { exact?: boolean, maxPages?: number }): Promise<SmartRowType<T>> => {
+      // @ts-ignore
+      return rowFinder.findRow(filters as Record<string, FilterValue>, options);
     },
 
     getRows: async (options?: { filter?: Partial<T> | Record<string, any>, exact?: boolean }): Promise<SmartRowArray<T>> => {
       console.warn('DEPRECATED: table.getRows() is deprecated and will be removed in a future version. Use table.findRows() instead.');
+      // @ts-ignore
       return rowFinder.findRows(options?.filter || {}, { ...options, maxPages: 1 });
     },
 
-    findRows: async (filters: Partial<T> | Record<string, any>, options?: { exact?: boolean, maxPages?: number } & { asJSON?: boolean }): Promise<any> => {
+    findRows: async (filters: Partial<T> | Record<string, any>, options?: { exact?: boolean, maxPages?: number }): Promise<SmartRowArray<T>> => {
       return rowFinder.findRows(filters, options);
     },
 

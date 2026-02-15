@@ -13,7 +13,20 @@ const table = useTable<MyTableType>(page.locator('#table'), {
   // ... more options
 });
 ```
+### `dataMapper`
 
+Optional object defining custom data extraction logic per column. This is useful for parsing numbers, checking boolean states, or handling custom components.
+
+```typescript
+dataMapper: {
+  // Parse 'ID' column as number
+  ID: async (cell) => parseInt(await cell.innerText(), 10),
+  // Check 'Active' column checkbox state
+  Active: async (cell) => await cell.locator('input').isChecked()
+}
+```
+
+The return types of these mappers must match the generic type `T` provided to `useTable<T>`.
 ## Properties
 
 ### headerSelector

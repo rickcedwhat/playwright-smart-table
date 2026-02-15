@@ -39,13 +39,23 @@ const createSmartRow = (rowLocator, map, rowIndex, config, rootLocator, resolve,
         return resolve(config.cellSelector, rowLocator).nth(idx);
     };
     smart.toJSON = (options) => __awaiter(void 0, void 0, void 0, function* () {
+        var _a;
         const result = {};
         const page = rootLocator.page();
         for (const [col, idx] of map.entries()) {
             if ((options === null || options === void 0 ? void 0 : options.columns) && !options.columns.includes(col)) {
                 continue;
             }
-            // Get the cell locator
+            // Check if we have a data mapper for this column
+            const mapper = (_a = config.dataMapper) === null || _a === void 0 ? void 0 : _a[col];
+            if (mapper) {
+                // Use custom mapper
+                // Ensure we have the cell first (same navigation logic)
+                // ... wait, the navigation logic below assumes we need to navigate.
+                // If we have a mapper, we still need the cell locator.
+                // Let's reuse the navigation logic to get targetCell
+            }
+            // --- Navigation Logic Start ---
             const cell = config.strategies.getCellLocator
                 ? config.strategies.getCellLocator({
                     row: rowLocator,
@@ -56,7 +66,6 @@ const createSmartRow = (rowLocator, map, rowIndex, config, rootLocator, resolve,
                 })
                 : resolve(config.cellSelector, rowLocator).nth(idx);
             let targetCell = cell;
-            // Check if cell exists
             const count = yield cell.count();
             if (count === 0) {
                 // Optimization: Check if we are ALREADY at the target cell
@@ -68,47 +77,59 @@ const createSmartRow = (rowLocator, map, rowIndex, config, rootLocator, resolve,
                         resolve
                     });
                     if (active && active.rowIndex === rowIndex && active.columnIndex === idx) {
-                        if (config.debug)
-                            console.log(`[SmartRow] Already at target cell (r:${active.rowIndex}, c:${active.columnIndex}), skipping navigation.`);
                         targetCell = active.locator;
-                        // Skip navigation and go to reading text
-                        const text = yield targetCell.innerText();
-                        result[col] = (text || '').trim();
-                        continue;
+                        // Skip navigation
                     }
-                }
-                // Cell doesn't exist - navigate to it
-                if (config.debug) {
-                    console.log(`[SmartRow.toJSON] Cell not found for column "${col}" (index ${idx}), navigating...`);
-                }
-                yield config.strategies.cellNavigation({
-                    config: config,
-                    root: rootLocator,
-                    page: page,
-                    resolve: resolve,
-                    column: col,
-                    index: idx,
-                    rowLocator: rowLocator,
-                    rowIndex: rowIndex
-                });
-                // Optimization: check if we can get the active cell directly
-                if (config.strategies.getActiveCell) {
-                    const activeCell = yield config.strategies.getActiveCell({
-                        config,
-                        root: rootLocator,
-                        page,
-                        resolve
-                    });
-                    if (activeCell) {
-                        if (config.debug) {
-                            console.log(`[SmartRow.toJSON] switching to active cell locator (r:${activeCell.rowIndex}, c:${activeCell.columnIndex})`);
+                    else {
+                        // Cell doesn't exist - navigate to it
+                        yield config.strategies.cellNavigation({
+                            config: config,
+                            root: rootLocator,
+                            page: page,
+                            resolve: resolve,
+                            column: col,
+                            index: idx,
+                            rowLocator: rowLocator,
+                            rowIndex: rowIndex
+                        });
+                        // Update targetCell after navigation if needed (e.g. active cell changed)
+                        if (config.strategies.getActiveCell) {
+                            const activeCell = yield config.strategies.getActiveCell({
+                                config,
+                                root: rootLocator,
+                                page,
+                                resolve
+                            });
+                            if (activeCell)
+                                targetCell = activeCell.locator;
                         }
-                        targetCell = activeCell.locator;
                     }
+                }
+                else {
+                    // Fallback navigation without active cell check
+                    yield config.strategies.cellNavigation({
+                        config: config,
+                        root: rootLocator,
+                        page: page,
+                        resolve: resolve,
+                        column: col,
+                        index: idx,
+                        rowLocator: rowLocator,
+                        rowIndex: rowIndex
+                    });
                 }
             }
-            const text = yield targetCell.innerText();
-            result[col] = (text || '').trim();
+            // --- Navigation Logic End ---
+            if (mapper) {
+                // Apply mapper
+                const mappedValue = yield mapper(targetCell);
+                result[col] = mappedValue;
+            }
+            else {
+                // Default string extraction
+                const text = yield targetCell.innerText();
+                result[col] = (text || '').trim();
+            }
         }
         return result;
     });
