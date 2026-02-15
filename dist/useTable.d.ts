@@ -8,7 +8,7 @@ import { Strategies } from './strategies';
 /**
  * Main hook to interact with a table.
  */
-export declare const useTable: <T = any>(rootLocator: Locator, configOptions?: TableConfig) => TableResult<T>;
+export declare const useTable: <T = any>(rootLocator: Locator, configOptions?: TableConfig<T>) => TableResult<T>;
 export declare const PaginationStrategies: {
     clickNext: (nextButtonSelector: Selector, options?: {
         stabilization?: import("./strategies/stabilization").StabilizationStrategy;

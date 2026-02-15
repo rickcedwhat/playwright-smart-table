@@ -1,5 +1,5 @@
 import { Locator, Page } from "@playwright/test";
-import { FinalTableConfig } from "./types";
+import { FinalTableConfig, FilterValue } from "./types";
 export declare class FilterEngine {
     private config;
     private resolve;
@@ -7,5 +7,5 @@ export declare class FilterEngine {
     /**
      * Applies filters to a set of rows.
      */
-    applyFilters(baseRows: Locator, filters: Record<string, string | RegExp | number>, map: Map<string, number>, exact: boolean, page: Page): Locator;
+    applyFilters(baseRows: Locator, filters: Record<string, FilterValue>, map: Map<string, number>, exact: boolean, page: Page): Locator;
 }

@@ -8,6 +8,17 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+var __rest = (this && this.__rest) || function (s, e) {
+    var t = {};
+    for (var p in s) if (Object.prototype.hasOwnProperty.call(s, p) && e.indexOf(p) < 0)
+        t[p] = s[p];
+    if (s != null && typeof Object.getOwnPropertySymbols === "function")
+        for (var i = 0, p = Object.getOwnPropertySymbols(s); i < p.length; i++) {
+            if (e.indexOf(p[i]) < 0 && Object.prototype.propertyIsEnumerable.call(s, p[i]))
+                t[p[i]] = s[p[i]];
+        }
+    return t;
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.RowFinder = void 0;
 const debugUtils_1 = require("../utils/debugUtils");
@@ -42,21 +53,48 @@ class RowFinder {
             return this.makeSmartRow(sentinel, yield this.tableMapper.getMap(), 0);
         });
     }
-    findRows(filters, options) {
+    findRows(filtersOrOptions, 
+    // Deprecated: verify legacy usage pattern support
+    legacyOptions) {
         return __awaiter(this, void 0, void 0, function* () {
+            // Detect argument pattern:
+            // Pattern A: findRows({ Name: 'Alice' }, { maxPages: 5 })
+            // Pattern B: findRows({ maxPages: 5 })  <-- No filters, just options
+            // Pattern C: findRows({ Name: 'Alice' }) <-- Only filters
             var _a, _b;
+            let filters = {};
+            let options = {};
+            if (legacyOptions) {
+                // Pattern A
+                filters = filtersOrOptions;
+                options = legacyOptions;
+            }
+            else {
+                // Pattern B or C
+                // We need to separate unknown keys (filters) from known options (exact, maxPages)
+                // However, filtersOrOptions can be null/undefined
+                if (filtersOrOptions) {
+                    const _c = filtersOrOptions, { exact, maxPages } = _c, rest = __rest(_c, ["exact", "maxPages"]);
+                    options = { exact, maxPages };
+                    filters = rest;
+                }
+            }
             const map = yield this.tableMapper.getMap();
             const allRows = [];
-            const effectiveMaxPages = (_b = (_a = options === null || options === void 0 ? void 0 : options.maxPages) !== null && _a !== void 0 ? _a : this.config.maxPages) !== null && _b !== void 0 ? _b : Infinity;
+            const effectiveMaxPages = (_b = (_a = options.maxPages) !== null && _a !== void 0 ? _a : this.config.maxPages) !== null && _b !== void 0 ? _b : Infinity;
             let pageCount = 0;
             const collectMatches = () => __awaiter(this, void 0, void 0, function* () {
                 var _a, _b;
+                // ... logic ...
                 let rowLocators = this.resolve(this.config.rowSelector, this.rootLocator);
-                rowLocators = this.filterEngine.applyFilters(rowLocators, filters, map, (_a = options === null || options === void 0 ? void 0 : options.exact) !== null && _a !== void 0 ? _a : false, this.rootLocator.page());
+                // Only apply filters if we have them
+                if (Object.keys(filters).length > 0) {
+                    rowLocators = this.filterEngine.applyFilters(rowLocators, filters, map, (_a = options.exact) !== null && _a !== void 0 ? _a : false, this.rootLocator.page());
+                }
                 const currentRows = yield rowLocators.all();
                 const isRowLoading = (_b = this.config.strategies.loading) === null || _b === void 0 ? void 0 : _b.isRowLoading;
                 for (let i = 0; i < currentRows.length; i++) {
-                    const smartRow = this.makeSmartRow(currentRows[i], map, i);
+                    const smartRow = this.makeSmartRow(currentRows[i], map, allRows.length + i);
                     if (isRowLoading && (yield isRowLoading(smartRow)))
                         continue;
                     allRows.push(smartRow);
@@ -64,30 +102,24 @@ class RowFinder {
             });
             // Scan first page
             yield collectMatches();
-            // Pagination Loop
-            while (pageCount < effectiveMaxPages && this.config.strategies.pagination) {
-                // Check if pagination needed? findRows assumes we want ALL matches across maxPages.
-                // If explicit maxPages is set, we paginate. If global maxPages is 1 (default), we stop.
-                // Wait, loop condition `pageCount < effectiveMaxPages`. If maxPages=1, 0 < 1 is true.
-                // We paginate AFTER first scan.
-                // If maxPages=1, we should NOT paginate.
-                if (effectiveMaxPages <= 1)
-                    break;
+            // Pagination Loop - Corrected logic
+            // We always scan at least 1 page.
+            // If maxPages > 1, and we have a pagination strategy, we try to go next.
+            while (pageCount < effectiveMaxPages - 1 && this.config.strategies.pagination) {
                 const context = {
                     root: this.rootLocator,
                     config: this.config,
                     resolve: this.resolve,
                     page: this.rootLocator.page()
                 };
+                // Check if we should stop? (e.g. if we found enough rows? No, findRows finds ALL)
                 const paginationResult = yield this.config.strategies.pagination(context);
-                const didPaginate = (0, validation_1.validatePaginationResult)(paginationResult, 'Pagination Strategy');
+                const didPaginate = yield (0, validation_1.validatePaginationResult)(paginationResult, 'Pagination Strategy');
                 if (!didPaginate)
                     break;
                 pageCount++;
+                // Wait for reload logic if needed? Usually pagination handles it.
                 yield collectMatches();
-            }
-            if (options === null || options === void 0 ? void 0 : options.asJSON) {
-                return Promise.all(allRows.map(r => r.toJSON()));
             }
             return (0, smartRowArray_1.createSmartRowArray)(allRows);
         });

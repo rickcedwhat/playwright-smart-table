@@ -245,6 +245,20 @@ findRows(
 ### Parameters
 
 - `filters` - The filter criteria to match
+- `options` - Search options including exact match and max pages
+
+<!-- /api-signature: findRows -->
+
+To get the JSON content of the rows (using `dataMapper` if configured), simply chain `.toJSON()` to the result:
+
+```ts
+const rows = await table.findRows({ Status: 'Active' });
+const data = await rows.toJSON();
+```
+
+### Parameters
+
+- `filters` - The filter criteria to match
 - `options` - Search options including exact match, max pages, and asJSON
 
 <!-- /api-signature: findRows -->

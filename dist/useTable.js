@@ -225,10 +225,12 @@ const useTable = (rootLocator, configOptions = {}) => {
             return _makeSmart(rowLocator, map, index);
         },
         findRow: (filters, options) => __awaiter(void 0, void 0, void 0, function* () {
+            // @ts-ignore
             return rowFinder.findRow(filters, options);
         }),
         getRows: (options) => __awaiter(void 0, void 0, void 0, function* () {
             console.warn('DEPRECATED: table.getRows() is deprecated and will be removed in a future version. Use table.findRows() instead.');
+            // @ts-ignore
             return rowFinder.findRows((options === null || options === void 0 ? void 0 : options.filter) || {}, Object.assign(Object.assign({}, options), { maxPages: 1 }));
         }),
         findRows: (filters, options) => __awaiter(void 0, void 0, void 0, function* () {

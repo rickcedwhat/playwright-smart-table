@@ -12,7 +12,7 @@ export const createSmartRow = <T = any>(
     rowLocator: Locator,
     map: Map<string, number>,
     rowIndex: number | undefined,
-    config: FinalTableConfig,
+    config: FinalTableConfig<T>,
     rootLocator: Locator,
     resolve: (item: any, parent: Locator | Page) => Locator,
     table: TableResult<T> | null
@@ -43,7 +43,7 @@ export const createSmartRow = <T = any>(
     };
 
     smart.toJSON = async (options?: { columns?: string[] }): Promise<T> => {
-        const result: Record<string, string> = {};
+        const result: Record<string, any> = {};
         const page = rootLocator.page();
 
         for (const [col, idx] of map.entries()) {
@@ -51,7 +51,19 @@ export const createSmartRow = <T = any>(
                 continue;
             }
 
-            // Get the cell locator
+            // Check if we have a data mapper for this column
+            const mapper = config.dataMapper?.[col as keyof T];
+
+            if (mapper) {
+                // Use custom mapper
+                // Ensure we have the cell first (same navigation logic)
+                // ... wait, the navigation logic below assumes we need to navigate.
+                // If we have a mapper, we still need the cell locator.
+
+                // Let's reuse the navigation logic to get targetCell
+            }
+
+            // --- Navigation Logic Start ---
             const cell = config.strategies.getCellLocator
                 ? config.strategies.getCellLocator({
                     row: rowLocator,
@@ -63,8 +75,6 @@ export const createSmartRow = <T = any>(
                 : resolve(config.cellSelector, rowLocator).nth(idx);
 
             let targetCell = cell;
-
-            // Check if cell exists
             const count = await cell.count();
 
             if (count === 0) {
@@ -77,53 +87,56 @@ export const createSmartRow = <T = any>(
                         resolve
                     });
                     if (active && active.rowIndex === rowIndex && active.columnIndex === idx) {
-                        if (config.debug) console.log(`[SmartRow] Already at target cell (r:${active.rowIndex}, c:${active.columnIndex}), skipping navigation.`);
                         targetCell = active.locator;
-                        // Skip navigation and go to reading text
-                        const text = await targetCell.innerText();
-                        result[col] = (text || '').trim();
-                        continue;
-                    }
-                }
-
-                // Cell doesn't exist - navigate to it
-                if (config.debug) {
-                    console.log(`[SmartRow.toJSON] Cell not found for column "${col}" (index ${idx}), navigating...`);
-                }
-
-                await config.strategies.cellNavigation!({
-                    config: config,
-                    root: rootLocator,
-                    page: page,
-                    resolve: resolve,
-                    column: col,
-                    index: idx,
-                    rowLocator: rowLocator,
-                    rowIndex: rowIndex
-                });
-
-
-
-                // Optimization: check if we can get the active cell directly
-                if (config.strategies.getActiveCell) {
-                    const activeCell = await config.strategies.getActiveCell({
-                        config,
-                        root: rootLocator,
-                        page,
-                        resolve
-                    });
-
-                    if (activeCell) {
-                        if (config.debug) {
-                            console.log(`[SmartRow.toJSON] switching to active cell locator (r:${activeCell.rowIndex}, c:${activeCell.columnIndex})`);
+                        // Skip navigation
+                    } else {
+                        // Cell doesn't exist - navigate to it
+                        await config.strategies.cellNavigation!({
+                            config: config,
+                            root: rootLocator,
+                            page: page,
+                            resolve: resolve,
+                            column: col,
+                            index: idx,
+                            rowLocator: rowLocator,
+                            rowIndex: rowIndex
+                        });
+                        // Update targetCell after navigation if needed (e.g. active cell changed)
+                        if (config.strategies.getActiveCell) {
+                            const activeCell = await config.strategies.getActiveCell({
+                                config,
+                                root: rootLocator,
+                                page,
+                                resolve
+                            });
+                            if (activeCell) targetCell = activeCell.locator;
                         }
-                        targetCell = activeCell.locator;
                     }
+                } else {
+                    // Fallback navigation without active cell check
+                    await config.strategies.cellNavigation!({
+                        config: config,
+                        root: rootLocator,
+                        page: page,
+                        resolve: resolve,
+                        column: col,
+                        index: idx,
+                        rowLocator: rowLocator,
+                        rowIndex: rowIndex
+                    });
                 }
             }
+            // --- Navigation Logic End ---
 
-            const text = await targetCell.innerText();
-            result[col] = (text || '').trim();
+            if (mapper) {
+                // Apply mapper
+                const mappedValue = await mapper(targetCell);
+                result[col] = mappedValue;
+            } else {
+                // Default string extraction
+                const text = await targetCell.innerText();
+                result[col] = (text || '').trim();
+            }
         }
         return result as unknown as T;
     };

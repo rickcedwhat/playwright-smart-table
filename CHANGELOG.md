@@ -1,5 +1,19 @@
 # Changelog
 
+## [6.3.0] - 2026-02-15
+
+### Added
+- **Data Mapper (`dataMapper`)**: New configuration option in `TableConfig<T>` allowing custom data extraction logic per column.
+  - Supports returning complex types (boolean, number, etc.) instead of just strings.
+  - Ensures strict type safety when using the new generic `useTable<T>`.
+- **Generic `useTable<T>`**: The `useTable` hook now accepts a generic type parameter `T` to define the shape of your row data.
+
+### Changed
+- **`findRows` API Update**: REMOVED the `asJSON` option.
+  - `findRows` now always returns `Promise<SmartRowArray<T>>`.
+  - To get the JSON data (using the `dataMapper`), chain `.toJSON()` on the result: `await (await table.findRows({...})).toJSON()`.
+- **Type Safety**: `SmartRow.toJSON()` now returns `Promise<T>` instead of `Promise<Record<string, string>>`.
+
 All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),

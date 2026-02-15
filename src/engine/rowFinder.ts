@@ -1,5 +1,5 @@
 import type { Locator, Page } from '@playwright/test';
-import { FinalTableConfig, TableContext, Selector, SmartRow } from '../types';
+import { FinalTableConfig, TableContext, Selector, SmartRow, FilterValue } from '../types';
 import { FilterEngine } from '../filterEngine';
 import { TableMapper } from './tableMapper';
 import { logDebug, debugDelay } from '../utils/debugUtils';
@@ -25,7 +25,7 @@ export class RowFinder<T = any> {
     }
 
     public async findRow(
-        filters: Record<string, string | RegExp | number>,
+        filters: Record<string, FilterValue>,
         options: { exact?: boolean, maxPages?: number } = {}
     ): Promise<SmartRow<T>> {
         logDebug(this.config, 'info', 'Searching for row', filters);
@@ -48,30 +48,58 @@ export class RowFinder<T = any> {
         return this.makeSmartRow(sentinel, await this.tableMapper.getMap(), 0);
     }
 
-    public async findRows<R extends { asJSON?: boolean }>(
-        filters: Partial<T> | Record<string, string | RegExp | number>,
-        options?: { exact?: boolean, maxPages?: number } & R
-    ): Promise<R['asJSON'] extends true ? Record<string, string>[] : SmartRowArray<T>> {
+    public async findRows(
+        filtersOrOptions?: (Partial<T> | Record<string, FilterValue>) & ({ exact?: boolean, maxPages?: number }),
+        // Deprecated: verify legacy usage pattern support
+        legacyOptions?: { exact?: boolean, maxPages?: number }
+    ): Promise<SmartRowArray<T>> {
+        // Detect argument pattern:
+        // Pattern A: findRows({ Name: 'Alice' }, { maxPages: 5 })
+        // Pattern B: findRows({ maxPages: 5 })  <-- No filters, just options
+        // Pattern C: findRows({ Name: 'Alice' }) <-- Only filters
+
+        let filters: Record<string, FilterValue> = {};
+        let options: { exact?: boolean, maxPages?: number } = {};
+
+        if (legacyOptions) {
+            // Pattern A
+            filters = filtersOrOptions as Record<string, FilterValue>;
+            options = legacyOptions;
+        } else {
+            // Pattern B or C
+            // We need to separate unknown keys (filters) from known options (exact, maxPages)
+            // However, filtersOrOptions can be null/undefined
+            if (filtersOrOptions) {
+                const { exact, maxPages, ...rest } = filtersOrOptions as any;
+                options = { exact, maxPages };
+                filters = rest;
+            }
+        }
+
         const map = await this.tableMapper.getMap();
         const allRows: SmartRow<T>[] = [];
-        const effectiveMaxPages = options?.maxPages ?? this.config.maxPages ?? Infinity;
+        const effectiveMaxPages = options.maxPages ?? this.config.maxPages ?? Infinity;
         let pageCount = 0;
 
         const collectMatches = async () => {
+            // ... logic ...
             let rowLocators = this.resolve(this.config.rowSelector, this.rootLocator);
-            rowLocators = this.filterEngine.applyFilters(
-                rowLocators,
-                filters as Record<string, any>,
-                map,
-                options?.exact ?? false,
-                this.rootLocator.page()
-            );
+            // Only apply filters if we have them
+            if (Object.keys(filters).length > 0) {
+                rowLocators = this.filterEngine.applyFilters(
+                    rowLocators,
+                    filters,
+                    map,
+                    options.exact ?? false,
+                    this.rootLocator.page()
+                );
+            }
 
             const currentRows = await rowLocators.all();
             const isRowLoading = this.config.strategies.loading?.isRowLoading;
 
             for (let i = 0; i < currentRows.length; i++) {
-                const smartRow = this.makeSmartRow(currentRows[i], map, i);
+                const smartRow = this.makeSmartRow(currentRows[i], map, allRows.length + i);
                 if (isRowLoading && await isRowLoading(smartRow)) continue;
                 allRows.push(smartRow);
             }
@@ -80,15 +108,10 @@ export class RowFinder<T = any> {
         // Scan first page
         await collectMatches();
 
-        // Pagination Loop
-        while (pageCount < effectiveMaxPages && this.config.strategies.pagination) {
-            // Check if pagination needed? findRows assumes we want ALL matches across maxPages.
-            // If explicit maxPages is set, we paginate. If global maxPages is 1 (default), we stop.
-            // Wait, loop condition `pageCount < effectiveMaxPages`. If maxPages=1, 0 < 1 is true.
-            // We paginate AFTER first scan.
-            // If maxPages=1, we should NOT paginate.
-            if (effectiveMaxPages <= 1) break;
-
+        // Pagination Loop - Corrected logic
+        // We always scan at least 1 page.
+        // If maxPages > 1, and we have a pagination strategy, we try to go next.
+        while (pageCount < effectiveMaxPages - 1 && this.config.strategies.pagination) {
             const context: TableContext = {
                 root: this.rootLocator,
                 config: this.config,
@@ -96,23 +119,23 @@ export class RowFinder<T = any> {
                 page: this.rootLocator.page()
             };
 
+            // Check if we should stop? (e.g. if we found enough rows? No, findRows finds ALL)
+
             const paginationResult = await this.config.strategies.pagination(context);
-            const didPaginate = validatePaginationResult(paginationResult, 'Pagination Strategy');
+            const didPaginate = await validatePaginationResult(paginationResult, 'Pagination Strategy');
 
             if (!didPaginate) break;
 
             pageCount++;
+            // Wait for reload logic if needed? Usually pagination handles it.
             await collectMatches();
         }
 
-        if (options?.asJSON) {
-            return Promise.all(allRows.map(r => r.toJSON())) as any;
-        }
-        return createSmartRowArray(allRows) as any;
+        return createSmartRowArray(allRows);
     }
 
     private async findRowLocator(
-        filters: Record<string, string | RegExp | number>,
+        filters: Record<string, FilterValue>,
         options: { exact?: boolean, maxPages?: number } = {}
     ): Promise<Locator | null> {
         const map = await this.tableMapper.getMap();
