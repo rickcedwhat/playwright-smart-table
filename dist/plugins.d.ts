@@ -10,6 +10,7 @@ export declare const Plugins: {
     Glide: {
         Strategies: {
             fill: import("./types").FillStrategy;
+            fillSimple: import("./types").FillStrategy;
             pagination: import("./types").PaginationStrategy;
             header: (context: import("./types").StrategyContext, options?: {
                 limit?: number;

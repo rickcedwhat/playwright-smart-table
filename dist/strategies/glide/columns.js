@@ -33,7 +33,17 @@ const glideGoRight = (context) => __awaiter(void 0, void 0, void 0, function* ()
 exports.glideGoRight = glideGoRight;
 const glideGoHome = (context) => __awaiter(void 0, void 0, void 0, function* () {
     const { root, page } = context;
-    yield root.focus();
+    // Glide renders to canvas - the accessibility table (root) is inside the canvas
+    // We need to find and focus the canvas element that contains our root
+    yield root.evaluate((el) => {
+        var _a;
+        // Find the closest canvas ancestor
+        const canvas = el.closest('canvas') || ((_a = el.parentElement) === null || _a === void 0 ? void 0 : _a.querySelector('canvas'));
+        if (canvas instanceof HTMLCanvasElement) {
+            canvas.tabIndex = 0;
+            canvas.focus();
+        }
+    });
     yield page.waitForTimeout(100);
     // Reset to top-left - Cross-OS sequence (Mac/Windows)
     yield page.keyboard.press('Control+Home');

@@ -5,6 +5,10 @@ import { scrollRightHeader } from './glide/headers';
 import { PaginationStrategies } from './pagination';
 import { StabilizationStrategies } from './stabilization';
 
+/**
+ * Fill strategy for Glide Data Grid with textarea validation.
+ * This is the default strategy that works with the standard Glide Data Grid editor.
+ */
 export const glideFillStrategy: FillStrategy = async ({ value, page }) => {
     // Edit Cell
     await page.keyboard.press('Enter');
@@ -32,6 +36,17 @@ export const glideFillStrategy: FillStrategy = async ({ value, page }) => {
     await textarea.waitFor({ state: 'detached', timeout: 2000 });
     // Wait for accessibility layer to sync with canvas state
     await page.waitForTimeout(300);
+};
+
+/**
+ * Simple fill strategy for Glide Data Grid.
+ * Use this if your Glide implementation doesn't use the standard textarea editor.
+ * This is faster but may not work for all Glide configurations.
+ */
+export const glideFillSimple: FillStrategy = async ({ value, page }) => {
+    await page.keyboard.press('Enter');
+    await page.keyboard.type(String(value));
+    await page.keyboard.press('Enter');
 };
 
 
@@ -85,6 +100,7 @@ export const glideGetActiveCell = async ({ page }: any) => {
 
 export const GlideStrategies = {
     fill: glideFillStrategy,
+    fillSimple: glideFillSimple,
     pagination: glidePaginationStrategy,
     header: scrollRightHeader,
     navigation: {
