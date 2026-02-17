@@ -16,11 +16,13 @@ export declare const Plugins: {
                 selector?: string;
                 scrollAmount?: number;
             }) => Promise<string[]>;
-            cellNavigation: (context: import("./types").StrategyContext & {
-                column: string;
-                index: number;
-                rowIndex?: number;
-            }) => Promise<void>;
+            navigation: {
+                goUp: (context: import("./types").StrategyContext) => Promise<void>;
+                goDown: (context: import("./types").StrategyContext) => Promise<void>;
+                goLeft: (context: import("./types").StrategyContext) => Promise<void>;
+                goRight: (context: import("./types").StrategyContext) => Promise<void>;
+                goHome: (context: import("./types").StrategyContext) => Promise<void>;
+            };
             getCellLocator: ({ row, columnIndex }: any) => any;
             getActiveCell: ({ page }: any) => Promise<{
                 rowIndex: number;

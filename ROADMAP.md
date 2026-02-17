@@ -28,3 +28,12 @@
     - **Repository**: Create a separate repo (or monorepo workspace) for `@playwright-smart-table/presets`.
     - **Targets**: Material UI, AgGrid, Ant Design, TanStack Table.
     - **Vision**: Enable community contributions for specific library support, removing the burden of manual configuration for popular libraries.
+
+## Non-Goals
+
+To maintain focus, the following are **explicitly out of scope**:
+
+- **Visual Regression Testing**: Use Playwright's screenshot APIs. We handle data, not pixels.
+- **Pure Canvas Tables (No DOM)**: No DOM = out of scope. Canvas with DOM fallbacks is supported. (Possibly explore pure canvas tables in the future and see if we're remotely able to support them)
+- **Complex Merged Cell Logic**: Basic support exists. Not a current priority.
+

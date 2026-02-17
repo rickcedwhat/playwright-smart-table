@@ -9,35 +9,36 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.keyboardCellNavigation = void 0;
+exports.glideGoHome = exports.glideGoRight = exports.glideGoLeft = exports.glideGoDown = exports.glideGoUp = void 0;
 /**
- * Strategy that clicks into the table to establish focus and then uses the Right Arrow key
- * to navigate to the target CELL (navigates down to the row, then right to the column).
- *
- * Useful for canvas-based grids like Glide where DOM scrolling might not be enough for interaction
- * or where keyboard navigation is the primary way to move focus.
+ * Primitive navigation functions for Glide Data Grid.
+ * These define HOW to move, not WHEN to move.
+ * The orchestration logic lives in _navigateToCell.
  */
-const keyboardCellNavigation = (context) => __awaiter(void 0, void 0, void 0, function* () {
-    const { root, page, index, rowIndex } = context;
-    if (typeof rowIndex !== 'number') {
-        throw new Error('Row index is required for keyboard navigation');
-    }
+const glideGoUp = (context) => __awaiter(void 0, void 0, void 0, function* () {
+    yield context.page.keyboard.press('ArrowUp');
+});
+exports.glideGoUp = glideGoUp;
+const glideGoDown = (context) => __awaiter(void 0, void 0, void 0, function* () {
+    yield context.page.keyboard.press('ArrowDown');
+});
+exports.glideGoDown = glideGoDown;
+const glideGoLeft = (context) => __awaiter(void 0, void 0, void 0, function* () {
+    yield context.page.keyboard.press('ArrowLeft');
+});
+exports.glideGoLeft = glideGoLeft;
+const glideGoRight = (context) => __awaiter(void 0, void 0, void 0, function* () {
+    yield context.page.keyboard.press('ArrowRight');
+});
+exports.glideGoRight = glideGoRight;
+const glideGoHome = (context) => __awaiter(void 0, void 0, void 0, function* () {
+    const { root, page } = context;
     yield root.focus();
     yield page.waitForTimeout(100);
-    // Robust Navigation:
-    // 1. Jump to Top-Left (Reset) - Sequence for Cross-OS (Mac/Windows)
+    // Reset to top-left - Cross-OS sequence (Mac/Windows)
     yield page.keyboard.press('Control+Home');
     yield page.keyboard.press('Meta+ArrowUp'); // Mac Go-To-Top
     yield page.keyboard.press('Home'); // Ensure start of row
     yield page.waitForTimeout(150);
-    // 2. Move Down to Target Row
-    for (let i = 0; i < rowIndex; i++) {
-        yield page.keyboard.press('ArrowDown');
-    }
-    // 3. Move Right to Target Column
-    for (let i = 0; i < index; i++) {
-        yield page.keyboard.press('ArrowRight');
-    }
-    yield page.waitForTimeout(50);
 });
-exports.keyboardCellNavigation = keyboardCellNavigation;
+exports.glideGoHome = glideGoHome;

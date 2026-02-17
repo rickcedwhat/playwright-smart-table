@@ -1,6 +1,6 @@
 import { expect } from '@playwright/test';
 import { TableContext, FillStrategy } from '../types';
-import { keyboardCellNavigation } from './glide/columns';
+import { glideGoUp, glideGoDown, glideGoLeft, glideGoRight, glideGoHome } from './glide/columns';
 import { scrollRightHeader } from './glide/headers';
 import { PaginationStrategies } from './pagination';
 import { StabilizationStrategies } from './stabilization';
@@ -87,7 +87,13 @@ export const GlideStrategies = {
     fill: glideFillStrategy,
     pagination: glidePaginationStrategy,
     header: scrollRightHeader,
-    cellNavigation: keyboardCellNavigation,
+    navigation: {
+        goUp: glideGoUp,
+        goDown: glideGoDown,
+        goLeft: glideGoLeft,
+        goRight: glideGoRight,
+        goHome: glideGoHome
+    },
     getCellLocator: glideGetCellLocator,
     getActiveCell: glideGetActiveCell
 };
