@@ -14,6 +14,99 @@ const fill_1 = require("./strategies/fill");
 const stringUtils_1 = require("./utils/stringUtils");
 const debugUtils_1 = require("./utils/debugUtils");
 /**
+ * Internal helper to navigate to a cell with active cell optimization.
+ * Uses navigation primitives (goUp, goDown, goLeft, goRight, goHome) for orchestration.
+ * Falls back to cellNavigation for backward compatibility.
+ * Returns the target cell locator after navigation.
+ */
+const _navigateToCell = (params) => __awaiter(void 0, void 0, void 0, function* () {
+    const { config, rootLocator, page, resolve, column, index, rowLocator, rowIndex } = params;
+    // Get active cell if strategy is available
+    let activeCell = null;
+    if (config.strategies.getActiveCell) {
+        activeCell = yield config.strategies.getActiveCell({
+            config,
+            root: rootLocator,
+            page,
+            resolve
+        });
+        // Optimization: Check if we are ALREADY at the target cell
+        if (activeCell && activeCell.rowIndex === rowIndex && activeCell.columnIndex === index) {
+            // Skip navigation - we're already there!
+            return activeCell.locator;
+        }
+    }
+    const context = { config, root: rootLocator, page, resolve };
+    // Use navigation primitives if available
+    if (config.strategies.navigation) {
+        const nav = config.strategies.navigation;
+        if (typeof rowIndex !== 'number') {
+            throw new Error('Row index is required for navigation');
+        }
+        // Determine starting position
+        let startRow = 0;
+        let startCol = 0;
+        if (activeCell && activeCell.rowIndex >= 0 && activeCell.columnIndex >= 0) {
+            // Use current position
+            startRow = activeCell.rowIndex;
+            startCol = activeCell.columnIndex;
+        }
+        else if (nav.goHome) {
+            // Reset to top-left
+            yield nav.goHome(context);
+        }
+        // Calculate movement needed
+        const rowDiff = rowIndex - startRow;
+        const colDiff = index - startCol;
+        // Navigate vertically
+        for (let i = 0; i < Math.abs(rowDiff); i++) {
+            if (rowDiff > 0 && nav.goDown) {
+                yield nav.goDown(context);
+            }
+            else if (rowDiff < 0 && nav.goUp) {
+                yield nav.goUp(context);
+            }
+        }
+        // Navigate horizontally
+        for (let i = 0; i < Math.abs(colDiff); i++) {
+            if (colDiff > 0 && nav.goRight) {
+                yield nav.goRight(context);
+            }
+            else if (colDiff < 0 && nav.goLeft) {
+                yield nav.goLeft(context);
+            }
+        }
+        yield page.waitForTimeout(50);
+    }
+    else if (config.strategies.cellNavigation) {
+        // Fallback to legacy cellNavigation strategy
+        yield config.strategies.cellNavigation({
+            config,
+            root: rootLocator,
+            page,
+            resolve,
+            column,
+            index,
+            rowLocator,
+            rowIndex,
+            activeCell
+        });
+    }
+    // Get the active cell locator after navigation (for virtualized tables)
+    if (config.strategies.getActiveCell) {
+        const updatedActiveCell = yield config.strategies.getActiveCell({
+            config,
+            root: rootLocator,
+            page,
+            resolve
+        });
+        if (updatedActiveCell) {
+            return updatedActiveCell.locator;
+        }
+    }
+    return null;
+});
+/**
  * Factory to create a SmartRow by extending a Playwright Locator.
  * We avoid Class/Proxy to ensure full compatibility with Playwright's expect(locator) matchers.
  */
@@ -68,55 +161,19 @@ const createSmartRow = (rowLocator, map, rowIndex, config, rootLocator, resolve,
             let targetCell = cell;
             const count = yield cell.count();
             if (count === 0) {
-                // Optimization: Check if we are ALREADY at the target cell
-                if (config.strategies.getActiveCell) {
-                    const active = yield config.strategies.getActiveCell({
-                        config,
-                        root: rootLocator,
-                        page,
-                        resolve
-                    });
-                    if (active && active.rowIndex === rowIndex && active.columnIndex === idx) {
-                        targetCell = active.locator;
-                        // Skip navigation
-                    }
-                    else {
-                        // Cell doesn't exist - navigate to it
-                        yield config.strategies.cellNavigation({
-                            config: config,
-                            root: rootLocator,
-                            page: page,
-                            resolve: resolve,
-                            column: col,
-                            index: idx,
-                            rowLocator: rowLocator,
-                            rowIndex: rowIndex
-                        });
-                        // Update targetCell after navigation if needed (e.g. active cell changed)
-                        if (config.strategies.getActiveCell) {
-                            const activeCell = yield config.strategies.getActiveCell({
-                                config,
-                                root: rootLocator,
-                                page,
-                                resolve
-                            });
-                            if (activeCell)
-                                targetCell = activeCell.locator;
-                        }
-                    }
-                }
-                else {
-                    // Fallback navigation without active cell check
-                    yield config.strategies.cellNavigation({
-                        config: config,
-                        root: rootLocator,
-                        page: page,
-                        resolve: resolve,
-                        column: col,
-                        index: idx,
-                        rowLocator: rowLocator,
-                        rowIndex: rowIndex
-                    });
+                // Cell not in DOM (virtualized) - navigate to it
+                const navigatedCell = yield _navigateToCell({
+                    config,
+                    rootLocator,
+                    page,
+                    resolve,
+                    column: col,
+                    index: idx,
+                    rowLocator,
+                    rowIndex
+                });
+                if (navigatedCell) {
+                    targetCell = navigatedCell;
                 }
             }
             // --- Navigation Logic End ---
@@ -142,15 +199,15 @@ const createSmartRow = (rowLocator, map, rowIndex, config, rootLocator, resolve,
             if (colIdx === undefined) {
                 throw new Error((0, stringUtils_1.buildColumnNotFoundError)(colName, Array.from(map.keys())));
             }
-            yield config.strategies.cellNavigation({
-                config: config,
-                root: rootLocator,
+            yield _navigateToCell({
+                config,
+                rootLocator,
                 page: rootLocator.page(),
-                resolve: resolve,
+                resolve,
                 column: colName,
                 index: colIdx,
-                rowLocator: rowLocator,
-                rowIndex: rowIndex
+                rowLocator,
+                rowIndex
             });
             const strategy = config.strategies.fill || fill_1.FillStrategies.default;
             (0, debugUtils_1.logDebug)(config, 'verbose', `Filling cell "${colName}" with value`, value);

@@ -1,5 +1,35 @@
 # Changelog
 
+## [6.3.1] - 2026-02-17
+
+### Added
+- **Navigation Primitives (`NavigationPrimitives`)**: New interface for defining primitive table navigation functions.
+  - `goUp`, `goDown`, `goLeft`, `goRight`, `goHome` - Simple movement primitives
+  - Strategies now define **HOW to move**, orchestration logic handles **WHEN to move**
+  - Cleaner separation of concerns and easier customization
+- **Glide Primitive Functions**: Implemented primitive navigation for Glide Data Grid
+  - `glideGoUp`, `glideGoDown`, `glideGoLeft`, `glideGoRight`, `glideGoHome`
+  - Reduced from 60-line complex strategy to 5 simple functions (~7 lines each)
+- **Plugin Export**: `Plugins` object now exported from main entry point
+  - Access via `import { Plugins } from '@rickcedwhat/playwright-smart-table'`
+
+### Changed
+- **`_navigateToCell` Refactor**: Internal helper now orchestrates navigation using primitives
+  - Calls `getActiveCell` for optimization
+  - Skips navigation if already at target cell
+  - Uses primitive functions when available, falls back to legacy `cellNavigation`
+- **`TableStrategies` Interface**: Added `navigation?: NavigationPrimitives` field
+- **Glide Strategy Export**: Now exports `navigation` object with primitive functions
+
+### Deprecated
+- **`cellNavigation`**: Marked as deprecated in favor of `navigation` primitives
+  - Still supported for backward compatibility
+  - Will be removed in a future major version
+
+### Internal
+- Simplified navigation logic by moving orchestration from strategies to `_navigateToCell`
+- Improved code reusability and composability
+
 ## [6.3.0] - 2026-02-15
 
 ### Added

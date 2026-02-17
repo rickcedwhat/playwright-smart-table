@@ -92,7 +92,13 @@ exports.GlideStrategies = {
     fill: exports.glideFillStrategy,
     pagination: exports.glidePaginationStrategy,
     header: headers_1.scrollRightHeader,
-    cellNavigation: columns_1.keyboardCellNavigation,
+    navigation: {
+        goUp: columns_1.glideGoUp,
+        goDown: columns_1.glideGoDown,
+        goLeft: columns_1.glideGoLeft,
+        goRight: columns_1.glideGoRight,
+        goHome: columns_1.glideGoHome
+    },
     getCellLocator: exports.glideGetCellLocator,
     getActiveCell: exports.glideGetActiveCell
 };

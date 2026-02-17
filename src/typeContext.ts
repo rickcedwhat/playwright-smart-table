@@ -201,7 +201,7 @@ export type FillStrategy = (options: {
 }) => Promise<void>;
 
 export type { HeaderStrategy } from './strategies/headers';
-export type { CellNavigationStrategy } from './strategies/columns';
+export type { CellNavigationStrategy, NavigationPrimitives } from './strategies/columns';
 
 /**
  * Strategy to resolve column names (string or regex) to their index.
@@ -235,7 +235,9 @@ export interface LoadingStrategy {
 export interface TableStrategies {
   /** Strategy for discovering/scanning headers */
   header?: HeaderStrategy;
-  /** Strategy for navigating to specific cells (row + column) */
+  /** Primitive navigation functions (goUp, goDown, goLeft, goRight, goHome) */
+  navigation?: NavigationPrimitives;
+  /** @deprecated Use navigation primitives instead. Strategy for navigating to specific cells (row + column) */
   cellNavigation?: CellNavigationStrategy;
   /** Strategy for filling form inputs */
   fill?: FillStrategy;
