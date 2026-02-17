@@ -1,5 +1,16 @@
 # Changelog
 
+## [6.3.2] - 2026-02-17
+
+### Fixed
+- **Glide Canvas Focus**: Fixed `glideGoHome` to correctly find and focus the parent canvas element that contains the accessibility table, resolving navigation issues when root locator is already a canvas or contains canvas elements.
+
+### Added
+- **`Plugins.Glide.Strategies.fillSimple`**: Exported alternative fill strategy for Glide implementations that don't use the standard textarea editor. This simpler strategy (Enter → Type → Enter) is faster but may not work for all Glide configurations.
+
+### Changed
+- **`glideFillStrategy`**: Remains the default fill strategy with textarea validation for maximum compatibility with standard Glide Data Grid implementations.
+
 ## [6.3.1] - 2026-02-17
 
 ### Added

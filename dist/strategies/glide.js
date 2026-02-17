@@ -9,11 +9,15 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.GlideStrategies = exports.glideGetActiveCell = exports.glideGetCellLocator = exports.glidePaginationStrategy = exports.glideFillStrategy = void 0;
+exports.GlideStrategies = exports.glideGetActiveCell = exports.glideGetCellLocator = exports.glidePaginationStrategy = exports.glideFillSimple = exports.glideFillStrategy = void 0;
 const columns_1 = require("./glide/columns");
 const headers_1 = require("./glide/headers");
 const pagination_1 = require("./pagination");
 const stabilization_1 = require("./stabilization");
+/**
+ * Fill strategy for Glide Data Grid with textarea validation.
+ * This is the default strategy that works with the standard Glide Data Grid editor.
+ */
 const glideFillStrategy = (_a) => __awaiter(void 0, [_a], void 0, function* ({ value, page }) {
     // Edit Cell
     yield page.keyboard.press('Enter');
@@ -44,6 +48,17 @@ const glideFillStrategy = (_a) => __awaiter(void 0, [_a], void 0, function* ({ v
     yield page.waitForTimeout(300);
 });
 exports.glideFillStrategy = glideFillStrategy;
+/**
+ * Simple fill strategy for Glide Data Grid.
+ * Use this if your Glide implementation doesn't use the standard textarea editor.
+ * This is faster but may not work for all Glide configurations.
+ */
+const glideFillSimple = (_a) => __awaiter(void 0, [_a], void 0, function* ({ value, page }) {
+    yield page.keyboard.press('Enter');
+    yield page.keyboard.type(String(value));
+    yield page.keyboard.press('Enter');
+});
+exports.glideFillSimple = glideFillSimple;
 exports.glidePaginationStrategy = pagination_1.PaginationStrategies.infiniteScroll({
     scrollTarget: 'xpath=//ancestor::body//div[contains(@class, "dvn-scroller")]',
     scrollAmount: 500,
@@ -90,6 +105,7 @@ const glideGetActiveCell = (_a) => __awaiter(void 0, [_a], void 0, function* ({ 
 exports.glideGetActiveCell = glideGetActiveCell;
 exports.GlideStrategies = {
     fill: exports.glideFillStrategy,
+    fillSimple: exports.glideFillSimple,
     pagination: exports.glidePaginationStrategy,
     header: headers_1.scrollRightHeader,
     navigation: {

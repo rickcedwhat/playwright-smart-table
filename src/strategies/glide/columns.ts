@@ -26,7 +26,16 @@ export const glideGoRight = async (context: StrategyContext) => {
 export const glideGoHome = async (context: StrategyContext) => {
     const { root, page } = context;
 
-    await root.focus();
+    // Glide renders to canvas - the accessibility table (root) is inside the canvas
+    // We need to find and focus the canvas element that contains our root
+    await root.evaluate((el) => {
+        // Find the closest canvas ancestor
+        const canvas = el.closest('canvas') || el.parentElement?.querySelector('canvas');
+        if (canvas instanceof HTMLCanvasElement) {
+            canvas.tabIndex = 0;
+            canvas.focus();
+        }
+    });
     await page.waitForTimeout(100);
 
     // Reset to top-left - Cross-OS sequence (Mac/Windows)
