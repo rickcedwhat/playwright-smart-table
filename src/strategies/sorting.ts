@@ -1,4 +1,4 @@
-import type { SortingStrategy } from '../types';
+import type { SortingStrategy, Selector } from '../types';
 
 /**
  * A collection of pre-built sorting strategies.
@@ -13,7 +13,7 @@ export const SortingStrategies = {
     return {
       async doSort({ columnName, direction, context }) {
         const { resolve, config, root } = context;
-        const headerLoc = resolve(config.headerSelector, root);
+        const headerLoc = resolve(config.headerSelector as Selector, root);
 
         const headers = await headerLoc.all();
         const headerTexts = await Promise.all(headers.map(h => h.innerText()));
@@ -40,7 +40,7 @@ export const SortingStrategies = {
       },
       async getSortState({ columnName, context }) {
         const { resolve, config, root } = context;
-        const headerLoc = resolve(config.headerSelector, root);
+        const headerLoc = resolve(config.headerSelector as Selector, root);
 
         const headers = await headerLoc.all();
         const headerTexts = await Promise.all(headers.map(h => h.innerText()));

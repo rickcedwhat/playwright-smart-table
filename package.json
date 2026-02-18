@@ -1,6 +1,6 @@
 {
   "name": "@rickcedwhat/playwright-smart-table",
-  "version": "6.3.2",
+  "version": "6.4.0",
   "description": "Smart, column-aware table interactions for Playwright",
   "author": "Cedrick Catalan",
   "license": "MIT",
@@ -15,12 +15,13 @@
   ],
   "scripts": {
     "generate-types": "node scripts/embed-types.mjs",
+    "generate-config-types": "node scripts/embed-config-types.mjs",
     "generate-docs": "node scripts/generate-readme.mjs",
     "generate-all-api-docs": "node scripts/generate-all-api-docs.mjs",
     "update-all-api-signatures": "node scripts/update-all-api-signatures.mjs",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
-    "build": "npm run generate-types && npm run generate-docs && npm run generate-all-api-docs && npm run update-all-api-signatures && tsc",
+    "build": "npm run generate-types && npm run generate-config-types && npm run generate-docs && npm run generate-all-api-docs && npm run update-all-api-signatures && tsc",
     "prepublishOnly": "npm run build",
     "test": "npm run test:unit && npx playwright test",
     "test:unit": "vitest run --reporter=verbose --reporter=html",

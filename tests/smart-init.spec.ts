@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { useTable } from '../src/useTable';
+import { useTable } from '../src/index';
 
 test.describe('Smart Initialization', () => {
     test('should wait for headers to appear (smart init)', async ({ page }) => {

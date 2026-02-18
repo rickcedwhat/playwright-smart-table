@@ -45,11 +45,6 @@
     "comment": "/**\n* Navigates to a specific column using the configured CellNavigationStrategy.\n*/"
   },
   {
-    "name": "getRows",
-    "signature": "getRows: (options?: { filter?: Record<string, any>, exact?: boolean }) => Promise<SmartRowArray>",
-    "comment": "/**\n* Gets all rows on the current page only (does not paginate).\n* Auto-initializes the table if not already initialized.\n* Returns a SmartRowArray which extends Array with a toJSON() helper method.\n* @param options - Filter options\n*/"
-  },
-  {
     "name": "reset",
     "signature": "reset: () => Promise<void>",
     "comment": "/**\n* Resets the table state (clears cache, flags) and invokes the onReset strategy.\n*/"

@@ -77,33 +77,21 @@ const _navigateToCell = (params) => __awaiter(void 0, void 0, void 0, function* 
             }
         }
         yield page.waitForTimeout(50);
-    }
-    else if (config.strategies.cellNavigation) {
-        // Fallback to legacy cellNavigation strategy
-        yield config.strategies.cellNavigation({
-            config,
-            root: rootLocator,
-            page,
-            resolve,
-            column,
-            index,
-            rowLocator,
-            rowIndex,
-            activeCell
-        });
-    }
-    // Get the active cell locator after navigation (for virtualized tables)
-    if (config.strategies.getActiveCell) {
-        const updatedActiveCell = yield config.strategies.getActiveCell({
-            config,
-            root: rootLocator,
-            page,
-            resolve
-        });
-        if (updatedActiveCell) {
-            return updatedActiveCell.locator;
+        // Get the active cell locator after navigation (for virtualized tables)
+        if (config.strategies.getActiveCell) {
+            const updatedActiveCell = yield config.strategies.getActiveCell({
+                config,
+                root: rootLocator,
+                page,
+                resolve
+            });
+            if (updatedActiveCell) {
+                return updatedActiveCell.locator;
+            }
         }
+        return null;
     }
+    ;
     return null;
 });
 /**

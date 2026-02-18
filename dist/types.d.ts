@@ -163,15 +163,6 @@ export interface TableContext<T = any> {
 }
 export type PaginationStrategy = (context: TableContext) => Promise<boolean>;
 export type DedupeStrategy = (row: SmartRow) => string | number | Promise<string | number>;
-export interface PromptOptions {
-    /**
-     * Output Strategy:
-     * - 'error': Throws an error with the prompt (useful for platforms that capture error output cleanly).
-     * - 'console': Standard console logs (Default).
-     */
-    output?: 'console' | 'error';
-    includeTypes?: boolean;
-}
 export type FillStrategy = (options: {
     row: SmartRow;
     columnName: string;
@@ -182,10 +173,9 @@ export type FillStrategy = (options: {
     table: TableResult;
     fillOptions?: FillOptions;
 }) => Promise<void>;
-export type { HeaderStrategy } from './strategies/headers';
-export type { CellNavigationStrategy, NavigationPrimitives } from './strategies/columns';
 import { HeaderStrategy } from './strategies/headers';
-import { CellNavigationStrategy, NavigationPrimitives } from './strategies/columns';
+export type { HeaderStrategy } from './strategies/headers';
+import { NavigationPrimitives } from './strategies/columns';
 /**
  * Strategy to resolve column names (string or regex) to their index.
  */
@@ -220,8 +210,6 @@ export interface TableStrategies {
     header?: HeaderStrategy;
     /** Primitive navigation functions (goUp, goDown, goLeft, goRight, goHome) */
     navigation?: NavigationPrimitives;
-    /** @deprecated Use navigation primitives instead. Strategy for navigating to specific cells (row + column) */
-    cellNavigation?: CellNavigationStrategy;
     /** Strategy for filling form inputs */
     fill?: FillStrategy;
     /** Strategy for paginating through data */
@@ -250,15 +238,9 @@ export interface TableStrategies {
     /** Strategy for detecting loading states */
     loading?: LoadingStrategy;
 }
-/**
- * Configuration options for useTable.
- */
-/**
- * Configuration options for useTable.
- */
 export interface TableConfig<T = any> {
     /** Selector for the table headers */
-    headerSelector?: string;
+    headerSelector?: string | ((root: Locator) => Locator);
     /** Selector for the table rows */
     rowSelector?: string;
     /** Selector for the cells within a row */
@@ -286,8 +268,8 @@ export interface TableConfig<T = any> {
      */
     dataMapper?: Partial<Record<keyof T, (cell: Locator) => Promise<T[keyof T]> | T[keyof T]>>;
 }
-export interface FinalTableConfigLike<T = any> extends TableConfig<T> {
-    headerSelector: string;
+export interface FinalTableConfig<T = any> extends TableConfig<T> {
+    headerSelector: string | ((root: Locator) => Locator);
     rowSelector: string;
     cellSelector: string;
     maxPages: number;
@@ -302,7 +284,6 @@ export interface FinalTableConfigLike<T = any> extends TableConfig<T> {
     onReset: (context: TableContext) => Promise<void>;
     strategies: TableStrategies;
 }
-export type FinalTableConfig<T = any> = FinalTableConfigLike<T>;
 export interface FillOptions {
     /**
      * Custom input mappers for specific columns.
@@ -381,16 +362,6 @@ export interface TableResult<T = any> {
      * Navigates to a specific column using the configured CellNavigationStrategy.
      */
     scrollToColumn: (columnName: string) => Promise<void>;
-    /**
-     * Gets all rows on the current page only (does not paginate).
-     * Auto-initializes the table if not already initialized.
-     * Returns a SmartRowArray which extends Array with a toJSON() helper method.
-     * @param options - Filter options
-     */
-    getRows: (options?: {
-        filter?: Record<string, any>;
-        exact?: boolean;
-    }) => Promise<SmartRowArray>;
     /**
      * Resets the table state (clears cache, flags) and invokes the onReset strategy.
      */

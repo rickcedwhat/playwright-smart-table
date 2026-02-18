@@ -1,5 +1,18 @@
 # Changelog
 
+## [6.4.0] - 2026-02-18
+
+### ⚠️ Breaking Changes
+- **Removed `getRows`**: The deprecated `getRows` method has been removed. Use `findRows` or `iterateThroughTable` instead.
+- **Removed `cellNavigation`**: The deprecated `cellNavigation` strategy type has been removed in favor of `navigation` primitives.
+
+### Added
+- **Explicit Strategies Export**: `Strategies` are now explicitly exported from the main index, improving discovery.
+
+### Changed
+- **`headerSelector` Type**: Updated to strictly allow `string | ((root: Locator) => Locator)`.
+- **Internal Cleanup**: Removed redundant types and aliases (`FinalTableConfigLike`).
+
 ## [6.3.2] - 2026-02-17
 
 ### Fixed

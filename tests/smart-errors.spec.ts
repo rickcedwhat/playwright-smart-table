@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { useTable } from '../src/useTable';
+import { useTable } from '../src/index';
 
 test.describe('Smart Error Messages', () => {
   test('shows helpful suggestions for misspelled column names', async ({ page }) => {

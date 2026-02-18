@@ -92,34 +92,23 @@ const _navigateToCell = async (params: {
         }
 
         await page.waitForTimeout(50);
-    } else if (config.strategies.cellNavigation) {
-        // Fallback to legacy cellNavigation strategy
-        await config.strategies.cellNavigation({
-            config,
-            root: rootLocator,
-            page,
-            resolve,
-            column,
-            index,
-            rowLocator,
-            rowIndex,
-            activeCell
-        });
-    }
 
-    // Get the active cell locator after navigation (for virtualized tables)
-    if (config.strategies.getActiveCell) {
-        const updatedActiveCell = await config.strategies.getActiveCell({
-            config,
-            root: rootLocator,
-            page,
-            resolve
-        });
-        if (updatedActiveCell) {
-            return updatedActiveCell.locator;
+
+        // Get the active cell locator after navigation (for virtualized tables)
+        if (config.strategies.getActiveCell) {
+            const updatedActiveCell = await config.strategies.getActiveCell({
+                config,
+                root: rootLocator,
+                page,
+                resolve
+            });
+            if (updatedActiveCell) {
+                return updatedActiveCell.locator;
+            }
         }
-    }
 
+        return null;
+    };
     return null;
 };
 
@@ -283,3 +272,4 @@ export const createSmartRow = <T = any>(
 
     return smart;
 };
+

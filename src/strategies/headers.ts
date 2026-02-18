@@ -1,4 +1,4 @@
-import { StrategyContext } from '../types';
+import { StrategyContext, Selector } from '../types';
 
 /**
  * Defines the contract for a header retrieval strategy.
@@ -12,7 +12,7 @@ export const HeaderStrategies = {
      * This is fast but won't find virtualized columns off-screen.
      */
     visible: async ({ config, resolve, root }: StrategyContext): Promise<string[]> => {
-        const headerLoc = resolve(config.headerSelector, root);
+        const headerLoc = resolve(config.headerSelector as Selector, root);
         try {
             // Wait for at least one header to be visible
             await headerLoc.first().waitFor({ state: 'visible', timeout: 3000 });

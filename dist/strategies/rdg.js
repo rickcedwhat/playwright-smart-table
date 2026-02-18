@@ -9,7 +9,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.RDGStrategies = exports.rdgPaginationStrategy = exports.rdgCellNavigation = exports.rdgGetCellLocator = exports.scrollRightHeaderRDG = void 0;
+exports.RDGStrategies = exports.rdgNavigation = exports.rdgPaginationStrategy = exports.rdgCellNavigation = exports.rdgGetCellLocator = exports.scrollRightHeaderRDG = void 0;
 /**
  * Scrolls the grid horizontally to collect all column headers.
  * Handles empty headers by labeling them (e.g. "Checkbox").
@@ -20,6 +20,7 @@ const scrollRightHeaderRDG = (context) => __awaiter(void 0, void 0, void 0, func
     const gridHandle = yield root.evaluateHandle((el) => {
         return el.querySelector('[role="grid"]') || el.closest('[role="grid"]');
     });
+    const scrollContainer = gridHandle; // RDG usually scrolls the grid container itself
     const expectedColumns = yield gridHandle.evaluate(el => el ? parseInt(el.getAttribute('aria-colcount') || '0', 10) : 0);
     const getVisible = () => __awaiter(void 0, void 0, void 0, function* () {
         const headerLoc = resolve(config.headerSelector, root);
@@ -92,9 +93,50 @@ exports.rdgPaginationStrategy = pagination_1.PaginationStrategies.infiniteScroll
     scrollAmount: 500,
     stabilization: stabilization_1.StabilizationStrategies.contentChanged({ timeout: 5000 })
 });
+exports.rdgNavigation = {
+    goRight: (_a) => __awaiter(void 0, [_a], void 0, function* ({ root, page }) {
+        yield root.evaluate((el) => {
+            // Find grid container
+            const grid = el.querySelector('[role="grid"]') || el.closest('[role="grid"]') || el;
+            if (grid)
+                grid.scrollLeft += 150;
+        });
+    }),
+    goLeft: (_a) => __awaiter(void 0, [_a], void 0, function* ({ root, page }) {
+        yield root.evaluate((el) => {
+            const grid = el.querySelector('[role="grid"]') || el.closest('[role="grid"]') || el;
+            if (grid)
+                grid.scrollLeft -= 150;
+        });
+    }),
+    goDown: (_a) => __awaiter(void 0, [_a], void 0, function* ({ root, page }) {
+        yield root.evaluate((el) => {
+            const grid = el.querySelector('[role="grid"]') || el.closest('[role="grid"]') || el;
+            if (grid)
+                grid.scrollTop += 35;
+        });
+    }),
+    goUp: (_a) => __awaiter(void 0, [_a], void 0, function* ({ root, page }) {
+        yield root.evaluate((el) => {
+            const grid = el.querySelector('[role="grid"]') || el.closest('[role="grid"]') || el;
+            if (grid)
+                grid.scrollTop -= 35;
+        });
+    }),
+    goHome: (_a) => __awaiter(void 0, [_a], void 0, function* ({ root, page }) {
+        yield root.evaluate((el) => {
+            const grid = el.querySelector('[role="grid"]') || el.closest('[role="grid"]') || el;
+            if (grid) {
+                grid.scrollLeft = 0;
+                grid.scrollTop = 0;
+            }
+        });
+    })
+};
 exports.RDGStrategies = {
     header: exports.scrollRightHeaderRDG,
     getCellLocator: exports.rdgGetCellLocator,
     cellNavigation: exports.rdgCellNavigation,
+    navigation: exports.rdgNavigation,
     pagination: exports.rdgPaginationStrategy
 };

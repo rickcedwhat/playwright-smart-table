@@ -1,5 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
-import { useTable, PaginationStrategies } from '../src/useTable';
+import { useTable, Strategies } from '../src/index';
 import { StabilizationStrategies } from '../src/strategies/stabilization';
 
 // Helper to set config
@@ -26,6 +26,13 @@ async function setPlaygroundConfig(page: Page, config: any) {
 
 test.describe('Playground: Virtualized Table', () => {
     test.beforeEach(async ({ page }) => {
+        try {
+            const response = await page.request.get('http://localhost:3000/virtualized');
+            if (!response.ok()) throw new Error('Local server not running');
+        } catch (e) {
+            test.skip(true, 'Skipping: Local playground server not running at localhost:3000');
+        }
+
         await page.goto('http://localhost:3000/virtualized');
         // Ensure ready
         await expect(page.getByRole('heading', { name: 'Virtualized Table Scenario' })).toBeVisible();
@@ -48,7 +55,7 @@ test.describe('Playground: Virtualized Table', () => {
             headerSelector: '.header [role="columnheader"]',
             cellSelector: '[role="cell"]',
             strategies: {
-                pagination: PaginationStrategies.infiniteScroll({
+                pagination: Strategies.Pagination.infiniteScroll({
                     scrollTarget: '[data-testid="virtuoso-scroller"]',
                     scrollAmount: 500,
                     action: 'js-scroll',
@@ -89,7 +96,7 @@ test.describe('Playground: Virtualized Table', () => {
             headerSelector: '.header [role="columnheader"]',
             cellSelector: '[role="cell"]',
             strategies: {
-                pagination: PaginationStrategies.infiniteScroll({
+                pagination: Strategies.Pagination.infiniteScroll({
                     scrollTarget: '[data-testid="virtuoso-scroller"]',
                     scrollAmount: 1000,
                     action: 'js-scroll',
@@ -126,7 +133,7 @@ test.describe('Playground: Virtualized Table', () => {
             headerSelector: '.header [role="columnheader"]',
             cellSelector: '[role="cell"]',
             strategies: {
-                pagination: PaginationStrategies.infiniteScroll({
+                pagination: Strategies.Pagination.infiniteScroll({
                     scrollTarget: '[data-testid="virtuoso-scroller"]',
                     scrollAmount: 1000,
                     action: 'js-scroll',
@@ -168,7 +175,7 @@ test.describe('Playground: Virtualized Table', () => {
             headerSelector: '.header [role="columnheader"]',
             cellSelector: '[role="cell"]',
             strategies: {
-                pagination: PaginationStrategies.infiniteScroll({
+                pagination: Strategies.Pagination.infiniteScroll({
                     scrollTarget: '[data-testid="virtuoso-scroller"]',
                     scrollAmount: 300,
                     action: 'js-scroll',
@@ -227,7 +234,7 @@ test.describe('Playground: Virtualized Table', () => {
             headerSelector: '.header [role="columnheader"]',
             cellSelector: '[role="cell"]',
             strategies: {
-                pagination: PaginationStrategies.infiniteScroll({
+                pagination: Strategies.Pagination.infiniteScroll({
                     scrollTarget: '[data-testid="virtuoso-scroller"]',
                     scrollAmount: 500,
                     action: 'js-scroll',
@@ -274,7 +281,7 @@ test.describe('Playground: Virtualized Table', () => {
             headerSelector: '.header [role="columnheader"]',
             cellSelector: '[role="cell"]',
             strategies: {
-                pagination: PaginationStrategies.infiniteScroll({
+                pagination: Strategies.Pagination.infiniteScroll({
                     scrollTarget: '[data-testid="virtuoso-scroller"]',
                     scrollAmount: 500,
                     action: 'js-scroll',
@@ -326,7 +333,7 @@ test.describe('Playground: Virtualized Table', () => {
             headerSelector: '.header [role="columnheader"]',
             cellSelector: '[role="cell"]',
             strategies: {
-                pagination: PaginationStrategies.infiniteScroll({
+                pagination: Strategies.Pagination.infiniteScroll({
                     scrollTarget: '[data-testid="virtuoso-scroller"]',
                     scrollAmount: 500,
                     action: 'js-scroll',

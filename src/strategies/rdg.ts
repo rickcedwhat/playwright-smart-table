@@ -1,4 +1,4 @@
-import { TableContext } from '../types';
+import { TableContext, Selector } from '../types';
 
 /**
  * Scrolls the grid horizontally to collect all column headers.
@@ -12,12 +12,15 @@ export const scrollRightHeaderRDG = async (context: TableContext) => {
         return el.querySelector('[role="grid"]') || el.closest('[role="grid"]');
     });
 
+    const scrollContainer = gridHandle; // RDG usually scrolls the grid container itself
+
+
     const expectedColumns = await gridHandle.evaluate(el =>
         el ? parseInt(el.getAttribute('aria-colcount') || '0', 10) : 0
     );
 
     const getVisible = async () => {
-        const headerLoc = resolve(config.headerSelector, root);
+        const headerLoc = resolve(config.headerSelector as Selector, root);
         const texts = await headerLoc.allInnerTexts();
         return texts.map(t => {
             const trimmed = t.trim();
@@ -102,9 +105,47 @@ export const rdgPaginationStrategy = PaginationStrategies.infiniteScroll({
     stabilization: StabilizationStrategies.contentChanged({ timeout: 5000 })
 });
 
+export const rdgNavigation = {
+    goRight: async ({ root, page }: any) => {
+        await root.evaluate((el: HTMLElement) => {
+            // Find grid container
+            const grid = el.querySelector('[role="grid"]') || el.closest('[role="grid"]') || el;
+            if (grid) grid.scrollLeft += 150;
+        });
+    },
+    goLeft: async ({ root, page }: any) => {
+        await root.evaluate((el: HTMLElement) => {
+            const grid = el.querySelector('[role="grid"]') || el.closest('[role="grid"]') || el;
+            if (grid) grid.scrollLeft -= 150;
+        });
+    },
+    goDown: async ({ root, page }: any) => {
+        await root.evaluate((el: HTMLElement) => {
+            const grid = el.querySelector('[role="grid"]') || el.closest('[role="grid"]') || el;
+            if (grid) grid.scrollTop += 35;
+        });
+    },
+    goUp: async ({ root, page }: any) => {
+        await root.evaluate((el: HTMLElement) => {
+            const grid = el.querySelector('[role="grid"]') || el.closest('[role="grid"]') || el;
+            if (grid) grid.scrollTop -= 35;
+        });
+    },
+    goHome: async ({ root, page }: any) => {
+        await root.evaluate((el: HTMLElement) => {
+            const grid = el.querySelector('[role="grid"]') || el.closest('[role="grid"]') || el;
+            if (grid) {
+                grid.scrollLeft = 0;
+                grid.scrollTop = 0;
+            }
+        });
+    }
+};
+
 export const RDGStrategies = {
     header: scrollRightHeaderRDG,
     getCellLocator: rdgGetCellLocator,
     cellNavigation: rdgCellNavigation,
+    navigation: rdgNavigation,
     pagination: rdgPaginationStrategy
 };
