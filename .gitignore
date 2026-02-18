@@ -11,3 +11,7 @@ docs/.vitepress/cache
 
 # Vitest
 html/
+
+.agent/
+.continue/
+.cursorrules

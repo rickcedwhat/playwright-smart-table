@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
-import { useTable } from '../src/useTable';
-import { Strategies } from '../src/strategies';
+import { useTable } from '../src/index';
+import { Strategies } from '../src/index';
 
 test.describe('README.md Examples Verification', () => {
 

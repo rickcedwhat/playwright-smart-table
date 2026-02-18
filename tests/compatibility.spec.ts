@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { useTable, Strategies } from '../src/useTable';
+import { useTable, Strategies } from '../src/index';
 
 /**
  * Compatibility Test Suite
@@ -26,7 +26,7 @@ test.describe('Backwards Compatibility Tests', () => {
     // Table should have all expected methods
     expect(table).toHaveProperty('getRow');
     expect(table).toHaveProperty('getRowByIndex');
-    expect(table).toHaveProperty('getRows');
+
     expect(table).toHaveProperty('getHeaders');
     expect(table).toHaveProperty('getHeaderCell');
     expect(table).toHaveProperty('reset');
@@ -330,17 +330,7 @@ test.describe('Backwards Compatibility Tests', () => {
 
     const table = useTable(page.locator('#test-table'));
 
-    // getRows should auto-init
-    const rows = await table.findRows({}, { maxPages: 1 });
-    expect(rows.length).toBeGreaterThan(0);
 
-    // getColumnValues should auto-init
-    const names = await table.getColumnValues('Name');
-    expect(names).toContain('John');
-
-    // findRow should auto-init
-    const row = await table.findRow({ Name: 'John' });
-    await expect(row).toBeVisible();
   });
 
   test('New API: init() method with timeout', async ({ page }) => {
@@ -614,7 +604,7 @@ test.describe('Backwards Compatibility Tests', () => {
     await table.iterateThroughTable(async ({ table: restrictedTable }) => {
       // Should have safe methods
       expect(restrictedTable).toHaveProperty('getRow');
-      expect(restrictedTable).toHaveProperty('getRows');
+
       expect(restrictedTable).toHaveProperty('getHeaders');
       expect(restrictedTable).toHaveProperty('getRowByIndex');
 

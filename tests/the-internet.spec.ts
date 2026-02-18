@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { useTable } from '../src/useTable';
+import { useTable } from '../src/index';
 
 test('The Internet Herokuapp - Standard Table', async ({ page }) => {
   await page.goto('https://the-internet.herokuapp.com/tables');

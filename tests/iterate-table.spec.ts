@@ -1,6 +1,6 @@
 
 import { test, expect } from '@playwright/test';
-import { useTable } from '../src/useTable';
+import { useTable } from '../src/index';
 
 test('iterateThroughTable flattens array results and provides SmartRowArray', async ({ page }) => {
   await page.setContent(`

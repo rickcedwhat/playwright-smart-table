@@ -1,4 +1,4 @@
-import { StrategyContext } from '../../types';
+import { StrategyContext, Selector } from '../../types';
 
 /**
  * Scans for headers by finding a scrollable container and setting scrollLeft.
@@ -10,7 +10,7 @@ export const scrollRightHeader = async (context: StrategyContext, options?: { li
     const collectedHeaders = new Set<string>();
 
     const getVisible = async () => {
-        const headerLoc = resolve(config.headerSelector, root);
+        const headerLoc = resolve(config.headerSelector as Selector, root);
         const texts = await headerLoc.allInnerTexts();
         return texts.map(t => t.trim());
     };

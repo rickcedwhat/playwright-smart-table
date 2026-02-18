@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { useTable } from '../src/useTable';
+import { useTable } from '../src/index';
 
 test('should filter rows by locator (custom filter)', async ({ page }) => {
     await page.setContent(`

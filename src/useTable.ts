@@ -1,6 +1,7 @@
 import type { Locator, Page } from '@playwright/test';
 import { TableConfig, TableContext, Selector, TableResult, SmartRow as SmartRowType, PromptOptions, FinalTableConfig, DedupeStrategy, RestrictedTableResult, PaginationStrategy, StrategyContext, TableStrategies as ITableStrategies, FilterValue } from './types';
 import { TYPE_CONTEXT } from './typeContext';
+import { MINIMAL_CONFIG_CONTEXT } from './minimalConfigContext';
 import { SortingStrategies as ImportedSortingStrategies } from './strategies/sorting';
 import { PaginationStrategies as ImportedPaginationStrategies } from './strategies/pagination';
 
@@ -8,7 +9,7 @@ import { DedupeStrategies as ImportedDedupeStrategies } from './strategies/dedup
 import { LoadingStrategies as ImportedLoadingStrategies } from './strategies/loading';
 import { FillStrategies } from './strategies/fill';
 import { HeaderStrategies } from './strategies/headers';
-import { CellNavigationStrategies } from './strategies/columns';
+
 import { createSmartRow } from './smartRow';
 import { FilterEngine } from './filterEngine';
 import { TableMapper } from './engine/tableMapper';
@@ -29,7 +30,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
   const defaultStrategies: ITableStrategies = {
     fill: FillStrategies.default,
     header: HeaderStrategies.visible,
-    cellNavigation: CellNavigationStrategies.default,
+
     pagination: async () => false,
     loading: {
       isHeaderLoading: ImportedLoadingStrategies.Headers.stable(200)
@@ -127,7 +128,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     const { output = 'console', includeTypes = true } = options;
     let finalPrompt = content;
     if (includeTypes) {
-      finalPrompt += `\n\n👇 Useful TypeScript Definitions 👇\n\`\`\`typescript\n${TYPE_CONTEXT}\n\`\`\`\n`;
+      finalPrompt += `\n\n👇 Useful TypeScript Definitions 👇\n\`\`\`typescript\n${MINIMAL_CONFIG_CONTEXT}\n\`\`\`\n`;
     }
     if (output === 'error') {
       console.log(`⚠️ Throwing error to display [${promptName}] cleanly...`);
@@ -159,14 +160,9 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       const idx = map.get(columnName);
       if (idx === undefined) throw _createColumnError(columnName, map);
 
-      await config.strategies.cellNavigation!({
-        config: config as FinalTableConfig,
-        root: rootLocator,
-        page: rootLocator.page(),
-        resolve,
-        column: columnName,
-        index: idx
-      });
+      // Use header cell for scrolling
+      const headerCell = resolve(config.headerSelector as Selector, rootLocator).nth(idx);
+      await headerCell.scrollIntoViewIfNeeded();
     },
 
     getHeaders: async () => {
@@ -178,7 +174,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       const map = await tableMapper.getMap();
       const idx = map.get(columnName);
       if (idx === undefined) throw _createColumnError(columnName, map, 'header cell');
-      return resolve(config.headerSelector, rootLocator).nth(idx);
+      return resolve(config.headerSelector as Selector, rootLocator).nth(idx);
     },
 
     reset: async () => {
@@ -251,11 +247,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       return rowFinder.findRow(filters as Record<string, FilterValue>, options);
     },
 
-    getRows: async (options?: { filter?: Partial<T> | Record<string, any>, exact?: boolean }): Promise<SmartRowArray<T>> => {
-      console.warn('DEPRECATED: table.getRows() is deprecated and will be removed in a future version. Use table.findRows() instead.');
-      // @ts-ignore
-      return rowFinder.findRows(options?.filter || {}, { ...options, maxPages: 1 });
-    },
+
 
     findRows: async (filters: Partial<T> | Record<string, any>, options?: { exact?: boolean, maxPages?: number }): Promise<SmartRowArray<T>> => {
       return rowFinder.findRows(filters, options);
@@ -328,7 +320,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
         getRow: result.getRow,
         getRowByIndex: result.getRowByIndex,
         findRow: result.findRow,
-        getRows: result.getRows,
+
         findRows: result.findRows,
         getColumnValues: result.getColumnValues,
         isInitialized: result.isInitialized,
@@ -516,11 +508,3 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
   finalTable = result;
   return result;
 };
-
-export const PaginationStrategies = {
-  ...ImportedPaginationStrategies
-};
-export const LoadingStrategies = ImportedLoadingStrategies;
-export const SortingStrategies = ImportedSortingStrategies;
-export const DedupeStrategies = ImportedDedupeStrategies;
-export { FillStrategies, HeaderStrategies, CellNavigationStrategies, ResolutionStrategies, Strategies };

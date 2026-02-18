@@ -1,6 +1,6 @@
 
 import { test, expect } from '@playwright/test';
-import { useTable } from '../src/useTable';
+import { useTable } from '../src/index';
 import { DedupeStrategies } from '../src/strategies/dedupe';
 
 test('DedupeStrategies.byTopPosition handles duplicate rows', async ({ page }) => {

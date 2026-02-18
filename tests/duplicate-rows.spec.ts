@@ -1,6 +1,6 @@
 
 import { test, expect } from '@playwright/test';
-import { useTable } from '../src/useTable';
+import { useTable } from '../src/index';
 
 test('findRow throws error when multiple rows match', async ({ page }) => {
   await page.setContent(`

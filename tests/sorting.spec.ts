@@ -1,7 +1,7 @@
 // tests/sorting.spec.ts
 import { test, expect } from '@playwright/test';
 import path from 'path';
-import { useTable, Strategies } from '../src/useTable';
+import { useTable, Strategies } from '../src/index';
 
 // Resolve the absolute path to the test HTML file
 const testFile = `file://${path.resolve(__dirname, 'test-assets/sortable-table.html')}`;

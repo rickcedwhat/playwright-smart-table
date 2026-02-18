@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
-import { useTable } from '../src/useTable';
-import { Plugins } from '../src/plugins';
+import { useTable } from '../src/index';
+import { Plugins } from '../src/index';
 import type { TableContext } from '../src/types';
 
 test.describe('React Data Grid (RDG)', () => {

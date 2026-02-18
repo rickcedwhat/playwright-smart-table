@@ -9,26 +9,15 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.Strategies = exports.ResolutionStrategies = exports.CellNavigationStrategies = exports.HeaderStrategies = exports.FillStrategies = exports.DedupeStrategies = exports.SortingStrategies = exports.LoadingStrategies = exports.PaginationStrategies = exports.useTable = void 0;
-const typeContext_1 = require("./typeContext");
-const sorting_1 = require("./strategies/sorting");
-const pagination_1 = require("./strategies/pagination");
-const dedupe_1 = require("./strategies/dedupe");
+exports.useTable = void 0;
+const minimalConfigContext_1 = require("./minimalConfigContext");
 const loading_1 = require("./strategies/loading");
 const fill_1 = require("./strategies/fill");
-Object.defineProperty(exports, "FillStrategies", { enumerable: true, get: function () { return fill_1.FillStrategies; } });
 const headers_1 = require("./strategies/headers");
-Object.defineProperty(exports, "HeaderStrategies", { enumerable: true, get: function () { return headers_1.HeaderStrategies; } });
-const columns_1 = require("./strategies/columns");
-Object.defineProperty(exports, "CellNavigationStrategies", { enumerable: true, get: function () { return columns_1.CellNavigationStrategies; } });
 const smartRow_1 = require("./smartRow");
 const filterEngine_1 = require("./filterEngine");
 const tableMapper_1 = require("./engine/tableMapper");
 const rowFinder_1 = require("./engine/rowFinder");
-const resolution_1 = require("./strategies/resolution");
-Object.defineProperty(exports, "ResolutionStrategies", { enumerable: true, get: function () { return resolution_1.ResolutionStrategies; } });
-const strategies_1 = require("./strategies");
-Object.defineProperty(exports, "Strategies", { enumerable: true, get: function () { return strategies_1.Strategies; } });
 const debugUtils_1 = require("./utils/debugUtils");
 const smartRowArray_1 = require("./utils/smartRowArray");
 /**
@@ -42,7 +31,6 @@ const useTable = (rootLocator, configOptions = {}) => {
     const defaultStrategies = {
         fill: fill_1.FillStrategies.default,
         header: headers_1.HeaderStrategies.visible,
-        cellNavigation: columns_1.CellNavigationStrategies.default,
         pagination: () => __awaiter(void 0, void 0, void 0, function* () { return false; }),
         loading: {
             isHeaderLoading: loading_1.LoadingStrategies.Headers.stable(200)
@@ -117,7 +105,7 @@ const useTable = (rootLocator, configOptions = {}) => {
         const { output = 'console', includeTypes = true } = options;
         let finalPrompt = content;
         if (includeTypes) {
-            finalPrompt += `\n\n👇 Useful TypeScript Definitions 👇\n\`\`\`typescript\n${typeContext_1.TYPE_CONTEXT}\n\`\`\`\n`;
+            finalPrompt += `\n\n👇 Useful TypeScript Definitions 👇\n\`\`\`typescript\n${minimalConfigContext_1.MINIMAL_CONFIG_CONTEXT}\n\`\`\`\n`;
         }
         if (output === 'error') {
             console.log(`⚠️ Throwing error to display [${promptName}] cleanly...`);
@@ -144,14 +132,9 @@ const useTable = (rootLocator, configOptions = {}) => {
             const idx = map.get(columnName);
             if (idx === undefined)
                 throw _createColumnError(columnName, map);
-            yield config.strategies.cellNavigation({
-                config: config,
-                root: rootLocator,
-                page: rootLocator.page(),
-                resolve,
-                column: columnName,
-                index: idx
-            });
+            // Use header cell for scrolling
+            const headerCell = resolve(config.headerSelector, rootLocator).nth(idx);
+            yield headerCell.scrollIntoViewIfNeeded();
         }),
         getHeaders: () => __awaiter(void 0, void 0, void 0, function* () {
             const map = yield tableMapper.getMap();
@@ -228,11 +211,6 @@ const useTable = (rootLocator, configOptions = {}) => {
             // @ts-ignore
             return rowFinder.findRow(filters, options);
         }),
-        getRows: (options) => __awaiter(void 0, void 0, void 0, function* () {
-            console.warn('DEPRECATED: table.getRows() is deprecated and will be removed in a future version. Use table.findRows() instead.');
-            // @ts-ignore
-            return rowFinder.findRows((options === null || options === void 0 ? void 0 : options.filter) || {}, Object.assign(Object.assign({}, options), { maxPages: 1 }));
-        }),
         findRows: (filters, options) => __awaiter(void 0, void 0, void 0, function* () {
             return rowFinder.findRows(filters, options);
         }),
@@ -273,7 +251,6 @@ const useTable = (rootLocator, configOptions = {}) => {
                 getRow: result.getRow,
                 getRowByIndex: result.getRowByIndex,
                 findRow: result.findRow,
-                getRows: result.getRows,
                 findRows: result.findRows,
                 getColumnValues: result.getColumnValues,
                 isInitialized: result.isInitialized,
@@ -438,7 +415,3 @@ const useTable = (rootLocator, configOptions = {}) => {
     return result;
 };
 exports.useTable = useTable;
-exports.PaginationStrategies = Object.assign({}, pagination_1.PaginationStrategies);
-exports.LoadingStrategies = loading_1.LoadingStrategies;
-exports.SortingStrategies = sorting_1.SortingStrategies;
-exports.DedupeStrategies = dedupe_1.DedupeStrategies;

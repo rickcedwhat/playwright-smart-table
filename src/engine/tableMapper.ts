@@ -34,7 +34,7 @@ export class TableMapper {
             try { await this.rootLocator.scrollIntoViewIfNeeded({ timeout: 1000 }); } catch (e) { }
         }
 
-        const headerLoc = this.resolve(this.config.headerSelector, this.rootLocator);
+        const headerLoc = this.resolve(this.config.headerSelector as Selector, this.rootLocator);
         const strategy = this.config.strategies.header || HeaderStrategies.visible;
         const context: TableContext = {
             root: this.rootLocator,
