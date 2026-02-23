@@ -6,8 +6,25 @@ export const FillStrategies = {
     /**
      * Default strategy: Detects input type and fills accordingly (Text, Select, Checkbox, ContentEditable).
      */
-    default: async ({ row, columnName, value, fillOptions }: Parameters<FillStrategy>[0]) => {
+    default: async ({ row, columnName, value, fillOptions, config, table }: Parameters<FillStrategy>[0]) => {
         const cell = row.getCell(columnName);
+
+        // 1. Check for Unified Column Override
+        const columnOverride = config?.columnOverrides?.[columnName as keyof any];
+        if (columnOverride?.write) {
+            let currentValue;
+            // Auto-sync: If read exists, fetch current state first
+            if (columnOverride.read) {
+                currentValue = await columnOverride.read(cell);
+            }
+            await columnOverride.write({
+                cell,
+                targetValue: value,
+                currentValue,
+                row
+            });
+            return;
+        }
 
         // Use custom input mapper for this column if provided, otherwise auto-detect
         let inputLocator: Locator;

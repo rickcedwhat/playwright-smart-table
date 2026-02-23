@@ -25,12 +25,13 @@ const debugUtils_1 = require("../utils/debugUtils");
 const smartRowArray_1 = require("../utils/smartRowArray");
 const validation_1 = require("../strategies/validation");
 class RowFinder {
-    constructor(rootLocator, config, resolve, filterEngine, tableMapper, makeSmartRow) {
+    constructor(rootLocator, config, resolve, filterEngine, tableMapper, makeSmartRow, tableState = { currentPageIndex: 0 }) {
         this.rootLocator = rootLocator;
         this.config = config;
         this.filterEngine = filterEngine;
         this.tableMapper = tableMapper;
         this.makeSmartRow = makeSmartRow;
+        this.tableState = tableState;
         this.resolve = resolve;
     }
     log(msg) {
@@ -82,7 +83,7 @@ class RowFinder {
             const map = yield this.tableMapper.getMap();
             const allRows = [];
             const effectiveMaxPages = (_b = (_a = options.maxPages) !== null && _a !== void 0 ? _a : this.config.maxPages) !== null && _b !== void 0 ? _b : Infinity;
-            let pageCount = 0;
+            let pagesScanned = 1;
             const collectMatches = () => __awaiter(this, void 0, void 0, function* () {
                 var _a, _b;
                 // ... logic ...
@@ -94,7 +95,7 @@ class RowFinder {
                 const currentRows = yield rowLocators.all();
                 const isRowLoading = (_b = this.config.strategies.loading) === null || _b === void 0 ? void 0 : _b.isRowLoading;
                 for (let i = 0; i < currentRows.length; i++) {
-                    const smartRow = this.makeSmartRow(currentRows[i], map, allRows.length + i);
+                    const smartRow = this.makeSmartRow(currentRows[i], map, allRows.length + i, this.tableState.currentPageIndex);
                     if (isRowLoading && (yield isRowLoading(smartRow)))
                         continue;
                     allRows.push(smartRow);
@@ -105,7 +106,7 @@ class RowFinder {
             // Pagination Loop - Corrected logic
             // We always scan at least 1 page.
             // If maxPages > 1, and we have a pagination strategy, we try to go next.
-            while (pageCount < effectiveMaxPages - 1 && this.config.strategies.pagination) {
+            while (pagesScanned < effectiveMaxPages && this.config.strategies.pagination) {
                 const context = {
                     root: this.rootLocator,
                     config: this.config,
@@ -113,11 +114,22 @@ class RowFinder {
                     page: this.rootLocator.page()
                 };
                 // Check if we should stop? (e.g. if we found enough rows? No, findRows finds ALL)
-                const paginationResult = yield this.config.strategies.pagination(context);
+                let paginationResult;
+                if (typeof this.config.strategies.pagination === 'function') {
+                    paginationResult = yield this.config.strategies.pagination(context);
+                }
+                else {
+                    // It's a PaginationPrimitives object, use goNext by default for findRows
+                    if (!this.config.strategies.pagination.goNext) {
+                        break; // Cannot paginate forward
+                    }
+                    paginationResult = yield this.config.strategies.pagination.goNext(context);
+                }
                 const didPaginate = yield (0, validation_1.validatePaginationResult)(paginationResult, 'Pagination Strategy');
                 if (!didPaginate)
                     break;
-                pageCount++;
+                this.tableState.currentPageIndex++;
+                pagesScanned++;
                 // Wait for reload logic if needed? Usually pagination handles it.
                 yield collectMatches();
             }
@@ -129,7 +141,7 @@ class RowFinder {
             var _a, _b;
             const map = yield this.tableMapper.getMap();
             const effectiveMaxPages = (_a = options.maxPages) !== null && _a !== void 0 ? _a : this.config.maxPages;
-            let currentPage = 1;
+            let pagesScanned = 1;
             this.log(`Looking for row: ${JSON.stringify(filters)} (MaxPages: ${effectiveMaxPages})`);
             while (true) {
                 // Check Loading
@@ -149,40 +161,51 @@ class RowFinder {
                 const allRows = this.resolve(this.config.rowSelector, this.rootLocator);
                 const matchedRows = this.filterEngine.applyFilters(allRows, filters, map, options.exact || false, this.rootLocator.page());
                 const count = yield matchedRows.count();
-                this.log(`Page ${currentPage}: Found ${count} matches.`);
+                this.log(`Page ${this.tableState.currentPageIndex}: Found ${count} matches.`);
                 if (count > 1) {
                     const sampleData = [];
                     try {
                         const firstFewRows = yield matchedRows.all();
                         const sampleCount = Math.min(firstFewRows.length, 3);
                         for (let i = 0; i < sampleCount; i++) {
-                            const rowData = yield this.makeSmartRow(firstFewRows[i], map, 0).toJSON();
+                            const rowData = yield this.makeSmartRow(firstFewRows[i], map, 0, this.tableState.currentPageIndex).toJSON();
                             sampleData.push(JSON.stringify(rowData));
                         }
                     }
                     catch (e) { }
                     const sampleMsg = sampleData.length > 0 ? `\nSample matching rows:\n${sampleData.map((d, i) => `  ${i + 1}. ${d}`).join('\n')}` : '';
-                    throw new Error(`Ambiguous Row: Found ${count} rows matching ${JSON.stringify(filters)} on page ${currentPage}. ` +
+                    throw new Error(`Ambiguous Row: Found ${count} rows matching ${JSON.stringify(filters)} on page ${this.tableState.currentPageIndex}. ` +
                         `Expected exactly one match. Try adding more filters to make your query unique.${sampleMsg}`);
                 }
                 if (count === 1)
                     return matchedRows.first();
-                if (currentPage < effectiveMaxPages) {
-                    this.log(`Page ${currentPage}: Not found. Attempting pagination...`);
+                if (pagesScanned < effectiveMaxPages) {
+                    this.log(`Page ${this.tableState.currentPageIndex}: Not found. Attempting pagination...`);
                     const context = {
                         root: this.rootLocator,
                         config: this.config,
                         resolve: this.resolve,
                         page: this.rootLocator.page()
                     };
-                    const paginationResult = yield this.config.strategies.pagination(context);
+                    let paginationResult;
+                    if (typeof this.config.strategies.pagination === 'function') {
+                        paginationResult = yield this.config.strategies.pagination(context);
+                    }
+                    else {
+                        if (!this.config.strategies.pagination.goNext) {
+                            this.log(`Page ${this.tableState.currentPageIndex}: Pagination failed (no goNext primitive).`);
+                            return null;
+                        }
+                        paginationResult = yield this.config.strategies.pagination.goNext(context);
+                    }
                     const didLoadMore = (0, validation_1.validatePaginationResult)(paginationResult, 'Pagination Strategy');
                     if (didLoadMore) {
-                        currentPage++;
+                        this.tableState.currentPageIndex++;
+                        pagesScanned++;
                         continue;
                     }
                     else {
-                        this.log(`Page ${currentPage}: Pagination failed (end of data).`);
+                        this.log(`Page ${this.tableState.currentPageIndex}: Pagination failed (end of data).`);
                     }
                 }
                 return null;

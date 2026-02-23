@@ -98,10 +98,12 @@ const _navigateToCell = (params) => __awaiter(void 0, void 0, void 0, function* 
  * Factory to create a SmartRow by extending a Playwright Locator.
  * We avoid Class/Proxy to ensure full compatibility with Playwright's expect(locator) matchers.
  */
-const createSmartRow = (rowLocator, map, rowIndex, config, rootLocator, resolve, table) => {
+const createSmartRow = (rowLocator, map, rowIndex, config, rootLocator, resolve, table, tablePageIndex) => {
     const smart = rowLocator;
     // Attach State
     smart.rowIndex = rowIndex;
+    smart.tablePageIndex = tablePageIndex;
+    smart.table = table;
     // Attach Methods
     smart.getCell = (colName) => {
         const idx = map.get(colName);
@@ -120,15 +122,16 @@ const createSmartRow = (rowLocator, map, rowIndex, config, rootLocator, resolve,
         return resolve(config.cellSelector, rowLocator).nth(idx);
     };
     smart.toJSON = (options) => __awaiter(void 0, void 0, void 0, function* () {
-        var _a;
+        var _a, _b;
         const result = {};
         const page = rootLocator.page();
         for (const [col, idx] of map.entries()) {
             if ((options === null || options === void 0 ? void 0 : options.columns) && !options.columns.includes(col)) {
                 continue;
             }
-            // Check if we have a data mapper for this column
-            const mapper = (_a = config.dataMapper) === null || _a === void 0 ? void 0 : _a[col];
+            // Check if we have a column override or data mapper for this column
+            const columnOverride = (_a = config.columnOverrides) === null || _a === void 0 ? void 0 : _a[col];
+            const mapper = (columnOverride === null || columnOverride === void 0 ? void 0 : columnOverride.read) || ((_b = config.dataMapper) === null || _b === void 0 ? void 0 : _b[col]);
             if (mapper) {
                 // Use custom mapper
                 // Ensure we have the cell first (same navigation logic)
@@ -206,6 +209,7 @@ const createSmartRow = (rowLocator, map, rowIndex, config, rootLocator, resolve,
                 index: rowIndex !== null && rowIndex !== void 0 ? rowIndex : -1,
                 page: rowLocator.page(),
                 rootLocator,
+                config,
                 table: table,
                 fillOptions
             });
@@ -218,6 +222,47 @@ const createSmartRow = (rowLocator, map, rowIndex, config, rootLocator, resolve,
         if (rowIndex === undefined) {
             throw new Error('Cannot bring row into view - row index is unknown. Use getRowByIndex() instead of getRow().');
         }
+        const parentTable = smart.table;
+        // Cross-page Navigation using PaginationPrimitives
+        if (tablePageIndex !== undefined && config.strategies.pagination) {
+            const primitives = config.strategies.pagination;
+            // Only orchestrate if it's an object of primitives, not a single function
+            if (typeof config.strategies.pagination !== 'function') {
+                const context = { root: rootLocator, config, page: rootLocator.page(), resolve };
+                if (primitives.goToPage) {
+                    (0, debugUtils_1.logDebug)(config, 'info', `bringIntoView: Jumping to page ${tablePageIndex} using goToPage primitive`);
+                    yield primitives.goToPage(tablePageIndex, context);
+                }
+                else if (primitives.goPrevious) {
+                    (0, debugUtils_1.logDebug)(config, 'info', `bringIntoView: Looping goPrevious until we reach page ${tablePageIndex}`);
+                    const diff = parentTable.currentPageIndex - tablePageIndex;
+                    for (let i = 0; i < diff; i++) {
+                        const success = yield primitives.goPrevious(context);
+                        if (!success) {
+                            throw new Error(`bringIntoView: Failed to paginate backwards. Strategy aborted before reaching page ${tablePageIndex}.`);
+                        }
+                    }
+                }
+                else if (primitives.goToFirst && primitives.goNext) {
+                    (0, debugUtils_1.logDebug)(config, 'info', `bringIntoView: going to first page and looping goNext until we reach page ${tablePageIndex}`);
+                    yield primitives.goToFirst(context);
+                    for (let i = 0; i < tablePageIndex; i++) {
+                        yield primitives.goNext(context);
+                    }
+                }
+                else {
+                    (0, debugUtils_1.logDebug)(config, 'error', `Cannot bring row on page ${tablePageIndex} into view. No backwards pagination strategies (goToPage, goPrevious, or goToFirst) provided.`);
+                    throw new Error(`Cannot bring row on page ${tablePageIndex} into view: Row is on a different page and no backward pagination primitive found.`);
+                }
+            }
+            else {
+                throw new Error(`Cannot bring row on page ${tablePageIndex} into view: Pagination is a single function. Provide an object with 'goPrevious', 'goToPage', or 'goToFirst' primitives.`);
+            }
+            // Successfully orchestrated backwards navigation, now update the state pointer
+            parentTable.currentPageIndex = tablePageIndex;
+        }
+        // Delay after pagination/finding before scrolling
+        yield (0, debugUtils_1.debugDelay)(config, 'findRow');
         // Scroll row into view using Playwright's built-in method
         yield rowLocator.scrollIntoViewIfNeeded();
     });

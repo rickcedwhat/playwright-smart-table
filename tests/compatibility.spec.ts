@@ -232,7 +232,16 @@ test.describe('Backwards Compatibility Tests', () => {
   });
 
   test('Core: headerTransformer function is applied', async ({ page }) => {
-    await page.goto('https://the-internet.herokuapp.com/tables');
+    await page.setContent(`
+      <table id="table1">
+        <thead>
+          <tr><th>Last Name</th><th>First Name</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Doe</td><td>John</td></tr>
+        </tbody>
+      </table>
+    `);
 
     const table = useTable(page.locator('#table1'), {
       headerTransformer: ({ text }) => text.trim().toLowerCase()
@@ -240,8 +249,8 @@ test.describe('Backwards Compatibility Tests', () => {
     await table.init();
 
     const headers = await table.getHeaders();
-    // Verify transformer was applied (headers should be lowercase)
-    expect(headers.some(h => h === h.toLowerCase())).toBe(true);
+    expect(headers).toContain('last name');
+    expect(headers).toContain('first name');
   });
 
   test('Core: SmartRow extends Locator API', async ({ page }) => {

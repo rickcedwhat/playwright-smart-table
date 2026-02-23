@@ -3,13 +3,18 @@
 ## 1. Short Term (v6.4.x) - Quality of Life & Safety
 
 ### 🛡️ Safety & Stability
-- [ ] **Limit Config Prompt Dump**: Restrict `generateConfigPrompt` to the first 5-10 rows preventing browser crashes on large tables.
-- [ ] **Harden Filter Logic**: Explicitly enforce relative locators in `FilterEngine` to prevent future Playwright regressions.
+<!-- No items currently in this section -->
 
 ### 👩‍💻 Developer Experience
-- [ ] **`inputMapper`**: Introduce `inputMapper` to `TableConfig`.
-    - **Purpose**: Allow explicit override of `smartFill` logic per column (similar to `dataMapper`).
-    - **Benefit**: Fixes "magic" issues where custom components (like `div` checkboxes) are misidentified.
+- [x] **`columnOverrides`**: Introduce `columnOverrides` to `TableConfig`.
+    - **Purpose**: Unified interface for two-way data binding per column, overriding `smartFill` and `toJSON`.
+    - **Benefit**: Fixes "magic" issues and deprecates separate `dataMapper` config.
+    - **Note**: `dataMapper` is now deprecated and will be removed in v7.0.0.
+- [x] **Test Coverage for `bringIntoView` with `findRows`**:
+    - **Purpose**: Ensure `row.bringIntoView()` works reliably for rows found across multiple pages via `findRows`.
+- [ ] **Array-like Iteration Methods (`map`, `forEach`, `filter`)**:
+    - **Purpose**: Introduce familiar, high-level array methods on the `TableResult` interface to wrap the powerful but complex `iterateThroughTable` engine.
+    - **Benefit**: Vastly improves Developer Experience by providing safe, sequential execution for interactions (`forEach`), and fast concurrent execution for data extraction (`map`).
 
 ## 2. Medium Term (v7.0.0) - Core Architecture & Performance
 
@@ -18,6 +23,10 @@
     - **Problem**: Re-scans entire DOM on every infinite scroll iteration (O(N^2)).
     - **Solution**: Implement a "cursor" or "incremental scan" strategy that only processes new rows.
     - **Impact**: Critical for enterprise-scale tests (10k+ rows).
+
+### 🛠️ Implementation Improvements
+- [ ] **Expose `getHeaderCell` in `StrategyContext`**: Allow custom strategies to easily resolve header cells without manual locators.
+- [ ] **Simplify Sorting Strategy API**: Refactor `doSort` so that strategies only define the *trigger* (e.g., "click this"), while the library handles the loop, state verification, and retries.
 
 ## 3. Long Term (v8.0+) - Ecosystem & Plugins
 

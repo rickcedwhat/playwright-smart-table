@@ -9,7 +9,7 @@ import type { SmartRowArray } from './utils/smartRowArray';
  * // Function selector
  * rowSelector: (root) => root.locator('[role="row"]')
  */
-export type Selector = string | ((root: Locator | Page) => Locator);
+export type Selector = string | ((root: Locator | Page) => Locator) | ((root: Locator) => Locator);
 /**
  * Value used to filter rows.
  * - string/number/RegExp: filter by text content of the cell.
@@ -58,6 +58,10 @@ export type GetActiveCellFn = (args: TableContext) => Promise<{
 export type SmartRow<T = any> = Locator & {
     /** Optional row index (0-based) if known */
     rowIndex?: number;
+    /** Optional page index this row was found on (0-based) */
+    tablePageIndex?: number;
+    /** Reference to the parent TableResult */
+    table: TableResult<T>;
     /**
      * Get a cell locator by column name.
      * @param column - Column name (case-sensitive)
@@ -161,7 +165,17 @@ export interface TableContext<T = any> {
     page: Page;
     resolve: (selector: Selector, parent: Locator | Page) => Locator;
 }
-export type PaginationStrategy = (context: TableContext) => Promise<boolean>;
+export interface PaginationPrimitives {
+    /** Classic "Next Page" or "Scroll Down" */
+    goNext?: (context: TableContext) => Promise<boolean>;
+    /** Classic "Previous Page" or "Scroll Up" */
+    goPrevious?: (context: TableContext) => Promise<boolean>;
+    /** Jump to first page / scroll to top */
+    goToFirst?: (context: TableContext) => Promise<boolean>;
+    /** Jump to specific page index (0-indexed) */
+    goToPage?: (pageIndex: number, context: TableContext) => Promise<boolean>;
+}
+export type PaginationStrategy = ((context: TableContext) => Promise<boolean>) | PaginationPrimitives;
 export type DedupeStrategy = (row: SmartRow) => string | number | Promise<string | number>;
 export type FillStrategy = (options: {
     row: SmartRow;
@@ -170,9 +184,26 @@ export type FillStrategy = (options: {
     index: number;
     page: Page;
     rootLocator: Locator;
+    config: FinalTableConfig<any>;
     table: TableResult;
     fillOptions?: FillOptions;
 }) => Promise<void>;
+export interface ColumnOverride<TValue = any> {
+    /**
+     * How to extract the value from the cell. (Replaces dataMapper logic)
+     */
+    read?: (cell: Locator) => Promise<TValue> | TValue;
+    /**
+     * How to fill the cell with a new value. (Replaces smartFill default logic)
+     * Provides the current value (via `read`) if a `write` wants to check state first.
+     */
+    write?: (params: {
+        cell: Locator;
+        targetValue: TValue;
+        currentValue?: TValue;
+        row: SmartRow<any>;
+    }) => Promise<void>;
+}
 import { HeaderStrategy } from './strategies/headers';
 export type { HeaderStrategy } from './strategies/headers';
 import { NavigationPrimitives } from './strategies/columns';
@@ -263,10 +294,16 @@ export interface TableConfig<T = any> {
     /** All interaction strategies */
     strategies?: TableStrategies;
     /**
+     * @deprecated Use `columnOverrides` instead. `dataMapper` will be removed in v7.0.0.
      * Custom data mappers for specific columns.
      * Allows extracting complex data types (boolean, number) instead of just string.
      */
     dataMapper?: Partial<Record<keyof T, (cell: Locator) => Promise<T[keyof T]> | T[keyof T]>>;
+    /**
+     * Unified interface for reading and writing data to specific columns.
+     * Overrides both default extraction (toJSON) and filling (smartFill) logic.
+     */
+    columnOverrides?: Partial<Record<keyof T, ColumnOverride<T[keyof T]>>>;
 }
 export interface FinalTableConfig<T = any> extends TableConfig<T> {
     headerSelector: string | ((root: Locator) => Locator);
@@ -308,6 +345,11 @@ export interface PromptOptions {
     includeTypes?: boolean;
 }
 export interface TableResult<T = any> {
+    /**
+     * Represents the current page index of the table's DOM.
+     * Starts at 0. Automatically maintained by the library during pagination and bringIntoView.
+     */
+    currentPageIndex: number;
     /**
      * Initializes the table by resolving headers. Must be called before using sync methods.
      * @param options Optional timeout for header resolution (default: 3000ms)

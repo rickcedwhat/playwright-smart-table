@@ -25,10 +25,15 @@ class FilterEngine {
             // But for now, we implement the default logic or use custom if we add it to config later
             // Default Filter Logic
             const cellTemplate = this.resolve(this.config.cellSelector, page);
-            // This logic assumes 1:1 row-to-cell mapping based on index.
-            // filter({ has: ... }) checks if the row *contains* the matching cell.
-            // But we need to be specific about WHICH cell.
-            // Locator filtering by `has: locator.nth(index)` works if `locator` search is relative to the row.
+            // ⚠️ CRITICAL WARNING: DO NOT "FIX" OR REFACTOR THIS LOGIC. ⚠️
+            // At first glance, `cellTemplate.nth(colIndex)` looks like a global page selector 
+            // that will return the Nth cell on the entire page, rather than the Nth cell in the row.
+            // THIS IS INTENTIONAL AND CORRECT. 
+            // Playwright deeply understands nested locator scoping. When this global-looking locator 
+            // is passed into `filtered.filter({ has: ... })` below, Playwright magically and 
+            // automatically re-bases the `nth()` selector to be strictly relative to the ROW being evaluated.
+            // Attempting to manually force generic relative locators here will break complex function 
+            // selectors and introduce regressions. Leave it as is.
             const targetCell = cellTemplate.nth(colIndex);
             if (typeof filterVal === 'function') {
                 // Locator-based filter: (cell) => cell.locator(...)

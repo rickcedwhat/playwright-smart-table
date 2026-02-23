@@ -11,6 +11,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.useTable = void 0;
 const minimalConfigContext_1 = require("./minimalConfigContext");
+const validation_1 = require("./strategies/validation");
 const loading_1 = require("./strategies/loading");
 const fill_1 = require("./strategies/fill");
 const headers_1 = require("./strategies/headers");
@@ -75,10 +76,11 @@ const useTable = (rootLocator, configOptions = {}) => {
     // Placeholder for the final table object
     let finalTable = null;
     // Helper factory
-    const _makeSmart = (rowLocator, map, rowIndex) => {
-        return (0, smartRow_1.createSmartRow)(rowLocator, map, rowIndex, config, rootLocator, resolve, finalTable);
+    const _makeSmart = (rowLocator, map, rowIndex, tablePageIndex) => {
+        return (0, smartRow_1.createSmartRow)(rowLocator, map, rowIndex, config, rootLocator, resolve, finalTable, tablePageIndex);
     };
-    const rowFinder = new rowFinder_1.RowFinder(rootLocator, config, resolve, filterEngine, tableMapper, _makeSmart);
+    const tableState = { currentPageIndex: 0 };
+    const rowFinder = new rowFinder_1.RowFinder(rootLocator, config, resolve, filterEngine, tableMapper, _makeSmart, tableState);
     const _getCleanHtml = (loc) => __awaiter(void 0, void 0, void 0, function* () {
         return loc.evaluate((el) => {
             const clone = el.cloneNode(true);
@@ -117,6 +119,8 @@ const useTable = (rootLocator, configOptions = {}) => {
         yield tableMapper.getMap();
     });
     const result = {
+        get currentPageIndex() { return tableState.currentPageIndex; },
+        set currentPageIndex(v) { tableState.currentPageIndex = v; },
         init: (options) => __awaiter(void 0, void 0, void 0, function* () {
             if (tableMapper.isInitialized())
                 return result;
@@ -168,7 +172,7 @@ const useTable = (rootLocator, configOptions = {}) => {
                 throw _createColumnError(column, map);
             const mapper = (_a = options === null || options === void 0 ? void 0 : options.mapper) !== null && _a !== void 0 ? _a : ((c) => c.innerText());
             const effectiveMaxPages = (_b = options === null || options === void 0 ? void 0 : options.maxPages) !== null && _b !== void 0 ? _b : config.maxPages;
-            let currentPage = 1;
+            let pagesScanned = 1;
             const results = [];
             log(`Getting column values for '${column}' (Pages: ${effectiveMaxPages})`);
             while (true) {
@@ -179,11 +183,23 @@ const useTable = (rootLocator, configOptions = {}) => {
                         : resolve(config.cellSelector, row).nth(colIdx);
                     results.push(yield mapper(cell));
                 }
-                if (currentPage < effectiveMaxPages) {
+                if (pagesScanned < effectiveMaxPages) {
                     const context = { root: rootLocator, config, page: rootLocator.page(), resolve };
-                    if (yield config.strategies.pagination(context)) {
+                    let pageRes;
+                    if (typeof config.strategies.pagination === 'function') {
+                        pageRes = yield config.strategies.pagination(context);
+                    }
+                    else {
+                        if (!config.strategies.pagination.goNext) {
+                            log('Cannot paginate: no goNext primitive found.');
+                            break;
+                        }
+                        pageRes = yield config.strategies.pagination.goNext(context);
+                    }
+                    if (yield (0, validation_1.validatePaginationResult)(pageRes, 'Pagination Strategy')) {
                         _hasPaginated = true;
-                        currentPage++;
+                        tableState.currentPageIndex++;
+                        pagesScanned++;
                         continue;
                     }
                 }
@@ -245,6 +261,7 @@ const useTable = (rootLocator, configOptions = {}) => {
             yield result.init();
             const map = tableMapper.getMapSync();
             const restrictedTable = {
+                get currentPageIndex() { return tableState.currentPageIndex; },
                 init: result.init,
                 getHeaders: result.getHeaders,
                 getHeaderCell: result.getHeaderCell,
@@ -339,10 +356,20 @@ const useTable = (rootLocator, configOptions = {}) => {
                     let finalIsLast = isLastDueToMax;
                     if (!isLastIteration) {
                         const context = { root: rootLocator, config, page: rootLocator.page(), resolve };
-                        paginationResult = yield paginationStrategy(context);
+                        if (typeof paginationStrategy === 'function') {
+                            paginationResult = yield paginationStrategy(context);
+                        }
+                        else {
+                            const pageObj = paginationStrategy;
+                            if (!pageObj.goNext)
+                                break;
+                            paginationResult = yield pageObj.goNext(context);
+                        }
                         (0, debugUtils_1.logDebug)(config, 'info', `Pagination ${paginationResult ? 'succeeded' : 'failed'}`);
                         yield (0, debugUtils_1.debugDelay)(config, 'pagination');
                         finalIsLast = getIsLast({ index: callbackIndex, paginationResult }) || !paginationResult;
+                        if (paginationResult)
+                            tableState.currentPageIndex++;
                     }
                     if (finalIsLast && (options === null || options === void 0 ? void 0 : options.afterLast)) {
                         yield options.afterLast({ index: callbackIndex, rows: (0, smartRowArray_1.createSmartRowArray)(callbackRows), allData });
@@ -360,9 +387,21 @@ const useTable = (rootLocator, configOptions = {}) => {
                 else {
                     // Continue paginating even when batching
                     const context = { root: rootLocator, config, page: rootLocator.page(), resolve };
-                    paginationResult = yield paginationStrategy(context);
+                    if (typeof paginationStrategy === 'function') {
+                        paginationResult = yield paginationStrategy(context);
+                    }
+                    else {
+                        const pageObj = paginationStrategy;
+                        if (!pageObj.goNext) {
+                            log(`Cannot paginate: no goNext primitive found.`);
+                            break;
+                        }
+                        paginationResult = yield pageObj.goNext(context);
+                    }
                     (0, debugUtils_1.logDebug)(config, 'info', `Pagination ${paginationResult ? 'succeeded' : 'failed'} (batching mode)`);
                     yield (0, debugUtils_1.debugDelay)(config, 'pagination');
+                    if (paginationResult)
+                        tableState.currentPageIndex++;
                     if (!paginationResult) {
                         // Pagination failed, invoke callback with current batch
                         const callbackIndex = batchStartIndex;

@@ -3,12 +3,27 @@ import { StabilizationStrategy } from './stabilization';
 export declare const PaginationStrategies: {
     /**
      * Strategy: Clicks a "Next" button and waits for stabilization.
-     * @param nextButtonSelector Selector for the next page button.
+     * Backward compatibility for when only a single 'next' selector was needed.
+     * @deprecated Use `click` with `{ next: selector }` instead.
+     */
+    clickNext: (nextButtonSelector: Selector, options?: {
+        stabilization?: StabilizationStrategy;
+        timeout?: number;
+    }) => PaginationStrategy;
+    /**
+     * Strategy: Classic Pagination Buttons.
+     * Clicks 'Next', 'Previous', or 'First' buttons and waits for stabilization.
+     *
+     * @param selectors Selectors for pagination buttons.
      * @param options.stabilization Strategy to determine when the page has updated.
      *        Defaults to `contentChanged({ scope: 'first' })`.
      * @param options.timeout Timeout for the click action.
      */
-    clickNext: (nextButtonSelector: Selector, options?: {
+    click: (selectors: {
+        next?: Selector;
+        previous?: Selector;
+        first?: Selector;
+    }, options?: {
         stabilization?: StabilizationStrategy;
         timeout?: number;
     }) => PaginationStrategy;

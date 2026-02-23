@@ -1,5 +1,5 @@
 import type { Locator, Page } from '@playwright/test';
-import { FinalTableConfig, TableContext, Selector, SmartRow, FilterValue } from '../types';
+import { FinalTableConfig, TableContext, Selector, SmartRow, FilterValue, PaginationPrimitives } from '../types';
 import { FilterEngine } from '../filterEngine';
 import { TableMapper } from './tableMapper';
 import { logDebug, debugDelay } from '../utils/debugUtils';
@@ -15,7 +15,8 @@ export class RowFinder<T = any> {
         resolve: (item: Selector, parent: Locator | Page) => Locator,
         private filterEngine: FilterEngine,
         private tableMapper: TableMapper,
-        private makeSmartRow: (loc: Locator, map: Map<string, number>, index: number) => SmartRow<T>
+        private makeSmartRow: (loc: Locator, map: Map<string, number>, index: number, tablePageIndex?: number) => SmartRow<T>,
+        private tableState: { currentPageIndex: number } = { currentPageIndex: 0 }
     ) {
         this.resolve = resolve;
     }
@@ -79,7 +80,7 @@ export class RowFinder<T = any> {
         const map = await this.tableMapper.getMap();
         const allRows: SmartRow<T>[] = [];
         const effectiveMaxPages = options.maxPages ?? this.config.maxPages ?? Infinity;
-        let pageCount = 0;
+        let pagesScanned = 1;
 
         const collectMatches = async () => {
             // ... logic ...
@@ -99,7 +100,7 @@ export class RowFinder<T = any> {
             const isRowLoading = this.config.strategies.loading?.isRowLoading;
 
             for (let i = 0; i < currentRows.length; i++) {
-                const smartRow = this.makeSmartRow(currentRows[i], map, allRows.length + i);
+                const smartRow = this.makeSmartRow(currentRows[i], map, allRows.length + i, this.tableState.currentPageIndex);
                 if (isRowLoading && await isRowLoading(smartRow)) continue;
                 allRows.push(smartRow);
             }
@@ -111,7 +112,7 @@ export class RowFinder<T = any> {
         // Pagination Loop - Corrected logic
         // We always scan at least 1 page.
         // If maxPages > 1, and we have a pagination strategy, we try to go next.
-        while (pageCount < effectiveMaxPages - 1 && this.config.strategies.pagination) {
+        while (pagesScanned < effectiveMaxPages && this.config.strategies.pagination) {
             const context: TableContext = {
                 root: this.rootLocator,
                 config: this.config,
@@ -121,12 +122,23 @@ export class RowFinder<T = any> {
 
             // Check if we should stop? (e.g. if we found enough rows? No, findRows finds ALL)
 
-            const paginationResult = await this.config.strategies.pagination(context);
+            let paginationResult: boolean | PaginationPrimitives;
+            if (typeof this.config.strategies.pagination === 'function') {
+                paginationResult = await this.config.strategies.pagination(context);
+            } else {
+                // It's a PaginationPrimitives object, use goNext by default for findRows
+                if (!this.config.strategies.pagination.goNext) {
+                    break; // Cannot paginate forward
+                }
+                paginationResult = await this.config.strategies.pagination.goNext(context);
+            }
+
             const didPaginate = await validatePaginationResult(paginationResult, 'Pagination Strategy');
 
             if (!didPaginate) break;
 
-            pageCount++;
+            this.tableState.currentPageIndex++;
+            pagesScanned++;
             // Wait for reload logic if needed? Usually pagination handles it.
             await collectMatches();
         }
@@ -140,7 +152,7 @@ export class RowFinder<T = any> {
     ): Promise<Locator | null> {
         const map = await this.tableMapper.getMap();
         const effectiveMaxPages = options.maxPages ?? this.config.maxPages;
-        let currentPage = 1;
+        let pagesScanned = 1;
 
         this.log(`Looking for row: ${JSON.stringify(filters)} (MaxPages: ${effectiveMaxPages})`);
 
@@ -171,7 +183,7 @@ export class RowFinder<T = any> {
             );
 
             const count = await matchedRows.count();
-            this.log(`Page ${currentPage}: Found ${count} matches.`);
+            this.log(`Page ${this.tableState.currentPageIndex}: Found ${count} matches.`);
 
             if (count > 1) {
                 const sampleData: string[] = [];
@@ -179,22 +191,22 @@ export class RowFinder<T = any> {
                     const firstFewRows = await matchedRows.all();
                     const sampleCount = Math.min(firstFewRows.length, 3);
                     for (let i = 0; i < sampleCount; i++) {
-                        const rowData = await this.makeSmartRow(firstFewRows[i], map, 0).toJSON();
+                        const rowData = await this.makeSmartRow(firstFewRows[i], map, 0, this.tableState.currentPageIndex).toJSON();
                         sampleData.push(JSON.stringify(rowData));
                     }
                 } catch (e) { }
                 const sampleMsg = sampleData.length > 0 ? `\nSample matching rows:\n${sampleData.map((d, i) => `  ${i + 1}. ${d}`).join('\n')}` : '';
 
                 throw new Error(
-                    `Ambiguous Row: Found ${count} rows matching ${JSON.stringify(filters)} on page ${currentPage}. ` +
+                    `Ambiguous Row: Found ${count} rows matching ${JSON.stringify(filters)} on page ${this.tableState.currentPageIndex}. ` +
                     `Expected exactly one match. Try adding more filters to make your query unique.${sampleMsg}`
                 );
             }
 
             if (count === 1) return matchedRows.first();
 
-            if (currentPage < effectiveMaxPages) {
-                this.log(`Page ${currentPage}: Not found. Attempting pagination...`);
+            if (pagesScanned < effectiveMaxPages) {
+                this.log(`Page ${this.tableState.currentPageIndex}: Not found. Attempting pagination...`);
                 const context: TableContext = {
                     root: this.rootLocator,
                     config: this.config,
@@ -202,14 +214,25 @@ export class RowFinder<T = any> {
                     page: this.rootLocator.page()
                 };
 
-                const paginationResult = await this.config.strategies.pagination!(context);
+                let paginationResult: boolean | PaginationPrimitives;
+                if (typeof this.config.strategies.pagination === 'function') {
+                    paginationResult = await this.config.strategies.pagination(context);
+                } else {
+                    if (!this.config.strategies.pagination!.goNext) {
+                        this.log(`Page ${this.tableState.currentPageIndex}: Pagination failed (no goNext primitive).`);
+                        return null;
+                    }
+                    paginationResult = await this.config.strategies.pagination!.goNext(context);
+                }
+
                 const didLoadMore = validatePaginationResult(paginationResult, 'Pagination Strategy');
 
                 if (didLoadMore) {
-                    currentPage++;
+                    this.tableState.currentPageIndex++;
+                    pagesScanned++;
                     continue;
                 } else {
-                    this.log(`Page ${currentPage}: Pagination failed (end of data).`);
+                    this.log(`Page ${this.tableState.currentPageIndex}: Pagination failed (end of data).`);
                 }
             }
             return null;

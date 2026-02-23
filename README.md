@@ -106,6 +106,14 @@ const allActive = await table.findRows({ Status: 'Active' });
 - ❌ You don't need to find a row based on a value in a cell
 - ❌ You don't need to find a cell based on a value in another cell in the same row
 
+### ⚠️ Important Note on Pagination & Interactions
+
+When using `findRows` across multiple pages, the returned `SmartRow` locators represent elements that may no longer be attached to the current DOM if the table paginated past them.
+
+- **Data Extraction:** Safe. You can use `table.iterateThroughTable()` to extract data (`await row.toJSON()`) while the row is visible.
+- **Interactions:** Unsafe directly. You cannot do `await row.click()` if the row is on Page 1 but the table is currently showing Page 3. 
+- **Solution:** If you need to interact with a row found on a previous page, you may be able to use `await row.bringIntoView()` before interacting with it to force the table to paginate back to that row (Note: this specific cross-page interaction flow is currently under testing).
+
 ## Documentation
 
 **📚 Full documentation available at: https://rickcedwhat.github.io/playwright-smart-table/**
