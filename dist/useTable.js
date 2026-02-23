@@ -8,6 +8,19 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
+var __await = (this && this.__await) || function (v) { return this instanceof __await ? (this.v = v, this) : new __await(v); }
+var __asyncGenerator = (this && this.__asyncGenerator) || function (thisArg, _arguments, generator) {
+    if (!Symbol.asyncIterator) throw new TypeError("Symbol.asyncIterator is not defined.");
+    var g = generator.apply(thisArg, _arguments || []), i, q = [];
+    return i = Object.create((typeof AsyncIterator === "function" ? AsyncIterator : Object).prototype), verb("next"), verb("throw"), verb("return", awaitReturn), i[Symbol.asyncIterator] = function () { return this; }, i;
+    function awaitReturn(f) { return function (v) { return Promise.resolve(v).then(f, reject); }; }
+    function verb(n, f) { if (g[n]) { i[n] = function (v) { return new Promise(function (a, b) { q.push([n, v, a, b]) > 1 || resume(n, v); }); }; if (f) i[n] = f(i[n]); } }
+    function resume(n, v) { try { step(g[n](v)); } catch (e) { settle(q[0][3], e); } }
+    function step(r) { r.value instanceof __await ? Promise.resolve(r.value.v).then(fulfill, reject) : settle(q[0][2], r); }
+    function fulfill(value) { resume("next", value); }
+    function reject(value) { resume("throw", value); }
+    function settle(f, v) { if (f(v), q.shift(), q.length) resume(q[0][0], q[0][1]); }
+};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.useTable = void 0;
 const minimalConfigContext_1 = require("./minimalConfigContext");
@@ -250,6 +263,219 @@ const useTable = (rootLocator, configOptions = {}) => {
                 return config.strategies.sorting.getSortState({ columnName, context });
             })
         },
+        // ─── Shared async row iterator ───────────────────────────────────────────
+        [Symbol.asyncIterator]() {
+            return __asyncGenerator(this, arguments, function* _a() {
+                var _b;
+                yield __await(_ensureInitialized());
+                const map = tableMapper.getMapSync();
+                const effectiveMaxPages = config.maxPages;
+                let rowIndex = 0;
+                let pagesScanned = 1;
+                while (true) {
+                    const pageRows = yield __await(resolve(config.rowSelector, rootLocator).all());
+                    for (const rowLocator of pageRows) {
+                        yield yield __await({ row: _makeSmart(rowLocator, map, rowIndex), rowIndex });
+                        rowIndex++;
+                    }
+                    if (pagesScanned >= effectiveMaxPages)
+                        break;
+                    const context = { root: rootLocator, config, page: rootLocator.page(), resolve };
+                    let advanced;
+                    if (typeof config.strategies.pagination === 'function') {
+                        advanced = !!(yield __await(config.strategies.pagination(context)));
+                    }
+                    else {
+                        advanced = !!(((_b = config.strategies.pagination) === null || _b === void 0 ? void 0 : _b.goNext) && (yield __await(config.strategies.pagination.goNext(context))));
+                    }
+                    if (!advanced)
+                        break;
+                    tableState.currentPageIndex++;
+                    pagesScanned++;
+                }
+            });
+        },
+        // ─── Private row-iteration engine ────────────────────────────────────────
+        forEach: (callback_1, ...args_1) => __awaiter(void 0, [callback_1, ...args_1], void 0, function* (callback, options = {}) {
+            var _a, _b, _c;
+            yield _ensureInitialized();
+            const map = tableMapper.getMapSync();
+            const effectiveMaxPages = (_a = options.maxPages) !== null && _a !== void 0 ? _a : config.maxPages;
+            const dedupeKeys = options.dedupe ? new Set() : null;
+            const parallel = (_b = options.parallel) !== null && _b !== void 0 ? _b : false;
+            let rowIndex = 0;
+            let stopped = false;
+            let pagesScanned = 1;
+            const stop = () => { stopped = true; };
+            while (!stopped) {
+                const pageRows = yield resolve(config.rowSelector, rootLocator).all();
+                const smartRows = pageRows.map((r, i) => _makeSmart(r, map, rowIndex + i));
+                if (parallel) {
+                    yield Promise.all(smartRows.map((row) => __awaiter(void 0, void 0, void 0, function* () {
+                        if (stopped)
+                            return;
+                        if (dedupeKeys) {
+                            const key = yield options.dedupe(row);
+                            if (dedupeKeys.has(key))
+                                return;
+                            dedupeKeys.add(key);
+                        }
+                        yield callback({ row, rowIndex: row.rowIndex, stop });
+                    })));
+                }
+                else {
+                    for (const row of smartRows) {
+                        if (stopped)
+                            break;
+                        if (dedupeKeys) {
+                            const key = yield options.dedupe(row);
+                            if (dedupeKeys.has(key))
+                                continue;
+                            dedupeKeys.add(key);
+                        }
+                        yield callback({ row, rowIndex: row.rowIndex, stop });
+                    }
+                }
+                rowIndex += smartRows.length;
+                if (stopped || pagesScanned >= effectiveMaxPages)
+                    break;
+                const context = { root: rootLocator, config, page: rootLocator.page(), resolve };
+                let advanced;
+                if (typeof config.strategies.pagination === 'function') {
+                    advanced = !!(yield config.strategies.pagination(context));
+                }
+                else {
+                    advanced = !!(((_c = config.strategies.pagination) === null || _c === void 0 ? void 0 : _c.goNext) && (yield config.strategies.pagination.goNext(context)));
+                }
+                if (!advanced)
+                    break;
+                tableState.currentPageIndex++;
+                pagesScanned++;
+            }
+        }),
+        map: (callback_1, ...args_1) => __awaiter(void 0, [callback_1, ...args_1], void 0, function* (callback, options = {}) {
+            var _a, _b, _c;
+            yield _ensureInitialized();
+            const map = tableMapper.getMapSync();
+            const effectiveMaxPages = (_a = options.maxPages) !== null && _a !== void 0 ? _a : config.maxPages;
+            const dedupeKeys = options.dedupe ? new Set() : null;
+            const parallel = (_b = options.parallel) !== null && _b !== void 0 ? _b : true;
+            const results = [];
+            let rowIndex = 0;
+            let stopped = false;
+            let pagesScanned = 1;
+            const stop = () => { stopped = true; };
+            while (!stopped) {
+                const pageRows = yield resolve(config.rowSelector, rootLocator).all();
+                const smartRows = pageRows.map((r, i) => _makeSmart(r, map, rowIndex + i));
+                if (parallel) {
+                    const SKIP = Symbol('skip');
+                    const pageResults = yield Promise.all(smartRows.map((row) => __awaiter(void 0, void 0, void 0, function* () {
+                        if (dedupeKeys) {
+                            const key = yield options.dedupe(row);
+                            if (dedupeKeys.has(key))
+                                return SKIP;
+                            dedupeKeys.add(key);
+                        }
+                        return callback({ row, rowIndex: row.rowIndex, stop });
+                    })));
+                    for (const r of pageResults) {
+                        if (r !== SKIP)
+                            results.push(r);
+                    }
+                }
+                else {
+                    for (const row of smartRows) {
+                        if (stopped)
+                            break;
+                        if (dedupeKeys) {
+                            const key = yield options.dedupe(row);
+                            if (dedupeKeys.has(key))
+                                continue;
+                            dedupeKeys.add(key);
+                        }
+                        results.push(yield callback({ row, rowIndex: row.rowIndex, stop }));
+                    }
+                }
+                rowIndex += smartRows.length;
+                if (stopped || pagesScanned >= effectiveMaxPages)
+                    break;
+                const context = { root: rootLocator, config, page: rootLocator.page(), resolve };
+                let advanced;
+                if (typeof config.strategies.pagination === 'function') {
+                    advanced = !!(yield config.strategies.pagination(context));
+                }
+                else {
+                    advanced = !!(((_c = config.strategies.pagination) === null || _c === void 0 ? void 0 : _c.goNext) && (yield config.strategies.pagination.goNext(context)));
+                }
+                if (!advanced)
+                    break;
+                tableState.currentPageIndex++;
+                pagesScanned++;
+            }
+            return results;
+        }),
+        filter: (predicate_1, ...args_1) => __awaiter(void 0, [predicate_1, ...args_1], void 0, function* (predicate, options = {}) {
+            var _a, _b, _c;
+            yield _ensureInitialized();
+            const map = tableMapper.getMapSync();
+            const effectiveMaxPages = (_a = options.maxPages) !== null && _a !== void 0 ? _a : config.maxPages;
+            const dedupeKeys = options.dedupe ? new Set() : null;
+            const parallel = (_b = options.parallel) !== null && _b !== void 0 ? _b : false;
+            const matched = [];
+            let rowIndex = 0;
+            let stopped = false;
+            let pagesScanned = 1;
+            const stop = () => { stopped = true; };
+            while (!stopped) {
+                const pageRows = yield resolve(config.rowSelector, rootLocator).all();
+                const smartRows = pageRows.map((r, i) => _makeSmart(r, map, rowIndex + i, pagesScanned - 1));
+                if (parallel) {
+                    const flags = yield Promise.all(smartRows.map((row) => __awaiter(void 0, void 0, void 0, function* () {
+                        if (dedupeKeys) {
+                            const key = yield options.dedupe(row);
+                            if (dedupeKeys.has(key))
+                                return false;
+                            dedupeKeys.add(key);
+                        }
+                        return predicate({ row, rowIndex: row.rowIndex, stop });
+                    })));
+                    smartRows.forEach((row, i) => { if (flags[i])
+                        matched.push(row); });
+                }
+                else {
+                    for (const row of smartRows) {
+                        if (stopped)
+                            break;
+                        if (dedupeKeys) {
+                            const key = yield options.dedupe(row);
+                            if (dedupeKeys.has(key))
+                                continue;
+                            dedupeKeys.add(key);
+                        }
+                        if (yield predicate({ row, rowIndex: row.rowIndex, stop })) {
+                            matched.push(row);
+                        }
+                    }
+                }
+                rowIndex += smartRows.length;
+                if (stopped || pagesScanned >= effectiveMaxPages)
+                    break;
+                const context = { root: rootLocator, config, page: rootLocator.page(), resolve };
+                let advanced;
+                if (typeof config.strategies.pagination === 'function') {
+                    advanced = !!(yield config.strategies.pagination(context));
+                }
+                else {
+                    advanced = !!(((_c = config.strategies.pagination) === null || _c === void 0 ? void 0 : _c.goNext) && (yield config.strategies.pagination.goNext(context)));
+                }
+                if (!advanced)
+                    break;
+                tableState.currentPageIndex++;
+                pagesScanned++;
+            }
+            return (0, smartRowArray_1.createSmartRowArray)(matched);
+        }),
         iterateThroughTable: (callback, options) => __awaiter(void 0, void 0, void 0, function* () {
             var _a, _b, _c, _d, _e, _f, _g;
             yield _ensureInitialized();
@@ -275,6 +501,10 @@ const useTable = (rootLocator, configOptions = {}) => {
                 scrollToColumn: result.scrollToColumn,
                 revalidate: result.revalidate,
                 generateConfigPrompt: result.generateConfigPrompt,
+                forEach: result.forEach,
+                map: result.map,
+                filter: result.filter,
+                [Symbol.asyncIterator]: result[Symbol.asyncIterator].bind(result),
             };
             const getIsFirst = (_b = options === null || options === void 0 ? void 0 : options.getIsFirst) !== null && _b !== void 0 ? _b : (({ index }) => index === 0);
             const getIsLast = (_c = options === null || options === void 0 ? void 0 : options.getIsLast) !== null && _c !== void 0 ? _c : (() => false);

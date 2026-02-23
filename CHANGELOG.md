@@ -1,5 +1,58 @@
 # Changelog
 
+## [6.6.0] - 2026-02-23
+
+### Added
+- **`table.forEach(callback, options?)`**: Iterates every row across all pages sequentially. Call `stop()` to end early.
+  ```typescript
+  await table.forEach(async ({ row, rowIndex, stop }) => {
+    if (rowIndex > 5) stop();
+    await row.getCell('Checkbox').click();
+  });
+  ```
+- **`table.map(callback, options?)`**: Transforms every row across all pages into a value. Parallel within each page by default.
+  ```typescript
+  const emails = await table.map(({ row }) => row.getCell('Email').innerText());
+  ```
+- **`table.filter(predicate, options?)`**: Filters rows across all pages by an async predicate. Returns a `SmartRowArray<T>` as-is.
+  ```typescript
+  const active = await table.filter(async ({ row }) =>
+    await row.getCell('Status').innerText() === 'Active'
+  );
+  ```
+- **Public Async Iterator** (`[Symbol.asyncIterator]`): Enables `for await...of` syntax over a table, page by page.
+  ```typescript
+  for await (const { row, rowIndex } of table) { ... }
+  ```
+- **Shared options** across all three methods:
+  - `maxPages?: number` — limits pages traversed.
+  - `parallel?: boolean` — within-page concurrency. Default: `false` for `forEach`/`filter`, `true` for `map`.
+  - `dedupe?: DedupeStrategy` — skip rows already seen by key (useful for infinite scroll tables).
+- **`RowIterationContext<T>`** and **`RowIterationOptions`** exported types for the new API.
+
+### Deprecated
+- **`iterateThroughTable`**: Use `forEach`, `map`, or `filter` instead. Only retain for advanced scenarios (batchSize, beforeFirst/afterLast hooks). Will be removed in v7.0.0.
+- **`getColumnValues`**: Use `table.map(({ row }) => row.getCell(col).innerText())` instead. Will be removed in v7.0.0.
+
+### Fixed
+- **`filter` now sets `tablePageIndex`** on returned rows, so `bringIntoView()` works correctly after a cross-page filter scan.
+  ```typescript
+  const active = await table.filter(...);
+  for (const row of active) {
+    await row.bringIntoView(); // ✅ navigates back to the correct page
+    await row.getCell('Checkbox').click();
+  }
+  ```
+
+### Notes
+- **`map` + UI interactions**: `map` defaults to `parallel: true` (safe for reads). If your callback opens popovers, fills inputs, or otherwise mutates UI state, you **must** pass `{ parallel: false }` to avoid concurrent interactions breaking each other.
+  ```typescript
+  // ✅ Safe for popover interactions
+  await table.map(async ({ row }) => { ... }, { parallel: false });
+  ```
+
+---
+
 ## [6.5.0] - 2026-02-23
 
 ### Added
