@@ -290,6 +290,216 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       }
     },
 
+    // ─── Shared async row iterator ───────────────────────────────────────────
+
+    async *[Symbol.asyncIterator](): AsyncIterableIterator<{ row: SmartRowType<T>; rowIndex: number }> {
+      await _ensureInitialized();
+      const map = tableMapper.getMapSync()!;
+      const effectiveMaxPages = config.maxPages;
+      let rowIndex = 0;
+      let pagesScanned = 1;
+
+      while (true) {
+        const pageRows = await resolve(config.rowSelector, rootLocator).all();
+        for (const rowLocator of pageRows) {
+          yield { row: _makeSmart(rowLocator, map, rowIndex), rowIndex };
+          rowIndex++;
+        }
+
+        if (pagesScanned >= effectiveMaxPages) break;
+
+        const context: TableContext = { root: rootLocator, config, page: rootLocator.page(), resolve };
+        let advanced: boolean;
+        if (typeof config.strategies.pagination === 'function') {
+          advanced = !!(await config.strategies.pagination(context));
+        } else {
+          advanced = !!(config.strategies.pagination?.goNext && await config.strategies.pagination.goNext(context));
+        }
+
+        if (!advanced) break;
+        tableState.currentPageIndex++;
+        pagesScanned++;
+      }
+    },
+
+    // ─── Private row-iteration engine ────────────────────────────────────────
+
+    forEach: async (callback, options = {}) => {
+      await _ensureInitialized();
+      const map = tableMapper.getMapSync()!;
+      const effectiveMaxPages = options.maxPages ?? config.maxPages;
+      const dedupeKeys = options.dedupe ? new Set<string | number>() : null;
+      const parallel = options.parallel ?? false;
+
+      let rowIndex = 0;
+      let stopped = false;
+      let pagesScanned = 1;
+      const stop = () => { stopped = true; };
+
+      while (!stopped) {
+        const pageRows = await resolve(config.rowSelector, rootLocator).all();
+        const smartRows = pageRows.map((r, i) => _makeSmart(r, map, rowIndex + i));
+
+        if (parallel) {
+          await Promise.all(smartRows.map(async (row) => {
+            if (stopped) return;
+            if (dedupeKeys) {
+              const key = await options.dedupe!(row);
+              if (dedupeKeys.has(key)) return;
+              dedupeKeys.add(key);
+            }
+            await callback({ row, rowIndex: row.rowIndex!, stop });
+          }));
+        } else {
+          for (const row of smartRows) {
+            if (stopped) break;
+            if (dedupeKeys) {
+              const key = await options.dedupe!(row);
+              if (dedupeKeys.has(key)) continue;
+              dedupeKeys.add(key);
+            }
+            await callback({ row, rowIndex: row.rowIndex!, stop });
+          }
+        }
+        rowIndex += smartRows.length;
+
+        if (stopped || pagesScanned >= effectiveMaxPages) break;
+
+        const context: TableContext = { root: rootLocator, config, page: rootLocator.page(), resolve };
+        let advanced: boolean;
+        if (typeof config.strategies.pagination === 'function') {
+          advanced = !!(await config.strategies.pagination(context));
+        } else {
+          advanced = !!(config.strategies.pagination?.goNext && await config.strategies.pagination.goNext(context));
+        }
+
+        if (!advanced) break;
+        tableState.currentPageIndex++;
+        pagesScanned++;
+      }
+    },
+
+    map: async <R>(callback: (ctx: import('./types').RowIterationContext<T>) => R | Promise<R>, options: import('./types').RowIterationOptions = {}): Promise<R[]> => {
+      await _ensureInitialized();
+      const map = tableMapper.getMapSync()!;
+      const effectiveMaxPages = options.maxPages ?? config.maxPages;
+      const dedupeKeys = options.dedupe ? new Set<string | number>() : null;
+      const parallel = options.parallel ?? true;
+
+      const results: R[] = [];
+      let rowIndex = 0;
+      let stopped = false;
+      let pagesScanned = 1;
+      const stop = () => { stopped = true; };
+
+      while (!stopped) {
+        const pageRows = await resolve(config.rowSelector, rootLocator).all();
+        const smartRows = pageRows.map((r, i) => _makeSmart(r, map, rowIndex + i));
+
+        if (parallel) {
+          const SKIP = Symbol('skip');
+          const pageResults = await Promise.all(smartRows.map(async (row) => {
+            if (dedupeKeys) {
+              const key = await options.dedupe!(row);
+              if (dedupeKeys.has(key)) return SKIP;
+              dedupeKeys.add(key);
+            }
+            return callback({ row, rowIndex: row.rowIndex!, stop });
+          }));
+          for (const r of pageResults) {
+            if (r !== SKIP) results.push(r as R);
+          }
+        } else {
+          for (const row of smartRows) {
+            if (stopped) break;
+            if (dedupeKeys) {
+              const key = await options.dedupe!(row);
+              if (dedupeKeys.has(key)) continue;
+              dedupeKeys.add(key);
+            }
+            results.push(await callback({ row, rowIndex: row.rowIndex!, stop }));
+          }
+        }
+        rowIndex += smartRows.length;
+
+        if (stopped || pagesScanned >= effectiveMaxPages) break;
+
+        const context: TableContext = { root: rootLocator, config, page: rootLocator.page(), resolve };
+        let advanced: boolean;
+        if (typeof config.strategies.pagination === 'function') {
+          advanced = !!(await config.strategies.pagination(context));
+        } else {
+          advanced = !!(config.strategies.pagination?.goNext && await config.strategies.pagination.goNext(context));
+        }
+
+        if (!advanced) break;
+        tableState.currentPageIndex++;
+        pagesScanned++;
+      }
+
+      return results;
+    },
+
+    filter: async (predicate, options = {}) => {
+      await _ensureInitialized();
+      const map = tableMapper.getMapSync()!;
+      const effectiveMaxPages = options.maxPages ?? config.maxPages;
+      const dedupeKeys = options.dedupe ? new Set<string | number>() : null;
+      const parallel = options.parallel ?? false;
+
+      const matched: SmartRowType<T>[] = [];
+      let rowIndex = 0;
+      let stopped = false;
+      let pagesScanned = 1;
+      const stop = () => { stopped = true; };
+
+      while (!stopped) {
+        const pageRows = await resolve(config.rowSelector, rootLocator).all();
+        const smartRows = pageRows.map((r, i) => _makeSmart(r, map, rowIndex + i, pagesScanned - 1));
+
+        if (parallel) {
+          const flags = await Promise.all(smartRows.map(async (row) => {
+            if (dedupeKeys) {
+              const key = await options.dedupe!(row);
+              if (dedupeKeys.has(key)) return false;
+              dedupeKeys.add(key);
+            }
+            return predicate({ row, rowIndex: row.rowIndex!, stop });
+          }));
+          smartRows.forEach((row, i) => { if (flags[i]) matched.push(row); });
+        } else {
+          for (const row of smartRows) {
+            if (stopped) break;
+            if (dedupeKeys) {
+              const key = await options.dedupe!(row);
+              if (dedupeKeys.has(key)) continue;
+              dedupeKeys.add(key);
+            }
+            if (await predicate({ row, rowIndex: row.rowIndex!, stop })) {
+              matched.push(row);
+            }
+          }
+        }
+        rowIndex += smartRows.length;
+
+        if (stopped || pagesScanned >= effectiveMaxPages) break;
+
+        const context: TableContext = { root: rootLocator, config, page: rootLocator.page(), resolve };
+        let advanced: boolean;
+        if (typeof config.strategies.pagination === 'function') {
+          advanced = !!(await config.strategies.pagination(context));
+        } else {
+          advanced = !!(config.strategies.pagination?.goNext && await config.strategies.pagination.goNext(context));
+        }
+
+        if (!advanced) break;
+        tableState.currentPageIndex++;
+        pagesScanned++;
+      }
+
+      return createSmartRowArray<T>(matched);
+    },
+
     iterateThroughTable: async <T = any>(
       callback: (context: {
         index: number;
@@ -338,7 +548,6 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
         getRow: result.getRow,
         getRowByIndex: result.getRowByIndex,
         findRow: result.findRow,
-
         findRows: result.findRows,
         getColumnValues: result.getColumnValues,
         isInitialized: result.isInitialized,
@@ -346,6 +555,10 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
         scrollToColumn: result.scrollToColumn,
         revalidate: result.revalidate,
         generateConfigPrompt: result.generateConfigPrompt,
+        forEach: result.forEach,
+        map: result.map,
+        filter: result.filter,
+        [Symbol.asyncIterator]: result[Symbol.asyncIterator].bind(result),
       };
 
       const getIsFirst = options?.getIsFirst ?? (({ index }) => index === 0);

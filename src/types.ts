@@ -362,7 +362,30 @@ export interface PromptOptions {
   includeTypes?: boolean;
 }
 
-export interface TableResult<T = any> {
+/** Callback context passed to forEach, map, and filter. */
+export type RowIterationContext<T = any> = {
+  row: SmartRow<T>;
+  rowIndex: number;
+  stop: () => void;
+};
+
+/** Shared options for forEach, map, and filter. */
+export type RowIterationOptions = {
+  /** Maximum number of pages to iterate. Defaults to config.maxPages. */
+  maxPages?: number;
+  /**
+   * Whether to process rows within a page concurrently.
+   * @default false for forEach/filter, true for map
+   */
+  parallel?: boolean;
+  /**
+   * Deduplication strategy. Use when rows may repeat across iterations
+   * (e.g. infinite scroll tables). Returns a unique key per row.
+   */
+  dedupe?: DedupeStrategy;
+};
+
+export interface TableResult<T = any> extends AsyncIterable<{ row: SmartRow<T>; rowIndex: number }> {
   /**
    * Represents the current page index of the table's DOM.
    * Starts at 0. Automatically maintained by the library during pagination and bringIntoView.
@@ -445,7 +468,53 @@ export interface TableResult<T = any> {
   revalidate: () => Promise<void>;
 
   /**
+   * Iterates every row across all pages, calling the callback for side effects.
+   * Execution is sequential by default (safe for interactions like clicking/filling).
+   * Call `stop()` in the callback to end iteration early.
+   *
+   * @example
+   * await table.forEach(async ({ row, stop }) => {
+   *   if (await row.getCell('Status').innerText() === 'Done') stop();
+   *   await row.getCell('Checkbox').click();
+   * });
+   */
+  forEach(
+    callback: (ctx: RowIterationContext<T>) => void | Promise<void>,
+    options?: RowIterationOptions
+  ): Promise<void>;
+
+  /**
+   * Transforms every row across all pages into a value. Returns a flat array.
+   * Execution is parallel within each page by default (safe for reads).
+   * Call `stop()` to halt after the current page finishes.
+   *
+   * @example
+   * const emails = await table.map(({ row }) => row.getCell('Email').innerText());
+   */
+  map<R>(
+    callback: (ctx: RowIterationContext<T>) => R | Promise<R>,
+    options?: RowIterationOptions
+  ): Promise<R[]>;
+
+  /**
+   * Filters rows across all pages by an async predicate. Returns a SmartRowArray.
+   * Rows are returned as-is — call `bringIntoView()` on each if needed.
+   * Execution is sequential by default.
+   *
+   * @example
+   * const active = await table.filter(async ({ row }) =>
+   *   await row.getCell('Status').innerText() === 'Active'
+   * );
+   */
+  filter(
+    predicate: (ctx: RowIterationContext<T>) => boolean | Promise<boolean>,
+    options?: RowIterationOptions
+  ): Promise<SmartRowArray<T>>;
+
+  /**
    * Scans a specific column across all pages and returns the values.
+   * @deprecated Use `table.map(({ row }) => row.getCell(column).innerText())` instead.
+   *             Will be removed in v7.0.0.
    */
   getColumnValues: <V = string>(column: string, options?: { mapper?: (cell: Locator) => Promise<V> | V, maxPages?: number }) => Promise<V[]>;
 
@@ -470,6 +539,9 @@ export interface TableResult<T = any> {
   /**
    * Iterates through paginated table data, calling the callback for each iteration.
    * Callback return values are automatically appended to allData, which is returned.
+   * @deprecated Use `forEach`, `map`, or `filter` instead for cleaner cross-page iteration.
+   *             Only use this for advanced scenarios (batchSize, beforeFirst/afterLast hooks).
+   *             Will be removed in v7.0.0.
    */
   iterateThroughTable: <T = any>(
     callback: (context: {
