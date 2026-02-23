@@ -14,12 +14,28 @@ exports.FillStrategies = {
     /**
      * Default strategy: Detects input type and fills accordingly (Text, Select, Checkbox, ContentEditable).
      */
-    default: (_a) => __awaiter(void 0, [_a], void 0, function* ({ row, columnName, value, fillOptions }) {
-        var _b;
+    default: (_a) => __awaiter(void 0, [_a], void 0, function* ({ row, columnName, value, fillOptions, config, table }) {
+        var _b, _c;
         const cell = row.getCell(columnName);
+        // 1. Check for Unified Column Override
+        const columnOverride = (_b = config === null || config === void 0 ? void 0 : config.columnOverrides) === null || _b === void 0 ? void 0 : _b[columnName];
+        if (columnOverride === null || columnOverride === void 0 ? void 0 : columnOverride.write) {
+            let currentValue;
+            // Auto-sync: If read exists, fetch current state first
+            if (columnOverride.read) {
+                currentValue = yield columnOverride.read(cell);
+            }
+            yield columnOverride.write({
+                cell,
+                targetValue: value,
+                currentValue,
+                row
+            });
+            return;
+        }
         // Use custom input mapper for this column if provided, otherwise auto-detect
         let inputLocator;
-        if ((_b = fillOptions === null || fillOptions === void 0 ? void 0 : fillOptions.inputMappers) === null || _b === void 0 ? void 0 : _b[columnName]) {
+        if ((_c = fillOptions === null || fillOptions === void 0 ? void 0 : fillOptions.inputMappers) === null || _c === void 0 ? void 0 : _c[columnName]) {
             inputLocator = fillOptions.inputMappers[columnName](cell);
         }
         else {

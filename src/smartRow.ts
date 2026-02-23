@@ -123,12 +123,15 @@ export const createSmartRow = <T = any>(
     config: FinalTableConfig<T>,
     rootLocator: Locator,
     resolve: (item: any, parent: Locator | Page) => Locator,
-    table: TableResult<T> | null
+    table: TableResult<T> | null,
+    tablePageIndex?: number
 ): SmartRowType<T> => {
     const smart = rowLocator as unknown as SmartRowType<T>;
 
     // Attach State
     smart.rowIndex = rowIndex;
+    smart.tablePageIndex = tablePageIndex;
+    smart.table = table as any;
 
     // Attach Methods
     smart.getCell = (colName: string): Locator => {
@@ -159,8 +162,9 @@ export const createSmartRow = <T = any>(
                 continue;
             }
 
-            // Check if we have a data mapper for this column
-            const mapper = config.dataMapper?.[col as keyof T];
+            // Check if we have a column override or data mapper for this column
+            const columnOverride = config.columnOverrides?.[col as keyof T];
+            const mapper = columnOverride?.read || config.dataMapper?.[col as keyof T];
 
             if (mapper) {
                 // Use custom mapper
@@ -250,6 +254,7 @@ export const createSmartRow = <T = any>(
                 index: rowIndex ?? -1,
                 page: rowLocator.page(),
                 rootLocator,
+                config,
                 table: table as TableResult,
                 fillOptions
             });
@@ -265,6 +270,48 @@ export const createSmartRow = <T = any>(
         if (rowIndex === undefined) {
             throw new Error('Cannot bring row into view - row index is unknown. Use getRowByIndex() instead of getRow().');
         }
+
+        const parentTable = smart.table as TableResult<T>;
+
+        // Cross-page Navigation using PaginationPrimitives
+        if (tablePageIndex !== undefined && config.strategies.pagination) {
+            const primitives = config.strategies.pagination as import('./types').PaginationPrimitives;
+            // Only orchestrate if it's an object of primitives, not a single function
+            if (typeof config.strategies.pagination !== 'function') {
+                const context = { root: rootLocator, config, page: rootLocator.page(), resolve };
+
+                if (primitives.goToPage) {
+                    logDebug(config, 'info', `bringIntoView: Jumping to page ${tablePageIndex} using goToPage primitive`);
+                    await primitives.goToPage(tablePageIndex, context);
+                } else if (primitives.goPrevious) {
+                    logDebug(config, 'info', `bringIntoView: Looping goPrevious until we reach page ${tablePageIndex}`);
+                    const diff = parentTable.currentPageIndex - tablePageIndex;
+                    for (let i = 0; i < diff; i++) {
+                        const success = await primitives.goPrevious(context);
+                        if (!success) {
+                            throw new Error(`bringIntoView: Failed to paginate backwards. Strategy aborted before reaching page ${tablePageIndex}.`);
+                        }
+                    }
+                } else if (primitives.goToFirst && primitives.goNext) {
+                    logDebug(config, 'info', `bringIntoView: going to first page and looping goNext until we reach page ${tablePageIndex}`);
+                    await primitives.goToFirst(context);
+                    for (let i = 0; i < tablePageIndex; i++) {
+                        await primitives.goNext(context);
+                    }
+                } else {
+                    logDebug(config, 'error', `Cannot bring row on page ${tablePageIndex} into view. No backwards pagination strategies (goToPage, goPrevious, or goToFirst) provided.`);
+                    throw new Error(`Cannot bring row on page ${tablePageIndex} into view: Row is on a different page and no backward pagination primitive found.`);
+                }
+            } else {
+                throw new Error(`Cannot bring row on page ${tablePageIndex} into view: Pagination is a single function. Provide an object with 'goPrevious', 'goToPage', or 'goToFirst' primitives.`);
+            }
+
+            // Successfully orchestrated backwards navigation, now update the state pointer
+            parentTable.currentPageIndex = tablePageIndex;
+        }
+
+        // Delay after pagination/finding before scrolling
+        await debugDelay(config, 'findRow');
 
         // Scroll row into view using Playwright's built-in method
         await rowLocator.scrollIntoViewIfNeeded();

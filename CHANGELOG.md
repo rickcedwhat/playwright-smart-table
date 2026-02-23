@@ -1,5 +1,31 @@
 # Changelog
 
+## [6.5.0] - 2026-02-23
+
+### Added
+- **`PaginationPrimitives` API**: New interface for defining bidirectional pagination primitives that power stateful cross-page navigation.
+  - `goNext`, `goPrevious`, `goToPage`, `goToFirst` — define how the library moves between pages.
+  - **`Strategies.Pagination.click`**: Updated with full `previous` and `first` selectors in addition to `next`.
+- **`SmartRow.bringIntoView()` — Cross-Page Navigation**: `SmartRow` can now intelligently navigate back to the page it was found on.
+  - Uses `goToPage` for instant O(1) jumps if provided.
+  - Falls back to looping `goPrevious` N times based on the tracked page diff.
+  - Falls back to `goToFirst` + N loops of `goNext` if no backward primitive exists.
+- **`TableResult.currentPageIndex`**: Tracks the current DOM page index as `findRows` and `iterateThroughTable` paginate forward. Updated by `bringIntoView` when navigating backwards.
+- **`SmartRow.table`**: Back-reference to the parent `TableResult` instance, enabling state queries like `rows[0].table.currentPageIndex`.
+- **`SmartRow.tablePageIndex`**: Records which page index the row was originally found on during `findRows`.
+
+### Changed
+- **`Strategies.Pagination.click`**: Now returns a `PaginationPrimitives` object instead of a single `PaginationStrategy` function, giving `bringIntoView` bidirectional awareness.
+- **`Strategies.Pagination.clickNext`**: Marked as `@deprecated`. Migrate to `Strategies.Pagination.click({ next: selector })`.
+
+### Fixed
+- `bringIntoView` no longer relies on `Locator.isVisible()` for cross-page position detection (which was unreliable as it matched the selector on the *current* page DOM). Now uses deterministic state-diff arithmetic.
+
+### Deprecated
+- **`Strategies.Pagination.clickNext`**: Use `Strategies.Pagination.click({ next: selector })` instead. Will be removed in v7.0.0.
+
+---
+
 ## [6.4.0] - 2026-02-18
 
 ### ⚠️ Breaking Changes

@@ -56,9 +56,9 @@ test.describe('README.md Examples Verification', () => {
       cellSelector: 'td',
       // Strategy: Tell it how to find the next page
       strategies: {
-        pagination: Strategies.Pagination.clickNext(() =>
-          page.getByRole('link', { name: 'Next' })
-        )
+        pagination: Strategies.Pagination.click({
+          next: () => page.getByRole('link', { name: 'Next' })
+        })
       },
       maxPages: 5 // Allow scanning up to 5 pages
     });
@@ -124,9 +124,9 @@ test.describe('README.md Examples Verification', () => {
       headerSelector: '.MuiDataGrid-columnHeader',
       cellSelector: '.MuiDataGrid-cell',
       strategies: {
-        pagination: Strategies.Pagination.clickNext(
-          (root) => root.getByRole("button", { name: "Go to next page" })
-        )
+        pagination: Strategies.Pagination.click({
+          next: () => page.getByRole("button", { name: "Go to next page" })
+        })
       },
       maxPages: 5,
       // Transform empty columns (detected as __col_0, __col_1, etc.) to meaningful names
@@ -157,7 +157,16 @@ test.describe('README.md Examples Verification', () => {
   });
 
   test('headerTransformer: Normalizing Column Names', async ({ page }) => {
-    await page.goto('https://the-internet.herokuapp.com/tables');
+    await page.setContent(`
+      <table id="table1">
+        <thead>
+          <tr><th> Last Name </th><th>First   Name </th><th> Email </th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Doe</td><td>Jason</td><td>jdoe@hotmail.com</td></tr>
+        </tbody>
+      </table>
+    `);
 
     // #region header-transformer-normalize
     // Example from: https://the-internet.herokuapp.com/tables
@@ -201,9 +210,9 @@ test.describe('README.md Examples Verification', () => {
     const table = useTable(page.locator('#example'), {
       headerSelector: 'thead th',
       strategies: {
-        pagination: Strategies.Pagination.clickNext(() =>
-          page.getByRole('link', { name: 'Next' })
-        )
+        pagination: Strategies.Pagination.click({
+          next: () => page.getByRole('link', { name: 'Next' })
+        })
       },
       maxPages: 5,
       onReset: async ({ page }) => {
@@ -238,9 +247,9 @@ test.describe('README.md Examples Verification', () => {
     const table = useTable(page.locator('#example'), {
       headerSelector: 'thead th',
       strategies: {
-        pagination: Strategies.Pagination.clickNext(() =>
-          page.getByRole('link', { name: 'Next' })
-        )
+        pagination: Strategies.Pagination.click({
+          next: () => page.getByRole('link', { name: 'Next' })
+        })
       },
       maxPages: 3
     });
@@ -278,9 +287,9 @@ test.describe('README.md Examples Verification', () => {
     const table = useTable(page.locator('#example'), {
       headerSelector: 'thead th',
       strategies: {
-        pagination: Strategies.Pagination.clickNext(() =>
-          page.getByRole('link', { name: 'Next' })
-        )
+        pagination: Strategies.Pagination.click({
+          next: () => page.getByRole('link', { name: 'Next' })
+        })
       },
       maxPages: 3
     });
@@ -342,9 +351,9 @@ test.describe('README.md Examples Verification', () => {
     const table = useTable(page.locator('#example'), {
       headerSelector: 'thead th',
       strategies: {
-        pagination: Strategies.Pagination.clickNext(() =>
-          page.getByRole('link', { name: 'Next' })
-        )
+        pagination: Strategies.Pagination.click({
+          next: () => page.getByRole('link', { name: 'Next' })
+        })
       },
       maxPages: 3
     });
@@ -506,9 +515,9 @@ test.describe('README.md Examples Verification', () => {
       headerSelector: 'thead th',
       cellSelector: 'td',
       strategies: {
-        pagination: Strategies.Pagination.clickNext(() =>
-          page.getByRole('button', { name: '›' })
-        )
+        pagination: Strategies.Pagination.click({
+          next: () => page.getByRole('button', { name: '›' })
+        })
       },
       maxPages: 10
     });

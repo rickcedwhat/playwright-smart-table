@@ -1,5 +1,10 @@
 [
   {
+    "name": "currentPageIndex",
+    "signature": "currentPageIndex: number",
+    "comment": "/**\n* Represents the current page index of the table's DOM.\n* Starts at 0. Automatically maintained by the library during pagination and bringIntoView.\n*/"
+  },
+  {
     "name": "init",
     "signature": "init(options?: { timeout?: number }): Promise<TableResult>",
     "comment": "/**\n* Initializes the table by resolving headers. Must be called before using sync methods.\n* @param options Optional timeout for header resolution (default: 3000ms)\n*/"

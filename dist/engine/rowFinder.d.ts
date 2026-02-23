@@ -9,8 +9,11 @@ export declare class RowFinder<T = any> {
     private filterEngine;
     private tableMapper;
     private makeSmartRow;
+    private tableState;
     private resolve;
-    constructor(rootLocator: Locator, config: FinalTableConfig, resolve: (item: Selector, parent: Locator | Page) => Locator, filterEngine: FilterEngine, tableMapper: TableMapper, makeSmartRow: (loc: Locator, map: Map<string, number>, index: number) => SmartRow<T>);
+    constructor(rootLocator: Locator, config: FinalTableConfig, resolve: (item: Selector, parent: Locator | Page) => Locator, filterEngine: FilterEngine, tableMapper: TableMapper, makeSmartRow: (loc: Locator, map: Map<string, number>, index: number, tablePageIndex?: number) => SmartRow<T>, tableState?: {
+        currentPageIndex: number;
+    });
     private log;
     findRow(filters: Record<string, FilterValue>, options?: {
         exact?: boolean;

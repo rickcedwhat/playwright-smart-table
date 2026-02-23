@@ -4,6 +4,7 @@ import { TYPE_CONTEXT } from './typeContext';
 import { MINIMAL_CONFIG_CONTEXT } from './minimalConfigContext';
 import { SortingStrategies as ImportedSortingStrategies } from './strategies/sorting';
 import { PaginationStrategies as ImportedPaginationStrategies } from './strategies/pagination';
+import { validatePaginationResult } from './strategies/validation';
 
 import { DedupeStrategies as ImportedDedupeStrategies } from './strategies/dedupe';
 import { LoadingStrategies as ImportedLoadingStrategies } from './strategies/loading';
@@ -54,7 +55,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
 
   const resolve = (item: Selector, parent: Locator | Page): Locator => {
     if (typeof item === 'string') return parent.locator(item);
-    if (typeof item === 'function') return item(parent);
+    if (typeof item === 'function') return (item as any)(parent);
     return item;
   };
 
@@ -95,11 +96,12 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
   let finalTable: TableResult<T> = null as unknown as TableResult<T>;
 
   // Helper factory
-  const _makeSmart = (rowLocator: Locator, map: Map<string, number>, rowIndex?: number): SmartRowType => {
-    return createSmartRow<T>(rowLocator, map, rowIndex, config, rootLocator, resolve, finalTable);
+  const _makeSmart = (rowLocator: Locator, map: Map<string, number>, rowIndex?: number, tablePageIndex?: number): SmartRowType => {
+    return createSmartRow<T>(rowLocator, map, rowIndex, config, rootLocator, resolve, finalTable, tablePageIndex);
   };
 
-  const rowFinder = new RowFinder<T>(rootLocator, config, resolve, filterEngine, tableMapper, _makeSmart);
+  const tableState = { currentPageIndex: 0 };
+  const rowFinder = new RowFinder<T>(rootLocator, config, resolve, filterEngine, tableMapper, _makeSmart, tableState);
 
   const _getCleanHtml = async (loc: Locator): Promise<string> => {
     return loc.evaluate((el) => {
@@ -142,6 +144,8 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
   };
 
   const result: TableResult<T> = {
+    get currentPageIndex() { return tableState.currentPageIndex; },
+    set currentPageIndex(v: number) { tableState.currentPageIndex = v; },
     init: async (options?: { timeout?: number }): Promise<TableResult<T>> => {
       if (tableMapper.isInitialized()) return result;
 
@@ -199,7 +203,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
 
       const mapper = options?.mapper ?? ((c: Locator) => c.innerText() as any as V);
       const effectiveMaxPages = options?.maxPages ?? config.maxPages;
-      let currentPage = 1;
+      let pagesScanned = 1;
       const results: V[] = [];
       log(`Getting column values for '${column}' (Pages: ${effectiveMaxPages})`);
 
@@ -211,11 +215,24 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
             : resolve(config.cellSelector, row).nth(colIdx);
           results.push(await mapper(cell));
         }
-        if (currentPage < effectiveMaxPages) {
+        if (pagesScanned < effectiveMaxPages) {
           const context: TableContext = { root: rootLocator, config, page: rootLocator.page(), resolve };
-          if (await config.strategies.pagination!(context)) {
+
+          let pageRes: boolean | import('./types').PaginationPrimitives;
+          if (typeof config.strategies.pagination === 'function') {
+            pageRes = await config.strategies.pagination(context);
+          } else {
+            if (!config.strategies.pagination!.goNext) {
+              log('Cannot paginate: no goNext primitive found.');
+              break;
+            }
+            pageRes = await config.strategies.pagination!.goNext(context);
+          }
+
+          if (await validatePaginationResult(pageRes, 'Pagination Strategy')) {
             _hasPaginated = true;
-            currentPage++;
+            tableState.currentPageIndex++;
+            pagesScanned++;
             continue;
           }
         }
@@ -314,6 +331,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       const map = tableMapper.getMapSync()!;
 
       const restrictedTable: RestrictedTableResult = {
+        get currentPageIndex() { return tableState.currentPageIndex; },
         init: result.init,
         getHeaders: result.getHeaders,
         getHeaderCell: result.getHeaderCell,
@@ -422,10 +440,17 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
           let finalIsLast = isLastDueToMax;
           if (!isLastIteration) {
             const context: TableContext = { root: rootLocator, config, page: rootLocator.page(), resolve };
-            paginationResult = await paginationStrategy(context);
+            if (typeof paginationStrategy === 'function') {
+              paginationResult = await paginationStrategy(context);
+            } else {
+              const pageObj = paginationStrategy as import('./types').PaginationPrimitives;
+              if (!pageObj.goNext) break;
+              paginationResult = await pageObj.goNext(context);
+            }
             logDebug(config, 'info', `Pagination ${paginationResult ? 'succeeded' : 'failed'}`);
             await debugDelay(config, 'pagination');
             finalIsLast = getIsLast({ index: callbackIndex, paginationResult }) || !paginationResult;
+            if (paginationResult) tableState.currentPageIndex++;
           }
 
           if (finalIsLast && options?.afterLast) {
@@ -445,9 +470,22 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
         } else {
           // Continue paginating even when batching
           const context: TableContext = { root: rootLocator, config, page: rootLocator.page(), resolve };
-          paginationResult = await paginationStrategy(context);
+
+          if (typeof paginationStrategy === 'function') {
+            paginationResult = await paginationStrategy(context);
+          } else {
+            const pageObj = paginationStrategy as import('./types').PaginationPrimitives;
+            if (!pageObj.goNext) {
+              log(`Cannot paginate: no goNext primitive found.`);
+              break;
+            }
+            paginationResult = await pageObj.goNext(context);
+          }
+
           logDebug(config, 'info', `Pagination ${paginationResult ? 'succeeded' : 'failed'} (batching mode)`);
           await debugDelay(config, 'pagination');
+
+          if (paginationResult) tableState.currentPageIndex++;
 
           if (!paginationResult) {
             // Pagination failed, invoke callback with current batch

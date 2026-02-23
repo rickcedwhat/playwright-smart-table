@@ -12,6 +12,14 @@ export declare const Strategies: {
             stabilization?: import("./stabilization").StabilizationStrategy;
             timeout?: number;
         }) => import("..").PaginationStrategy;
+        click: (selectors: {
+            next?: import("..").Selector;
+            previous?: import("..").Selector;
+            first?: import("..").Selector;
+        }, options?: {
+            stabilization?: import("./stabilization").StabilizationStrategy;
+            timeout?: number;
+        }) => import("..").PaginationStrategy;
         infiniteScroll: (options?: {
             action?: "scroll" | "js-scroll";
             scrollTarget?: import("..").Selector;
@@ -30,7 +38,7 @@ export declare const Strategies: {
         visible: ({ config, resolve, root }: import("..").StrategyContext) => Promise<string[]>;
     };
     Fill: {
-        default: ({ row, columnName, value, fillOptions }: Parameters<import("..").FillStrategy>[0]) => Promise<void>;
+        default: ({ row, columnName, value, fillOptions, config, table }: Parameters<import("..").FillStrategy>[0]) => Promise<void>;
     };
     Resolution: {
         default: import("./resolution").ColumnResolutionStrategy;

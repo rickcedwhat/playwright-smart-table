@@ -7,32 +7,55 @@ import { StabilizationStrategies, StabilizationStrategy } from './stabilization'
 export const PaginationStrategies = {
   /**
    * Strategy: Clicks a "Next" button and waits for stabilization.
-   * @param nextButtonSelector Selector for the next page button.
-   * @param options.stabilization Strategy to determine when the page has updated.
-   *        Defaults to `contentChanged({ scope: 'first' })`.
-   * @param options.timeout Timeout for the click action.
+   * Backward compatibility for when only a single 'next' selector was needed.
+   * @deprecated Use `click` with `{ next: selector }` instead.
    */
   clickNext: (nextButtonSelector: Selector, options: {
     stabilization?: StabilizationStrategy,
     timeout?: number
   } = {}): PaginationStrategy => {
-    return async (context: TableContext) => {
-      const { root, resolve, page } = context;
-      const nextBtn = resolve(nextButtonSelector, root).first();
+    return PaginationStrategies.click({ next: nextButtonSelector }, options);
+  },
 
-      if (!await nextBtn.isVisible() || !await nextBtn.isEnabled()) {
-        return false;
-      }
+  /**
+   * Strategy: Classic Pagination Buttons.
+   * Clicks 'Next', 'Previous', or 'First' buttons and waits for stabilization.
+   * 
+   * @param selectors Selectors for pagination buttons.
+   * @param options.stabilization Strategy to determine when the page has updated.
+   *        Defaults to `contentChanged({ scope: 'first' })`.
+   * @param options.timeout Timeout for the click action.
+   */
+  click: (selectors: {
+    next?: Selector,
+    previous?: Selector,
+    first?: Selector
+  }, options: {
+    stabilization?: StabilizationStrategy,
+    timeout?: number
+  } = {}): PaginationStrategy => {
+    const defaultStabilize = options.stabilization ?? StabilizationStrategies.contentChanged({ scope: 'first', timeout: options.timeout });
 
-      // Default stabilization: Wait for first row content to change
-      const stabilization = options.stabilization ??
-        StabilizationStrategies.contentChanged({ scope: 'first', timeout: options.timeout });
+    const createClicker = (selector?: Selector) => {
+      if (!selector) return undefined;
+      return async (context: TableContext) => {
+        const { root, resolve } = context;
+        const btn = resolve(selector, root).first();
 
-      // Stabilization: Wrap action
-      const success = await stabilization(context, async () => {
-        await nextBtn.click({ timeout: 2000 }).catch(() => { });
-      });
-      return success;
+        if (!btn || !await btn.isVisible() || !await btn.isEnabled()) {
+          return false;
+        }
+
+        return await defaultStabilize(context, async () => {
+          await btn.click({ timeout: 2000 }).catch(() => { });
+        });
+      };
+    };
+
+    return {
+      goNext: createClicker(selectors.next),
+      goPrevious: createClicker(selectors.previous),
+      goToFirst: createClicker(selectors.first)
     };
   },
 
@@ -54,35 +77,43 @@ export const PaginationStrategies = {
     stabilization?: StabilizationStrategy,
     timeout?: number
   } = {}): PaginationStrategy => {
-    return async (context: TableContext) => {
-      const { root, resolve, page } = context;
-      const scrollTarget = options.scrollTarget
-        ? resolve(options.scrollTarget, root)
-        : root;
 
-      // Default stabilization: Wait for row count to increase (Append mode)
-      const stabilization = options.stabilization ??
-        StabilizationStrategies.rowCountIncreased({ timeout: options.timeout });
+    // Default stabilization: Wait for row count to increase (Append mode)
+    const stabilization = options.stabilization ??
+      StabilizationStrategies.rowCountIncreased({ timeout: options.timeout });
+    const amount = options.scrollAmount ?? 500;
 
-      const amount = options.scrollAmount ?? 500;
+    const createScroller = (directionMultiplier: 1 | -1) => {
+      return async (context: TableContext) => {
+        const { root, resolve, page } = context;
+        const scrollTarget = options.scrollTarget
+          ? resolve(options.scrollTarget, root)
+          : root;
 
-      const doScroll = async () => {
-        const box = await scrollTarget.boundingBox();
-        // Action: Scroll
-        if (options.action === 'js-scroll' || !box) {
-          await scrollTarget.evaluate((el: HTMLElement, y: number) => {
-            el.scrollTop += y;
-          }, amount);
-        } else {
-          // Mouse Wheel
-          await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-          await page.mouse.wheel(0, amount);
-        }
+        const doScroll = async () => {
+          const box = await scrollTarget.boundingBox();
+          const scrollValue = amount * directionMultiplier;
+
+          // Action: Scroll
+          if (options.action === 'js-scroll' || !box) {
+            await scrollTarget.evaluate((el: HTMLElement, y: number) => {
+              el.scrollTop += y;
+            }, scrollValue);
+          } else {
+            // Mouse Wheel
+            await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+            await page.mouse.wheel(0, scrollValue);
+          }
+        };
+
+        // Stabilization: Wait
+        return await stabilization(context, doScroll);
       };
+    };
 
-      // Stabilization: Wait
-      const success = await stabilization(context, doScroll);
-      return success;
+    return {
+      goNext: createScroller(1),
+      goPrevious: createScroller(-1)
     };
   }
 };

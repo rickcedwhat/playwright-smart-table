@@ -1,0 +1,417 @@
+
+Running 52 tests using 6 workers
+
+  ✓   3 tests/compatibility.spec.ts:94:7 › Backwards Compatibility Tests › Core: findRows with filter option (1.3s)
+  ✓   6 tests/compatibility.spec.ts:36:7 › Backwards Compatibility Tests › Core: getRow returns SmartRow with getCell method (1.3s)
+  ✓   1 tests/compatibility.spec.ts:79:7 › Backwards Compatibility Tests › Core: findRows (current page) returns array of SmartRows (1.3s)
+  ✓   2 tests/compatibility.spec.ts:55:7 › Backwards Compatibility Tests › Core: getRow with multiple filters (1.3s)
+  ✓   4 tests/compatibility.spec.ts:67:7 › Backwards Compatibility Tests › Core: getRow returns sentinel for non-existent rows (1.4s)
+  ✓   5 tests/compatibility.spec.ts:18:7 › Backwards Compatibility Tests › Core: useTable creates table instance (1.4s)
+  ✓  10 tests/compatibility.spec.ts:157:7 › Backwards Compatibility Tests › Core: getHeaders returns array of column names (1.2s)
+  ✓   8 tests/compatibility.spec.ts:125:7 › Backwards Compatibility Tests › Core: getRow with toJSON() (1.2s)
+  ✓  11 tests/compatibility.spec.ts:173:7 › Backwards Compatibility Tests › Core: getHeaderCell returns Locator (1.2s)
+  ✓  12 tests/compatibility.spec.ts:186:7 › Backwards Compatibility Tests › Core: getColumnValues returns array of values (1.3s)
+  ✓   9 tests/compatibility.spec.ts:141:7 › Backwards Compatibility Tests › Core: SmartRow.toJSON returns row data (1.3s)
+  ✓  17 tests/compatibility.spec.ts:264:7 › Backwards Compatibility Tests › Lazy Loading: getRow works when table appears later (360ms)
+  ✓   7 tests/compatibility.spec.ts:108:7 › Backwards Compatibility Tests › Core: findRows with asJSON option (1.8s)
+  ✓  19 tests/compatibility.spec.ts:323:7 › Backwards Compatibility Tests › New API: Async methods auto-initialize (104ms)
+  ✓  18 tests/compatibility.spec.ts:302:7 › Backwards Compatibility Tests › New API: Sync methods throw error if not initialized (591ms)
+  ✓  13 tests/compatibility.spec.ts:201:7 › Backwards Compatibility Tests › Core: reset method exists and is callable (1.1s)
+  ✓  14 tests/compatibility.spec.ts:213:7 › Backwards Compatibility Tests › Core: pagination with clickNext strategy (1.1s)
+  ✓  16 tests/compatibility.spec.ts:247:7 › Backwards Compatibility Tests › Core: SmartRow extends Locator API (1.1s)
+  ✓  21 tests/compatibility.spec.ts:362:7 › Backwards Compatibility Tests › New API: init() method chaining (332ms)
+Available headers: [ [32m'Name'[39m, [32m'Email'[39m, [32m'ID'[39m ]
+  ✓  22 tests/compatibility.spec.ts:378:7 › Backwards Compatibility Tests › New API: getRow vs findRow (1.2s)
+  ✓  20 tests/compatibility.spec.ts:336:7 › Backwards Compatibility Tests › New API: init() method with timeout (2.3s)
+  ✓  23 tests/compatibility.spec.ts:406:7 › Backwards Compatibility Tests › iterateThroughTable: Basic iteration with clickNext (1.8s)
+  ✓  25 tests/compatibility.spec.ts:480:7 › Backwards Compatibility Tests › iterateThroughTable: Callback return values appended to allData (1.8s)
+  ✓  26 tests/compatibility.spec.ts:507:7 › Backwards Compatibility Tests › iterateThroughTable: getIsFirst/getIsLast functions (1.5s)
+Total rows collected: 1, Unique keys: 1
+  ✓  24 tests/compatibility.spec.ts:438:7 › Backwards Compatibility Tests › iterateThroughTable: Deduplication with infiniteScroll (3.1s)
+🔍 [19:05:00] [SmartTable] Mapping headers... 
+afterLast called at index 2, iterationCount: 3
+  ✓  28 tests/compatibility.spec.ts:589:7 › Backwards Compatibility Tests › iterateThroughTable: Restricted table context (1.5s)
+  ✓  27 tests/compatibility.spec.ts:544:7 › Backwards Compatibility Tests › iterateThroughTable: beforeFirst/afterLast hooks (1.6s)
+🔍 [19:05:01] [SmartTable] Mapping headers... 
+🔍 [19:05:01] [SmartTable] Mapping headers... 
+🔍 [19:05:01] [SmartTable] Mapped 2 columns: ["ID","Name"] 
+  ✓  29 tests/compatibility.spec.ts:621:7 › Backwards Compatibility Tests › iterateThroughTable: Pagination strategy from options (1.5s)
+  ✘  31 tests/cross-page-navigation.spec.ts:71:9 › Stateful Cross-Page Navigation & PaginationPrimitives › TableResult correctly tracks currentPageIndex during findRows and iterates (371ms)
+🔍 [19:05:01] [SmartTable] Mapping headers... 
+🔍 [19:05:01] [SmartTable] Mapped 2 columns: ["ID","Name"] 
+🔍 [19:05:01] [SmartTable] Mapped 2 columns: ["ID","Name"] 
+  ✘  32 tests/cross-page-navigation.spec.ts:93:9 › Stateful Cross-Page Navigation & PaginationPrimitives › SmartRow tracks tablePageIndex and bringIntoView loops goPrevious correctly (352ms)
+  ✘  33 tests/cross-page-navigation.spec.ts:123:9 › Stateful Cross-Page Navigation & PaginationPrimitives › bringIntoView uses goToPage for instant jumping (337ms)
+🔍 [19:05:01] [SmartTable] Mapped 2 columns: ["ID","Name"] 
+  ✓  30 tests/compatibility.spec.ts:645:7 › Backwards Compatibility Tests › iterateThroughTable: Throws error if no pagination strategy (1.2s)
+  ✘  34 tests/cross-page-navigation.spec.ts:158:9 › Stateful Cross-Page Navigation & PaginationPrimitives › bringIntoView calculates goToFirst + goNext loop if no goPrevious or goToPage (335ms)
+  ✓  35 tests/readme_verification.spec.ts:76:7 › README.md Examples Verification › getRow: Strict Retrieval & Negative Assertion (1.1s)
+  ✓  36 tests/readme_verification.spec.ts:7:7 › README.md Examples Verification › Quick Start: Standard Table (1.1s)
+{
+  Name: [32m'Airi Satou'[39m,
+  Position: [32m'Accountant'[39m,
+  Office: [32m'Tokyo'[39m,
+  Age: [32m'33'[39m,
+  [32m'Start date'[39m: [32m'2008-11-28'[39m,
+  Salary: [32m'$162,700'[39m
+}
+  ✓  37 tests/readme_verification.spec.ts:24:7 › README.md Examples Verification › SmartRow: Core Pattern (1.3s)
+  ✓  38 tests/readme_verification.spec.ts:47:7 › README.md Examples Verification › Pagination: Click Next Strategy (1.3s)
+[
+  {
+    Name: [32m'Airi Satou'[39m,
+    Position: [32m'Accountant'[39m,
+    Office: [32m'Tokyo'[39m,
+    Age: [32m'33'[39m,
+    [32m'Start date'[39m: [32m'2008-11-28'[39m,
+    Salary: [32m'$162,700'[39m
+  },
+  {
+    Name: [32m'Angelica Ramos'[39m,
+    Position: [32m'Chief Executive Officer (CEO)'[39m,
+    Office: [32m'London'[39m,
+    Age: [32m'47'[39m,
+    [32m'Start date'[39m: [32m'2009-10-09'[39m,
+    Salary: [32m'$1,200,000'[39m
+  },
+  {
+    Name: [32m'Ashton Cox'[39m,
+    Position: [32m'Junior Technical Author'[39m,
+    Office: [32m'San Francisco'[39m,
+    Age: [32m'66'[39m,
+    [32m'Start date'[39m: [32m'2009-01-12'[39m,
+    Salary: [32m'$86,000'[39m
+  },
+  {
+    Name: [32m'Bradley Greer'[39m,
+    Position: [32m'Software Engineer'[39m,
+    Office: [32m'London'[39m,
+    Age: [32m'41'[39m,
+    [32m'Start date'[39m: [32m'2012-10-13'[39m,
+    Salary: [32m'$132,000'[39m
+  },
+  {
+    Name: [32m'Brenden Wagner'[39m,
+    Position: [32m'Software Engineer'[39m,
+    Office: [32m'San Francisco'[39m,
+    Age: [32m'28'[39m,
+    [32m'Start date'[39m: [32m'2011-06-07'[39m,
+    Salary: [32m'$206,850'[39m
+  },
+  {
+    Name: [32m'Brielle Williamson'[39m,
+    Position: [32m'Integration Specialist'[39m,
+    Office: [32m'New York'[39m,
+    Age: [32m'61'[39m,
+    [32m'Start date'[39m: [32m'2012-12-02'[39m,
+    Salary: [32m'$372,000'[39m
+  },
+  {
+    Name: [32m'Bruno Nash'[39m,
+    Position: [32m'Software Engineer'[39m,
+    Office: [32m'London'[39m,
+    Age: [32m'38'[39m,
+    [32m'Start date'[39m: [32m'2011-05-03'[39m,
+    Salary: [32m'$163,500'[39m
+  },
+  {
+    Name: [32m'Caesar Vance'[39m,
+    Position: [32m'Pre-Sales Support'[39m,
+    Office: [32m'New York'[39m,
+    Age: [32m'21'[39m,
+    [32m'Start date'[39m: [32m'2011-12-12'[39m,
+    Salary: [32m'$106,450'[39m
+  },
+  {
+    Name: [32m'Cara Stevens'[39m,
+    Position: [32m'Sales Assistant'[39m,
+    Office: [32m'New York'[39m,
+    Age: [32m'46'[39m,
+    [32m'Start date'[39m: [32m'2011-12-06'[39m,
+    Salary: [32m'$145,600'[39m
+  },
+  {
+    Name: [32m'Cedric Kelly'[39m,
+    Position: [32m'Senior JavaScript Developer'[39m,
+    Office: [32m'Edinburgh'[39m,
+    Age: [32m'22'[39m,
+    [32m'Start date'[39m: [32m'2012-03-29'[39m,
+    Salary: [32m'$433,060'[39m
+  }
+]
+ℹ️ [19:05:03] [SmartTable] Initializing table 
+🔍 [19:05:03] [SmartTable] Mapping headers... 
+  ✓  39 tests/readme_verification.spec.ts:93:7 › README.md Examples Verification › getAllCurrentRows: Multiple Usage Patterns (1.9s)
+🔍 [19:05:04] [SmartTable] Mapped 6 columns: ["Name","Position","Office","Age","Start date","Salary"] 
+ℹ️ [19:05:04] [SmartTable] Table initialized with 6 columns [ [32m'Name'[39m, [32m'Position'[39m, [32m'Office'[39m, [32m'Age'[39m, [32m'Start date'[39m, [32m'Salary'[39m ]
+  ✓  42 tests/readme_verification.spec.ts:181:7 › README.md Examples Verification › Advanced: Debug Mode (1.1s)
+  ✓  40 tests/readme_verification.spec.ts:117:7 › README.md Examples Verification › headerTransformer: Renaming Empty Columns (1.8s)
+  ✓  43 tests/readme_verification.spec.ts:199:7 › README.md Examples Verification › Advanced: Reset Table State (1.5s)
+  ✓  45 tests/readme_verification.spec.ts:258:7 › README.md Examples Verification › getAllCurrentRows: Filtering with Exact Match (1.1s)
+  ✓  44 tests/readme_verification.spec.ts:236:7 › README.md Examples Verification › Advanced: Column Scanning (1.5s)
+  ✘  15 tests/compatibility.spec.ts:234:7 › Backwards Compatibility Tests › Core: headerTransformer function is applied (9.1s)
+  ✓  46 tests/readme_verification.spec.ts:274:7 › README.md Examples Verification › iterateThroughTable: Iterate through paginated data (1.7s)
+  ✓  50 tests/readme_verification.spec.ts:555:7 › README.md Examples Verification › fill: Intelligent Row Data Entry (548ms)
+  ✓  51 tests/readme_verification.spec.ts:625:7 › README.md Examples Verification › fill: With Custom Input Mappers (364ms)
+Starting data collection...
+  ✓  49 tests/readme_verification.spec.ts:376:7 › README.md Examples Verification › iterateThroughTable: Filter and Validate Across Pages (1.4s)
+  ✓  47 tests/readme_verification.spec.ts:302:7 › README.md Examples Verification › iterateThroughTable: Scrape all data with deduplication (3.1s)
+Collected 3 total items
+  ✓  48 tests/readme_verification.spec.ts:338:7 › README.md Examples Verification › iterateThroughTable: Using hooks and custom logic (3.7s)
+  ✘  41 tests/readme_verification.spec.ts:159:7 › README.md Examples Verification › headerTransformer: Normalizing Column Names (9.0s)
+  ✘  52 tests/the-internet.spec.ts:4:5 › The Internet Herokuapp - Standard Table (9.2s)
+
+
+  1) tests/compatibility.spec.ts:234:7 › Backwards Compatibility Tests › Core: headerTransformer function is applied 
+
+    Error: Initialization Error: No columns found using selector "thead th". Check your selector or ensure the table is visible.
+
+       at ../src/engine/tableMapper.ts:123
+
+      121 |         // Validation: Check for empty table
+      122 |         if (entries.length === 0) {
+    > 123 |             throw new Error(`Initialization Error: No columns found using selector "${this.config.headerSelector}". Check your selector or ensure the table is visible.`);
+          |                   ^
+      124 |         }
+      125 |
+      126 |         // Validation: Check for duplicates
+        at TableMapper.processHeaders (/Users/cedrick/Documents/projects/playwright-smart-table/src/engine/tableMapper.ts:123:19)
+        at TableMapper.getMap (/Users/cedrick/Documents/projects/playwright-smart-table/src/engine/tableMapper.ts:69:44)
+        at Object.init (/Users/cedrick/Documents/projects/playwright-smart-table/src/useTable.ts:155:19)
+        at /Users/cedrick/Documents/projects/playwright-smart-table/tests/compatibility.spec.ts:240:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/compatibility-Backwards-Co-745d2-sformer-function-is-applied/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/compatibility-Backwards-Co-745d2-sformer-function-is-applied/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/compatibility-Backwards-Co-745d2-sformer-function-is-applied/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/compatibility-Backwards-Co-745d2-sformer-function-is-applied/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/compatibility-Backwards-Co-745d2-sformer-function-is-applied/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  2) tests/cross-page-navigation.spec.ts:71:9 › Stateful Cross-Page Navigation & PaginationPrimitives › TableResult correctly tracks currentPageIndex during findRows and iterates 
+
+    Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoBe[2m([22m[32mexpected[39m[2m) // Object.is equality[22m
+
+    Expected: [32m2[39m
+    Received: [31m0[39m
+
+      85 |
+      86 |         // Since there are 3 pages (indexes 0, 1, 2)
+    > 87 |         expect(table.currentPageIndex).toBe(2);
+         |                                        ^
+      88 |
+      89 |         // Status text should read Page 3
+      90 |         await expect(page.locator('#status')).toHaveText('Page 3');
+        at /Users/cedrick/Documents/projects/playwright-smart-table/tests/cross-page-navigation.spec.ts:87:40
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/cross-page-navigation-Stat-57517-uring-findRows-and-iterates/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/cross-page-navigation-Stat-57517-uring-findRows-and-iterates/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/cross-page-navigation-Stat-57517-uring-findRows-and-iterates/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/cross-page-navigation-Stat-57517-uring-findRows-and-iterates/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/cross-page-navigation-Stat-57517-uring-findRows-and-iterates/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  3) tests/cross-page-navigation.spec.ts:93:9 › Stateful Cross-Page Navigation & PaginationPrimitives › SmartRow tracks tablePageIndex and bringIntoView loops goPrevious correctly 
+
+    Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoBe[2m([22m[32mexpected[39m[2m) // Object.is equality[22m
+
+    Expected: [32m6[39m
+    Received: [31m2[39m
+
+      105 |
+      106 |         const rows = await table.findRows({});
+    > 107 |         expect(rows.length).toBe(6);
+          |                             ^
+      108 |         expect(table.currentPageIndex).toBe(2);
+      109 |
+      110 |         // Row 1 should be on page 1 (index 0)
+        at /Users/cedrick/Documents/projects/playwright-smart-table/tests/cross-page-navigation.spec.ts:107:29
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/cross-page-navigation-Stat-44a62--loops-goPrevious-correctly/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/cross-page-navigation-Stat-44a62--loops-goPrevious-correctly/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/cross-page-navigation-Stat-44a62--loops-goPrevious-correctly/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/cross-page-navigation-Stat-44a62--loops-goPrevious-correctly/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/cross-page-navigation-Stat-44a62--loops-goPrevious-correctly/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  4) tests/cross-page-navigation.spec.ts:123:9 › Stateful Cross-Page Navigation & PaginationPrimitives › bringIntoView uses goToPage for instant jumping 
+
+    Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoBe[2m([22m[32mexpected[39m[2m) // Object.is equality[22m
+
+    Expected: [32m2[39m
+    Received: [31m0[39m
+
+      146 |
+      147 |         const rows = await table.findRows({});
+    > 148 |         expect(table.currentPageIndex).toBe(2); // Ends on page 3
+          |                                        ^
+      149 |
+      150 |         // Row on Page 2 (index 1)
+      151 |         await rows[2].bringIntoView();
+        at /Users/cedrick/Documents/projects/playwright-smart-table/tests/cross-page-navigation.spec.ts:148:40
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/cross-page-navigation-Stat-f7f05-oToPage-for-instant-jumping/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/cross-page-navigation-Stat-f7f05-oToPage-for-instant-jumping/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/cross-page-navigation-Stat-f7f05-oToPage-for-instant-jumping/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/cross-page-navigation-Stat-f7f05-oToPage-for-instant-jumping/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/cross-page-navigation-Stat-f7f05-oToPage-for-instant-jumping/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  5) tests/cross-page-navigation.spec.ts:158:9 › Stateful Cross-Page Navigation & PaginationPrimitives › bringIntoView calculates goToFirst + goNext loop if no goPrevious or goToPage 
+
+    Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoBe[2m([22m[32mexpected[39m[2m) // Object.is equality[22m
+
+    Expected: [32m2[39m
+    Received: [31m0[39m
+
+      181 |
+      182 |         const rows = await table.findRows({});
+    > 183 |         expect(table.currentPageIndex).toBe(2); // Ends on page 3
+          |                                        ^
+      184 |
+      185 |         // Row on Page 2 (index 1)
+      186 |         await rows[2].bringIntoView();
+        at /Users/cedrick/Documents/projects/playwright-smart-table/tests/cross-page-navigation.spec.ts:183:40
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/cross-page-navigation-Stat-381da-f-no-goPrevious-or-goToPage/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/cross-page-navigation-Stat-381da-f-no-goPrevious-or-goToPage/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/cross-page-navigation-Stat-381da-f-no-goPrevious-or-goToPage/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/cross-page-navigation-Stat-381da-f-no-goPrevious-or-goToPage/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/cross-page-navigation-Stat-381da-f-no-goPrevious-or-goToPage/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  6) tests/readme_verification.spec.ts:159:7 › README.md Examples Verification › headerTransformer: Normalizing Column Names 
+
+    Error: Initialization Error: No columns found using selector "thead th". Check your selector or ensure the table is visible.
+
+       at ../src/engine/tableMapper.ts:123
+
+      121 |         // Validation: Check for empty table
+      122 |         if (entries.length === 0) {
+    > 123 |             throw new Error(`Initialization Error: No columns found using selector "${this.config.headerSelector}". Check your selector or ensure the table is visible.`);
+          |                   ^
+      124 |         }
+      125 |
+      126 |         // Validation: Check for duplicates
+        at TableMapper.processHeaders (/Users/cedrick/Documents/projects/playwright-smart-table/src/engine/tableMapper.ts:123:19)
+        at TableMapper.getMap (/Users/cedrick/Documents/projects/playwright-smart-table/src/engine/tableMapper.ts:69:44)
+        at Object.init (/Users/cedrick/Documents/projects/playwright-smart-table/src/useTable.ts:155:19)
+        at /Users/cedrick/Documents/projects/playwright-smart-table/tests/readme_verification.spec.ts:172:5
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/readme_verification-README-b0394-er-Normalizing-Column-Names/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/readme_verification-README-b0394-er-Normalizing-Column-Names/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/readme_verification-README-b0394-er-Normalizing-Column-Names/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/readme_verification-README-b0394-er-Normalizing-Column-Names/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/readme_verification-README-b0394-er-Normalizing-Column-Names/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  7) tests/the-internet.spec.ts:4:5 › The Internet Herokuapp - Standard Table ──────────────────────
+
+    Error: Initialization Error: No columns found using selector "thead th". Check your selector or ensure the table is visible.
+
+       at ../src/engine/tableMapper.ts:123
+
+      121 |         // Validation: Check for empty table
+      122 |         if (entries.length === 0) {
+    > 123 |             throw new Error(`Initialization Error: No columns found using selector "${this.config.headerSelector}". Check your selector or ensure the table is visible.`);
+          |                   ^
+      124 |         }
+      125 |
+      126 |         // Validation: Check for duplicates
+        at TableMapper.processHeaders (/Users/cedrick/Documents/projects/playwright-smart-table/src/engine/tableMapper.ts:123:19)
+        at TableMapper.getMap (/Users/cedrick/Documents/projects/playwright-smart-table/src/engine/tableMapper.ts:69:44)
+        at Object.init (/Users/cedrick/Documents/projects/playwright-smart-table/src/useTable.ts:155:19)
+        at /Users/cedrick/Documents/projects/playwright-smart-table/tests/the-internet.spec.ts:8:3
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/the-internet-The-Internet-Herokuapp---Standard-Table/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/the-internet-The-Internet-Herokuapp---Standard-Table/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/the-internet-The-Internet-Herokuapp---Standard-Table/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/the-internet-The-Internet-Herokuapp---Standard-Table/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/the-internet-The-Internet-Herokuapp---Standard-Table/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+  7 failed
+    tests/compatibility.spec.ts:234:7 › Backwards Compatibility Tests › Core: headerTransformer function is applied 
+    tests/cross-page-navigation.spec.ts:71:9 › Stateful Cross-Page Navigation & PaginationPrimitives › TableResult correctly tracks currentPageIndex during findRows and iterates 
+    tests/cross-page-navigation.spec.ts:93:9 › Stateful Cross-Page Navigation & PaginationPrimitives › SmartRow tracks tablePageIndex and bringIntoView loops goPrevious correctly 
+    tests/cross-page-navigation.spec.ts:123:9 › Stateful Cross-Page Navigation & PaginationPrimitives › bringIntoView uses goToPage for instant jumping 
+    tests/cross-page-navigation.spec.ts:158:9 › Stateful Cross-Page Navigation & PaginationPrimitives › bringIntoView calculates goToFirst + goNext loop if no goPrevious or goToPage 
+    tests/readme_verification.spec.ts:159:7 › README.md Examples Verification › headerTransformer: Normalizing Column Names 
+    tests/the-internet.spec.ts:4:5 › The Internet Herokuapp - Standard Table ───────────────────────
+  45 passed (22.9s)
