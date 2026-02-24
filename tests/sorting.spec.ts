@@ -65,7 +65,7 @@ test.describe('AriaSort Strategy', () => {
     await table.sorting.apply('Name', 'asc');
 
     // After sorting by name asc, the order should be Alice, Bob, Charlie
-    const names = await table.getColumnValues('Name');
+    const names = await table.map(({ row }) => row.getCell('Name').innerText());
     expect(names).toEqual(['Alice', 'Bob', 'Charlie']);
   });
 
@@ -80,7 +80,7 @@ test.describe('AriaSort Strategy', () => {
     await table.sorting.apply('Age', 'desc');
 
     // After sorting by age desc, the order should be 35, 30, 25
-    const ages = await table.getColumnValues('Age');
+    const ages = await table.map(({ row }) => row.getCell('Age').innerText());
     expect(ages).toEqual(['35', '30', '25']);
   });
 

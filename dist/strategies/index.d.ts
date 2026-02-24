@@ -8,25 +8,23 @@ export * from './dedupe';
 export * from './loading';
 export declare const Strategies: {
     Pagination: {
-        clickNext: (nextButtonSelector: import("..").Selector, options?: {
-            stabilization?: import("./stabilization").StabilizationStrategy;
-            timeout?: number;
-        }) => import("..").PaginationStrategy;
         click: (selectors: {
             next?: import("..").Selector;
             previous?: import("..").Selector;
+            nextBulk?: import("..").Selector;
+            previousBulk?: import("..").Selector;
             first?: import("..").Selector;
         }, options?: {
             stabilization?: import("./stabilization").StabilizationStrategy;
             timeout?: number;
-        }) => import("..").PaginationStrategy;
+        }) => import("../types").PaginationStrategy;
         infiniteScroll: (options?: {
             action?: "scroll" | "js-scroll";
             scrollTarget?: import("..").Selector;
             scrollAmount?: number;
             stabilization?: import("./stabilization").StabilizationStrategy;
             timeout?: number;
-        }) => import("..").PaginationStrategy;
+        }) => import("../types").PaginationStrategy;
     };
     Sorting: {
         AriaSort: () => import("..").SortingStrategy;
@@ -35,21 +33,21 @@ export declare const Strategies: {
         default: () => Promise<void>;
     };
     Header: {
-        visible: ({ config, resolve, root }: import("..").StrategyContext) => Promise<string[]>;
+        visible: ({ config, resolve, root }: import("../types").StrategyContext) => Promise<string[]>;
     };
     Fill: {
-        default: ({ row, columnName, value, fillOptions, config, table }: Parameters<import("..").FillStrategy>[0]) => Promise<void>;
+        default: ({ row, columnName, value, fillOptions, config, table }: Parameters<import("../types").FillStrategy>[0]) => Promise<void>;
     };
     Resolution: {
         default: import("./resolution").ColumnResolutionStrategy;
     };
     Dedupe: {
-        byTopPosition: (tolerance?: number) => import("..").DedupeStrategy;
+        byTopPosition: (tolerance?: number) => import("../types").DedupeStrategy;
     };
     Loading: {
         Table: {
-            hasSpinner: (selector?: string) => ({ root }: import("..").TableContext) => Promise<boolean>;
-            custom: (fn: (context: import("..").TableContext) => Promise<boolean>) => (context: import("..").TableContext) => Promise<boolean>;
+            hasSpinner: (selector?: string) => ({ root }: import("../types").TableContext) => Promise<boolean>;
+            custom: (fn: (context: import("../types").TableContext) => Promise<boolean>) => (context: import("../types").TableContext) => Promise<boolean>;
             never: () => Promise<boolean>;
         };
         Row: {
@@ -59,7 +57,7 @@ export declare const Strategies: {
             never: () => Promise<boolean>;
         };
         Headers: {
-            stable: (duration?: number) => (context: import("..").TableContext) => Promise<boolean>;
+            stable: (duration?: number) => (context: import("../types").TableContext) => Promise<boolean>;
             never: () => Promise<boolean>;
         };
     };

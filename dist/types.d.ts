@@ -114,6 +114,8 @@ export type SmartRow<T = any> = Locator & {
 export type StrategyContext = TableContext & {
     rowLocator?: Locator;
     rowIndex?: number;
+    /** Helper to reliably get a header cell locator by name */
+    getHeaderCell?: (headerName: string) => Promise<Locator>;
 };
 /**
  * Defines the contract for a sorting strategy.
@@ -170,6 +172,10 @@ export interface PaginationPrimitives {
     goNext?: (context: TableContext) => Promise<boolean>;
     /** Classic "Previous Page" or "Scroll Up" */
     goPrevious?: (context: TableContext) => Promise<boolean>;
+    /** Bulk skip forward multiple pages at once */
+    goNextBulk?: (context: TableContext) => Promise<boolean>;
+    /** Bulk skip backward multiple pages at once */
+    goPreviousBulk?: (context: TableContext) => Promise<boolean>;
     /** Jump to first page / scroll to top */
     goToFirst?: (context: TableContext) => Promise<boolean>;
     /** Jump to specific page index (0-indexed) */
@@ -294,12 +300,6 @@ export interface TableConfig<T = any> {
     /** All interaction strategies */
     strategies?: TableStrategies;
     /**
-     * @deprecated Use `columnOverrides` instead. `dataMapper` will be removed in v7.0.0.
-     * Custom data mappers for specific columns.
-     * Allows extracting complex data types (boolean, number) instead of just string.
-     */
-    dataMapper?: Partial<Record<keyof T, (cell: Locator) => Promise<T[keyof T]> | T[keyof T]>>;
-    /**
      * Unified interface for reading and writing data to specific columns.
      * Overrides both default extraction (toJSON) and filling (smartFill) logic.
      */
@@ -327,22 +327,6 @@ export interface FillOptions {
      * Maps column names to functions that return the input locator for that cell.
      */
     inputMappers?: Record<string, (cell: Locator) => Locator>;
-}
-/**
- * Options for generateConfigPrompt
- */
-export interface PromptOptions {
-    /**
-     * Output Strategy:
-     * - 'error': Throws an error with the prompt (useful for platforms that capture error output cleanly).
-     * - 'console': Standard console logs (Default).
-     */
-    output?: 'console' | 'error';
-    /**
-     * Include TypeScript type definitions in the prompt
-     * @default true
-     */
-    includeTypes?: boolean;
 }
 /** Callback context passed to forEach, map, and filter. */
 export type RowIterationContext<T = any> = {
@@ -454,8 +438,22 @@ export interface TableResult<T = any> extends AsyncIterable<{
      * Execution is parallel within each page by default (safe for reads).
      * Call `stop()` to halt after the current page finishes.
      *
+     * > **⚠️ UI Interactions:** `map` defaults to `parallel: true`. If your callback opens popovers,
+     * > fills inputs, or otherwise mutates UI state, pass `{ parallel: false }` to avoid concurrent
+     * > interactions interfering with each other.
+     *
      * @example
+     * // Data extraction — parallel is safe
      * const emails = await table.map(({ row }) => row.getCell('Email').innerText());
+     *
+     * @example
+     * // UI interactions — must use parallel: false
+     * const assignees = await table.map(async ({ row }) => {
+     *   await row.getCell('Assignee').locator('button').click();
+     *   const name = await page.locator('.popover .name').innerText();
+     *   await page.keyboard.press('Escape');
+     *   return name;
+     * }, { parallel: false });
      */
     map<R>(callback: (ctx: RowIterationContext<T>) => R | Promise<R>, options?: RowIterationOptions): Promise<R[]>;
     /**
@@ -469,15 +467,6 @@ export interface TableResult<T = any> extends AsyncIterable<{
      * );
      */
     filter(predicate: (ctx: RowIterationContext<T>) => boolean | Promise<boolean>, options?: RowIterationOptions): Promise<SmartRowArray<T>>;
-    /**
-     * Scans a specific column across all pages and returns the values.
-     * @deprecated Use `table.map(({ row }) => row.getCell(column).innerText())` instead.
-     *             Will be removed in v7.0.0.
-     */
-    getColumnValues: <V = string>(column: string, options?: {
-        mapper?: (cell: Locator) => Promise<V> | V;
-        maxPages?: number;
-    }) => Promise<V[]>;
     /**
      * Provides access to sorting actions and assertions.
      */
@@ -496,59 +485,9 @@ export interface TableResult<T = any> extends AsyncIterable<{
         getState(columnName: string): Promise<'asc' | 'desc' | 'none'>;
     };
     /**
-     * Iterates through paginated table data, calling the callback for each iteration.
-     * Callback return values are automatically appended to allData, which is returned.
-     * @deprecated Use `forEach`, `map`, or `filter` instead for cleaner cross-page iteration.
-     *             Only use this for advanced scenarios (batchSize, beforeFirst/afterLast hooks).
-     *             Will be removed in v7.0.0.
-     */
-    iterateThroughTable: <T = any>(callback: (context: {
-        index: number;
-        isFirst: boolean;
-        isLast: boolean;
-        rows: SmartRowArray;
-        allData: T[];
-        table: RestrictedTableResult;
-        batchInfo?: {
-            startIndex: number;
-            endIndex: number;
-            size: number;
-        };
-    }) => T | T[] | Promise<T | T[]>, options?: {
-        pagination?: PaginationStrategy;
-        dedupeStrategy?: DedupeStrategy;
-        maxIterations?: number;
-        batchSize?: number;
-        getIsFirst?: (context: {
-            index: number;
-        }) => boolean;
-        getIsLast?: (context: {
-            index: number;
-            paginationResult: boolean;
-        }) => boolean;
-        beforeFirst?: (context: {
-            index: number;
-            rows: SmartRowArray;
-            allData: any[];
-        }) => void | Promise<void>;
-        afterLast?: (context: {
-            index: number;
-            rows: SmartRowArray;
-            allData: any[];
-        }) => void | Promise<void>;
-        /**
-         * If true, flattens array results from callback into the main data array.
-         * If false (default), pushes the return value as-is (preserves batching/arrays).
-         */
-        autoFlatten?: boolean;
-    }) => Promise<T[]>;
-    /**
      * Generate an AI-friendly configuration prompt for debugging.
      * Outputs table HTML and TypeScript definitions to help AI assistants generate config.
+     * Automatically throws an Error containing the prompt.
      */
-    generateConfigPrompt: (options?: PromptOptions) => Promise<void>;
+    generateConfigPrompt: () => Promise<void>;
 }
-/**
- * Restricted table result that excludes methods that shouldn't be called during iteration.
- */
-export type RestrictedTableResult<T = any> = Omit<TableResult<T>, 'searchForRow' | 'iterateThroughTable' | 'reset'>;

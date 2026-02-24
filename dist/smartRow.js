@@ -122,16 +122,16 @@ const createSmartRow = (rowLocator, map, rowIndex, config, rootLocator, resolve,
         return resolve(config.cellSelector, rowLocator).nth(idx);
     };
     smart.toJSON = (options) => __awaiter(void 0, void 0, void 0, function* () {
-        var _a, _b;
+        var _a;
         const result = {};
         const page = rootLocator.page();
         for (const [col, idx] of map.entries()) {
             if ((options === null || options === void 0 ? void 0 : options.columns) && !options.columns.includes(col)) {
                 continue;
             }
-            // Check if we have a column override or data mapper for this column
+            // Check if we have a column override for this column
             const columnOverride = (_a = config.columnOverrides) === null || _a === void 0 ? void 0 : _a[col];
-            const mapper = (columnOverride === null || columnOverride === void 0 ? void 0 : columnOverride.read) || ((_b = config.dataMapper) === null || _b === void 0 ? void 0 : _b[col]);
+            const mapper = columnOverride === null || columnOverride === void 0 ? void 0 : columnOverride.read;
             if (mapper) {
                 // Use custom mapper
                 // Ensure we have the cell first (same navigation logic)

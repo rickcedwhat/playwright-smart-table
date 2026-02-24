@@ -1,5 +1,5 @@
 import type { Locator, Page } from '@playwright/test';
-import { TableConfig, TableContext, Selector, TableResult, SmartRow as SmartRowType, PromptOptions, FinalTableConfig, DedupeStrategy, RestrictedTableResult, PaginationStrategy, StrategyContext, TableStrategies as ITableStrategies, FilterValue } from './types';
+import { TableConfig, TableContext, Selector, TableResult, SmartRow as SmartRowType, FinalTableConfig, DedupeStrategy, PaginationStrategy, StrategyContext, TableStrategies as ITableStrategies, FilterValue } from './types';
 import { TYPE_CONTEXT } from './typeContext';
 import { MINIMAL_CONFIG_CONTEXT } from './minimalConfigContext';
 import { SortingStrategies as ImportedSortingStrategies } from './strategies/sorting';
@@ -126,17 +126,12 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     });
   };
 
-  const _handlePrompt = async (promptName: string, content: string, options: PromptOptions = {}) => {
-    const { output = 'console', includeTypes = true } = options;
+  const _handlePrompt = async (promptName: string, content: string) => {
     let finalPrompt = content;
-    if (includeTypes) {
-      finalPrompt += `\n\n👇 Useful TypeScript Definitions 👇\n\`\`\`typescript\n${MINIMAL_CONFIG_CONTEXT}\n\`\`\`\n`;
-    }
-    if (output === 'error') {
-      console.log(`⚠️ Throwing error to display [${promptName}] cleanly...`);
-      throw new Error(finalPrompt);
-    }
-    console.log(finalPrompt);
+    finalPrompt += `\n\n👇 Useful TypeScript Definitions 👇\n\`\`\`typescript\n${MINIMAL_CONFIG_CONTEXT}\n\`\`\`\n`;
+
+    console.log(`⚠️ Throwing error to display [${promptName}] cleanly...`);
+    throw new Error(finalPrompt);
   };
 
   const _ensureInitialized = async () => {
@@ -185,7 +180,16 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       log("Resetting table...");
       const context: TableContext = { root: rootLocator, config, page: rootLocator.page(), resolve };
       await config.onReset(context);
+
+      if (typeof config.strategies.pagination !== 'function' && config.strategies.pagination?.goToFirst) {
+        log("Auto-navigating to first page...");
+        await config.strategies.pagination.goToFirst(context);
+      } else if (hasPaginationInConfig) {
+        log("No goToFirst strategy configured. Table may not be on page 1.");
+      }
+
       _hasPaginated = false;
+      tableState.currentPageIndex = 0;
       tableMapper.clear();
       log("Table reset complete.");
     },
@@ -196,50 +200,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       log("Table revalidated.");
     },
 
-    getColumnValues: async <V = string>(column: string, options?: { mapper?: (cell: Locator) => Promise<V> | V, maxPages?: number }) => {
-      const map = await tableMapper.getMap();
-      const colIdx = map.get(column);
-      if (colIdx === undefined) throw _createColumnError(column, map);
 
-      const mapper = options?.mapper ?? ((c: Locator) => c.innerText() as any as V);
-      const effectiveMaxPages = options?.maxPages ?? config.maxPages;
-      let pagesScanned = 1;
-      const results: V[] = [];
-      log(`Getting column values for '${column}' (Pages: ${effectiveMaxPages})`);
-
-      while (true) {
-        const rows = await resolve(config.rowSelector, rootLocator).all();
-        for (const row of rows) {
-          const cell = typeof config.cellSelector === 'string'
-            ? row.locator(config.cellSelector).nth(colIdx)
-            : resolve(config.cellSelector, row).nth(colIdx);
-          results.push(await mapper(cell));
-        }
-        if (pagesScanned < effectiveMaxPages) {
-          const context: TableContext = { root: rootLocator, config, page: rootLocator.page(), resolve };
-
-          let pageRes: boolean | import('./types').PaginationPrimitives;
-          if (typeof config.strategies.pagination === 'function') {
-            pageRes = await config.strategies.pagination(context);
-          } else {
-            if (!config.strategies.pagination!.goNext) {
-              log('Cannot paginate: no goNext primitive found.');
-              break;
-            }
-            pageRes = await config.strategies.pagination!.goNext(context);
-          }
-
-          if (await validatePaginationResult(pageRes, 'Pagination Strategy')) {
-            _hasPaginated = true;
-            tableState.currentPageIndex++;
-            pagesScanned++;
-            continue;
-          }
-        }
-        break;
-      }
-      return results;
-    },
 
     getRow: (filters: Partial<T> | Record<string, FilterValue>, options: { exact?: boolean } = { exact: false }): SmartRowType<T> => {
       const map = tableMapper.getMapSync();
@@ -279,13 +240,36 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
         await _ensureInitialized();
         if (!config.strategies.sorting) throw new Error('No sorting strategy has been configured.');
         log(`Applying sort for column "${columnName}" (${direction})`);
-        const context: StrategyContext = { root: rootLocator, config, page: rootLocator.page(), resolve };
-        await config.strategies.sorting.doSort({ columnName, direction, context });
+        const context: StrategyContext = { root: rootLocator, config, page: rootLocator.page(), resolve, getHeaderCell: result.getHeaderCell };
+
+        const maxRetries = 3;
+        for (let i = 0; i < maxRetries; i++) {
+          const currentState = await config.strategies.sorting.getSortState({ columnName, context });
+          if (currentState === direction) {
+            log(`Sort for "${columnName}" is already "${direction}".`);
+            return;
+          }
+          await config.strategies.sorting.doSort({ columnName, direction, context });
+
+          if (config.strategies.loading?.isTableLoading) {
+            await config.strategies.loading.isTableLoading(context);
+          } else {
+            await rootLocator.page().waitForTimeout(200);
+          }
+          await debugDelay(config, 'default');
+
+          const newState = await config.strategies.sorting.getSortState({ columnName, context });
+          if (newState === direction) {
+            log(`Successfully sorted "${columnName}" to "${direction}".`);
+            return;
+          }
+        }
+        throw new Error(`Failed to sort column "${columnName}" to "${direction}" after ${maxRetries} attempts.`);
       },
       getState: async (columnName: string): Promise<'asc' | 'desc' | 'none'> => {
         await _ensureInitialized();
         if (!config.strategies.sorting) throw new Error('No sorting strategy has been configured.');
-        const context: StrategyContext = { root: rootLocator, config, page: rootLocator.page(), resolve };
+        const context: StrategyContext = { root: rootLocator, config, page: rootLocator.page(), resolve, getHeaderCell: result.getHeaderCell };
         return config.strategies.sorting.getSortState({ columnName, context });
       }
     },
@@ -328,7 +312,8 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       await _ensureInitialized();
       const map = tableMapper.getMapSync()!;
       const effectiveMaxPages = options.maxPages ?? config.maxPages;
-      const dedupeKeys = options.dedupe ? new Set<string | number>() : null;
+      const dedupeStrategy = options.dedupe ?? config.strategies.dedupe;
+      const dedupeKeys = dedupeStrategy ? new Set<string | number>() : null;
       const parallel = options.parallel ?? false;
 
       let rowIndex = 0;
@@ -344,7 +329,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
           await Promise.all(smartRows.map(async (row) => {
             if (stopped) return;
             if (dedupeKeys) {
-              const key = await options.dedupe!(row);
+              const key = await dedupeStrategy!(row);
               if (dedupeKeys.has(key)) return;
               dedupeKeys.add(key);
             }
@@ -354,7 +339,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
           for (const row of smartRows) {
             if (stopped) break;
             if (dedupeKeys) {
-              const key = await options.dedupe!(row);
+              const key = await dedupeStrategy!(row);
               if (dedupeKeys.has(key)) continue;
               dedupeKeys.add(key);
             }
@@ -383,7 +368,8 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       await _ensureInitialized();
       const map = tableMapper.getMapSync()!;
       const effectiveMaxPages = options.maxPages ?? config.maxPages;
-      const dedupeKeys = options.dedupe ? new Set<string | number>() : null;
+      const dedupeStrategy = options.dedupe ?? config.strategies.dedupe;
+      const dedupeKeys = dedupeStrategy ? new Set<string | number>() : null;
       const parallel = options.parallel ?? true;
 
       const results: R[] = [];
@@ -400,7 +386,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
           const SKIP = Symbol('skip');
           const pageResults = await Promise.all(smartRows.map(async (row) => {
             if (dedupeKeys) {
-              const key = await options.dedupe!(row);
+              const key = await dedupeStrategy!(row);
               if (dedupeKeys.has(key)) return SKIP;
               dedupeKeys.add(key);
             }
@@ -413,7 +399,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
           for (const row of smartRows) {
             if (stopped) break;
             if (dedupeKeys) {
-              const key = await options.dedupe!(row);
+              const key = await dedupeStrategy!(row);
               if (dedupeKeys.has(key)) continue;
               dedupeKeys.add(key);
             }
@@ -444,7 +430,8 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       await _ensureInitialized();
       const map = tableMapper.getMapSync()!;
       const effectiveMaxPages = options.maxPages ?? config.maxPages;
-      const dedupeKeys = options.dedupe ? new Set<string | number>() : null;
+      const dedupeStrategy = options.dedupe ?? config.strategies.dedupe;
+      const dedupeKeys = dedupeStrategy ? new Set<string | number>() : null;
       const parallel = options.parallel ?? false;
 
       const matched: SmartRowType<T>[] = [];
@@ -460,7 +447,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
         if (parallel) {
           const flags = await Promise.all(smartRows.map(async (row) => {
             if (dedupeKeys) {
-              const key = await options.dedupe!(row);
+              const key = await dedupeStrategy!(row);
               if (dedupeKeys.has(key)) return false;
               dedupeKeys.add(key);
             }
@@ -500,259 +487,13 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       return createSmartRowArray<T>(matched);
     },
 
-    iterateThroughTable: async <T = any>(
-      callback: (context: {
-        index: number;
-        isFirst: boolean;
-        isLast: boolean;
-        rows: SmartRowArray;
-        allData: T[];
-        table: RestrictedTableResult;
-        batchInfo?: {
-          startIndex: number;
-          endIndex: number;
-          size: number;
-        };
-      }) => T | T[] | Promise<T | T[]>,
-      options?: {
-        pagination?: PaginationStrategy;
-        dedupeStrategy?: DedupeStrategy;
-        maxIterations?: number;
-        batchSize?: number;
-        getIsFirst?: (context: { index: number }) => boolean;
-        getIsLast?: (context: { index: number, paginationResult: boolean }) => boolean;
-        beforeFirst?: (context: { index: number, rows: SmartRowArray, allData: any[] }) => void | Promise<void>;
-        afterLast?: (context: { index: number, rows: SmartRowArray, allData: any[] }) => void | Promise<void>;
-        /**
-       * If true, flattens array results from callback into the main data array.
-       * If false (default), pushes the return value as-is (preserves batching/arrays).
-       */
-        autoFlatten?: boolean;
-      }
-    ): Promise<T[]> => {
-      await _ensureInitialized();
-      const paginationStrategy = options?.pagination ?? config.strategies.pagination!;
-      const hasPaginationInOptions = options?.pagination !== undefined;
-      if (!hasPaginationInOptions && !hasPaginationInConfig) throw new Error('No pagination strategy provided.');
 
-      await result.reset();
-      await result.init();
 
-      const map = tableMapper.getMapSync()!;
-
-      const restrictedTable: RestrictedTableResult = {
-        get currentPageIndex() { return tableState.currentPageIndex; },
-        init: result.init,
-        getHeaders: result.getHeaders,
-        getHeaderCell: result.getHeaderCell,
-        getRow: result.getRow,
-        getRowByIndex: result.getRowByIndex,
-        findRow: result.findRow,
-        findRows: result.findRows,
-        getColumnValues: result.getColumnValues,
-        isInitialized: result.isInitialized,
-        sorting: result.sorting,
-        scrollToColumn: result.scrollToColumn,
-        revalidate: result.revalidate,
-        generateConfigPrompt: result.generateConfigPrompt,
-        forEach: result.forEach,
-        map: result.map,
-        filter: result.filter,
-        [Symbol.asyncIterator]: result[Symbol.asyncIterator].bind(result),
-      };
-
-      const getIsFirst = options?.getIsFirst ?? (({ index }) => index === 0);
-      const getIsLast = options?.getIsLast ?? (() => false);
-      const allData: T[] = [];
-      const effectiveMaxIterations = options?.maxIterations ?? config.maxPages;
-      const batchSize = options?.batchSize;
-      const isBatching = batchSize !== undefined && batchSize > 1;
-      const autoFlatten = options?.autoFlatten ?? false;
-
-      let index = 0;
-      let paginationResult = true;
-      let seenKeys: Set<string | number> | null = null;
-      let batchRows: SmartRowType[] = [];
-      let batchStartIndex = 0;
-
-      log(`Starting iterateThroughTable (maxIterations: ${effectiveMaxIterations}, batchSize: ${batchSize ?? 'none'})`);
-
-      while (index < effectiveMaxIterations) {
-        const rowLocators = await resolve(config.rowSelector, rootLocator).all();
-        const smartRowsArray: SmartRowType[] = [];
-        const isRowLoading = config.strategies.loading?.isRowLoading;
-
-        for (let i = 0; i < rowLocators.length; i++) {
-          const smartRow = _makeSmart(rowLocators[i], map, i);
-          if (isRowLoading && await isRowLoading(smartRow)) continue;
-          smartRowsArray.push(smartRow);
-        }
-        let rows = createSmartRowArray(smartRowsArray);
-
-        const dedupeStrategy = options?.dedupeStrategy ?? config.strategies.dedupe;
-        if (dedupeStrategy && rows.length > 0) {
-          if (!seenKeys) seenKeys = new Set<string | number>();
-          const deduplicated: SmartRowType[] = [];
-          for (const row of rows) {
-            const key = await dedupeStrategy(row);
-
-            if (!seenKeys.has(key)) {
-              seenKeys.add(key);
-              deduplicated.push(row);
-            }
-          }
-          rows = createSmartRowArray(deduplicated);
-          log(`Deduplicated ${rowLocators.length} rows to ${rows.length} unique rows (total seen: ${seenKeys.size})`);
-        }
-
-        // Add rows to batch if batching is enabled
-        if (isBatching) {
-          batchRows.push(...rows);
-        }
-
-        const isLastIteration = index === effectiveMaxIterations - 1;
-
-        // Determine if we should invoke the callback
-        const batchComplete = isBatching && (index - batchStartIndex + 1) >= batchSize!;
-        const shouldInvokeCallback = !isBatching || batchComplete || isLastIteration;
-
-        if (shouldInvokeCallback) {
-          const callbackRows = isBatching ? batchRows : rows;
-          const callbackIndex = isBatching ? batchStartIndex : index;
-          const isFirst = getIsFirst({ index: callbackIndex });
-          let isLast = getIsLast({ index: callbackIndex, paginationResult });
-          const isLastDueToMax = index === effectiveMaxIterations - 1;
-
-          if (isFirst && options?.beforeFirst) {
-            await options.beforeFirst({ index: callbackIndex, rows: createSmartRowArray(callbackRows), allData });
-          }
-
-          const batchInfo = isBatching ? {
-            startIndex: batchStartIndex,
-            endIndex: index,
-            size: index - batchStartIndex + 1
-          } : undefined;
-
-          const returnValue = await callback({
-            index: callbackIndex,
-            isFirst,
-            isLast,
-            rows: createSmartRowArray(callbackRows),
-            allData,
-            table: restrictedTable,
-            batchInfo
-          });
-
-          if (autoFlatten && Array.isArray(returnValue)) {
-            allData.push(...returnValue);
-          } else {
-            allData.push(returnValue as T);
-          }
-
-          // Determine if this is truly the last iteration
-          let finalIsLast = isLastDueToMax;
-          if (!isLastIteration) {
-            const context: TableContext = { root: rootLocator, config, page: rootLocator.page(), resolve };
-            if (typeof paginationStrategy === 'function') {
-              paginationResult = await paginationStrategy(context);
-            } else {
-              const pageObj = paginationStrategy as import('./types').PaginationPrimitives;
-              if (!pageObj.goNext) break;
-              paginationResult = await pageObj.goNext(context);
-            }
-            logDebug(config, 'info', `Pagination ${paginationResult ? 'succeeded' : 'failed'}`);
-            await debugDelay(config, 'pagination');
-            finalIsLast = getIsLast({ index: callbackIndex, paginationResult }) || !paginationResult;
-            if (paginationResult) tableState.currentPageIndex++;
-          }
-
-          if (finalIsLast && options?.afterLast) {
-            await options.afterLast({ index: callbackIndex, rows: createSmartRowArray(callbackRows), allData });
-          }
-
-          if (finalIsLast || !paginationResult) {
-            log(`Reached last iteration (index: ${index}, paginationResult: ${paginationResult})`);
-            break;
-          }
-
-          // Reset batch
-          if (isBatching) {
-            batchRows = [];
-            batchStartIndex = index + 1;
-          }
-        } else {
-          // Continue paginating even when batching
-          const context: TableContext = { root: rootLocator, config, page: rootLocator.page(), resolve };
-
-          if (typeof paginationStrategy === 'function') {
-            paginationResult = await paginationStrategy(context);
-          } else {
-            const pageObj = paginationStrategy as import('./types').PaginationPrimitives;
-            if (!pageObj.goNext) {
-              log(`Cannot paginate: no goNext primitive found.`);
-              break;
-            }
-            paginationResult = await pageObj.goNext(context);
-          }
-
-          logDebug(config, 'info', `Pagination ${paginationResult ? 'succeeded' : 'failed'} (batching mode)`);
-          await debugDelay(config, 'pagination');
-
-          if (paginationResult) tableState.currentPageIndex++;
-
-          if (!paginationResult) {
-            // Pagination failed, invoke callback with current batch
-            const callbackIndex = batchStartIndex;
-            const isFirst = getIsFirst({ index: callbackIndex });
-            const isLast = true;
-
-            if (isFirst && options?.beforeFirst) {
-              await options.beforeFirst({ index: callbackIndex, rows: createSmartRowArray(batchRows), allData });
-            }
-
-            const batchInfo = {
-              startIndex: batchStartIndex,
-              endIndex: index,
-              size: index - batchStartIndex + 1
-            };
-
-            const returnValue = await callback({
-              index: callbackIndex,
-              isFirst,
-              isLast,
-              rows: createSmartRowArray(batchRows),
-              allData,
-              table: restrictedTable,
-              batchInfo
-            });
-            if (autoFlatten && Array.isArray(returnValue)) {
-              allData.push(...returnValue);
-            } else {
-              allData.push(returnValue as T);
-            }
-
-            if (options?.afterLast) {
-              await options.afterLast({ index: callbackIndex, rows: createSmartRowArray(batchRows), allData });
-            }
-
-            log(`Pagination failed mid-batch (index: ${index})`);
-            break;
-          }
-        }
-
-        index++;
-        log(`Iteration ${index} completed, continuing...`);
-      }
-      log(`iterateThroughTable completed after ${index + 1
-        } iterations, collected ${allData.length} items`);
-      return allData;
-    },
-
-    generateConfigPrompt: async (options?: PromptOptions) => {
+    generateConfigPrompt: async () => {
       const html = await _getCleanHtml(rootLocator);
       const separator = "=".repeat(50);
       const content = `\n${separator} \n🤖 COPY INTO GEMINI / ChatGPT 🤖\n${separator} \nI am using 'playwright-smart-table'.\nTarget Table Locator: ${rootLocator.toString()} \nGenerate config for: \n\`\`\`html\n${html.substring(0, 10000)} ...\n\`\`\`\n${separator}\n`;
-      await _handlePrompt('Smart Table Config', content, options);
+      await _handlePrompt('Smart Table Config', content);
     },
   };
 

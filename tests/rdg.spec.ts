@@ -70,23 +70,19 @@ test.describe('React Data Grid (RDG)', () => {
             rowSelector: '[role="row"].rdg-row',
             cellSelector: '[role="gridcell"]',
             headerSelector: '[role="columnheader"]',
-            strategies: Plugins.RDG.Strategies,
+            strategies: {
+                ...Plugins.RDG.Strategies,
+                dedupe: async (row) => row.getCell('ID').innerText()
+            },
             maxPages: 3  // Reduced to avoid virtualization issues
         });
 
         await table.init();
 
-        const allData = await table.iterateThroughTable(
-            async ({ rows, index }) => {
-                console.log(`Page ${index + 1}: ${rows.length} rows`);
-                // Only read first 10 rows per page to stay within viewport
-                const rowsToRead = rows.slice(0, Math.min(10, rows.length));
-                return Promise.all(rowsToRead.map(r => r.toJSON({ columns: ['ID', 'Task', 'Client'] })));
-            },
-            { maxIterations: 3 }
+        const flatData = await table.map(
+            ({ row }) => row.toJSON({ columns: ['ID', 'Task', 'Client'] }),
+            { maxPages: 3 }
         );
-
-        const flatData = allData.flat();
         console.log(`Total rows collected: ${flatData.length}`);
 
         // Filter out the sticky summary row ("Total")
