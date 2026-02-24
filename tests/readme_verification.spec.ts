@@ -255,10 +255,9 @@ test.describe('README.md Examples Verification', () => {
     });
     await table.init();
 
-    // #region advanced-column-scan
     // Example from: https://datatables.net/examples/data_sources/dom
     // Quickly grab all text values from the "Office" column
-    const offices = await table.getColumnValues('Office');
+    const offices = await table.map(({ row }) => row.getCell('Office').innerText());
     expect(offices).toContain('Tokyo');
     expect(offices.length).toBeGreaterThan(0);
     // #endregion advanced-column-scan
@@ -280,7 +279,7 @@ test.describe('README.md Examples Verification', () => {
     // #endregion get-all-rows-exact
   });
 
-  test('iterateThroughTable: Iterate through paginated data', async ({ page }) => {
+  test('table.map: Iterate through paginated data', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
     await page.waitForSelector('#example_wrapper');
 
@@ -297,92 +296,40 @@ test.describe('README.md Examples Verification', () => {
 
     // #region iterate-through-table
     // Iterate through all pages and collect data
-    const allNames = await table.iterateThroughTable(async ({ rows, index }) => {
-      // Return names from this iteration - automatically appended to allData
-      return await Promise.all(rows.map(r => r.getCell('Name').innerText()));
-    });
+    const allNames = await table.map(({ row }) => row.getCell('Name').innerText());
 
     // allNames contains all names from all iterations
-    // Verify sorting across allNames
-    expect(allNames.flat().length).toBeGreaterThan(10);
+    // Verify we collected names from multiple pages
+    expect(allNames.length).toBeGreaterThan(10);
     // #endregion iterate-through-table
   });
 
-  test('iterateThroughTable: Scrape all data with deduplication', async ({ page }) => {
+  test('table.map: Scrape all data with deduplication', async ({ page }) => {
     await page.goto('https://htmx.org/examples/infinite-scroll/');
 
+    // #region iterate-through-table-dedupe
     const table = useTable(page.locator('table'), {
       rowSelector: 'tbody tr',
       headerSelector: 'thead th',
       cellSelector: 'td',
       strategies: {
-        pagination: Strategies.Pagination.infiniteScroll()
+        pagination: Strategies.Pagination.infiniteScroll(),
+        dedupe: (row) => row.getCell('ID').innerText()
       },
       maxPages: 3
     });
     await table.init();
 
-    // Get headers to find a suitable column for deduplication
-    const headers = await table.getHeaders();
-    const dedupeColumn = headers[0];
-
-    // #region iterate-through-table-dedupe
     // Scrape all data with deduplication (useful for infinite scroll)
-    const allData = await table.iterateThroughTable(
-      async ({ rows }) => {
-        // Return row data - automatically appended to allData
-        return await Promise.all(rows.map(r => r.toJSON()));
-      },
-      {
-        dedupeStrategy: (row) => row.getCell(dedupeColumn).innerText(),
-        getIsLast: ({ paginationResult }) => !paginationResult
-      }
-    );
+    const allData = await table.map(({ row }) => row.toJSON());
 
     // allData contains all row data from all iterations (deduplicated at row level)
-    expect(allData.flat().length).toBeGreaterThan(0);
+    expect(allData.length).toBeGreaterThan(0);
     // #endregion iterate-through-table-dedupe
   });
 
-  test('iterateThroughTable: Using hooks and custom logic', async ({ page }) => {
-    await page.goto('https://datatables.net/examples/data_sources/dom');
-    await page.waitForSelector('#example_wrapper');
 
-    const table = useTable(page.locator('#example'), {
-      headerSelector: 'thead th',
-      strategies: {
-        pagination: Strategies.Pagination.click({
-          next: () => page.getByRole('link', { name: 'Next' })
-        })
-      },
-      maxPages: 3
-    });
-    await table.init();
-
-    // #region iterate-through-table-hooks
-    const allData = await table.iterateThroughTable(
-      async ({ rows, index, isFirst, isLast }) => {
-        // Normal logic for each iteration - return value appended to allData
-        return await Promise.all(rows.map(r => r.toJSON()));
-      },
-      {
-        getIsLast: ({ paginationResult }) => !paginationResult,
-        beforeFirst: async ({ allData }) => {
-          console.log('Starting data collection...');
-          // Could perform setup actions
-        },
-        afterLast: async ({ allData }) => {
-          console.log(`Collected ${allData.length} total items`);
-          // Could perform cleanup or final actions
-        }
-      }
-    );
-    // #endregion iterate-through-table-hooks
-
-    expect(allData.length).toBeGreaterThan(0);
-  });
-
-  test('iterateThroughTable: Filter and Validate Across Pages', async ({ page }) => {
+  test('table.forEach: Filter and Validate Across Pages', async ({ page }) => {
     // Create a self-contained paginated table with search functionality
     await page.setContent(`
       <!DOCTYPE html>
@@ -539,22 +486,10 @@ test.describe('README.md Examples Verification', () => {
     const searchTerm = 'Audi';
     let totalValidated = 0;
 
-    const validationCounts = await table.iterateThroughTable(
-      async ({ rows }) => {
-        let pageCount = 0;
-        for (const row of rows) {
-          // Assert that all rows have the expected Make value
-          await expect(row.getCell('Make')).toHaveText(searchTerm);
-          pageCount++;
-        }
-        return pageCount;
-      },
-      {
-        getIsLast: ({ paginationResult }) => !paginationResult
-      }
-    );
-
-    totalValidated = validationCounts.reduce((a, b) => a + b, 0);
+    await table.forEach(async ({ row }) => {
+      await expect(row.getCell('Make')).toHaveText(searchTerm);
+      totalValidated++;
+    });
 
     // Assert we validated all filtered results (7 Audi vehicles)
     expect(totalValidated).toBe(7);

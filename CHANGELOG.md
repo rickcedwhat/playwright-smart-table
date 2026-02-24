@@ -1,5 +1,24 @@
 # Changelog
 
+## [6.7.0] - 2026-02-23
+
+### Breaking Changes ⚠️
+- **Removed deprecated `iterateThroughTable` method**. `table.map()`, `table.filter()`, or `table.forEach()` are drop-in replacements.
+- **Removed deprecated `getColumnValues` method**. Use `table.map(({ row }) => row.getCell(columnName).innerText())`.
+- **Removed deprecated `dataMapper` table configuration**. Read and write operations now use `columnOverrides`.
+- **Removed deprecated `clickNext` pagination strategy**. Pass a `next:` selector to `Strategies.Pagination.click()` instead.
+
+### Added
+- **`goNextBulk` & `goPreviousBulk` Pagination Primitives**: Define bulk skip navigation in your custom strategies when dealing with large pagination sets. Built-in `click` strategy supports `nextBulk` and `previousBulk` selectors natively.
+- **`getHeaderCell` exposed on `StrategyContext`**: Strategies now have native access to column header locators.
+- **`reset()` auto-navigates to the first page**: Calling `table.reset()` now implicitly calls `goToFirst()` immediately following `onReset()`.
+
+### Changed
+- **Sorting Execution Flow Simplified**: Sorting logic is now exclusively managed centrally by the Smart Table engine. It handles verification retries and loading states behind the scenes. Custom strategies should now only issue the interaction *(e.g. 'click')* without awaiting state resolution.
+
+### Fixed
+- Iterators (`map`, `forEach`, `filter`) now correctly default to the global `config.strategies.dedupe()` when skipping options.
+
 ## [6.6.0] - 2026-02-23
 
 ### Added

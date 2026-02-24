@@ -162,9 +162,9 @@ export const createSmartRow = <T = any>(
                 continue;
             }
 
-            // Check if we have a column override or data mapper for this column
+            // Check if we have a column override for this column
             const columnOverride = config.columnOverrides?.[col as keyof T];
-            const mapper = columnOverride?.read || config.dataMapper?.[col as keyof T];
+            const mapper = columnOverride?.read;
 
             if (mapper) {
                 // Use custom mapper

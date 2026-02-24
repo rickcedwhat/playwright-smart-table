@@ -12,50 +12,25 @@ export const SortingStrategies = {
   AriaSort: (): SortingStrategy => {
     return {
       async doSort({ columnName, direction, context }) {
-        const { resolve, config, root } = context;
-        const headerLoc = resolve(config.headerSelector as Selector, root);
-
-        const headers = await headerLoc.all();
-        const headerTexts = await Promise.all(headers.map(h => h.innerText()));
-
-        const columnIndex = headerTexts.findIndex(text => text.trim() === columnName);
-        if (columnIndex === -1) {
-          throw new Error(`[AriaSort] Header with text "${columnName}" not found.`);
-        }
-
-        const targetHeader = headers[columnIndex];
-
-        // Click repeatedly to cycle through sort states
-        for (let i = 0; i < 3; i++) { // Max 3 clicks to prevent infinite loops (none -> asc -> desc)
-          const currentState = await targetHeader.getAttribute('aria-sort');
-          const mappedState = currentState === 'ascending' ? 'asc' : currentState === 'descending' ? 'desc' : 'none';
-
-          if (mappedState === direction) {
-            return; // Desired state achieved
-          }
-          await targetHeader.click();
-        }
-
-        throw new Error(`[AriaSort] Could not achieve sort direction "${direction}" for column "${columnName}" after 3 clicks.`);
+        const { getHeaderCell } = context;
+        if (!getHeaderCell) throw new Error('getHeaderCell is required in StrategyContext for sorting.');
+        // The table engine handles verify-and-retry. We only provide the trigger here.
+        const targetHeader = await getHeaderCell(columnName);
+        await targetHeader.click();
       },
       async getSortState({ columnName, context }) {
-        const { resolve, config, root } = context;
-        const headerLoc = resolve(config.headerSelector as Selector, root);
+        const { getHeaderCell } = context;
+        try {
+          if (!getHeaderCell) throw new Error('getHeaderCell is required');
+          const targetHeader = await getHeaderCell(columnName);
+          const ariaSort = await targetHeader.getAttribute('aria-sort');
 
-        const headers = await headerLoc.all();
-        const headerTexts = await Promise.all(headers.map(h => h.innerText()));
-
-        const columnIndex = headerTexts.findIndex(text => text.trim() === columnName);
-        if (columnIndex === -1) {
+          if (ariaSort === 'ascending') return 'asc';
+          if (ariaSort === 'descending') return 'desc';
+          return 'none';
+        } catch {
           return 'none'; // Header not found, so it's not sorted
         }
-
-        const targetHeader = headers[columnIndex];
-        const ariaSort = await targetHeader.getAttribute('aria-sort');
-
-        if (ariaSort === 'ascending') return 'asc';
-        if (ariaSort === 'descending') return 'desc';
-        return 'none';
       },
     };
   },

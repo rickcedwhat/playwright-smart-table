@@ -72,16 +72,11 @@ test.describe('Live Glide Data Grid', () => {
         });
         await table.init();
 
-        // Collect data using iterateThroughTable
-        const allData = await table.iterateThroughTable(
-            async ({ rows }) => {
-                return Promise.all(rows.map(r => r.toJSON({ columns: ['First name', 'Last name', 'Title', 'Email'] })));
-            },
-            { maxIterations: 3, autoFlatten: true }
+        // Collect data using map
+        const flattenedData = await table.map(
+            ({ row }) => row.toJSON({ columns: ['First name', 'Last name', 'Title', 'Email'] }),
+            { maxPages: 3 }
         );
-
-        // const flattenedData = allData.flat(); // No longer needed with autoFlatten: true
-        const flattenedData = allData;
 
         console.log(`Collected ${flattenedData.length} total rows after scroll`);
         expect(flattenedData.length).toBeGreaterThan(12);
@@ -119,16 +114,11 @@ test.describe('Live Glide Data Grid', () => {
 
         const columns = ["First name", "Title", "Column 59"];
 
-        // Collect data using iterateThroughTable
-        const allData = await table.iterateThroughTable(
-            async ({ rows }) => {
-                return Promise.all(rows.map(r => r.toJSON({ columns })));
-            },
-            { maxIterations: 3, autoFlatten: true }
+        // Collect data using map
+        const flattenedData = await table.map(
+            ({ row }) => row.toJSON({ columns: ['First name', 'Title', 'Column 59'] }),
+            { maxPages: 3 }
         );
-
-        // const flattenedData = allData.flat(); // No longer needed
-        const flattenedData = allData;
 
         console.log(`Collected ${flattenedData.length} total rows after scroll`);
         expect(flattenedData.length).toBeGreaterThan(12);

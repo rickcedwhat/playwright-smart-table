@@ -180,34 +180,19 @@ test.describe('Playground: Virtualized Table', () => {
                     scrollAmount: 300,
                     action: 'js-scroll',
                     stabilization: StabilizationStrategies.contentChanged({ timeout: 1000 })
-                })
+                }),
+                dedupe: async (row) => {
+                    const data = await row.toJSON();
+                    return data.ID;
+                }
             }
         });
 
         // 2. Iterate and collect all data
-        const results = await table.iterateThroughTable(
-            async ({ rows }) => {
-                return await rows.toJSON();
-            },
-            {
-                maxIterations: 30,
-                dedupeStrategy: async (row) => {
-                    // Use ID or unique content as key
-                    const data = await row.toJSON();
-                    return data.ID;
-                },
-                autoFlatten: true
-            }
+        const results = await table.map(
+            ({ row }) => row.toJSON(),
+            { maxPages: 30 }
         );
-
-        // Flatten if needed (iterateThroughTable returns T[])
-        // But our callback returns Promise<any[]> (toJSON returns object array?)
-        // Wait, rows.toJSON() returns Promise<any[]>.
-        // iterateThroughTable collects results.
-        // If callback returns array, iterateThroughTable flattens result if T[] matches?
-        // Let's check iterateThroughTable implementation.
-        // If callback returns T[], allData.push(...returnValue).
-        // So results will be array of ROW OBJECTS.
 
         console.log(`Collected ${results.length} rows.`);
 
@@ -220,96 +205,6 @@ test.describe('Playground: Virtualized Table', () => {
         expect(hasId100).toBe(true);
     });
 
-    test('should return batches by default (autoFlatten=false)', async ({ page }) => {
-        // 1. Setup simple table
-        await setPlaygroundConfig(page, {
-            rowCount: 10,
-            defaults: { generator: "simple" } // Fast generator
-        });
-
-        await page.waitForTimeout(500);
-
-        const table = useTable(page.locator('.virtual-table-container'), {
-            rowSelector: '.virtual-row',
-            headerSelector: '.header [role="columnheader"]',
-            cellSelector: '[role="cell"]',
-            strategies: {
-                pagination: Strategies.Pagination.infiniteScroll({
-                    scrollTarget: '[data-testid="virtuoso-scroller"]',
-                    scrollAmount: 500,
-                    action: 'js-scroll',
-                    stabilization: StabilizationStrategies.contentChanged()
-                })
-            }
-        });
-
-        // 2. Iterate with batching, relying on default autoFlatten=false
-        const batchedData = await table.iterateThroughTable(
-            async ({ rows }) => {
-                return await rows.toJSON();
-            },
-            {
-                maxIterations: 2,
-                batchSize: 5
-                // autoFlatten: false (implicit default)
-            }
-        );
-
-        // Should return array of arrays (batches)
-        expect(Array.isArray(batchedData)).toBe(true);
-        expect(batchedData.length).toBeGreaterThan(0);
-        // First item should be an array of rows
-        expect(Array.isArray(batchedData[0])).toBe(true);
-
-        // Safety check: ensure INNER items are row objects
-        const firstBatch = batchedData[0] as any[];
-        if (firstBatch.length > 0) {
-            expect(firstBatch[0]).toHaveProperty('ID');
-        }
-    });
-
-    test('should flatten batches when autoFlatten is true', async ({ page }) => {
-        // 1. Reuse setup logic (or setup anew to be safe)
-        await setPlaygroundConfig(page, {
-            rowCount: 10,
-            defaults: { generator: "simple" }
-        });
-        await page.waitForTimeout(500);
-
-        const table = useTable(page.locator('.virtual-table-container'), {
-            rowSelector: '.virtual-row',
-            headerSelector: '.header [role="columnheader"]',
-            cellSelector: '[role="cell"]',
-            strategies: {
-                pagination: Strategies.Pagination.infiniteScroll({
-                    scrollTarget: '[data-testid="virtuoso-scroller"]',
-                    scrollAmount: 500,
-                    action: 'js-scroll',
-                    stabilization: StabilizationStrategies.contentChanged()
-                })
-            }
-        });
-
-        // 2. Iterate with explicit autoFlatten=true
-        const flatData = await table.iterateThroughTable(
-            async ({ rows }) => {
-                return await rows.toJSON();
-            },
-            {
-                maxIterations: 2,
-                batchSize: 5,
-                autoFlatten: true
-            }
-        );
-
-        // Should return flat array of rows
-        expect(Array.isArray(flatData)).toBe(true);
-        expect(flatData.length).toBeGreaterThan(0);
-
-        // First item should be a row object, NOT an array
-        expect(Array.isArray(flatData[0])).toBe(false);
-        expect(flatData[0]).toHaveProperty('ID');
-    });
 
     test('should cache previously loaded rows (skip delay)', async ({ page }) => {
         page.on('console', msg => console.log(`[Browser] ${msg.text()}`));

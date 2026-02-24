@@ -76,13 +76,66 @@ const email = await row.getCell('Email').textContent();
 const allActive = await table.findRows({ Status: 'Active' });
 ```
 
+### Iterating Across Pages
+
+```typescript
+// forEach — sequential, safe for interactions (parallel: false default)
+await table.forEach(async ({ row, rowIndex, stop }) => {
+  if (await row.getCell('Status').innerText() === 'Done') stop();
+  await row.getCell('Checkbox').click();
+});
+
+// map — parallel within page, safe for reads (parallel: true default)
+const emails = await table.map(({ row }) => row.getCell('Email').innerText());
+
+// filter — async predicate across all pages, returns SmartRowArray
+const active = await table.filter(async ({ row }) =>
+  await row.getCell('Status').innerText() === 'Active'
+);
+
+// for await...of — low-level page-by-page iteration
+for await (const { row, rowIndex } of table) {
+  console.log(rowIndex, await row.getCell('Name').innerText());
+}
+```
+
+> **`map` + UI interactions:** `map` defaults to `parallel: true`. If your callback opens popovers,
+> fills inputs, or otherwise mutates UI state, pass `{ parallel: false }` to avoid overlapping interactions.
+
+### `filter` vs `findRows`
+
+| Use case | Best tool |
+|---|---|
+| Match by column value / regex / locator | `findRows` |
+| Computed value (math, range, derived) | `filter` |
+| Cross-column OR logic | `filter` |
+| Multi-step interaction in predicate (click, read, close) | `filter` |
+| Early exit after N matches | `filter` + `stop()` |
+
+**`findRows` is faster** for column-value matches — Playwright evaluates the locator natively with no DOM reads. **`filter` is more flexible** for logic that a CSS selector can't express.
+
+```typescript
+// findRows — structural match, no DOM reads, fast
+const notStarted = await table.findRows({
+  Status: (cell) => cell.locator('[class*="gray"]')
+});
+
+// filter — arbitrary async logic
+const expensive = await table.filter(async ({ row }) => {
+  const price = parseFloat(await row.getCell('Price').innerText());
+  const qty = parseFloat(await row.getCell('Qty').innerText());
+  return price * qty > 1000;
+});
+```
+
 ## Key Features
 
 - 🎯 **Smart Locators** - Find rows by content, not position
-- 🧠 **Fuzzy Matching** - Smart suggestions for typos (e.g., incorrectly typed "Firstname" suggests "First Name" in error messages)
+- 🧠 **Fuzzy Matching** - Smart suggestions for typos in column names
 - ⚡ **Smart Initialization** - Handles loading states and dynamic headers automatically
 - 📄 **Auto-Pagination** - Search across all pages automatically
 - 🔍 **Column-Aware Access** - Access cells by column name
+- 🔁 **Iteration Methods** - `forEach`, `map`, `filter`, and `for await...of` across all pages
 - 🛠️ **Debug Mode** - Visual debugging with slow motion and logging
 - 🔌 **[Extensible Strategies](docs/concepts/strategies.md)** - Support any table implementation
 - 💪 **Type-Safe** - Full TypeScript support
@@ -108,11 +161,21 @@ const allActive = await table.findRows({ Status: 'Active' });
 
 ### ⚠️ Important Note on Pagination & Interactions
 
-When using `findRows` across multiple pages, the returned `SmartRow` locators represent elements that may no longer be attached to the current DOM if the table paginated past them.
+When `findRows` or `filter` paginates across pages, returned `SmartRow` locators point to rows that may be off the current DOM page.
 
-- **Data Extraction:** Safe. You can use `table.iterateThroughTable()` to extract data (`await row.toJSON()`) while the row is visible.
-- **Interactions:** Unsafe directly. You cannot do `await row.click()` if the row is on Page 1 but the table is currently showing Page 3. 
-- **Solution:** If you need to interact with a row found on a previous page, you may be able to use `await row.bringIntoView()` before interacting with it to force the table to paginate back to that row (Note: this specific cross-page interaction flow is currently under testing).
+- **Data extraction:** Safe — `toJSON()` and cell reads work while the row is visible during iteration.
+- **Interactions after pagination:** Use `await row.bringIntoView()` first — it navigates back to the page the row was originally found on, then you can safely click/fill.
+
+```typescript
+const active = await table.filter(async ({ row }) =>
+  await row.getCell('Status').innerText() === 'Active'
+);
+
+for (const row of active) {
+  await row.bringIntoView(); // navigate back to the row's page
+  await row.getCell('Checkbox').click(); // safe to interact
+}
+```
 
 ## Documentation
 

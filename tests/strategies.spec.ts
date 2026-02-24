@@ -31,7 +31,6 @@ test.describe('Real World Strategy Tests', () => {
 
     await expect(missing).not.toBeVisible();
 
-    // ✅ UPDATE: getRows -> getRows
     const finalRows = await table.findRows({}, { maxPages: 1 });
     console.log(`Final Row Count: ${finalRows.length}`);
 
@@ -50,9 +49,9 @@ test.describe('Real World Strategy Tests', () => {
       headerSelector: '.MuiDataGrid-columnHeader',
       cellSelector: '.MuiDataGrid-cell', // MUI uses distinct divs for cells
       strategies: {
-        pagination: Strategies.Pagination.clickNext(
-          (root) => root.getByRole("button", { name: "Go to next page" })
-        ),
+        pagination: Strategies.Pagination.click({
+          next: (root: any) => root.getByRole("button", { name: "Go to next page" })
+        }),
       },
       maxPages: 5,
       // ✅ Rename the empty column to "Actions" so we can reference it easily

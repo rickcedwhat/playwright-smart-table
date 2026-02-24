@@ -12,23 +12,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.PaginationStrategies = void 0;
 const stabilization_1 = require("./stabilization");
 exports.PaginationStrategies = {
-    /**
-     * Strategy: Clicks a "Next" button and waits for stabilization.
-     * Backward compatibility for when only a single 'next' selector was needed.
-     * @deprecated Use `click` with `{ next: selector }` instead.
-     */
-    clickNext: (nextButtonSelector, options = {}) => {
-        return exports.PaginationStrategies.click({ next: nextButtonSelector }, options);
-    },
-    /**
-     * Strategy: Classic Pagination Buttons.
-     * Clicks 'Next', 'Previous', or 'First' buttons and waits for stabilization.
-     *
-     * @param selectors Selectors for pagination buttons.
-     * @param options.stabilization Strategy to determine when the page has updated.
-     *        Defaults to `contentChanged({ scope: 'first' })`.
-     * @param options.timeout Timeout for the click action.
-     */
     click: (selectors, options = {}) => {
         var _a;
         const defaultStabilize = (_a = options.stabilization) !== null && _a !== void 0 ? _a : stabilization_1.StabilizationStrategies.contentChanged({ scope: 'first', timeout: options.timeout });
@@ -49,6 +32,8 @@ exports.PaginationStrategies = {
         return {
             goNext: createClicker(selectors.next),
             goPrevious: createClicker(selectors.previous),
+            goNextBulk: createClicker(selectors.nextBulk),
+            goPreviousBulk: createClicker(selectors.previousBulk),
             goToFirst: createClicker(selectors.first)
         };
     },

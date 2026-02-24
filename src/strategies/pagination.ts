@@ -4,20 +4,7 @@ import { waitForCondition } from '../utils';
 
 import { StabilizationStrategies, StabilizationStrategy } from './stabilization';
 
-export const PaginationStrategies = {
-  /**
-   * Strategy: Clicks a "Next" button and waits for stabilization.
-   * Backward compatibility for when only a single 'next' selector was needed.
-   * @deprecated Use `click` with `{ next: selector }` instead.
-   */
-  clickNext: (nextButtonSelector: Selector, options: {
-    stabilization?: StabilizationStrategy,
-    timeout?: number
-  } = {}): PaginationStrategy => {
-    return PaginationStrategies.click({ next: nextButtonSelector }, options);
-  },
-
-  /**
+export const PaginationStrategies = {  /**
    * Strategy: Classic Pagination Buttons.
    * Clicks 'Next', 'Previous', or 'First' buttons and waits for stabilization.
    * 
@@ -29,6 +16,8 @@ export const PaginationStrategies = {
   click: (selectors: {
     next?: Selector,
     previous?: Selector,
+    nextBulk?: Selector,
+    previousBulk?: Selector,
     first?: Selector
   }, options: {
     stabilization?: StabilizationStrategy,
@@ -55,6 +44,8 @@ export const PaginationStrategies = {
     return {
       goNext: createClicker(selectors.next),
       goPrevious: createClicker(selectors.previous),
+      goNextBulk: createClicker(selectors.nextBulk),
+      goPreviousBulk: createClicker(selectors.previousBulk),
       goToFirst: createClicker(selectors.first)
     };
   },
