@@ -13,6 +13,7 @@ exports.RowFinder = void 0;
 const debugUtils_1 = require("../utils/debugUtils");
 const smartRowArray_1 = require("../utils/smartRowArray");
 const validation_1 = require("../strategies/validation");
+const elementTracker_1 = require("../utils/elementTracker");
 class RowFinder {
     constructor(rootLocator, config, resolve, filterEngine, tableMapper, makeSmartRow, tableState = { currentPageIndex: 0 }) {
         this.rootLocator = rootLocator;
@@ -53,54 +54,55 @@ class RowFinder {
             const allRows = [];
             const effectiveMaxPages = (_b = (_a = options === null || options === void 0 ? void 0 : options.maxPages) !== null && _a !== void 0 ? _a : this.config.maxPages) !== null && _b !== void 0 ? _b : Infinity;
             let pagesScanned = 1;
-            const collectMatches = () => __awaiter(this, void 0, void 0, function* () {
-                var _a, _b;
-                // ... logic ...
-                let rowLocators = this.resolve(this.config.rowSelector, this.rootLocator);
-                // Only apply filters if we have them
-                if (Object.keys(filtersRecord).length > 0) {
-                    rowLocators = this.filterEngine.applyFilters(rowLocators, filtersRecord, map, (_a = options === null || options === void 0 ? void 0 : options.exact) !== null && _a !== void 0 ? _a : false, this.rootLocator.page());
-                }
-                const currentRows = yield rowLocators.all();
-                const isRowLoading = (_b = this.config.strategies.loading) === null || _b === void 0 ? void 0 : _b.isRowLoading;
-                for (let i = 0; i < currentRows.length; i++) {
-                    const smartRow = this.makeSmartRow(currentRows[i], map, allRows.length + i, this.tableState.currentPageIndex);
-                    if (isRowLoading && (yield isRowLoading(smartRow)))
-                        continue;
-                    allRows.push(smartRow);
-                }
-            });
-            // Scan first page
-            yield collectMatches();
-            // Pagination Loop - Corrected logic
-            // We always scan at least 1 page.
-            // If maxPages > 1, and we have a pagination strategy, we try to go next.
-            while (pagesScanned < effectiveMaxPages && this.config.strategies.pagination) {
-                const context = {
-                    root: this.rootLocator,
-                    config: this.config,
-                    resolve: this.resolve,
-                    page: this.rootLocator.page()
-                };
-                // Check if we should stop? (e.g. if we found enough rows? No, findRows finds ALL)
-                let paginationResult;
-                if (typeof this.config.strategies.pagination === 'function') {
-                    paginationResult = yield this.config.strategies.pagination(context);
-                }
-                else {
-                    // It's a PaginationPrimitives object, use goNext by default for findRows
-                    if (!this.config.strategies.pagination.goNext) {
-                        break; // Cannot paginate forward
+            const tracker = new elementTracker_1.ElementTracker('findRows');
+            try {
+                const collectMatches = () => __awaiter(this, void 0, void 0, function* () {
+                    var _a, _b;
+                    let rowLocators = this.resolve(this.config.rowSelector, this.rootLocator);
+                    // Only apply filters if we have them
+                    if (Object.keys(filtersRecord).length > 0) {
+                        rowLocators = this.filterEngine.applyFilters(rowLocators, filtersRecord, map, (_a = options === null || options === void 0 ? void 0 : options.exact) !== null && _a !== void 0 ? _a : false, this.rootLocator.page());
                     }
-                    paginationResult = yield this.config.strategies.pagination.goNext(context);
-                }
-                const didPaginate = (0, validation_1.validatePaginationResult)(paginationResult, 'Pagination Strategy');
-                if (!didPaginate)
-                    break;
-                this.tableState.currentPageIndex++;
-                pagesScanned++;
-                // Wait for reload logic if needed? Usually pagination handles it.
+                    // Get only newly seen matched rows
+                    const newIndices = yield tracker.getUnseenIndices(rowLocators);
+                    const currentRows = yield rowLocators.all();
+                    const isRowLoading = (_b = this.config.strategies.loading) === null || _b === void 0 ? void 0 : _b.isRowLoading;
+                    for (const idx of newIndices) {
+                        const smartRow = this.makeSmartRow(currentRows[idx], map, allRows.length, this.tableState.currentPageIndex);
+                        if (isRowLoading && (yield isRowLoading(smartRow)))
+                            continue;
+                        allRows.push(smartRow);
+                    }
+                });
+                // Scan first page
                 yield collectMatches();
+                // Pagination Loop
+                while (pagesScanned < effectiveMaxPages && this.config.strategies.pagination) {
+                    const context = {
+                        root: this.rootLocator,
+                        config: this.config,
+                        resolve: this.resolve,
+                        page: this.rootLocator.page()
+                    };
+                    let paginationResult;
+                    if (typeof this.config.strategies.pagination === 'function') {
+                        paginationResult = yield this.config.strategies.pagination(context);
+                    }
+                    else {
+                        if (!this.config.strategies.pagination.goNext)
+                            break;
+                        paginationResult = yield this.config.strategies.pagination.goNext(context);
+                    }
+                    const didPaginate = (0, validation_1.validatePaginationResult)(paginationResult, 'Pagination Strategy');
+                    if (!didPaginate)
+                        break;
+                    this.tableState.currentPageIndex++;
+                    pagesScanned++;
+                    yield collectMatches();
+                }
+            }
+            finally {
+                yield tracker.cleanup(this.rootLocator.page());
             }
             return (0, smartRowArray_1.createSmartRowArray)(allRows);
         });

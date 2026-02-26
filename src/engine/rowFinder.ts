@@ -5,6 +5,7 @@ import { TableMapper } from './tableMapper';
 import { logDebug, debugDelay } from '../utils/debugUtils';
 import { createSmartRowArray, SmartRowArray } from '../utils/smartRowArray';
 import { validatePaginationResult } from '../strategies/validation';
+import { ElementTracker } from '../utils/elementTracker';
 
 export class RowFinder<T = any> {
     private resolve: (item: Selector, parent: Locator | Page) => Locator;
@@ -61,65 +62,63 @@ export class RowFinder<T = any> {
         const effectiveMaxPages = options?.maxPages ?? this.config.maxPages ?? Infinity;
         let pagesScanned = 1;
 
-        const collectMatches = async () => {
-            // ... logic ...
-            let rowLocators = this.resolve(this.config.rowSelector, this.rootLocator);
-            // Only apply filters if we have them
-            if (Object.keys(filtersRecord).length > 0) {
-                rowLocators = this.filterEngine.applyFilters(
-                    rowLocators,
-                    filtersRecord,
-                    map,
-                    options?.exact ?? false,
-                    this.rootLocator.page()
-                );
-            }
+        const tracker = new ElementTracker('findRows');
 
-            const currentRows = await rowLocators.all();
-            const isRowLoading = this.config.strategies.loading?.isRowLoading;
+        try {
+            const collectMatches = async () => {
+                let rowLocators = this.resolve(this.config.rowSelector, this.rootLocator);
+                // Only apply filters if we have them
+                if (Object.keys(filtersRecord).length > 0) {
+                    rowLocators = this.filterEngine.applyFilters(
+                        rowLocators,
+                        filtersRecord,
+                        map,
+                        options?.exact ?? false,
+                        this.rootLocator.page()
+                    );
+                }
 
-            for (let i = 0; i < currentRows.length; i++) {
-                const smartRow = this.makeSmartRow(currentRows[i], map, allRows.length + i, this.tableState.currentPageIndex);
-                if (isRowLoading && await isRowLoading(smartRow)) continue;
-                allRows.push(smartRow);
-            }
-        };
+                // Get only newly seen matched rows
+                const newIndices = await tracker.getUnseenIndices(rowLocators);
+                const currentRows = await rowLocators.all();
+                const isRowLoading = this.config.strategies.loading?.isRowLoading;
 
-        // Scan first page
-        await collectMatches();
-
-        // Pagination Loop - Corrected logic
-        // We always scan at least 1 page.
-        // If maxPages > 1, and we have a pagination strategy, we try to go next.
-        while (pagesScanned < effectiveMaxPages && this.config.strategies.pagination) {
-            const context: TableContext = {
-                root: this.rootLocator,
-                config: this.config,
-                resolve: this.resolve,
-                page: this.rootLocator.page()
+                for (const idx of newIndices) {
+                    const smartRow = this.makeSmartRow(currentRows[idx], map, allRows.length, this.tableState.currentPageIndex);
+                    if (isRowLoading && await isRowLoading(smartRow)) continue;
+                    allRows.push(smartRow);
+                }
             };
 
-            // Check if we should stop? (e.g. if we found enough rows? No, findRows finds ALL)
-
-            let paginationResult: boolean | PaginationPrimitives;
-            if (typeof this.config.strategies.pagination === 'function') {
-                paginationResult = await this.config.strategies.pagination(context);
-            } else {
-                // It's a PaginationPrimitives object, use goNext by default for findRows
-                if (!this.config.strategies.pagination.goNext) {
-                    break; // Cannot paginate forward
-                }
-                paginationResult = await this.config.strategies.pagination.goNext(context);
-            }
-
-            const didPaginate = validatePaginationResult(paginationResult, 'Pagination Strategy');
-
-            if (!didPaginate) break;
-
-            this.tableState.currentPageIndex++;
-            pagesScanned++;
-            // Wait for reload logic if needed? Usually pagination handles it.
+            // Scan first page
             await collectMatches();
+
+            // Pagination Loop
+            while (pagesScanned < effectiveMaxPages && this.config.strategies.pagination) {
+                const context: TableContext = {
+                    root: this.rootLocator,
+                    config: this.config,
+                    resolve: this.resolve,
+                    page: this.rootLocator.page()
+                };
+
+                let paginationResult: boolean | PaginationPrimitives;
+                if (typeof this.config.strategies.pagination === 'function') {
+                    paginationResult = await this.config.strategies.pagination(context);
+                } else {
+                    if (!this.config.strategies.pagination.goNext) break;
+                    paginationResult = await this.config.strategies.pagination.goNext(context);
+                }
+
+                const didPaginate = validatePaginationResult(paginationResult, 'Pagination Strategy');
+                if (!didPaginate) break;
+
+                this.tableState.currentPageIndex++;
+                pagesScanned++;
+                await collectMatches();
+            }
+        } finally {
+            await tracker.cleanup(this.rootLocator.page());
         }
 
         return createSmartRowArray(allRows);

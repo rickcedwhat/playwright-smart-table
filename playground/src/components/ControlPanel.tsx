@@ -23,6 +23,9 @@ export interface RowConfig {
 
 export interface PlaygroundConfig {
     rowCount: number;
+    columnCount?: number;
+    virtualizeColumns?: boolean;
+    virtualizeHeaders?: boolean;
     defaults: {
         tableInitDelay: Delay;
         rowDelay: Delay;
@@ -41,7 +44,12 @@ interface ControlPanelProps {
     onReload: () => void;
 }
 
-const DEFAULT_JSON = (config: PlaygroundConfig) => JSON.stringify(config, null, 2);
+const DEFAULT_JSON = (config: PlaygroundConfig) => JSON.stringify({
+    ...config,
+    columnCount: config.columnCount ?? 4,
+    virtualizeColumns: config.virtualizeColumns ?? false,
+    virtualizeHeaders: config.virtualizeHeaders ?? config.virtualizeColumns ?? false
+}, null, 2);
 
 export const ControlPanel: React.FC<ControlPanelProps> = ({ config, onChange, onReload }) => {
     const [jsonText, setJsonText] = useState(DEFAULT_JSON(config));
