@@ -33,6 +33,7 @@ const tableMapper_1 = require("./engine/tableMapper");
 const rowFinder_1 = require("./engine/rowFinder");
 const debugUtils_1 = require("./utils/debugUtils");
 const smartRowArray_1 = require("./utils/smartRowArray");
+const elementTracker_1 = require("./utils/elementTracker");
 /**
  * Main hook to interact with a table.
  */
@@ -266,19 +267,27 @@ const useTable = (rootLocator, configOptions = {}) => {
                 yield __await(_autoInit());
                 const map = tableMapper.getMapSync();
                 const effectiveMaxPages = config.maxPages;
-                let rowIndex = 0;
-                let pagesScanned = 1;
-                while (true) {
-                    const pageRows = yield __await(resolve(config.rowSelector, rootLocator).all());
-                    for (const rowLocator of pageRows) {
-                        yield yield __await({ row: _makeSmart(rowLocator, map, rowIndex), rowIndex });
-                        rowIndex++;
+                const tracker = new elementTracker_1.ElementTracker('iterator');
+                try {
+                    let rowIndex = 0;
+                    let pagesScanned = 1;
+                    while (true) {
+                        const rowLocators = resolve(config.rowSelector, rootLocator);
+                        const newIndices = yield __await(tracker.getUnseenIndices(rowLocators));
+                        const pageRows = yield __await(rowLocators.all());
+                        for (const idx of newIndices) {
+                            yield yield __await({ row: _makeSmart(pageRows[idx], map, rowIndex), rowIndex });
+                            rowIndex++;
+                        }
+                        if (pagesScanned >= effectiveMaxPages)
+                            break;
+                        if (!(yield __await(_advancePage())))
+                            break;
+                        pagesScanned++;
                     }
-                    if (pagesScanned >= effectiveMaxPages)
-                        break;
-                    if (!(yield __await(_advancePage())))
-                        break;
-                    pagesScanned++;
+                }
+                finally {
+                    yield __await(tracker.cleanup(rootLocator.page()));
                 }
             });
         },
@@ -291,45 +300,53 @@ const useTable = (rootLocator, configOptions = {}) => {
             const dedupeStrategy = (_b = options.dedupe) !== null && _b !== void 0 ? _b : config.strategies.dedupe;
             const dedupeKeys = dedupeStrategy ? new Set() : null;
             const parallel = (_c = options.parallel) !== null && _c !== void 0 ? _c : false;
-            let rowIndex = 0;
-            let stopped = false;
-            let pagesScanned = 1;
-            const stop = () => { stopped = true; };
-            while (!stopped) {
-                const pageRows = yield resolve(config.rowSelector, rootLocator).all();
-                const smartRows = pageRows.map((r, i) => _makeSmart(r, map, rowIndex + i));
-                if (parallel) {
-                    yield Promise.all(smartRows.map((row) => __awaiter(void 0, void 0, void 0, function* () {
-                        if (stopped)
-                            return;
-                        if (dedupeKeys) {
-                            const key = yield dedupeStrategy(row);
-                            if (dedupeKeys.has(key))
+            const tracker = new elementTracker_1.ElementTracker('forEach');
+            try {
+                let rowIndex = 0;
+                let stopped = false;
+                let pagesScanned = 1;
+                const stop = () => { stopped = true; };
+                while (!stopped) {
+                    const rowLocators = resolve(config.rowSelector, rootLocator);
+                    const newIndices = yield tracker.getUnseenIndices(rowLocators);
+                    const pageRows = yield rowLocators.all();
+                    const smartRows = newIndices.map((idx, i) => _makeSmart(pageRows[idx], map, rowIndex + i));
+                    if (parallel) {
+                        yield Promise.all(smartRows.map((row) => __awaiter(void 0, void 0, void 0, function* () {
+                            if (stopped)
                                 return;
-                            dedupeKeys.add(key);
-                        }
-                        yield callback({ row, rowIndex: row.rowIndex, stop });
-                    })));
-                }
-                else {
-                    for (const row of smartRows) {
-                        if (stopped)
-                            break;
-                        if (dedupeKeys) {
-                            const key = yield dedupeStrategy(row);
-                            if (dedupeKeys.has(key))
-                                continue;
-                            dedupeKeys.add(key);
-                        }
-                        yield callback({ row, rowIndex: row.rowIndex, stop });
+                            if (dedupeKeys) {
+                                const key = yield dedupeStrategy(row);
+                                if (dedupeKeys.has(key))
+                                    return;
+                                dedupeKeys.add(key);
+                            }
+                            yield callback({ row, rowIndex: row.rowIndex, stop });
+                        })));
                     }
+                    else {
+                        for (const row of smartRows) {
+                            if (stopped)
+                                break;
+                            if (dedupeKeys) {
+                                const key = yield dedupeStrategy(row);
+                                if (dedupeKeys.has(key))
+                                    continue;
+                                dedupeKeys.add(key);
+                            }
+                            yield callback({ row, rowIndex: row.rowIndex, stop });
+                        }
+                    }
+                    rowIndex += smartRows.length;
+                    if (stopped || pagesScanned >= effectiveMaxPages)
+                        break;
+                    if (!(yield _advancePage()))
+                        break;
+                    pagesScanned++;
                 }
-                rowIndex += smartRows.length;
-                if (stopped || pagesScanned >= effectiveMaxPages)
-                    break;
-                if (!(yield _advancePage()))
-                    break;
-                pagesScanned++;
+            }
+            finally {
+                yield tracker.cleanup(rootLocator.page());
             }
         }),
         map: (callback_1, ...args_1) => __awaiter(void 0, [callback_1, ...args_1], void 0, function* (callback, options = {}) {
@@ -340,49 +357,57 @@ const useTable = (rootLocator, configOptions = {}) => {
             const dedupeStrategy = (_b = options.dedupe) !== null && _b !== void 0 ? _b : config.strategies.dedupe;
             const dedupeKeys = dedupeStrategy ? new Set() : null;
             const parallel = (_c = options.parallel) !== null && _c !== void 0 ? _c : true;
+            const tracker = new elementTracker_1.ElementTracker('map');
             const results = [];
-            let rowIndex = 0;
-            let stopped = false;
-            let pagesScanned = 1;
-            const stop = () => { stopped = true; };
-            while (!stopped) {
-                const pageRows = yield resolve(config.rowSelector, rootLocator).all();
-                const smartRows = pageRows.map((r, i) => _makeSmart(r, map, rowIndex + i));
-                if (parallel) {
-                    const SKIP = Symbol('skip');
-                    const pageResults = yield Promise.all(smartRows.map((row) => __awaiter(void 0, void 0, void 0, function* () {
-                        if (dedupeKeys) {
-                            const key = yield dedupeStrategy(row);
-                            if (dedupeKeys.has(key))
-                                return SKIP;
-                            dedupeKeys.add(key);
+            try {
+                let rowIndex = 0;
+                let stopped = false;
+                let pagesScanned = 1;
+                const stop = () => { stopped = true; };
+                while (!stopped) {
+                    const rowLocators = resolve(config.rowSelector, rootLocator);
+                    const newIndices = yield tracker.getUnseenIndices(rowLocators);
+                    const pageRows = yield rowLocators.all();
+                    const smartRows = newIndices.map((idx, i) => _makeSmart(pageRows[idx], map, rowIndex + i));
+                    if (parallel) {
+                        const SKIP = Symbol('skip');
+                        const pageResults = yield Promise.all(smartRows.map((row) => __awaiter(void 0, void 0, void 0, function* () {
+                            if (dedupeKeys) {
+                                const key = yield dedupeStrategy(row);
+                                if (dedupeKeys.has(key))
+                                    return SKIP;
+                                dedupeKeys.add(key);
+                            }
+                            return callback({ row, rowIndex: row.rowIndex, stop });
+                        })));
+                        for (const r of pageResults) {
+                            if (r !== SKIP)
+                                results.push(r);
                         }
-                        return callback({ row, rowIndex: row.rowIndex, stop });
-                    })));
-                    for (const r of pageResults) {
-                        if (r !== SKIP)
-                            results.push(r);
                     }
-                }
-                else {
-                    for (const row of smartRows) {
-                        if (stopped)
-                            break;
-                        if (dedupeKeys) {
-                            const key = yield dedupeStrategy(row);
-                            if (dedupeKeys.has(key))
-                                continue;
-                            dedupeKeys.add(key);
+                    else {
+                        for (const row of smartRows) {
+                            if (stopped)
+                                break;
+                            if (dedupeKeys) {
+                                const key = yield dedupeStrategy(row);
+                                if (dedupeKeys.has(key))
+                                    continue;
+                                dedupeKeys.add(key);
+                            }
+                            results.push(yield callback({ row, rowIndex: row.rowIndex, stop }));
                         }
-                        results.push(yield callback({ row, rowIndex: row.rowIndex, stop }));
                     }
+                    rowIndex += smartRows.length;
+                    if (stopped || pagesScanned >= effectiveMaxPages)
+                        break;
+                    if (!(yield _advancePage()))
+                        break;
+                    pagesScanned++;
                 }
-                rowIndex += smartRows.length;
-                if (stopped || pagesScanned >= effectiveMaxPages)
-                    break;
-                if (!(yield _advancePage()))
-                    break;
-                pagesScanned++;
+            }
+            finally {
+                yield tracker.cleanup(rootLocator.page());
             }
             return results;
         }),
@@ -394,48 +419,56 @@ const useTable = (rootLocator, configOptions = {}) => {
             const dedupeStrategy = (_b = options.dedupe) !== null && _b !== void 0 ? _b : config.strategies.dedupe;
             const dedupeKeys = dedupeStrategy ? new Set() : null;
             const parallel = (_c = options.parallel) !== null && _c !== void 0 ? _c : false;
+            const tracker = new elementTracker_1.ElementTracker('filter');
             const matched = [];
-            let rowIndex = 0;
-            let stopped = false;
-            let pagesScanned = 1;
-            const stop = () => { stopped = true; };
-            while (!stopped) {
-                const pageRows = yield resolve(config.rowSelector, rootLocator).all();
-                const smartRows = pageRows.map((r, i) => _makeSmart(r, map, rowIndex + i, pagesScanned - 1));
-                if (parallel) {
-                    const flags = yield Promise.all(smartRows.map((row) => __awaiter(void 0, void 0, void 0, function* () {
-                        if (dedupeKeys) {
-                            const key = yield dedupeStrategy(row);
-                            if (dedupeKeys.has(key))
-                                return false;
-                            dedupeKeys.add(key);
-                        }
-                        return predicate({ row, rowIndex: row.rowIndex, stop });
-                    })));
-                    smartRows.forEach((row, i) => { if (flags[i])
-                        matched.push(row); });
-                }
-                else {
-                    for (const row of smartRows) {
-                        if (stopped)
-                            break;
-                        if (dedupeKeys) {
-                            const key = yield dedupeStrategy(row);
-                            if (dedupeKeys.has(key))
-                                continue;
-                            dedupeKeys.add(key);
-                        }
-                        if (yield predicate({ row, rowIndex: row.rowIndex, stop })) {
-                            matched.push(row);
+            try {
+                let rowIndex = 0;
+                let stopped = false;
+                let pagesScanned = 1;
+                const stop = () => { stopped = true; };
+                while (!stopped) {
+                    const rowLocators = resolve(config.rowSelector, rootLocator);
+                    const newIndices = yield tracker.getUnseenIndices(rowLocators);
+                    const pageRows = yield rowLocators.all();
+                    const smartRows = newIndices.map((idx, i) => _makeSmart(pageRows[idx], map, rowIndex + i, pagesScanned - 1));
+                    if (parallel) {
+                        const flags = yield Promise.all(smartRows.map((row) => __awaiter(void 0, void 0, void 0, function* () {
+                            if (dedupeKeys) {
+                                const key = yield dedupeStrategy(row);
+                                if (dedupeKeys.has(key))
+                                    return false;
+                                dedupeKeys.add(key);
+                            }
+                            return predicate({ row, rowIndex: row.rowIndex, stop });
+                        })));
+                        smartRows.forEach((row, i) => { if (flags[i])
+                            matched.push(row); });
+                    }
+                    else {
+                        for (const row of smartRows) {
+                            if (stopped)
+                                break;
+                            if (dedupeKeys) {
+                                const key = yield dedupeStrategy(row);
+                                if (dedupeKeys.has(key))
+                                    continue;
+                                dedupeKeys.add(key);
+                            }
+                            if (yield predicate({ row, rowIndex: row.rowIndex, stop })) {
+                                matched.push(row);
+                            }
                         }
                     }
+                    rowIndex += smartRows.length;
+                    if (stopped || pagesScanned >= effectiveMaxPages)
+                        break;
+                    if (!(yield _advancePage()))
+                        break;
+                    pagesScanned++;
                 }
-                rowIndex += smartRows.length;
-                if (stopped || pagesScanned >= effectiveMaxPages)
-                    break;
-                if (!(yield _advancePage()))
-                    break;
-                pagesScanned++;
+            }
+            finally {
+                yield tracker.cleanup(rootLocator.page());
             }
             return (0, smartRowArray_1.createSmartRowArray)(matched);
         }),

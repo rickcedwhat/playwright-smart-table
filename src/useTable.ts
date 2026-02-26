@@ -16,9 +16,9 @@ import { FilterEngine } from './filterEngine';
 import { TableMapper } from './engine/tableMapper';
 import { RowFinder } from './engine/rowFinder';
 import { ResolutionStrategies } from './strategies/resolution';
-import { Strategies } from './strategies';
 import { debugDelay, logDebug, warnIfDebugInCI } from './utils/debugUtils';
 import { createSmartRowArray, SmartRowArray } from './utils/smartRowArray';
+import { ElementTracker } from './utils/elementTracker';
 
 /**
  * Main hook to interact with a table.
@@ -295,20 +295,28 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       await _autoInit();
       const map = tableMapper.getMapSync()!;
       const effectiveMaxPages = config.maxPages;
-      let rowIndex = 0;
-      let pagesScanned = 1;
+      const tracker = new ElementTracker('iterator');
 
-      while (true) {
-        const pageRows = await resolve(config.rowSelector, rootLocator).all();
-        for (const rowLocator of pageRows) {
-          yield { row: _makeSmart(rowLocator, map, rowIndex), rowIndex };
-          rowIndex++;
+      try {
+        let rowIndex = 0;
+        let pagesScanned = 1;
+
+        while (true) {
+          const rowLocators = resolve(config.rowSelector, rootLocator);
+          const newIndices = await tracker.getUnseenIndices(rowLocators);
+          const pageRows = await rowLocators.all();
+
+          for (const idx of newIndices) {
+            yield { row: _makeSmart(pageRows[idx], map, rowIndex), rowIndex };
+            rowIndex++;
+          }
+
+          if (pagesScanned >= effectiveMaxPages) break;
+          if (!await _advancePage()) break;
+          pagesScanned++;
         }
-
-        if (pagesScanned >= effectiveMaxPages) break;
-
-        if (!await _advancePage()) break;
-        pagesScanned++;
+      } finally {
+        await tracker.cleanup(rootLocator.page());
       }
     },
 
@@ -321,43 +329,49 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       const dedupeStrategy = options.dedupe ?? config.strategies.dedupe;
       const dedupeKeys = dedupeStrategy ? new Set<string | number>() : null;
       const parallel = options.parallel ?? false;
+      const tracker = new ElementTracker('forEach');
 
-      let rowIndex = 0;
-      let stopped = false;
-      let pagesScanned = 1;
-      const stop = () => { stopped = true; };
+      try {
+        let rowIndex = 0;
+        let stopped = false;
+        let pagesScanned = 1;
+        const stop = () => { stopped = true; };
 
-      while (!stopped) {
-        const pageRows = await resolve(config.rowSelector, rootLocator).all();
-        const smartRows = pageRows.map((r, i) => _makeSmart(r, map, rowIndex + i));
+        while (!stopped) {
+          const rowLocators = resolve(config.rowSelector, rootLocator);
+          const newIndices = await tracker.getUnseenIndices(rowLocators);
+          const pageRows = await rowLocators.all();
+          const smartRows = newIndices.map((idx, i) => _makeSmart(pageRows[idx], map, rowIndex + i));
 
-        if (parallel) {
-          await Promise.all(smartRows.map(async (row) => {
-            if (stopped) return;
-            if (dedupeKeys) {
-              const key = await dedupeStrategy!(row);
-              if (dedupeKeys.has(key)) return;
-              dedupeKeys.add(key);
+          if (parallel) {
+            await Promise.all(smartRows.map(async (row) => {
+              if (stopped) return;
+              if (dedupeKeys) {
+                const key = await dedupeStrategy!(row);
+                if (dedupeKeys.has(key)) return;
+                dedupeKeys.add(key);
+              }
+              await callback({ row, rowIndex: row.rowIndex!, stop });
+            }));
+          } else {
+            for (const row of smartRows) {
+              if (stopped) break;
+              if (dedupeKeys) {
+                const key = await dedupeStrategy!(row);
+                if (dedupeKeys.has(key)) continue;
+                dedupeKeys.add(key);
+              }
+              await callback({ row, rowIndex: row.rowIndex!, stop });
             }
-            await callback({ row, rowIndex: row.rowIndex!, stop });
-          }));
-        } else {
-          for (const row of smartRows) {
-            if (stopped) break;
-            if (dedupeKeys) {
-              const key = await dedupeStrategy!(row);
-              if (dedupeKeys.has(key)) continue;
-              dedupeKeys.add(key);
-            }
-            await callback({ row, rowIndex: row.rowIndex!, stop });
           }
+          rowIndex += smartRows.length;
+
+          if (stopped || pagesScanned >= effectiveMaxPages) break;
+          if (!await _advancePage()) break;
+          pagesScanned++;
         }
-        rowIndex += smartRows.length;
-
-        if (stopped || pagesScanned >= effectiveMaxPages) break;
-
-        if (!await _advancePage()) break;
-        pagesScanned++;
+      } finally {
+        await tracker.cleanup(rootLocator.page());
       }
     },
 
@@ -368,49 +382,54 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       const dedupeStrategy = options.dedupe ?? config.strategies.dedupe;
       const dedupeKeys = dedupeStrategy ? new Set<string | number>() : null;
       const parallel = options.parallel ?? true;
+      const tracker = new ElementTracker('map');
 
       const results: R[] = [];
-      let rowIndex = 0;
-      let stopped = false;
-      let pagesScanned = 1;
-      const stop = () => { stopped = true; };
+      try {
+        let rowIndex = 0;
+        let stopped = false;
+        let pagesScanned = 1;
+        const stop = () => { stopped = true; };
 
-      while (!stopped) {
-        const pageRows = await resolve(config.rowSelector, rootLocator).all();
-        const smartRows = pageRows.map((r, i) => _makeSmart(r, map, rowIndex + i));
+        while (!stopped) {
+          const rowLocators = resolve(config.rowSelector, rootLocator);
+          const newIndices = await tracker.getUnseenIndices(rowLocators);
+          const pageRows = await rowLocators.all();
+          const smartRows = newIndices.map((idx, i) => _makeSmart(pageRows[idx], map, rowIndex + i));
 
-        if (parallel) {
-          const SKIP = Symbol('skip');
-          const pageResults = await Promise.all(smartRows.map(async (row) => {
-            if (dedupeKeys) {
-              const key = await dedupeStrategy!(row);
-              if (dedupeKeys.has(key)) return SKIP;
-              dedupeKeys.add(key);
+          if (parallel) {
+            const SKIP = Symbol('skip');
+            const pageResults = await Promise.all(smartRows.map(async (row) => {
+              if (dedupeKeys) {
+                const key = await dedupeStrategy!(row);
+                if (dedupeKeys.has(key)) return SKIP;
+                dedupeKeys.add(key);
+              }
+              return callback({ row, rowIndex: row.rowIndex!, stop });
+            }));
+            for (const r of pageResults) {
+              if (r !== SKIP) results.push(r as R);
             }
-            return callback({ row, rowIndex: row.rowIndex!, stop });
-          }));
-          for (const r of pageResults) {
-            if (r !== SKIP) results.push(r as R);
-          }
-        } else {
-          for (const row of smartRows) {
-            if (stopped) break;
-            if (dedupeKeys) {
-              const key = await dedupeStrategy!(row);
-              if (dedupeKeys.has(key)) continue;
-              dedupeKeys.add(key);
+          } else {
+            for (const row of smartRows) {
+              if (stopped) break;
+              if (dedupeKeys) {
+                const key = await dedupeStrategy!(row);
+                if (dedupeKeys.has(key)) continue;
+                dedupeKeys.add(key);
+              }
+              results.push(await callback({ row, rowIndex: row.rowIndex!, stop }));
             }
-            results.push(await callback({ row, rowIndex: row.rowIndex!, stop }));
           }
+          rowIndex += smartRows.length;
+
+          if (stopped || pagesScanned >= effectiveMaxPages) break;
+          if (!await _advancePage()) break;
+          pagesScanned++;
         }
-        rowIndex += smartRows.length;
-
-        if (stopped || pagesScanned >= effectiveMaxPages) break;
-
-        if (!await _advancePage()) break;
-        pagesScanned++;
+      } finally {
+        await tracker.cleanup(rootLocator.page());
       }
-
       return results;
     },
 
@@ -421,48 +440,53 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       const dedupeStrategy = options.dedupe ?? config.strategies.dedupe;
       const dedupeKeys = dedupeStrategy ? new Set<string | number>() : null;
       const parallel = options.parallel ?? false;
+      const tracker = new ElementTracker('filter');
 
       const matched: SmartRowType<T>[] = [];
-      let rowIndex = 0;
-      let stopped = false;
-      let pagesScanned = 1;
-      const stop = () => { stopped = true; };
+      try {
+        let rowIndex = 0;
+        let stopped = false;
+        let pagesScanned = 1;
+        const stop = () => { stopped = true; };
 
-      while (!stopped) {
-        const pageRows = await resolve(config.rowSelector, rootLocator).all();
-        const smartRows = pageRows.map((r, i) => _makeSmart(r, map, rowIndex + i, pagesScanned - 1));
+        while (!stopped) {
+          const rowLocators = resolve(config.rowSelector, rootLocator);
+          const newIndices = await tracker.getUnseenIndices(rowLocators);
+          const pageRows = await rowLocators.all();
+          const smartRows = newIndices.map((idx, i) => _makeSmart(pageRows[idx], map, rowIndex + i, pagesScanned - 1));
 
-        if (parallel) {
-          const flags = await Promise.all(smartRows.map(async (row) => {
-            if (dedupeKeys) {
-              const key = await dedupeStrategy!(row);
-              if (dedupeKeys.has(key)) return false;
-              dedupeKeys.add(key);
-            }
-            return predicate({ row, rowIndex: row.rowIndex!, stop });
-          }));
-          smartRows.forEach((row, i) => { if (flags[i]) matched.push(row); });
-        } else {
-          for (const row of smartRows) {
-            if (stopped) break;
-            if (dedupeKeys) {
-              const key = await dedupeStrategy!(row);
-              if (dedupeKeys.has(key)) continue;
-              dedupeKeys.add(key);
-            }
-            if (await predicate({ row, rowIndex: row.rowIndex!, stop })) {
-              matched.push(row);
+          if (parallel) {
+            const flags = await Promise.all(smartRows.map(async (row) => {
+              if (dedupeKeys) {
+                const key = await dedupeStrategy!(row);
+                if (dedupeKeys.has(key)) return false;
+                dedupeKeys.add(key);
+              }
+              return predicate({ row, rowIndex: row.rowIndex!, stop });
+            }));
+            smartRows.forEach((row, i) => { if (flags[i]) matched.push(row); });
+          } else {
+            for (const row of smartRows) {
+              if (stopped) break;
+              if (dedupeKeys) {
+                const key = await dedupeStrategy!(row);
+                if (dedupeKeys.has(key)) continue;
+                dedupeKeys.add(key);
+              }
+              if (await predicate({ row, rowIndex: row.rowIndex!, stop })) {
+                matched.push(row);
+              }
             }
           }
+          rowIndex += smartRows.length;
+
+          if (stopped || pagesScanned >= effectiveMaxPages) break;
+          if (!await _advancePage()) break;
+          pagesScanned++;
         }
-        rowIndex += smartRows.length;
-
-        if (stopped || pagesScanned >= effectiveMaxPages) break;
-
-        if (!await _advancePage()) break;
-        pagesScanned++;
+      } finally {
+        await tracker.cleanup(rootLocator.page());
       }
-
       return createSmartRowArray<T>(matched);
     },
 

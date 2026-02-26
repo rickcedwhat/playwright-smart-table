@@ -38,6 +38,6 @@ export default defineConfig({
     command: 'npm run dev',
     cwd: 'playground',
     port: 3000,
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,
   },
 });

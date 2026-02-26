@@ -142,9 +142,11 @@ const Cell: React.FC<CellProps> = ({ content, columnId, width, rowConfig, defaul
     );
 };
 
-const RowContent = ({ index, data, onRowLoaded, isRowCached, onCellLoaded, isCellCached }: {
+const RowContent = ({ index, data, columns, scrollerRef, onRowLoaded, isRowCached, onCellLoaded, isCellCached }: {
     index: number;
     data: PlaygroundConfig;
+    columns: any[];
+    scrollerRef: React.RefObject<HTMLElement | null>;
     onRowLoaded: (index: number) => void;
     isRowCached: (index: number) => boolean;
     onCellLoaded: (index: number, colId: string) => void;
@@ -160,6 +162,41 @@ const RowContent = ({ index, data, onRowLoaded, isRowCached, onCellLoaded, isCel
     const isCached = (rowConfig?.cache ?? config.defaults.rowCache) && isRowCached(index);
     const [isRowLoaded, setIsRowLoaded] = useState(isCached || resolvedRowDelay <= 0);
 
+    const [visibleRange, setVisibleRange] = useState({ start: 0, end: columns.length });
+
+    useEffect(() => {
+        if (!config.virtualizeColumns || !scrollerRef.current) {
+            setVisibleRange({ start: 0, end: columns.length });
+            return;
+        }
+
+        const scroller = scrollerRef.current;
+        let ticking = false;
+        const handleScroll = () => {
+            if (!ticking) {
+                window.requestAnimationFrame(() => {
+                    const sl = scroller.scrollLeft;
+                    const width = scroller.clientWidth || window.innerWidth;
+                    const avgWidth = 150;
+                    const start = Math.max(0, Math.floor(sl / avgWidth) - 4);
+                    const end = Math.min(columns.length, Math.ceil((sl + width) / avgWidth) + 4);
+                    setVisibleRange({ start, end });
+                    ticking = false;
+                });
+                ticking = true;
+            }
+        };
+
+        scroller.addEventListener('scroll', handleScroll);
+        window.addEventListener('resize', handleScroll);
+        handleScroll(); // init
+
+        return () => {
+            scroller.removeEventListener('scroll', handleScroll);
+            window.removeEventListener('resize', handleScroll);
+        };
+    }, [config.virtualizeColumns, columns.length, scrollerRef]);
+
     useEffect(() => {
         if (!isRowLoaded && resolvedRowDelay < Infinity && resolvedRowDelay >= 0) {
             const timer = setTimeout(() => {
@@ -172,7 +209,6 @@ const RowContent = ({ index, data, onRowLoaded, isRowCached, onCellLoaded, isCel
         }
     }, [isRowLoaded, resolvedRowDelay, index, onRowLoaded]);
 
-    // Simple fade-in style
     const style: React.CSSProperties = {
         display: 'flex',
         borderBottom: '1px solid var(--color-border)',
@@ -198,20 +234,112 @@ const RowContent = ({ index, data, onRowLoaded, isRowCached, onCellLoaded, isCel
 
     return (
         <div className="virtual-row" role="row" style={style}>
-            <Cell columnId="id" content={rowData.id} width="60px" {...cellProps} />
-            <Cell columnId="name" content={rowData.name || rowData.value} width="150px" {...cellProps} />
-            <Cell columnId="status" content={rowData.status || 'N/A'} width="100px" {...cellProps} />
-            <div style={{ flex: 1, display: 'flex' }} role="cell">
-                <Cell columnId="email" content={rowData.email || rowData.description || ''} width="100%" {...cellProps} />
-            </div>
+            {columns.map((col, i) => {
+                const isVisible = i >= visibleRange.start && i < visibleRange.end;
+                if (!isVisible) {
+                    return <div key={col.id} style={{ width: col.width, flexShrink: 0 }} role="cell" />;
+                }
+
+                let content = rowData[col.id];
+                if (content === undefined) {
+                    // Fallbacks for standard generated data keys
+                    if (col.id === 'name') content = rowData.name || rowData.value;
+                    else if (col.id === 'email') content = rowData.email || rowData.description;
+                    else if (col.id === 'status') content = rowData.status || 'N/A';
+                    else content = `Data for Row ${index + 1} ${col.title}`;
+                }
+
+                return (
+                    <Cell
+                        key={col.id}
+                        columnId={col.id}
+                        content={content}
+                        width={`${col.width}px`}
+                        {...cellProps}
+                    />
+                );
+            })}
         </div>
     );
 };
+
+const VirtualizedHeader = ({ columns, config, scrollerRef }: { columns: any[], config: PlaygroundConfig, scrollerRef: React.RefObject<HTMLElement | null> }) => {
+    const [visibleRange, setVisibleRange] = useState({ start: 0, end: columns.length });
+
+    useEffect(() => {
+        const shouldVirtualizeHeaders = config.virtualizeHeaders ?? config.virtualizeColumns ?? false;
+        if (!shouldVirtualizeHeaders || !scrollerRef.current) {
+            setVisibleRange({ start: 0, end: columns.length });
+            return;
+        }
+
+        const scroller = scrollerRef.current;
+        let ticking = false;
+        const handleScroll = () => {
+            if (!ticking) {
+                window.requestAnimationFrame(() => {
+                    const sl = scroller.scrollLeft;
+                    const width = scroller.clientWidth || window.innerWidth;
+                    const avgWidth = 150;
+                    const start = Math.max(0, Math.floor(sl / avgWidth) - 4);
+                    const end = Math.min(columns.length, Math.ceil((sl + width) / avgWidth) + 4);
+                    setVisibleRange({ start, end });
+                    ticking = false;
+                });
+                ticking = true;
+            }
+        };
+
+        scroller.addEventListener('scroll', handleScroll);
+        window.addEventListener('resize', handleScroll);
+        handleScroll(); // init
+
+        return () => {
+            scroller.removeEventListener('scroll', handleScroll);
+            window.removeEventListener('resize', handleScroll);
+        };
+    }, [config.virtualizeColumns, columns.length, scrollerRef]);
+
+    return (
+        <>
+            {columns.map((col, i) => {
+                const isVisible = i >= visibleRange.start && i < visibleRange.end;
+                if (!isVisible) return <div key={col.id} style={{ width: col.width, flexShrink: 0 }} role="columnheader" />;
+                return (
+                    <div key={col.id} style={{ width: col.width, flexShrink: 0 }} role="columnheader">
+                        {col.title}
+                    </div>
+                );
+            })}
+        </>
+    );
+};
+
+const COLUMNS_BASE = [
+    { id: 'id', title: 'ID', width: 60 },
+    { id: 'name', title: 'Name', width: 150 },
+    { id: 'status', title: 'Status', width: 100 },
+    { id: 'email', title: 'Email', width: 250 },
+];
 
 export const VirtualizedTable: React.FC<{ config: PlaygroundConfig }> = ({ config }) => {
     // Cache references (persist as long as this component is mounted)
     const loadedRows = useRef(new Set<number>());
     const loadedCells = useRef(new Set<string>());
+
+    const scrollerRef = useRef<HTMLElement | null>(null);
+    const headerRef = useRef<HTMLDivElement | null>(null);
+
+    const columnCount = config.columnCount ?? 4;
+    const columns = useMemo(() => {
+        const cols = [...COLUMNS_BASE];
+        for (let i = 4; i < columnCount; i++) {
+            cols.push({ id: `col_${i + 1}`, title: `Column ${i + 1}`, width: 150 });
+        }
+        return cols;
+    }, [columnCount]);
+
+    const totalWidth = useMemo(() => columns.reduce((sum, col) => sum + col.width, 0) + 32, [columns]); // +32 for row padding
 
     const onRowLoaded = useMemo(() => (index: number) => {
         loadedRows.current.add(index);
@@ -235,30 +363,47 @@ export const VirtualizedTable: React.FC<{ config: PlaygroundConfig }> = ({ confi
             style={{ height: 500, width: '100%', border: '1px solid var(--color-border)' }}
             data-debug-row-delay={typeof config.defaults.rowDelay === 'object' ? config.defaults.rowDelay.base : config.defaults.rowDelay}
         >
-            <div className="header" style={{
-                display: 'flex', fontWeight: 600, padding: '12px 16px',
-                borderBottom: '2px solid var(--color-border)', backgroundColor: '#f7fafc',
-                color: 'var(--color-text-secondary)', fontSize: '0.875rem'
-            }} role="row">
-                <div style={{ width: '60px' }} role="columnheader">ID</div>
-                <div style={{ width: '150px' }} role="columnheader">Name</div>
-                <div style={{ width: '100px' }} role="columnheader">Status</div>
-                <div style={{ flex: 1 }} role="columnheader">Email</div>
+            <div
+                ref={headerRef}
+                className="header"
+                style={{
+                    display: 'flex', fontWeight: 600, padding: '12px 16px',
+                    borderBottom: '2px solid var(--color-border)', backgroundColor: '#f7fafc',
+                    color: 'var(--color-text-secondary)', fontSize: '0.875rem',
+                    overflowX: 'hidden', // virtuosso handles x scroll
+                    width: '100%'
+                }}
+                role="row"
+            >
+                <div style={{ display: 'flex', width: totalWidth - 32 }}>
+                    <VirtualizedHeader columns={columns} config={config} scrollerRef={scrollerRef} />
+                </div>
             </div>
 
             <Virtuoso
-                style={{ height: 'calc(100% - 45px)' }} // Subtract header height
+                scrollerRef={(ref) => scrollerRef.current = ref as HTMLElement}
+                onScroll={(e) => {
+                    const target = e.currentTarget as HTMLElement;
+                    if (headerRef.current) {
+                        headerRef.current.scrollLeft = target.scrollLeft;
+                    }
+                }}
+                style={{ height: 'calc(100% - 45px)', overflowX: 'auto' }} // Subtract header height
                 totalCount={config.rowCount}
                 data={new Array(config.rowCount).fill(null).map((_, i) => i)} // Dummy data array for pure index access or just modify itemContent
                 itemContent={(index) => (
-                    <RowContent
-                        index={index}
-                        data={config}
-                        onRowLoaded={onRowLoaded}
-                        isRowCached={isRowCached}
-                        onCellLoaded={onCellLoaded}
-                        isCellCached={isCellCached}
-                    />
+                    <div style={{ width: totalWidth, display: 'flex' }}>
+                        <RowContent
+                            index={index}
+                            data={config}
+                            columns={columns}
+                            scrollerRef={scrollerRef}
+                            onRowLoaded={onRowLoaded}
+                            isRowCached={isRowCached}
+                            onCellLoaded={onCellLoaded}
+                            isCellCached={isCellCached}
+                        />
+                    </div>
                 )}
             />
         </div>
