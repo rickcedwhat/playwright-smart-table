@@ -11,6 +11,11 @@ export type {
     FillOptions,
     RowIterationContext,
     RowIterationOptions,
+    TableContext,
+    StrategyContext,
+    BeforeCellReadFn,
+    GetCellLocatorFn,
+    GetActiveCellFn,
 } from './types';
 
 // Export namespace-like strategy collections

@@ -121,8 +121,23 @@ const useTable = (rootLocator, configOptions = {}) => {
         console.log(`⚠️ Throwing error to display [${promptName}] cleanly...`);
         throw new Error(finalPrompt);
     });
-    const _ensureInitialized = () => __awaiter(void 0, void 0, void 0, function* () {
+    const _autoInit = () => __awaiter(void 0, void 0, void 0, function* () {
         yield tableMapper.getMap();
+    });
+    const _advancePage = () => __awaiter(void 0, void 0, void 0, function* () {
+        var _a;
+        const context = { root: rootLocator, config, page: rootLocator.page(), resolve, getHeaderCell: result.getHeaderCell, getHeaders: result.getHeaders, scrollToColumn: result.scrollToColumn };
+        let advanced;
+        if (typeof config.strategies.pagination === 'function') {
+            advanced = !!(yield config.strategies.pagination(context));
+        }
+        else {
+            advanced = !!(((_a = config.strategies.pagination) === null || _a === void 0 ? void 0 : _a.goNext) && (yield config.strategies.pagination.goNext(context)));
+        }
+        if (advanced) {
+            tableState.currentPageIndex++;
+        }
+        return advanced;
     });
     const result = {
         get currentPageIndex() { return tableState.currentPageIndex; },
@@ -160,7 +175,7 @@ const useTable = (rootLocator, configOptions = {}) => {
         reset: () => __awaiter(void 0, void 0, void 0, function* () {
             var _a;
             log("Resetting table...");
-            const context = { root: rootLocator, config, page: rootLocator.page(), resolve };
+            const context = { root: rootLocator, config, page: rootLocator.page(), resolve, getHeaderCell: result.getHeaderCell };
             yield config.onReset(context);
             if (typeof config.strategies.pagination !== 'function' && ((_a = config.strategies.pagination) === null || _a === void 0 ? void 0 : _a.goToFirst)) {
                 log("Auto-navigating to first page...");
@@ -172,7 +187,8 @@ const useTable = (rootLocator, configOptions = {}) => {
             _hasPaginated = false;
             tableState.currentPageIndex = 0;
             tableMapper.clear();
-            log("Table reset complete.");
+            log("Table reset complete. Calling autoInit to restore state.");
+            yield _autoInit();
         }),
         revalidate: () => __awaiter(void 0, void 0, void 0, function* () {
             log("Revalidating table structure...");
@@ -182,16 +198,16 @@ const useTable = (rootLocator, configOptions = {}) => {
         getRow: (filters, options = { exact: false }) => {
             const map = tableMapper.getMapSync();
             if (!map)
-                throw new Error('Table not initialized. Call await table.init() first, or use async methods like table.findRow() or table.getRows() which auto-initialize.');
+                throw new Error('Table not initialized. Call await table.init() first, or use async methods like table.findRow() or table.findRows() which auto-initialize.');
             const allRows = resolve(config.rowSelector, rootLocator);
             const matchedRows = filterEngine.applyFilters(allRows, filters, map, options.exact || false, rootLocator.page());
             const rowLocator = matchedRows.first();
             return _makeSmart(rowLocator, map, 0); // fallback index 0
         },
-        getRowByIndex: (index, options = {}) => {
+        getRowByIndex: (index) => {
             const map = tableMapper.getMapSync();
             if (!map)
-                throw new Error('Table not initialized. Call await table.init() first, or use async methods like table.findRow() or table.getRows() which auto-initialize.');
+                throw new Error('Table not initialized. Call await table.init() first, or use async methods like table.findRow() or table.findRows() which auto-initialize.');
             const rowLocator = resolve(config.rowSelector, rootLocator).nth(index);
             return _makeSmart(rowLocator, map, index);
         },
@@ -208,7 +224,7 @@ const useTable = (rootLocator, configOptions = {}) => {
         sorting: {
             apply: (columnName, direction) => __awaiter(void 0, void 0, void 0, function* () {
                 var _a;
-                yield _ensureInitialized();
+                yield _autoInit();
                 if (!config.strategies.sorting)
                     throw new Error('No sorting strategy has been configured.');
                 log(`Applying sort for column "${columnName}" (${direction})`);
@@ -237,7 +253,7 @@ const useTable = (rootLocator, configOptions = {}) => {
                 throw new Error(`Failed to sort column "${columnName}" to "${direction}" after ${maxRetries} attempts.`);
             }),
             getState: (columnName) => __awaiter(void 0, void 0, void 0, function* () {
-                yield _ensureInitialized();
+                yield _autoInit();
                 if (!config.strategies.sorting)
                     throw new Error('No sorting strategy has been configured.');
                 const context = { root: rootLocator, config, page: rootLocator.page(), resolve, getHeaderCell: result.getHeaderCell };
@@ -247,8 +263,7 @@ const useTable = (rootLocator, configOptions = {}) => {
         // ─── Shared async row iterator ───────────────────────────────────────────
         [Symbol.asyncIterator]() {
             return __asyncGenerator(this, arguments, function* _a() {
-                var _b;
-                yield __await(_ensureInitialized());
+                yield __await(_autoInit());
                 const map = tableMapper.getMapSync();
                 const effectiveMaxPages = config.maxPages;
                 let rowIndex = 0;
@@ -261,25 +276,16 @@ const useTable = (rootLocator, configOptions = {}) => {
                     }
                     if (pagesScanned >= effectiveMaxPages)
                         break;
-                    const context = { root: rootLocator, config, page: rootLocator.page(), resolve };
-                    let advanced;
-                    if (typeof config.strategies.pagination === 'function') {
-                        advanced = !!(yield __await(config.strategies.pagination(context)));
-                    }
-                    else {
-                        advanced = !!(((_b = config.strategies.pagination) === null || _b === void 0 ? void 0 : _b.goNext) && (yield __await(config.strategies.pagination.goNext(context))));
-                    }
-                    if (!advanced)
+                    if (!(yield __await(_advancePage())))
                         break;
-                    tableState.currentPageIndex++;
                     pagesScanned++;
                 }
             });
         },
         // ─── Private row-iteration engine ────────────────────────────────────────
         forEach: (callback_1, ...args_1) => __awaiter(void 0, [callback_1, ...args_1], void 0, function* (callback, options = {}) {
-            var _a, _b, _c, _d;
-            yield _ensureInitialized();
+            var _a, _b, _c;
+            yield _autoInit();
             const map = tableMapper.getMapSync();
             const effectiveMaxPages = (_a = options.maxPages) !== null && _a !== void 0 ? _a : config.maxPages;
             const dedupeStrategy = (_b = options.dedupe) !== null && _b !== void 0 ? _b : config.strategies.dedupe;
@@ -321,23 +327,14 @@ const useTable = (rootLocator, configOptions = {}) => {
                 rowIndex += smartRows.length;
                 if (stopped || pagesScanned >= effectiveMaxPages)
                     break;
-                const context = { root: rootLocator, config, page: rootLocator.page(), resolve };
-                let advanced;
-                if (typeof config.strategies.pagination === 'function') {
-                    advanced = !!(yield config.strategies.pagination(context));
-                }
-                else {
-                    advanced = !!(((_d = config.strategies.pagination) === null || _d === void 0 ? void 0 : _d.goNext) && (yield config.strategies.pagination.goNext(context)));
-                }
-                if (!advanced)
+                if (!(yield _advancePage()))
                     break;
-                tableState.currentPageIndex++;
                 pagesScanned++;
             }
         }),
         map: (callback_1, ...args_1) => __awaiter(void 0, [callback_1, ...args_1], void 0, function* (callback, options = {}) {
-            var _a, _b, _c, _d;
-            yield _ensureInitialized();
+            var _a, _b, _c;
+            yield _autoInit();
             const map = tableMapper.getMapSync();
             const effectiveMaxPages = (_a = options.maxPages) !== null && _a !== void 0 ? _a : config.maxPages;
             const dedupeStrategy = (_b = options.dedupe) !== null && _b !== void 0 ? _b : config.strategies.dedupe;
@@ -383,24 +380,15 @@ const useTable = (rootLocator, configOptions = {}) => {
                 rowIndex += smartRows.length;
                 if (stopped || pagesScanned >= effectiveMaxPages)
                     break;
-                const context = { root: rootLocator, config, page: rootLocator.page(), resolve };
-                let advanced;
-                if (typeof config.strategies.pagination === 'function') {
-                    advanced = !!(yield config.strategies.pagination(context));
-                }
-                else {
-                    advanced = !!(((_d = config.strategies.pagination) === null || _d === void 0 ? void 0 : _d.goNext) && (yield config.strategies.pagination.goNext(context)));
-                }
-                if (!advanced)
+                if (!(yield _advancePage()))
                     break;
-                tableState.currentPageIndex++;
                 pagesScanned++;
             }
             return results;
         }),
         filter: (predicate_1, ...args_1) => __awaiter(void 0, [predicate_1, ...args_1], void 0, function* (predicate, options = {}) {
-            var _a, _b, _c, _d;
-            yield _ensureInitialized();
+            var _a, _b, _c;
+            yield _autoInit();
             const map = tableMapper.getMapSync();
             const effectiveMaxPages = (_a = options.maxPages) !== null && _a !== void 0 ? _a : config.maxPages;
             const dedupeStrategy = (_b = options.dedupe) !== null && _b !== void 0 ? _b : config.strategies.dedupe;
@@ -432,7 +420,7 @@ const useTable = (rootLocator, configOptions = {}) => {
                         if (stopped)
                             break;
                         if (dedupeKeys) {
-                            const key = yield options.dedupe(row);
+                            const key = yield dedupeStrategy(row);
                             if (dedupeKeys.has(key))
                                 continue;
                             dedupeKeys.add(key);
@@ -445,17 +433,8 @@ const useTable = (rootLocator, configOptions = {}) => {
                 rowIndex += smartRows.length;
                 if (stopped || pagesScanned >= effectiveMaxPages)
                     break;
-                const context = { root: rootLocator, config, page: rootLocator.page(), resolve };
-                let advanced;
-                if (typeof config.strategies.pagination === 'function') {
-                    advanced = !!(yield config.strategies.pagination(context));
-                }
-                else {
-                    advanced = !!(((_d = config.strategies.pagination) === null || _d === void 0 ? void 0 : _d.goNext) && (yield config.strategies.pagination.goNext(context)));
-                }
-                if (!advanced)
+                if (!(yield _advancePage()))
                     break;
-                tableState.currentPageIndex++;
                 pagesScanned++;
             }
             return (0, smartRowArray_1.createSmartRowArray)(matched);

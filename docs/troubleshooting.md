@@ -76,7 +76,7 @@ const row = table.getRowByIndex(0);
 ```typescript
 // These methods auto-initialize
 const row = await table.findRow({ Name: 'John' }); // ✅
-const rows = await table.getRows(); // ✅
+const rows = await table.findRows({}); // ✅
 ```
 
 ---
@@ -232,11 +232,8 @@ Tests are slow when iterating through large tables.
 **1. Use batching**
 
 ```typescript
-await table.iterateThroughTable({
-  batchSize: 50, // Process 50 rows at a time
-  callback: async (row) => {
-    // Process row
-  }
+await table.forEach(async ({ row }) => {
+  // Process row
 });
 ```
 
@@ -253,13 +250,11 @@ const rows = await table.findRows(
 
 ```typescript
 // ❌ Slow - gets all rows then filters in code
-const allRows = await table.getRows();
+const allRows = await table.findRows({});
 const filtered = allRows.filter(/* ... */);
 
 // ✅ Fast - filters in DOM
-const filtered = await table.getRows({
-  filter: { Office: 'Tokyo' }
-});
+const filtered = await table.findRows({ Office: 'Tokyo' });
 ```
 
 ---

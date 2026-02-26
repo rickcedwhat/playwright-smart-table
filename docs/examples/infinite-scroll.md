@@ -60,12 +60,12 @@ strategies: {
 
 ## Data Scraping with Infinite Scroll
 
-You can scrape an entire infinite list using `iterateThroughTable`.
+You can scrape an entire infinite list using `table.map()`.
 
 ```typescript
-const allItems = await table.iterateThroughTable(async ({ rows }) => {
+const allItems = await table.map(async ({ row }) => {
   // Process visible rows
-  return rows.toJSON();
+  return row.toJSON();
 }, {
   // dedupe is important for infinite scroll!
   // Rows often stay in the DOM, so we might see them again.

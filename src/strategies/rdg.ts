@@ -73,22 +73,7 @@ export const rdgGetCellLocator = ({ row, columnIndex }: any) => {
     return row.locator(`[role="gridcell"][aria-colindex="${ariaColIndex}"]`);
 };
 
-/**
- * Scrolls virtualized columns into view before reading.
- */
-export const rdgCellNavigation = async ({ root, page, index }: any) => {
-    // Check if the column header is visible and scroll horizontally if needed
-    const headerCell = root.locator(`[role="columnheader"][aria-colindex="${index + 1}"]`);
-    const isVisible = await headerCell.isVisible().catch(() => false);
 
-    if (!isVisible) {
-        const estimatedScroll = index * 150;
-        await root.evaluate((el: HTMLElement, scrollAmount: number) => {
-            el.scrollLeft = scrollAmount;
-        }, estimatedScroll);
-        await page.waitForTimeout(300);
-    }
-};
 
 /**
  * Scrolls the grid vertically to load more virtualized rows.
@@ -145,7 +130,6 @@ export const rdgNavigation = {
 export const RDGStrategies = {
     header: scrollRightHeaderRDG,
     getCellLocator: rdgGetCellLocator,
-    cellNavigation: rdgCellNavigation,
     navigation: rdgNavigation,
     pagination: rdgPaginationStrategy
 };

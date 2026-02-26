@@ -8,8 +8,7 @@
 ### 👩‍💻 Developer Experience
 - [x] **`columnOverrides`**: Introduce `columnOverrides` to `TableConfig`.
     - **Purpose**: Unified interface for two-way data binding per column, overriding `smartFill` and `toJSON`.
-    - **Benefit**: Fixes "magic" issues and deprecates separate `dataMapper` config.
-    - **Note**: `dataMapper` is now deprecated and will be removed in a future major version.
+
 - [x] **Test Coverage for `bringIntoView` with `findRows`**:
     - **Purpose**: Ensure `row.bringIntoView()` works reliably for rows found across multiple pages via `findRows`.
 - [x] **Array-like Iteration Methods (`map`, `forEach`, `filter`)**:

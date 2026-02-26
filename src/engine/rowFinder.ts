@@ -46,52 +46,31 @@ export class RowFinder<T = any> {
 
         const sentinel = this.resolve(this.config.rowSelector, this.rootLocator)
             .filter({ hasText: "___SENTINEL_ROW_NOT_FOUND___" + Date.now() });
-        return this.makeSmartRow(sentinel, await this.tableMapper.getMap(), 0);
+        const smartRow = this.makeSmartRow(sentinel, await this.tableMapper.getMap(), 0);
+        (smartRow as any)._isSentinel = true;
+        return smartRow;
     }
 
     public async findRows(
-        filtersOrOptions?: (Partial<T> | Record<string, FilterValue>) & ({ exact?: boolean, maxPages?: number }),
-        // Deprecated: verify legacy usage pattern support
-        legacyOptions?: { exact?: boolean, maxPages?: number }
+        filters?: Partial<T> | Record<string, FilterValue>,
+        options?: { exact?: boolean, maxPages?: number }
     ): Promise<SmartRowArray<T>> {
-        // Detect argument pattern:
-        // Pattern A: findRows({ Name: 'Alice' }, { maxPages: 5 })
-        // Pattern B: findRows({ maxPages: 5 })  <-- No filters, just options
-        // Pattern C: findRows({ Name: 'Alice' }) <-- Only filters
-
-        let filters: Record<string, FilterValue> = {};
-        let options: { exact?: boolean, maxPages?: number } = {};
-
-        if (legacyOptions) {
-            // Pattern A
-            filters = filtersOrOptions as Record<string, FilterValue>;
-            options = legacyOptions;
-        } else {
-            // Pattern B or C
-            // We need to separate unknown keys (filters) from known options (exact, maxPages)
-            // However, filtersOrOptions can be null/undefined
-            if (filtersOrOptions) {
-                const { exact, maxPages, ...rest } = filtersOrOptions as any;
-                options = { exact, maxPages };
-                filters = rest;
-            }
-        }
-
+        const filtersRecord = (filters as Record<string, FilterValue>) || {};
         const map = await this.tableMapper.getMap();
         const allRows: SmartRow<T>[] = [];
-        const effectiveMaxPages = options.maxPages ?? this.config.maxPages ?? Infinity;
+        const effectiveMaxPages = options?.maxPages ?? this.config.maxPages ?? Infinity;
         let pagesScanned = 1;
 
         const collectMatches = async () => {
             // ... logic ...
             let rowLocators = this.resolve(this.config.rowSelector, this.rootLocator);
             // Only apply filters if we have them
-            if (Object.keys(filters).length > 0) {
+            if (Object.keys(filtersRecord).length > 0) {
                 rowLocators = this.filterEngine.applyFilters(
                     rowLocators,
-                    filters,
+                    filtersRecord,
                     map,
-                    options.exact ?? false,
+                    options?.exact ?? false,
                     this.rootLocator.page()
                 );
             }
@@ -133,7 +112,7 @@ export class RowFinder<T = any> {
                 paginationResult = await this.config.strategies.pagination.goNext(context);
             }
 
-            const didPaginate = await validatePaginationResult(paginationResult, 'Pagination Strategy');
+            const didPaginate = validatePaginationResult(paginationResult, 'Pagination Strategy');
 
             if (!didPaginate) break;
 

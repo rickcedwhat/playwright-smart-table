@@ -63,14 +63,12 @@ await expect(row.getCell('Age')).toBeVisible();
 ## Getting Multiple Rows
 
 ```typescript
-// Get all rows on current page
-const allRows = await table.getRows();
+// Get all rows
+const allRows = await table.findRows({});
 console.log(`Found ${allRows.length} rows`);
 
 // Filter rows
-const tokyoEmployees = await table.getRows({
-  filter: { Office: 'Tokyo' }
-});
+const tokyoEmployees = await table.findRows({ Office: 'Tokyo' });
 
 // Iterate through rows
 for (const row of allRows) {
@@ -83,7 +81,7 @@ for (const row of allRows) {
 
 ```typescript
 // Get rows and convert to JSON
-const rows = await table.getRows();
+const rows = await table.findRows({});
 const data = await rows.toJSON();
 
 console.log(data);
@@ -119,15 +117,13 @@ await row.getCell('Actions').hover();
 
 ```typescript
 // Get all names
-const names = await table.getColumnValues('Name');
+const names = await table.map(({ row }) => row.getCell('Name').innerText());
 console.log(names); // ['Airi Satou', 'Angelica Ramos', ...]
 
-// With custom mapper
-const salaries = await table.getColumnValues('Salary', {
-  mapper: async (cell) => {
-    const text = await cell.textContent();
-    return parseInt(text.replace(/[$,]/g, ''));
-  }
+// With custom mapping logic
+const salaries = await table.map(async ({ row }) => {
+  const text = await row.getCell('Salary').innerText();
+  return parseInt(text.replace(/[$,]/g, ''));
 });
 
 const avgSalary = salaries.reduce((a, b) => a + b) / salaries.length;
@@ -158,9 +154,7 @@ test('employee table operations', async ({ page }) => {
   await expect(airi.getCell('Age')).toHaveText('33');
   
   // Get all Tokyo employees
-  const tokyoEmployees = await table.getRows({
-    filter: { Office: 'Tokyo' }
-  });
+  const tokyoEmployees = await table.findRows({ Office: 'Tokyo' });
   
   console.log(`Tokyo has ${tokyoEmployees.length} employees`);
   

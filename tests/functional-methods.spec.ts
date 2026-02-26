@@ -252,4 +252,43 @@ test.describe('dedupe option', () => {
         // Verify no duplicates
         expect(new Set(ids).size).toBe(6);
     });
+
+    test('filter uses globally configured dedupe strategy sequentially', async ({ page }) => {
+        // Create table with repeated identical rows across "pages"
+        const DUP_HTML = `
+            <table id="dup-table">
+                <thead><tr><th>ID</th><th>Status</th></tr></thead>
+                <tbody>
+                    <tr><td>1</td><td>Active</td></tr>
+                    <tr><td>1</td><td>Active</td></tr>
+                </tbody>
+            </table>
+        `;
+        await page.setContent(DUP_HTML);
+        let paginationCalled = false;
+
+        const table = useTable(page.locator('#dup-table'), {
+            strategies: {
+                dedupe: async (row) => row.getCell('ID').innerText(),
+                pagination: async () => {
+                    if (paginationCalled) return false;
+                    paginationCalled = true;
+                    // Mock pagination by appending the identical rows again
+                    await page.evaluate(() => {
+                        const tbody = document.querySelector('tbody');
+                        tbody!.innerHTML += '<tr><td>1</td><td>Active</td></tr><tr><td>1</td><td>Active</td></tr>';
+                    });
+                    return true;
+                }
+            }
+        });
+
+        // Use filter with default sequential iteration
+        const activeRows = await table.filter(async ({ row }) => {
+            return await row.getCell('Status').innerText() === 'Active';
+        });
+
+        // 4 rows in DOM matching 'Active', but all have ID '1', so dedupe should return exactly 1
+        expect(activeRows.length).toBe(1);
+    });
 });

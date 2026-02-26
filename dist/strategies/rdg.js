@@ -9,7 +9,7 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
     });
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.RDGStrategies = exports.rdgNavigation = exports.rdgPaginationStrategy = exports.rdgCellNavigation = exports.rdgGetCellLocator = exports.scrollRightHeaderRDG = void 0;
+exports.RDGStrategies = exports.rdgNavigation = exports.rdgPaginationStrategy = exports.rdgGetCellLocator = exports.scrollRightHeaderRDG = void 0;
 /**
  * Scrolls the grid horizontally to collect all column headers.
  * Handles empty headers by labeling them (e.g. "Checkbox").
@@ -64,22 +64,6 @@ const rdgGetCellLocator = ({ row, columnIndex }) => {
     return row.locator(`[role="gridcell"][aria-colindex="${ariaColIndex}"]`);
 };
 exports.rdgGetCellLocator = rdgGetCellLocator;
-/**
- * Scrolls virtualized columns into view before reading.
- */
-const rdgCellNavigation = (_a) => __awaiter(void 0, [_a], void 0, function* ({ root, page, index }) {
-    // Check if the column header is visible and scroll horizontally if needed
-    const headerCell = root.locator(`[role="columnheader"][aria-colindex="${index + 1}"]`);
-    const isVisible = yield headerCell.isVisible().catch(() => false);
-    if (!isVisible) {
-        const estimatedScroll = index * 150;
-        yield root.evaluate((el, scrollAmount) => {
-            el.scrollLeft = scrollAmount;
-        }, estimatedScroll);
-        yield page.waitForTimeout(300);
-    }
-});
-exports.rdgCellNavigation = rdgCellNavigation;
 /**
  * Scrolls the grid vertically to load more virtualized rows.
  */
@@ -136,7 +120,6 @@ exports.rdgNavigation = {
 exports.RDGStrategies = {
     header: exports.scrollRightHeaderRDG,
     getCellLocator: exports.rdgGetCellLocator,
-    cellNavigation: exports.rdgCellNavigation,
     navigation: exports.rdgNavigation,
     pagination: exports.rdgPaginationStrategy
 };

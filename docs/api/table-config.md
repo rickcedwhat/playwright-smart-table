@@ -13,20 +13,27 @@ const table = useTable<MyTableType>(page.locator('#table'), {
   // ... more options
 });
 ```
-### `dataMapper`
+### `columnOverrides`
 
-Optional object defining custom data extraction logic per column. This is useful for parsing numbers, checking boolean states, or handling custom components.
+Optional object defining custom data extraction logic (`read`) or fill logic (`write`) per column. This is useful for parsing numbers, checking boolean states, or handling custom widgets like dropdowns or multi-inputs.
 
 ```typescript
-dataMapper: {
-  // Parse 'ID' column as number
-  ID: async (cell) => parseInt(await cell.innerText(), 10),
-  // Check 'Active' column checkbox state
-  Active: async (cell) => await cell.locator('input').isChecked()
+columnOverrides: {
+  // Parse 'ID' column as number when reading data
+  ID: {
+    read: async (cell) => parseInt(await cell.innerText(), 10)
+  },
+  // Custom click logic for the 'Active' column checkbox when writing data
+  Active: {
+    write: async (cell, value) => {
+      if (value) await cell.locator('input').check();
+      else await cell.locator('input').uncheck();
+    }
+  }
 }
 ```
 
-The return types of these mappers must match the generic type `T` provided to `useTable<T>`.
+The return types of these `read` overrides must match the generic type `T` provided to `useTable<T>`.
 ## Properties
 
 ### headerSelector

@@ -4,7 +4,7 @@ Learn how to efficiently extract data from tables, whether they are small, pagin
 
 ## Extracting All Data
 
-The most efficient way to scrape an entire table is using `iterateThroughTable()`. This handles pagination automatically and processes rows in batches.
+The most efficient way to scrape an entire table is using `table.map()`. This handles pagination automatically and processes rows in chunks.
 
 ```typescript
 // Define the data shape you want to extract
@@ -14,22 +14,13 @@ interface User {
   email: string;
 }
 
-const allUsers = await table.iterateThroughTable<User[]>(
-  // Callback runs for each page
-  async ({ rows, allData }) => {
-    // Convert current page rows to JSON
-    const pageUsers = await Promise.all(
-      rows.map(async row => ({
-        id: await row.getCell('ID').innerText(),
-        name: await row.getCell('Name').innerText(),
-        email: await row.getCell('Email').innerText()
-      }))
-    );
-    
-    // Accumulate results
-    return [...allData, ...pageUsers];
-  }
-);
+const allUsers = await table.map<User>(async ({ row }) => {
+  return {
+    id: await row.getCell('ID').innerText(),
+    name: await row.getCell('Name').innerText(),
+    email: await row.getCell('Email').innerText()
+  };
+});
 
 console.log(`Extracted ${allUsers.length} users`);
 ```
@@ -44,15 +35,13 @@ import fs from 'fs';
 const stream = fs.createWriteStream('users.csv');
 stream.write('ID,Name,Email\n');
 
-await table.iterateThroughTable(
-  async ({ rows }) => {
-    for (const row of rows) {
-      const id = await row.getCell('ID').innerText();
-      const name = await row.getCell('Name').innerText();
-      const email = await row.getCell('Email').innerText();
-      
-      stream.write(`${id},${name},${email}\n`);
-    }
+await table.forEach(
+  async ({ row }) => {
+    const id = await row.getCell('ID').innerText();
+    const name = await row.getCell('Name').innerText();
+    const email = await row.getCell('Email').innerText();
+    
+    stream.write(`${id},${name},${email}\n`);
   }
 );
 
@@ -61,18 +50,16 @@ stream.end();
 
 ## Scraping Specific Columns
 
-If you only need values from a single column across all pages, use `getColumnValues()`.
+If you only need values from a single column across all pages, use `table.map()`.
 
 ```typescript
 // Get all email addresses from the entire table
-const emails = await table.getColumnValues('Email');
+const emails = await table.map(({ row }) => row.getCell('Email').innerText());
 
 // Get and transform values (e.g., parse currency)
-const salaries = await table.getColumnValues('Salary', {
-  mapper: async (cell) => {
-    const text = await cell.innerText();
-    return parseFloat(text.replace('$', '').replace(',', ''));
-  }
+const salaries = await table.map(async ({ row }) => {
+  const text = await row.getCell('Salary').innerText();
+  return parseFloat(text.replace('$', '').replace(',', ''));
 });
 ```
 
@@ -81,17 +68,15 @@ const salaries = await table.getColumnValues('Salary', {
 Some tables load data lazily. You might need to wait for cell content to be non-empty.
 
 ```typescript
-await table.iterateThroughTable(
-  async ({ rows }) => {
-    await Promise.all(rows.map(async row => {
-      // Wait for specific cell to have content
-      await expect(row.getCell('Status')).not.toBeEmpty();
-      // Or wait for a specific condition
-      await row.getCell('Status').locator('.badge').waitFor();
-    }));
+const allData = await table.map(
+  async ({ row }) => {
+    // Wait for specific cell to have content
+    await expect(row.getCell('Status')).not.toBeEmpty();
+    // Or wait for a specific condition
+    await row.getCell('Status').locator('.badge').waitFor();
     
     // Now extract data...
-    return rows.toJSON();
+    return row.toJSON();
   }
 );
 ```
@@ -102,7 +87,7 @@ You can easily dump the current page or specific rows to JSON.
 
 ```typescript
 // Dump current page
-const pageData = await table.getRows().then(r => r.toJSON());
+const pageData = await table.findRows({}).then(r => r.toJSON());
 
 // Dump specific rows
 const activeUsers = await table.findRows({ Status: 'Active' });

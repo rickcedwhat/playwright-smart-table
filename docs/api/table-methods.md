@@ -108,47 +108,6 @@ const gmailRow = table.getRow({
 
 ---
 
-## getRows()
-
-Get all rows on the current page (does not paginate). Returns a `SmartRowArray` which adds helper methods like `toJSON()`.
-
-
-<!-- api-signature: getRows -->
-
-### Signature
-
-```typescript
-getRows(options?: {
-  filter?: Record<string, any>,
-  exact?: boolean
-}): Promise<SmartRowArray>
-```
-
-### Parameters
-
-- `options` - Filter options
-
-<!-- /api-signature: getRows -->
-
-### Example
-
-```typescript
-const rows = await table.getRows();
-
-// Filter in memory
-const activeRows = rows.filter(async row => 
-  await row.getCell('Status').innerText() === 'Active'
-);
-
-// Convert all to JSON
-const data = await rows.toJSON();
-console.log(data); 
-// [{ Name: 'John', Status: 'Active' }, ...]
-```
-
-[Back to Top](#table-methods)
-
----
 
 ## getRowByIndex()
 
@@ -256,12 +215,6 @@ const rows = await table.findRows({ Status: 'Active' });
 const data = await rows.toJSON();
 ```
 
-### Parameters
-
-- `filters` - The filter criteria to match
-- `options` - Search options including exact match, max pages, and asJSON
-
-<!-- /api-signature: findRows -->
 
 ### Example
 
@@ -286,30 +239,6 @@ const exactRows = await table.findRows(
 
 ---
 
-## getColumnValues()
-
-Extract all values from a specific column across multiple pages.
-
-
-<!-- api-signature: getColumnValues -->
-
-### Signature
-
-```typescript
-getColumnValues<V = string>(
-  column: string,
-  options?: {
-    mapper?: (cell: Locator) => Promise<V> | V,
-    maxPages?: number
-  }
-): Promise<V[]>
-```
-
-<!-- /api-signature: getColumnValues -->
-
-[Back to Top](#table-methods)
-
----
 
 ## getHeaders()
 
@@ -348,47 +277,6 @@ getHeaderCell(columnName: string): Promise<Locator>
 [Back to Top](#table-methods)
 
 ---
-
-## iterateThroughTable()
-
-Iterate through all rows across all pages with callbacks.
-
-
-<!-- api-signature: iterateThroughTable -->
-
-### Signature
-
-```typescript
-iterateThroughTable: <T = any>(
-  callback: (context: {
-  index: number;
-  isFirst: boolean;
-  isLast: boolean;
-  rows: SmartRowArray;
-  allData: T[];
-  table: RestrictedTableResult;
-  batchInfo?: {
-  startIndex: number;
-  endIndex: number;
-  size: number;
-  };
-  }) => T | T[] | Promise<T | T[]>,
-  options?: {
-  pagination?: PaginationStrategy;
-  dedupeStrategy?: DedupeStrategy;
-  maxIterations?: number;
-  batchSize?: number;
-  getIsFirst?: (context: { index: number }) => boolean;
-  getIsLast?: (context: { index: number, paginationResult: boolean }) => boolean;
-  beforeFirst?: (context: { index: number, rows: SmartRowArray, allData: any[] }) => void | Promise<void>;
-  afterLast?: (context: { index: number, rows: SmartRowArray, allData: any[] }) => void | Promise<void>;
-  autoFlatten?: boolean;
-  }
-```
-
-<!-- /api-signature: iterateThroughTable -->
-
-[Back to Top](#table-methods)
 
 
 ## scrollToColumn()

@@ -7,11 +7,11 @@ Strategies define how the library interacts with different table implementations
 
 | Strategy Type | Used By Methods | Description |
 |--------------|----------------|-------------|
-| **Pagination** | `findRow()`, `findRows()`, `iterateThroughTable()` | Navigating to next pages |
+| **Pagination** | `findRow()`, `findRows()`, `forEach`, `map` | Navigating to next pages |
 | **Sorting** | `sorting.apply()` | applying sort order |
 | **Fill** | `row.smartFill()` | Entering data into cells |
 | **Header** | `init()`, `revalidate()` | Finding and parsing column headers |
-| **Resolution** | `getCell()`, `column navigation` | Locating specific cells within a row |
+| **Resolution** | `getCell()` | Locating specific cells within a row |
 
 ## Overview
 
@@ -159,35 +159,6 @@ strategies: {
 
 ---
 
-## Cell Navigation Strategies
-
-Control how to move focus to a specific column, especially in virtualized tables where horizontal scrolling is required.
-
-### Keyboard
-
-Uses keyboard arrow keys to navigate.
-
-```typescript
-Strategies.CellNavigation.Keyboard(options?: {
-    rootSelector?: string // Container to focus before pressing keys
-})
-```
-
-### Custom Navigation
-
-```typescript
-strategies: {
-    cellNavigation: async ({ page, currentColumn, targetColumn }) => {
-        // Calculate difference and press Right/Left keys
-        const diff = targetColumnIndex - currentColumnIndex;
-        for (let i = 0; i < Math.abs(diff); i++) {
-            await page.keyboard.press(diff > 0 ? 'ArrowRight' : 'ArrowLeft');
-        }
-    }
-}
-```
-
----
 
 ## Fill Strategies
 

@@ -48,11 +48,9 @@ const engineers = await table.findRows(
 ## Iterating Through All Pages
 
 ```typescript
-await table.iterateThroughTable({
-  callback: async (row, index) => {
-    const name = await row.getCell('Name').textContent();
-    console.log(`${index}: ${name}`);
-  }
+await table.forEach(async ({ row, rowIndex }) => {
+  const name = await row.getCell('Name').textContent();
+  console.log(`${rowIndex}: ${name}`);
 });
 ```
 
@@ -60,10 +58,10 @@ await table.iterateThroughTable({
 
 ```typescript
 // Get all email addresses across all pages
-const emails = await table.getColumnValues('Email');
+const emails = await table.map(({ row }) => row.getCell('Email').innerText());
 
 // With page limit
-const emails = await table.getColumnValues('Email', {
+const emails = await table.map(({ row }) => row.getCell('Email').innerText(), {
   maxPages: 5
 });
 ```
@@ -136,12 +134,8 @@ test('paginated table search', async ({ page }) => {
   console.log(`Found ${sfEmployees.length} SF employees`);
   
   // Export all data
-  const allData = [];
-  await table.iterateThroughTable({
-    callback: async (row) => {
-      const data = await row.toJSON();
-      allData.push(data);
-    }
+  const allData = await table.map(async ({ row }) => {
+    return row.toJSON();
   });
   
   console.log(`Total employees: ${allData.length}`);

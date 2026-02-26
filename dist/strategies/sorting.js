@@ -23,21 +23,16 @@ exports.SortingStrategies = {
         return {
             doSort(_a) {
                 return __awaiter(this, arguments, void 0, function* ({ columnName, direction, context }) {
-                    const { getHeaderCell } = context;
-                    if (!getHeaderCell)
-                        throw new Error('getHeaderCell is required in StrategyContext for sorting.');
+                    // getHeaderCell is always present on TableContext after table is initialized
+                    const targetHeader = yield context.getHeaderCell(columnName);
                     // The table engine handles verify-and-retry. We only provide the trigger here.
-                    const targetHeader = yield getHeaderCell(columnName);
                     yield targetHeader.click();
                 });
             },
             getSortState(_a) {
                 return __awaiter(this, arguments, void 0, function* ({ columnName, context }) {
-                    const { getHeaderCell } = context;
                     try {
-                        if (!getHeaderCell)
-                            throw new Error('getHeaderCell is required');
-                        const targetHeader = yield getHeaderCell(columnName);
+                        const targetHeader = yield context.getHeaderCell(columnName);
                         const ariaSort = yield targetHeader.getAttribute('aria-sort');
                         if (ariaSort === 'ascending')
                             return 'asc';
@@ -46,7 +41,7 @@ exports.SortingStrategies = {
                         return 'none';
                     }
                     catch (_b) {
-                        return 'none'; // Header not found, so it's not sorted
+                        return 'none'; // Header not found, treat as unsorted
                     }
                 });
             },

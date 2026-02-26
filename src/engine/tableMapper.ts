@@ -110,7 +110,7 @@ export class TableMapper {
                 text = await this.config.headerTransformer({
                     text,
                     index: i,
-                    locator: this.rootLocator.locator(this.config.headerSelector as string).nth(i),
+                    locator: this.resolve(this.config.headerSelector, this.rootLocator).nth(i),
                     seenHeaders
                 });
             }

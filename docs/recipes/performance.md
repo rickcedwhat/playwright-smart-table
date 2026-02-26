@@ -2,20 +2,19 @@
 
 Tips for keeping your table tests fast and reliable, especially with large datasets.
 
-## 1. Use `iterateThroughTable`
+## 1. Use Iteration Methods (`map`, `forEach`, `filter`)
 
 Instead of paging manually:
 
 ```typescript
 // ❌ Slow: Looping manually
 for (let i = 0; i < 10; i++) {
-   await table.getRows();
-   await nextBtn.click();
+   await table.findRows({}); // or manually clicking next
 }
 
 // ✅ Fast: Built-in iteration
-await table.iterateThroughTable(async ({ rows }) => {
-   // Processing happens efficiently in batches
+await table.forEach(async ({ row }) => {
+   // Automation handles pagination seamlessly
 });
 ```
 

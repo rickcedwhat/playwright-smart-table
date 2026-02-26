@@ -18,5 +18,10 @@
     "name": "smartFill",
     "signature": "smartFill: (data: Partial<T> | Record<string, any>, options?: FillOptions) => Promise<void>",
     "comment": "/**\n* Intelligently fills form fields in the row.\n* Automatically detects input types (text, select, checkbox, contenteditable).\n*\n* @param data - Column-value pairs to fill\n* @param options - Optional configuration\n* @param options.inputMappers - Custom input selectors per column\n* @example\n* // Auto-detection\n* await row.smartFill({ Name: 'John', Status: 'Active', Subscribe: true });\n*\n* // Custom input mappers\n* await row.smartFill(\n*   { Name: 'John' },\n*   { inputMappers: { Name: (cell) => cell.locator('.custom-input') } }\n* );\n*/"
+  },
+  {
+    "name": "wasFound",
+    "signature": "wasFound(): boolean",
+    "comment": "/**\n* Returns whether the row exists in the DOM (i.e. is not a sentinel row).\n*/"
   }
 ]

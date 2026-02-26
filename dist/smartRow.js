@@ -16,7 +16,6 @@ const debugUtils_1 = require("./utils/debugUtils");
 /**
  * Internal helper to navigate to a cell with active cell optimization.
  * Uses navigation primitives (goUp, goDown, goLeft, goRight, goHome) for orchestration.
- * Falls back to cellNavigation for backward compatibility.
  * Returns the target cell locator after navigation.
  */
 const _navigateToCell = (params) => __awaiter(void 0, void 0, void 0, function* () {
@@ -91,7 +90,6 @@ const _navigateToCell = (params) => __awaiter(void 0, void 0, void 0, function* 
         }
         return null;
     }
-    ;
     return null;
 });
 /**
@@ -121,10 +119,23 @@ const createSmartRow = (rowLocator, map, rowIndex, config, rootLocator, resolve,
         }
         return resolve(config.cellSelector, rowLocator).nth(idx);
     };
+    smart.wasFound = () => {
+        return !smart._isSentinel;
+    };
     smart.toJSON = (options) => __awaiter(void 0, void 0, void 0, function* () {
         var _a;
         const result = {};
         const page = rootLocator.page();
+        // Build a getHeaderCell helper for the beforeCellRead context.
+        // Uses the table reference if available, otherwise falls back to index-based lookup.
+        const getHeaderCell = (table === null || table === void 0 ? void 0 : table.getHeaderCell)
+            ? table.getHeaderCell.bind(table)
+            : (colName) => __awaiter(void 0, void 0, void 0, function* () {
+                const idx = map.get(colName);
+                if (idx === undefined)
+                    throw new Error(`Column "${colName}" not found`);
+                return resolve(config.headerSelector, rootLocator).nth(idx);
+            });
         for (const [col, idx] of map.entries()) {
             if ((options === null || options === void 0 ? void 0 : options.columns) && !options.columns.includes(col)) {
                 continue;
@@ -132,13 +143,6 @@ const createSmartRow = (rowLocator, map, rowIndex, config, rootLocator, resolve,
             // Check if we have a column override for this column
             const columnOverride = (_a = config.columnOverrides) === null || _a === void 0 ? void 0 : _a[col];
             const mapper = columnOverride === null || columnOverride === void 0 ? void 0 : columnOverride.read;
-            if (mapper) {
-                // Use custom mapper
-                // Ensure we have the cell first (same navigation logic)
-                // ... wait, the navigation logic below assumes we need to navigate.
-                // If we have a mapper, we still need the cell locator.
-                // Let's reuse the navigation logic to get targetCell
-            }
             // --- Navigation Logic Start ---
             const cell = config.strategies.getCellLocator
                 ? config.strategies.getCellLocator({
@@ -168,6 +172,19 @@ const createSmartRow = (rowLocator, map, rowIndex, config, rootLocator, resolve,
                 }
             }
             // --- Navigation Logic End ---
+            // Call beforeCellRead hook if configured.
+            // Fires for BOTH columnOverrides.read and the default innerText path.
+            if (config.strategies.beforeCellRead) {
+                yield config.strategies.beforeCellRead({
+                    cell: targetCell,
+                    columnName: col,
+                    columnIndex: idx,
+                    row: rowLocator,
+                    page,
+                    root: rootLocator,
+                    getHeaderCell,
+                });
+            }
             if (mapper) {
                 // Apply mapper
                 const mappedValue = yield mapper(targetCell);
@@ -182,6 +199,7 @@ const createSmartRow = (rowLocator, map, rowIndex, config, rootLocator, resolve,
         return result;
     });
     smart.smartFill = (data, fillOptions) => __awaiter(void 0, void 0, void 0, function* () {
+        var _a;
         (0, debugUtils_1.logDebug)(config, 'info', 'Filling row', data);
         for (const [colName, value] of Object.entries(data)) {
             if (value === undefined)
@@ -200,19 +218,35 @@ const createSmartRow = (rowLocator, map, rowIndex, config, rootLocator, resolve,
                 rowLocator,
                 rowIndex
             });
-            const strategy = config.strategies.fill || fill_1.FillStrategies.default;
-            (0, debugUtils_1.logDebug)(config, 'verbose', `Filling cell "${colName}" with value`, value);
-            yield strategy({
-                row: smart,
-                columnName: colName,
-                value,
-                index: rowIndex !== null && rowIndex !== void 0 ? rowIndex : -1,
-                page: rowLocator.page(),
-                rootLocator,
-                config,
-                table: table,
-                fillOptions
-            });
+            const columnOverride = (_a = config.columnOverrides) === null || _a === void 0 ? void 0 : _a[colName];
+            if (columnOverride === null || columnOverride === void 0 ? void 0 : columnOverride.write) {
+                const cellLocator = smart.getCell(colName);
+                let currentValue;
+                if (columnOverride.read) {
+                    currentValue = yield columnOverride.read(cellLocator);
+                }
+                yield columnOverride.write({
+                    cell: cellLocator,
+                    targetValue: value,
+                    currentValue,
+                    row: smart
+                });
+            }
+            else {
+                const strategy = config.strategies.fill || fill_1.FillStrategies.default;
+                (0, debugUtils_1.logDebug)(config, 'verbose', `Filling cell "${colName}" with value`, value);
+                yield strategy({
+                    row: smart,
+                    columnName: colName,
+                    value,
+                    index: rowIndex !== null && rowIndex !== void 0 ? rowIndex : -1,
+                    page: rowLocator.page(),
+                    rootLocator,
+                    config,
+                    table: table,
+                    fillOptions
+                });
+            }
             // Delay after filling
             yield (0, debugUtils_1.debugDelay)(config, 'getCell');
         }

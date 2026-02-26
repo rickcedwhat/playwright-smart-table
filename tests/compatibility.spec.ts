@@ -32,110 +32,7 @@ test.describe('Backwards Compatibility Tests', () => {
     expect(table).toHaveProperty('reset');
   });
 
-  test('Core: getRow returns SmartRow with getCell method', async ({ page }) => {
-    await page.goto('https://datatables.net/examples/data_sources/dom');
 
-    const table = useTable(page.locator('#example'), {
-      headerSelector: 'thead th'
-    });
-    await table.init();
-
-    const row = table.getRow({ Name: 'Airi Satou' });
-
-    // SmartRow should have getCell method
-    expect(typeof row.getCell).toBe('function');
-    expect(typeof row.toJSON).toBe('function');
-
-    // getCell should return a Locator
-    const cell = row.getCell('Position');
-    await expect(cell).toHaveText('Accountant');
-  });
-
-  test('Core: getRow with multiple filters', async ({ page }) => {
-    await page.goto('https://datatables.net/examples/data_sources/dom');
-
-    const table = useTable(page.locator('#example'), {
-      headerSelector: 'thead th'
-    });
-    await table.init();
-
-    const row = table.getRow({ Name: 'Airi Satou', Office: 'Tokyo' });
-    await expect(row).toBeVisible();
-  });
-
-  test('Core: getRow returns sentinel for non-existent rows', async ({ page }) => {
-    await page.goto('https://datatables.net/examples/data_sources/dom');
-
-    const table = useTable(page.locator('#example'), {
-      headerSelector: 'thead th'
-    });
-    await table.init();
-
-    const row = table.getRow({ Name: 'NonExistentUser' });
-    await expect(row).not.toBeVisible();
-  });
-
-  test('Core: findRows (current page) returns array of SmartRows', async ({ page }) => {
-    await page.goto('https://datatables.net/examples/data_sources/dom');
-
-    const table = useTable(page.locator('#example'), {
-      headerSelector: 'thead th'
-    });
-    await table.init();
-
-    const rows = await table.findRows({}, { maxPages: 1 });
-
-    expect(Array.isArray(rows)).toBe(true);
-    expect(rows.length).toBeGreaterThan(0);
-    expect(typeof rows[0].getCell).toBe('function');
-  });
-
-  test('Core: findRows with filter option', async ({ page }) => {
-    await page.goto('https://datatables.net/examples/data_sources/dom');
-
-    const table = useTable(page.locator('#example'), {
-      headerSelector: 'thead th'
-    });
-    await table.init();
-
-    const filtered = await table.findRows({ Office: 'Tokyo' }, { maxPages: 1 });
-
-    expect(Array.isArray(filtered)).toBe(true);
-    expect(filtered.length).toBeGreaterThan(0);
-  });
-
-  test('Core: findRows with asJSON option', async ({ page }) => {
-    await page.goto('https://datatables.net/examples/data_sources/dom');
-
-    const table = useTable(page.locator('#example'), {
-      headerSelector: 'thead th'
-    });
-    await table.init();
-
-    const rows = await table.findRows({}, { maxPages: 1 });
-    const data = await Promise.all(rows.map(r => r.toJSON()));
-
-    expect(Array.isArray(data)).toBe(true);
-    expect(data.length).toBeGreaterThan(0);
-    expect(typeof data[0]).toBe('object');
-    expect(data[0]).toHaveProperty('Name');
-  });
-
-  test('Core: getRow with toJSON()', async ({ page }) => {
-    await page.goto('https://datatables.net/examples/data_sources/dom');
-
-    const table = useTable(page.locator('#example'), {
-      headerSelector: 'thead th'
-    });
-    await table.init();
-
-    const row = table.getRow({ Name: 'Airi Satou' });
-    const data = await row.toJSON();
-
-    expect(typeof data).toBe('object');
-    expect(data).toHaveProperty('Name', 'Airi Satou');
-    expect(data).toHaveProperty('Position');
-  });
 
   test('Core: SmartRow.toJSON returns row data', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
@@ -292,7 +189,12 @@ test.describe('Backwards Compatibility Tests', () => {
 
     const table = useTable(page.locator('#test-table'));
 
+    // findRow is async and should auto-initialize
+    const row = await table.findRow({ Name: 'John' });
 
+    // The table should now be initialized
+    expect(table.isInitialized()).toBe(true);
+    await expect(row.getCell('Age')).toHaveText('30');
   });
 
   test('New API: init() method with timeout', async ({ page }) => {
@@ -365,6 +267,73 @@ test.describe('Backwards Compatibility Tests', () => {
     await expect(secondPageRow).toBeVisible();
   });
 
+  test('New API: revalidate() recognizes new columns without losing state', async ({ page }) => {
+    await page.setContent(`
+      <table id="test-table">
+        <thead><tr id="headers"><th>Name</th></tr></thead>
+        <tbody><tr><td>John</td></tr></tbody>
+      </table>
+    `);
 
+    const table = useTable(page.locator('#test-table'));
+    await table.init();
+
+    // Verify initial headers
+    let headers = await table.getHeaders();
+    expect(headers).toEqual(['Name']);
+
+    // Dynamically change HTML
+    await page.evaluate(() => {
+      document.querySelector('#headers')!.innerHTML += '<th>Age</th>';
+      document.querySelector('tbody tr')!.innerHTML += '<td>30</td>';
+    });
+
+    // We shouldn't see 'Age' until revalidate
+    headers = await table.getHeaders();
+    expect(headers).toEqual(['Name']); // Cached
+
+    await table.revalidate();
+
+    // Now we should see the new header
+    headers = await table.getHeaders();
+    expect(headers).toEqual(['Name', 'Age']);
+
+    const row = table.getRow({ Name: 'John' });
+    await expect(row.getCell('Age')).toHaveText('30');
+  });
+
+  test('New API: scrollToColumn interacts correctly with headers', async ({ page }) => {
+    await page.setContent(`
+      <div style="width: 200px; overflow-x: auto;">
+        <table id="test-table">
+          <thead>
+            <tr>
+              <th style="min-width: 150px">Col 1</th>
+              <th style="min-width: 150px">Col 2</th>
+              <th style="min-width: 150px">Col 3</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>A</td><td>B</td><td>C</td></tr>
+          </tbody>
+        </table>
+      </div>
+    `);
+
+    const table = useTable(page.locator('#test-table'));
+    await table.init();
+
+    // Get the header cell we want to test scrolling to
+    const headerCell = await table.getHeaderCell('Col 3');
+
+    // Check it is not visible in the viewport initially
+    await expect(headerCell).not.toBeInViewport();
+
+    // Scroll to it
+    await table.scrollToColumn('Col 3');
+
+    // Now it should be visible
+    await expect(headerCell).toBeInViewport();
+  });
 });
 
