@@ -39,18 +39,23 @@ AG Grid virtualizes both rows (vertical) and columns (horizontal).
 
 ### Horizontal Scrolling
 
-If columns are off-screen, `getCell()` won't find them by default. You need a `cellNavigation` strategy or use `scrollToColumn`.
+If columns are off-screen, `getCell()` won't find them by default. You need a `navigation` strategy or to use `scrollToColumn()`.
 
 ```typescript
 // 1. Scroll to column manually
 await table.scrollToColumn('Status');
 await row.getCell('Status').click();
 
-// 2. Or configure a strategy to auto-scroll
+// 2. Or configure a strategy to auto-scroll using right arrow
 strategies: {
-  cellNavigation: Strategies.CellNavigation.Keyboard({
-    rootSelector: '.ag-body-viewport' // Focus here first
-  })
+  navigation: {
+    goRight: async () => {
+      await page.keyboard.press('ArrowRight');
+    },
+    goLeft: async () => {
+      await page.keyboard.press('ArrowLeft');
+    }
+  }
 }
 ```
 

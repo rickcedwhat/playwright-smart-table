@@ -10,10 +10,6 @@ export declare const scrollRightHeaderRDG: (context: TableContext) => Promise<st
  */
 export declare const rdgGetCellLocator: ({ row, columnIndex }: any) => any;
 /**
- * Scrolls virtualized columns into view before reading.
- */
-export declare const rdgCellNavigation: ({ root, page, index }: any) => Promise<void>;
-/**
  * Scrolls the grid vertically to load more virtualized rows.
  */
 export declare const rdgPaginationStrategy: import("../types").PaginationStrategy;
@@ -27,7 +23,6 @@ export declare const rdgNavigation: {
 export declare const RDGStrategies: {
     header: (context: TableContext) => Promise<string[]>;
     getCellLocator: ({ row, columnIndex }: any) => any;
-    cellNavigation: ({ root, page, index }: any) => Promise<void>;
     navigation: {
         goRight: ({ root, page }: any) => Promise<void>;
         goLeft: ({ root, page }: any) => Promise<void>;

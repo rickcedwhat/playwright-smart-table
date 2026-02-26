@@ -23,9 +23,7 @@ await expect(row.getCell('Email')).toHaveText('john@example.com');
 ### Filtering and Iteration
 
 ```typescript
-const engineers = await table.getRows({ 
-  filter: { Department: 'Engineering' } 
-});
+const engineers = await table.findRows({ Department: 'Engineering' });
 
 for (const engineer of engineers) {
   const name = await engineer.getCell('Name').textContent();
@@ -36,7 +34,7 @@ for (const engineer of engineers) {
 ### Data Export
 
 ```typescript
-const rows = await table.getRows();
+const rows = await table.findRows({});
 const data = await rows.toJSON();
 console.log(JSON.stringify(data, null, 2));
 ```

@@ -3,7 +3,6 @@ export declare const Plugins: {
         Strategies: {
             header: (context: import("./types").TableContext) => Promise<string[]>;
             getCellLocator: ({ row, columnIndex }: any) => any;
-            cellNavigation: ({ root, page, index }: any) => Promise<void>;
             navigation: {
                 goRight: ({ root, page }: any) => Promise<void>;
                 goLeft: ({ root, page }: any) => Promise<void>;

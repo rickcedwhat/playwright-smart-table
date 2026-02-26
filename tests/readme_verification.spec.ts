@@ -90,7 +90,7 @@ test.describe('README.md Examples Verification', () => {
     // #endregion get-by-row
   });
 
-  test('getAllCurrentRows: Multiple Usage Patterns', async ({ page }) => {
+  test('findRows: Multiple Usage Patterns', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
     const table = useTable(page.locator('#example'), { headerSelector: 'thead th' });
     await table.init();
@@ -263,7 +263,7 @@ test.describe('README.md Examples Verification', () => {
     // #endregion advanced-column-scan
   });
 
-  test('getAllCurrentRows: Filtering with Exact Match', async ({ page }) => {
+  test('findRows: Filtering with Exact Match', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
     const table = useTable(page.locator('#example'), { headerSelector: 'thead th' });
     await table.init();

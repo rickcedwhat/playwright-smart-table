@@ -105,7 +105,7 @@ class TableMapper {
                     text = yield this.config.headerTransformer({
                         text,
                         index: i,
-                        locator: this.rootLocator.locator(this.config.headerSelector).nth(i),
+                        locator: this.resolve(this.config.headerSelector, this.rootLocator).nth(i),
                         seenHeaders
                     });
                 }

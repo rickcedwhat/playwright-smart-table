@@ -1,1 +1,7 @@
-[]
+[
+  {
+    "name": "beforeCellRead?",
+    "signature": "beforeCellRead?: BeforeCellReadFn",
+    "comment": "/**\n* Hook called before each cell value is read in toJSON and columnOverrides.read.\n* Fires for both the default innerText extraction and custom read mappers.\n* Useful for scrolling off-screen columns into view in horizontally virtualized tables.\n*/"
+  }
+]

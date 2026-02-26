@@ -1,5 +1,12 @@
 # Changelog
 
+## [6.7.1] - 2026-02-26
+
+### Documentation & Cleanup
+- **Documentation Revamp**: Completely updated the `docs/` directory, `README.md`, examples, and recipes to exclusively use the new v6.6.0 iteration APIs (`map`, `filter`, `forEach`). 
+- **Column Overrides**: Added comprehensive documentation for the `columnOverrides` feature.
+- **Internal Cleanups**: Removed lingering dead code, types, and JSDoc references associated with the deprecated `dataMapper` and `cellNavigation`.
+
 ## [6.7.0] - 2026-02-23
 
 ### Breaking Changes ⚠️

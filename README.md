@@ -128,6 +128,32 @@ const expensive = await table.filter(async ({ row }) => {
 });
 ```
 
+### Advanced: `columnOverrides`
+
+For complex DOM structures, custom data extraction, or specialized input widgets, use `columnOverrides` to intercept how Smart Table interacts with specific columns:
+
+```typescript
+const table = useTable(page.locator('#table'), {
+  columnOverrides: {
+    // Override how data is read from the 'Status' column (e.g., for .toJSON())
+    Status: {
+      read: async (cell) => {
+        const isChecked = await cell.locator('input[type="checkbox"]').isChecked();
+        return isChecked ? 'Active' : 'Inactive';
+      }
+    },
+    // Override how data is written to the 'Tags' column (for .smartFill())
+    Tags: {
+      write: async (cell, value) => {
+        await cell.click();
+        await page.keyboard.type(value);
+        await page.keyboard.press('Enter');
+      }
+    }
+  }
+});
+```
+
 ## Key Features
 
 - 🎯 **Smart Locators** - Find rows by content, not position

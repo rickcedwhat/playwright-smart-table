@@ -12,24 +12,20 @@ export const SortingStrategies = {
   AriaSort: (): SortingStrategy => {
     return {
       async doSort({ columnName, direction, context }) {
-        const { getHeaderCell } = context;
-        if (!getHeaderCell) throw new Error('getHeaderCell is required in StrategyContext for sorting.');
+        // getHeaderCell is always present on TableContext after table is initialized
+        const targetHeader = await context.getHeaderCell!(columnName);
         // The table engine handles verify-and-retry. We only provide the trigger here.
-        const targetHeader = await getHeaderCell(columnName);
         await targetHeader.click();
       },
       async getSortState({ columnName, context }) {
-        const { getHeaderCell } = context;
         try {
-          if (!getHeaderCell) throw new Error('getHeaderCell is required');
-          const targetHeader = await getHeaderCell(columnName);
+          const targetHeader = await context.getHeaderCell!(columnName);
           const ariaSort = await targetHeader.getAttribute('aria-sort');
-
           if (ariaSort === 'ascending') return 'asc';
           if (ariaSort === 'descending') return 'desc';
           return 'none';
         } catch {
-          return 'none'; // Header not found, so it's not sorted
+          return 'none'; // Header not found, treat as unsorted
         }
       },
     };

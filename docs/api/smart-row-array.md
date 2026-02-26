@@ -1,7 +1,7 @@
 <!-- NEEDS REVIEW -->
 # SmartRowArray
 
-`SmartRowArray` is a specialized array of [SmartRow](/api/smart-row) objects returned by methods like [getRows()](/api/table-methods#getrows) and [findRows()](/api/table-methods#findrows).
+`SmartRowArray` is a specialized array of [SmartRow](/api/smart-row) objects returned by methods like [findRows()](/api/table-methods#findrows) and `table.filter()`.
 
 It extends the native Array, so you can use all standard array methods (`map`, `filter`, `forEach`, etc.), but adds a convenient `toJSON()` method to resolve data from all rows at once.
 
@@ -27,7 +27,7 @@ toJSON(options?: { columns?: string[] }): Promise<Record<string, any>[]>
 #### Example
 
 ```typescript
-const rows = await table.getRows();
+const rows = await table.findRows({ Role: 'Admin' });
 
 // Get all data
 const allData = await rows.toJSON();
@@ -48,14 +48,14 @@ console.log(partialData);
 Since `SmartRowArray` extends `Array`, you can chain standard methods with `toJSON()`.
 
 ```typescript
-const rows = await table.getRows();
+const rows = await table.findRows({});
 
-// Filter rows locally (note: this filters SmartRow objects)
-const adminRows = rows.filter(async row => 
-  await row.getCell('Role').innerText() === 'Admin'
+// Filter rows locally (note: this filters SmartRow objects, but it's usually better to use table.filter())
+const adminRows = await Promise.all(
+  rows.filter(async row => await row.getCell('Role').innerText() === 'Admin')
 );
 
-// Map to specific promises
+// Map to specific promises (or use table.map())
 const names = await Promise.all(
   rows.map(row => row.getCell('Name').innerText())
 );

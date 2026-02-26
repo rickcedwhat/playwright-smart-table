@@ -34,6 +34,31 @@ export type GetCellLocatorFn = (args: {
     page: Page;
 }) => Locator;
 /**
+ * Hook called before each cell value is read in toJSON (and columnOverrides.read).
+ * Use this to scroll off-screen columns into view in horizontally virtualized tables,
+ * wait for lazy-rendered content, or perform any pre-read setup.
+ *
+ * @example
+ * // Scroll the column header into view to trigger horizontal virtualization render
+ * strategies: {
+ *   beforeCellRead: async ({ columnName, getHeaderCell }) => {
+ *     const header = await getHeaderCell(columnName);
+ *     await header.scrollIntoViewIfNeeded();
+ *   }
+ * }
+ */
+export type BeforeCellReadFn = (args: {
+    /** The resolved cell locator */
+    cell: Locator;
+    columnName: string;
+    columnIndex: number;
+    row: Locator;
+    page: Page;
+    root: Locator;
+    /** Resolves a column name to its header cell locator */
+    getHeaderCell: (columnName: string) => Promise<Locator>;
+}) => Promise<void>;
+/**
  * Function to get the currently active/focused cell.
  * Returns null if no cell is active.
  */
@@ -110,12 +135,14 @@ export type SmartRow<T = any> = Locator & {
      * );
      */
     smartFill: (data: Partial<T> | Record<string, any>, options?: FillOptions) => Promise<void>;
+    /**
+     * Returns whether the row exists in the DOM (i.e. is not a sentinel row).
+     */
+    wasFound(): boolean;
 };
 export type StrategyContext = TableContext & {
     rowLocator?: Locator;
     rowIndex?: number;
-    /** Helper to reliably get a header cell locator by name */
-    getHeaderCell?: (headerName: string) => Promise<Locator>;
 };
 /**
  * Defines the contract for a sorting strategy.
@@ -166,6 +193,12 @@ export interface TableContext<T = any> {
     config: FinalTableConfig<T>;
     page: Page;
     resolve: (selector: Selector, parent: Locator | Page) => Locator;
+    /** Resolves a column name to its header cell locator. Available after table is initialized. */
+    getHeaderCell?: (columnName: string) => Promise<Locator>;
+    /** Returns all column names in order. Available after table is initialized. */
+    getHeaders?: () => Promise<string[]>;
+    /** Scrolls the table horizontally to bring the given column's header into view. */
+    scrollToColumn?: (columnName: string) => Promise<void>;
 }
 export interface PaginationPrimitives {
     /** Classic "Next Page" or "Scroll Down" */
@@ -196,7 +229,7 @@ export type FillStrategy = (options: {
 }) => Promise<void>;
 export interface ColumnOverride<TValue = any> {
     /**
-     * How to extract the value from the cell. (Replaces dataMapper logic)
+     * How to extract the value from the cell.
      */
     read?: (cell: Locator) => Promise<TValue> | TValue;
     /**
@@ -259,6 +292,12 @@ export interface TableStrategies {
     getCellLocator?: GetCellLocatorFn;
     /** Function to get the currently active/focused cell */
     getActiveCell?: GetActiveCellFn;
+    /**
+     * Hook called before each cell value is read in toJSON and columnOverrides.read.
+     * Fires for both the default innerText extraction and custom read mappers.
+     * Useful for scrolling off-screen columns into view in horizontally virtualized tables.
+     */
+    beforeCellRead?: BeforeCellReadFn;
     /** Custom helper to check if a table is fully loaded/ready */
     isTableLoaded?: (args: TableContext) => Promise<boolean>;
     /** Custom helper to check if a row is fully loaded/ready */
@@ -385,9 +424,7 @@ export interface TableResult<T = any> extends AsyncIterable<{
      * @param index 1-based row index
      * @param options Optional settings including bringIntoView
      */
-    getRowByIndex: (index: number, options?: {
-        bringIntoView?: boolean;
-    }) => SmartRow;
+    getRowByIndex: (index: number) => SmartRow;
     /**
      * ASYNC: Searches for a single row across pages using pagination.
      * Auto-initializes the table if not already initialized.

@@ -33,7 +33,7 @@ export declare const Strategies: {
         default: () => Promise<void>;
     };
     Header: {
-        visible: ({ config, resolve, root }: import("../types").StrategyContext) => Promise<string[]>;
+        visible: ({ config, resolve, root }: import("..").StrategyContext) => Promise<string[]>;
     };
     Fill: {
         default: ({ row, columnName, value, fillOptions, config, table }: Parameters<import("../types").FillStrategy>[0]) => Promise<void>;
@@ -46,8 +46,8 @@ export declare const Strategies: {
     };
     Loading: {
         Table: {
-            hasSpinner: (selector?: string) => ({ root }: import("../types").TableContext) => Promise<boolean>;
-            custom: (fn: (context: import("../types").TableContext) => Promise<boolean>) => (context: import("../types").TableContext) => Promise<boolean>;
+            hasSpinner: (selector?: string) => ({ root }: import("..").TableContext) => Promise<boolean>;
+            custom: (fn: (context: import("..").TableContext) => Promise<boolean>) => (context: import("..").TableContext) => Promise<boolean>;
             never: () => Promise<boolean>;
         };
         Row: {
@@ -57,7 +57,7 @@ export declare const Strategies: {
             never: () => Promise<boolean>;
         };
         Headers: {
-            stable: (duration?: number) => (context: import("../types").TableContext) => Promise<boolean>;
+            stable: (duration?: number) => (context: import("..").TableContext) => Promise<boolean>;
             never: () => Promise<boolean>;
         };
     };
