@@ -1,5 +1,10 @@
 # Changelog
 
+## [6.7.3] - 2026-02-26
+
+### Fixed
+- **TypeScript Strictness**: Resolved a TS compilation lint error in `PaginationPrimitives` by relaxing the internal `createClicker` return type, allowing seamless mixing of boolean and numeric bulk pagination returns without throwing assignment errors.
+
 ## [6.7.2] - 2026-02-26
 
 ### Performance Optimizations 🚀

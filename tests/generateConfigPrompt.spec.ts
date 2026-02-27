@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { useTable } from '../src/index';
+import { MINIMAL_CONFIG_CONTEXT } from '../src/minimalConfigContext';
 
 test.describe('generateConfigPrompt', () => {
     test('should throw an error containing the prompt and TypeScript types', async ({ page }) => {
@@ -26,9 +27,11 @@ test.describe('generateConfigPrompt', () => {
             expect(message).toContain('Val 1');
             expect(message).toContain('Val 2');
 
+            // Should contain the table HTML exactly as rendered
+            expect(message).toContain(tableHTML.trim());
+
             // Should contain the TypeScript config types automatically
-            expect(message).toContain('Useful TypeScript Definitions');
-            expect(message).toContain('export interface TableConfig');
+            expect(message).toContain(MINIMAL_CONFIG_CONTEXT);
 
             // Should prompt the user to copy into Gemini / ChatGPT
             expect(message).toContain('COPY INTO GEMINI / ChatGPT');
