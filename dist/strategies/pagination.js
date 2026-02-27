@@ -13,9 +13,9 @@ exports.PaginationStrategies = void 0;
 const stabilization_1 = require("./stabilization");
 exports.PaginationStrategies = {
     click: (selectors, options = {}) => {
-        var _a;
+        var _a, _b, _c;
         const defaultStabilize = (_a = options.stabilization) !== null && _a !== void 0 ? _a : stabilization_1.StabilizationStrategies.contentChanged({ scope: 'first', timeout: options.timeout });
-        const createClicker = (selector) => {
+        const createClicker = (selector, returnVal = true) => {
             if (!selector)
                 return undefined;
             return (context) => __awaiter(void 0, void 0, void 0, function* () {
@@ -26,14 +26,14 @@ exports.PaginationStrategies = {
                 }
                 return yield defaultStabilize(context, () => __awaiter(void 0, void 0, void 0, function* () {
                     yield btn.click({ timeout: 2000 }).catch(() => { });
-                }));
+                })).then(stabilized => stabilized ? returnVal : false);
             });
         };
         return {
             goNext: createClicker(selectors.next),
             goPrevious: createClicker(selectors.previous),
-            goNextBulk: createClicker(selectors.nextBulk),
-            goPreviousBulk: createClicker(selectors.previousBulk),
+            goNextBulk: createClicker(selectors.nextBulk, (_b = options.nextBulkPages) !== null && _b !== void 0 ? _b : 10),
+            goPreviousBulk: createClicker(selectors.previousBulk, (_c = options.previousBulkPages) !== null && _c !== void 0 ? _c : 10),
             goToFirst: createClicker(selectors.first)
         };
     },

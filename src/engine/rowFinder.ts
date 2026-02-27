@@ -102,19 +102,25 @@ export class RowFinder<T = any> {
                     page: this.rootLocator.page()
                 };
 
-                let paginationResult: boolean | PaginationPrimitives;
+                let paginationResult: boolean | number | PaginationPrimitives;
                 if (typeof this.config.strategies.pagination === 'function') {
                     paginationResult = await this.config.strategies.pagination(context);
                 } else {
-                    if (!this.config.strategies.pagination.goNext) break;
-                    paginationResult = await this.config.strategies.pagination.goNext(context);
+                    if (this.config.strategies.pagination!.goNextBulk) {
+                        paginationResult = await this.config.strategies.pagination!.goNextBulk(context);
+                    } else if (this.config.strategies.pagination!.goNext) {
+                        paginationResult = await this.config.strategies.pagination!.goNext(context);
+                    } else {
+                        break;
+                    }
                 }
 
                 const didPaginate = validatePaginationResult(paginationResult, 'Pagination Strategy');
                 if (!didPaginate) break;
 
-                this.tableState.currentPageIndex++;
-                pagesScanned++;
+                const pagesJumped = typeof paginationResult === 'number' ? paginationResult : 1;
+                this.tableState.currentPageIndex += pagesJumped;
+                pagesScanned += pagesJumped;
                 await collectMatches();
             }
         } finally {
@@ -192,22 +198,26 @@ export class RowFinder<T = any> {
                     page: this.rootLocator.page()
                 };
 
-                let paginationResult: boolean | PaginationPrimitives;
+                let paginationResult: boolean | number | PaginationPrimitives;
                 if (typeof this.config.strategies.pagination === 'function') {
                     paginationResult = await this.config.strategies.pagination(context);
                 } else {
-                    if (!this.config.strategies.pagination!.goNext) {
-                        this.log(`Page ${this.tableState.currentPageIndex}: Pagination failed (no goNext primitive).`);
+                    if (this.config.strategies.pagination!.goNextBulk) {
+                        paginationResult = await this.config.strategies.pagination!.goNextBulk(context);
+                    } else if (this.config.strategies.pagination!.goNext) {
+                        paginationResult = await this.config.strategies.pagination!.goNext(context);
+                    } else {
+                        this.log(`Page ${this.tableState.currentPageIndex}: Pagination failed (no goNext or goNextBulk primitive).`);
                         return null;
                     }
-                    paginationResult = await this.config.strategies.pagination!.goNext(context);
                 }
 
                 const didLoadMore = validatePaginationResult(paginationResult, 'Pagination Strategy');
 
                 if (didLoadMore) {
-                    this.tableState.currentPageIndex++;
-                    pagesScanned++;
+                    const pagesJumped = typeof paginationResult === 'number' ? paginationResult : 1;
+                    this.tableState.currentPageIndex += pagesJumped;
+                    pagesScanned += pagesJumped;
                     continue;
                 } else {
                     this.log(`Page ${this.tableState.currentPageIndex}: Pagination failed (end of data).`);

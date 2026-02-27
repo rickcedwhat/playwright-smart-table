@@ -18,16 +18,18 @@ export const PaginationStrategies = {  /**
     previous?: Selector,
     nextBulk?: Selector,
     previousBulk?: Selector,
-    first?: Selector
+    first?: Selector,
   }, options: {
+    nextBulkPages?: number,
+    previousBulkPages?: number,
     stabilization?: StabilizationStrategy,
     timeout?: number
   } = {}): PaginationStrategy => {
     const defaultStabilize = options.stabilization ?? StabilizationStrategies.contentChanged({ scope: 'first', timeout: options.timeout });
 
-    const createClicker = (selector?: Selector) => {
+    const createClicker = (selector?: Selector, returnVal: boolean | number = true) => {
       if (!selector) return undefined;
-      return async (context: TableContext) => {
+      return async (context: TableContext): Promise<any> => {
         const { root, resolve } = context;
         const btn = resolve(selector, root).first();
 
@@ -37,15 +39,15 @@ export const PaginationStrategies = {  /**
 
         return await defaultStabilize(context, async () => {
           await btn.click({ timeout: 2000 }).catch(() => { });
-        });
+        }).then(stabilized => stabilized ? returnVal : false);
       };
     };
 
     return {
       goNext: createClicker(selectors.next),
       goPrevious: createClicker(selectors.previous),
-      goNextBulk: createClicker(selectors.nextBulk),
-      goPreviousBulk: createClicker(selectors.previousBulk),
+      goNextBulk: createClicker(selectors.nextBulk, options.nextBulkPages ?? 10),
+      goPreviousBulk: createClicker(selectors.previousBulk, options.previousBulkPages ?? 10),
       goToFirst: createClicker(selectors.first)
     };
   },

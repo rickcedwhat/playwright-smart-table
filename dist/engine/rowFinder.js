@@ -89,15 +89,22 @@ class RowFinder {
                         paginationResult = yield this.config.strategies.pagination(context);
                     }
                     else {
-                        if (!this.config.strategies.pagination.goNext)
+                        if (this.config.strategies.pagination.goNextBulk) {
+                            paginationResult = yield this.config.strategies.pagination.goNextBulk(context);
+                        }
+                        else if (this.config.strategies.pagination.goNext) {
+                            paginationResult = yield this.config.strategies.pagination.goNext(context);
+                        }
+                        else {
                             break;
-                        paginationResult = yield this.config.strategies.pagination.goNext(context);
+                        }
                     }
                     const didPaginate = (0, validation_1.validatePaginationResult)(paginationResult, 'Pagination Strategy');
                     if (!didPaginate)
                         break;
-                    this.tableState.currentPageIndex++;
-                    pagesScanned++;
+                    const pagesJumped = typeof paginationResult === 'number' ? paginationResult : 1;
+                    this.tableState.currentPageIndex += pagesJumped;
+                    pagesScanned += pagesJumped;
                     yield collectMatches();
                 }
             }
@@ -163,16 +170,22 @@ class RowFinder {
                         paginationResult = yield this.config.strategies.pagination(context);
                     }
                     else {
-                        if (!this.config.strategies.pagination.goNext) {
-                            this.log(`Page ${this.tableState.currentPageIndex}: Pagination failed (no goNext primitive).`);
+                        if (this.config.strategies.pagination.goNextBulk) {
+                            paginationResult = yield this.config.strategies.pagination.goNextBulk(context);
+                        }
+                        else if (this.config.strategies.pagination.goNext) {
+                            paginationResult = yield this.config.strategies.pagination.goNext(context);
+                        }
+                        else {
+                            this.log(`Page ${this.tableState.currentPageIndex}: Pagination failed (no goNext or goNextBulk primitive).`);
                             return null;
                         }
-                        paginationResult = yield this.config.strategies.pagination.goNext(context);
                     }
                     const didLoadMore = (0, validation_1.validatePaginationResult)(paginationResult, 'Pagination Strategy');
                     if (didLoadMore) {
-                        this.tableState.currentPageIndex++;
-                        pagesScanned++;
+                        const pagesJumped = typeof paginationResult === 'number' ? paginationResult : 1;
+                        this.tableState.currentPageIndex += pagesJumped;
+                        pagesScanned += pagesJumped;
                         continue;
                     }
                     else {

@@ -30,6 +30,9 @@ export declare const Plugins: {
                 goRight: (context: import("./types").StrategyContext) => Promise<void>;
                 goHome: (context: import("./types").StrategyContext) => Promise<void>;
             };
+            loading: {
+                isHeaderLoading: () => Promise<boolean>;
+            };
             getCellLocator: ({ row, columnIndex }: any) => any;
             getActiveCell: ({ page }: any) => Promise<{
                 rowIndex: number;

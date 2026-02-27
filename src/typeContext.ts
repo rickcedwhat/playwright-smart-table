@@ -228,11 +228,11 @@ export interface PaginationPrimitives {
   /** Classic "Previous Page" or "Scroll Up" */
   goPrevious?: (context: TableContext) => Promise<boolean>;
 
-  /** Bulk skip forward multiple pages at once */
-  goNextBulk?: (context: TableContext) => Promise<boolean>;
+  /** Bulk skip forward multiple pages at once. Returns number of pages skipped. */
+  goNextBulk?: (context: TableContext) => Promise<boolean | number>;
 
-  /** Bulk skip backward multiple pages at once */
-  goPreviousBulk?: (context: TableContext) => Promise<boolean>;
+  /** Bulk skip backward multiple pages at once. Returns number of pages skipped. */
+  goPreviousBulk?: (context: TableContext) => Promise<boolean | number>;
 
   /** Jump to first page / scroll to top */
   goToFirst?: (context: TableContext) => Promise<boolean>;
@@ -241,7 +241,7 @@ export interface PaginationPrimitives {
   goToPage?: (pageIndex: number, context: TableContext) => Promise<boolean>;
 }
 
-export type PaginationStrategy = ((context: TableContext) => Promise<boolean>) | PaginationPrimitives;
+export type PaginationStrategy = ((context: TableContext) => Promise<boolean | number>) | PaginationPrimitives;
 
 export type DedupeStrategy = (row: SmartRow) => string | number | Promise<string | number>;
 

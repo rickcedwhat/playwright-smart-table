@@ -110,6 +110,9 @@ export const GlideStrategies = {
         goRight: glideGoRight,
         goHome: glideGoHome
     },
+    loading: {
+        isHeaderLoading: async () => false // Glide renders headers on a canvas, there is no innerText delay
+    },
     getCellLocator: glideGetCellLocator,
     getActiveCell: glideGetActiveCell
 };

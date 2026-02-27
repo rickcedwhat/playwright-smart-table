@@ -10,9 +10,12 @@ exports.validateFillStrategy = validateFillStrategy;
  * @param strategyName - Name of the strategy for error messages
  */
 function validatePaginationResult(result, strategyName = 'Custom Pagination Strategy') {
-    if (typeof result !== 'boolean') {
-        throw new Error(`[${strategyName}] Pagination strategy must return a boolean (true if paginated, false if no more pages). ` +
+    if (typeof result !== 'boolean' && typeof result !== 'number') {
+        throw new Error(`[${strategyName}] Pagination strategy must return a boolean (true if paginated, false if no more pages) or a number (pages jumped). ` +
             `Received: ${typeof result} (${JSON.stringify(result)})`);
+    }
+    if (typeof result === 'number') {
+        return result > 0;
     }
     return result;
 }

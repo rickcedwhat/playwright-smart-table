@@ -15,6 +15,8 @@ export declare const Strategies: {
             previousBulk?: import("..").Selector;
             first?: import("..").Selector;
         }, options?: {
+            nextBulkPages?: number;
+            previousBulkPages?: number;
             stabilization?: import("./stabilization").StabilizationStrategy;
             timeout?: number;
         }) => import("../types").PaginationStrategy;

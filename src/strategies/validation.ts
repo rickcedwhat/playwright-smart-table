@@ -6,12 +6,17 @@ import type { PaginationStrategy, SortingStrategy, FillStrategy } from '../types
  * @param strategyName - Name of the strategy for error messages
  */
 export function validatePaginationResult(result: any, strategyName: string = 'Custom Pagination Strategy'): boolean {
-    if (typeof result !== 'boolean') {
+    if (typeof result !== 'boolean' && typeof result !== 'number') {
         throw new Error(
-            `[${strategyName}] Pagination strategy must return a boolean (true if paginated, false if no more pages). ` +
+            `[${strategyName}] Pagination strategy must return a boolean (true if paginated, false if no more pages) or a number (pages jumped). ` +
             `Received: ${typeof result} (${JSON.stringify(result)})`
         );
     }
+
+    if (typeof result === 'number') {
+        return result > 0;
+    }
+
     return result;
 }
 

@@ -115,6 +115,9 @@ exports.GlideStrategies = {
         goRight: columns_1.glideGoRight,
         goHome: columns_1.glideGoHome
     },
+    loading: {
+        isHeaderLoading: () => __awaiter(void 0, void 0, void 0, function* () { return false; }) // Glide renders headers on a canvas, there is no innerText delay
+    },
     getCellLocator: exports.glideGetCellLocator,
     getActiveCell: exports.glideGetActiveCell
 };

@@ -8,6 +8,8 @@ export declare const PaginationStrategies: {
         previousBulk?: Selector;
         first?: Selector;
     }, options?: {
+        nextBulkPages?: number;
+        previousBulkPages?: number;
         stabilization?: StabilizationStrategy;
         timeout?: number;
     }) => PaginationStrategy;
