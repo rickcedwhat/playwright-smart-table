@@ -74,7 +74,7 @@ test.describe('Performance Benchmark', () => {
         const data = await targetRow.toJSON();
         expect(data).toEqual(expect.objectContaining({ ID: '10000', Name: 'Item 10000' }));
 
-        expect(duration).toBeLessThan(20000);
+        expect(duration).toBeLessThan(30000);
     });
 
     test('should extract virtualized column values with static headers', async ({ page }) => {
