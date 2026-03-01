@@ -99,6 +99,8 @@ for await (const { row, rowIndex } of table) {
 }
 ```
 
+When your pagination strategy supports bulk jumps (`goNextBulk`), pass `{ useBulkPagination: true }` to `map`/`forEach`/`filter` to advance by multiple pages at once.
+
 > **`map` + UI interactions:** `map` defaults to `parallel: true`. If your callback opens popovers,
 > fills inputs, or otherwise mutates UI state, pass `{ parallel: false }` to avoid overlapping interactions.
 

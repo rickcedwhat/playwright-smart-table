@@ -24,7 +24,7 @@
 - [x] **Document `forEach`/`map`/`filter` in README**
 - [x] **JSDoc `@note` on `map`'s `parallel` default**
 
-### 🧹 Cleanup (next major version)
+### 🧹 Cleanup (completed in v6.7.0)
 - [x] **Remove Deprecated APIs**:
     - `iterateThroughTable` → replaced by `forEach`/`map`/`filter`.
     - `getColumnValues` → replaced by `map`.
@@ -32,10 +32,10 @@
     - `clickNext` pagination strategy → replaced by `click({ next: ... })`.
 
 ### ⚡ Performance
-- [ ] **Improve infinite scroll iteration**:
-    - **Problem**: Re-scans entire DOM on every infinite scroll iteration (O(N^2)).
-    - **Solution**: Implement a "cursor" or "incremental scan" strategy that only processes new rows.
-    - **Impact**: Critical for enterprise-scale tests (10k+ rows).
+- [x] **Improve infinite scroll iteration** (done in v6.7.2):
+    - **Was**: Re-scanned entire DOM on every infinite scroll iteration (O(N²)).
+    - **Now**: Incremental scan via `evaluateAll` + browser-side `WeakMap`; only new rows processed.
+    - **Impact**: 10k-row traversal reduced from multiple seconds to ~400ms.
 
 ### 🛠️ Implementation Improvements
 - [x] **Expose `getHeaderCell` in `StrategyContext`**: Allow custom strategies to easily resolve header cells without manual locators.

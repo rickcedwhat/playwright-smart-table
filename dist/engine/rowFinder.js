@@ -48,7 +48,7 @@ class RowFinder {
     }
     findRows(filters, options) {
         return __awaiter(this, void 0, void 0, function* () {
-            var _a, _b;
+            var _a, _b, _c, _d;
             const filtersRecord = filters || {};
             const map = yield this.tableMapper.getMap();
             const allRows = [];
@@ -85,19 +85,14 @@ class RowFinder {
                         page: this.rootLocator.page()
                     };
                     let paginationResult;
-                    if (typeof this.config.strategies.pagination === 'function') {
-                        paginationResult = yield this.config.strategies.pagination(context);
+                    if ((_c = this.config.strategies.pagination) === null || _c === void 0 ? void 0 : _c.goNextBulk) {
+                        paginationResult = yield this.config.strategies.pagination.goNextBulk(context);
+                    }
+                    else if ((_d = this.config.strategies.pagination) === null || _d === void 0 ? void 0 : _d.goNext) {
+                        paginationResult = yield this.config.strategies.pagination.goNext(context);
                     }
                     else {
-                        if (this.config.strategies.pagination.goNextBulk) {
-                            paginationResult = yield this.config.strategies.pagination.goNextBulk(context);
-                        }
-                        else if (this.config.strategies.pagination.goNext) {
-                            paginationResult = yield this.config.strategies.pagination.goNext(context);
-                        }
-                        else {
-                            break;
-                        }
+                        break;
                     }
                     const didPaginate = (0, validation_1.validatePaginationResult)(paginationResult, 'Pagination Strategy');
                     if (!didPaginate)
@@ -116,7 +111,7 @@ class RowFinder {
     }
     findRowLocator(filters_1) {
         return __awaiter(this, arguments, void 0, function* (filters, options = {}) {
-            var _a, _b;
+            var _a, _b, _c, _d;
             const map = yield this.tableMapper.getMap();
             const effectiveMaxPages = (_a = options.maxPages) !== null && _a !== void 0 ? _a : this.config.maxPages;
             let pagesScanned = 1;
@@ -166,20 +161,15 @@ class RowFinder {
                         page: this.rootLocator.page()
                     };
                     let paginationResult;
-                    if (typeof this.config.strategies.pagination === 'function') {
-                        paginationResult = yield this.config.strategies.pagination(context);
+                    if ((_c = this.config.strategies.pagination) === null || _c === void 0 ? void 0 : _c.goNextBulk) {
+                        paginationResult = yield this.config.strategies.pagination.goNextBulk(context);
+                    }
+                    else if ((_d = this.config.strategies.pagination) === null || _d === void 0 ? void 0 : _d.goNext) {
+                        paginationResult = yield this.config.strategies.pagination.goNext(context);
                     }
                     else {
-                        if (this.config.strategies.pagination.goNextBulk) {
-                            paginationResult = yield this.config.strategies.pagination.goNextBulk(context);
-                        }
-                        else if (this.config.strategies.pagination.goNext) {
-                            paginationResult = yield this.config.strategies.pagination.goNext(context);
-                        }
-                        else {
-                            this.log(`Page ${this.tableState.currentPageIndex}: Pagination failed (no goNext or goNextBulk primitive).`);
-                            return null;
-                        }
+                        this.log(`Page ${this.tableState.currentPageIndex}: Pagination failed (no goNext or goNextBulk primitive).`);
+                        return null;
                     }
                     const didLoadMore = (0, validation_1.validatePaginationResult)(paginationResult, 'Pagination Strategy');
                     if (didLoadMore) {

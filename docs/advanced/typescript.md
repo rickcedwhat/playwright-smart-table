@@ -30,12 +30,10 @@ await table.findRow({ Salary: 50000 });
 
 ## return Types
 
-Methods like `getColumnValues` allow you to specify the return type when using a mapper.
+Methods like `map` allow you to infer or explicitly specify the return type.
 
 ```typescript
-const ids = await table.getColumnValues<number>('ID', {
-    mapper: async (cell) => parseInt(await cell.innerText())
-});
+const ids = await table.map<number>(async ({ row }) => parseInt(await row.getCell('ID').innerText()));
 
 // ids is number[]
 ```

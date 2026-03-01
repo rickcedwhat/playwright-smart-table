@@ -1,11 +1,10 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.validatePaginationResult = validatePaginationResult;
-exports.validatePaginationStrategy = validatePaginationStrategy;
 exports.validateSortingStrategy = validateSortingStrategy;
 exports.validateFillStrategy = validateFillStrategy;
 /**
- * Validates that a pagination strategy returns a boolean.
+ * Validates that a pagination strategy returns a boolean or number (pages jumped).
  * @param result - The result from a pagination strategy
  * @param strategyName - Name of the strategy for error messages
  */
@@ -18,16 +17,6 @@ function validatePaginationResult(result, strategyName = 'Custom Pagination Stra
         return result > 0;
     }
     return result;
-}
-/**
- * Validates that a pagination strategy is properly configured.
- * @param strategy - The pagination strategy to validate
- */
-function validatePaginationStrategy(strategy) {
-    if (typeof strategy !== 'function') {
-        throw new Error(`Pagination strategy must be a function. Received: ${typeof strategy}`);
-    }
-    return true;
 }
 /**
  * Validates that a sorting strategy has the required methods.

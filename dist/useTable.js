@@ -24,6 +24,7 @@ var __asyncGenerator = (this && this.__asyncGenerator) || function (thisArg, _ar
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.useTable = void 0;
 const minimalConfigContext_1 = require("./minimalConfigContext");
+const validation_1 = require("./strategies/validation");
 const loading_1 = require("./strategies/loading");
 const fill_1 = require("./strategies/fill");
 const headers_1 = require("./strategies/headers");
@@ -45,7 +46,7 @@ const useTable = (rootLocator, configOptions = {}) => {
     const defaultStrategies = {
         fill: fill_1.FillStrategies.default,
         header: headers_1.HeaderStrategies.visible,
-        pagination: () => __awaiter(void 0, void 0, void 0, function* () { return false; }),
+        pagination: {},
         loading: {
             isHeaderLoading: loading_1.LoadingStrategies.Headers.stable(200)
         }
@@ -125,20 +126,26 @@ const useTable = (rootLocator, configOptions = {}) => {
     const _autoInit = () => __awaiter(void 0, void 0, void 0, function* () {
         yield tableMapper.getMap();
     });
-    const _advancePage = () => __awaiter(void 0, void 0, void 0, function* () {
-        var _a;
+    // Default: goNext (one page). Pass useBulk true to prefer goNextBulk. "How far" uses numeric return when strategy provides it.
+    const _advancePage = (...args_1) => __awaiter(void 0, [...args_1], void 0, function* (useBulk = false) {
         const context = { root: rootLocator, config, page: rootLocator.page(), resolve, getHeaderCell: result.getHeaderCell, getHeaders: result.getHeaders, scrollToColumn: result.scrollToColumn };
-        let advanced;
-        if (typeof config.strategies.pagination === 'function') {
-            advanced = !!(yield config.strategies.pagination(context));
+        const pagination = config.strategies.pagination;
+        let rawResult;
+        if (useBulk && (pagination === null || pagination === void 0 ? void 0 : pagination.goNextBulk)) {
+            rawResult = yield pagination.goNextBulk(context);
         }
-        else {
-            advanced = !!(((_a = config.strategies.pagination) === null || _a === void 0 ? void 0 : _a.goNext) && (yield config.strategies.pagination.goNext(context)));
+        else if (pagination === null || pagination === void 0 ? void 0 : pagination.goNext) {
+            rawResult = yield pagination.goNext(context);
         }
-        if (advanced) {
-            tableState.currentPageIndex++;
+        else if (pagination === null || pagination === void 0 ? void 0 : pagination.goNextBulk) {
+            rawResult = yield pagination.goNextBulk(context);
         }
-        return advanced;
+        const didAdvance = rawResult !== undefined && (0, validation_1.validatePaginationResult)(rawResult, 'Pagination Strategy');
+        const pagesJumped = typeof rawResult === 'number' ? rawResult : (didAdvance ? 1 : 0);
+        if (pagesJumped > 0) {
+            tableState.currentPageIndex += pagesJumped;
+        }
+        return didAdvance;
     });
     const result = {
         get currentPageIndex() { return tableState.currentPageIndex; },
@@ -178,7 +185,7 @@ const useTable = (rootLocator, configOptions = {}) => {
             log("Resetting table...");
             const context = { root: rootLocator, config, page: rootLocator.page(), resolve, getHeaderCell: result.getHeaderCell };
             yield config.onReset(context);
-            if (typeof config.strategies.pagination !== 'function' && ((_a = config.strategies.pagination) === null || _a === void 0 ? void 0 : _a.goToFirst)) {
+            if ((_a = config.strategies.pagination) === null || _a === void 0 ? void 0 : _a.goToFirst) {
                 log("Auto-navigating to first page...");
                 yield config.strategies.pagination.goToFirst(context);
             }
@@ -268,6 +275,7 @@ const useTable = (rootLocator, configOptions = {}) => {
                 const map = tableMapper.getMapSync();
                 const effectiveMaxPages = config.maxPages;
                 const tracker = new elementTracker_1.ElementTracker('iterator');
+                const useBulk = false; // iterator has no options; default goNext
                 try {
                     let rowIndex = 0;
                     let pagesScanned = 1;
@@ -281,7 +289,7 @@ const useTable = (rootLocator, configOptions = {}) => {
                         }
                         if (pagesScanned >= effectiveMaxPages)
                             break;
-                        if (!(yield __await(_advancePage())))
+                        if (!(yield __await(_advancePage(useBulk))))
                             break;
                         pagesScanned++;
                     }
@@ -293,13 +301,14 @@ const useTable = (rootLocator, configOptions = {}) => {
         },
         // ─── Private row-iteration engine ────────────────────────────────────────
         forEach: (callback_1, ...args_1) => __awaiter(void 0, [callback_1, ...args_1], void 0, function* (callback, options = {}) {
-            var _a, _b, _c;
+            var _a, _b, _c, _d;
             yield _autoInit();
             const map = tableMapper.getMapSync();
             const effectiveMaxPages = (_a = options.maxPages) !== null && _a !== void 0 ? _a : config.maxPages;
             const dedupeStrategy = (_b = options.dedupe) !== null && _b !== void 0 ? _b : config.strategies.dedupe;
             const dedupeKeys = dedupeStrategy ? new Set() : null;
             const parallel = (_c = options.parallel) !== null && _c !== void 0 ? _c : false;
+            const useBulk = (_d = options.useBulkPagination) !== null && _d !== void 0 ? _d : false;
             const tracker = new elementTracker_1.ElementTracker('forEach');
             try {
                 let rowIndex = 0;
@@ -340,7 +349,7 @@ const useTable = (rootLocator, configOptions = {}) => {
                     rowIndex += smartRows.length;
                     if (stopped || pagesScanned >= effectiveMaxPages)
                         break;
-                    if (!(yield _advancePage()))
+                    if (!(yield _advancePage(useBulk)))
                         break;
                     pagesScanned++;
                 }
@@ -350,13 +359,14 @@ const useTable = (rootLocator, configOptions = {}) => {
             }
         }),
         map: (callback_1, ...args_1) => __awaiter(void 0, [callback_1, ...args_1], void 0, function* (callback, options = {}) {
-            var _a, _b, _c;
+            var _a, _b, _c, _d;
             yield _autoInit();
             const map = tableMapper.getMapSync();
             const effectiveMaxPages = (_a = options.maxPages) !== null && _a !== void 0 ? _a : config.maxPages;
             const dedupeStrategy = (_b = options.dedupe) !== null && _b !== void 0 ? _b : config.strategies.dedupe;
             const dedupeKeys = dedupeStrategy ? new Set() : null;
             const parallel = (_c = options.parallel) !== null && _c !== void 0 ? _c : true;
+            const useBulk = (_d = options.useBulkPagination) !== null && _d !== void 0 ? _d : false;
             const tracker = new elementTracker_1.ElementTracker('map');
             const results = [];
             try {
@@ -401,7 +411,7 @@ const useTable = (rootLocator, configOptions = {}) => {
                     rowIndex += smartRows.length;
                     if (stopped || pagesScanned >= effectiveMaxPages)
                         break;
-                    if (!(yield _advancePage()))
+                    if (!(yield _advancePage(useBulk)))
                         break;
                     pagesScanned++;
                 }
@@ -412,13 +422,14 @@ const useTable = (rootLocator, configOptions = {}) => {
             return results;
         }),
         filter: (predicate_1, ...args_1) => __awaiter(void 0, [predicate_1, ...args_1], void 0, function* (predicate, options = {}) {
-            var _a, _b, _c;
+            var _a, _b, _c, _d;
             yield _autoInit();
             const map = tableMapper.getMapSync();
             const effectiveMaxPages = (_a = options.maxPages) !== null && _a !== void 0 ? _a : config.maxPages;
             const dedupeStrategy = (_b = options.dedupe) !== null && _b !== void 0 ? _b : config.strategies.dedupe;
             const dedupeKeys = dedupeStrategy ? new Set() : null;
             const parallel = (_c = options.parallel) !== null && _c !== void 0 ? _c : false;
+            const useBulk = (_d = options.useBulkPagination) !== null && _d !== void 0 ? _d : false;
             const tracker = new elementTracker_1.ElementTracker('filter');
             const matched = [];
             try {
@@ -462,7 +473,7 @@ const useTable = (rootLocator, configOptions = {}) => {
                     rowIndex += smartRows.length;
                     if (stopped || pagesScanned >= effectiveMaxPages)
                         break;
-                    if (!(yield _advancePage()))
+                    if (!(yield _advancePage(useBulk)))
                         break;
                     pagesScanned++;
                 }
@@ -472,11 +483,15 @@ const useTable = (rootLocator, configOptions = {}) => {
             }
             return (0, smartRowArray_1.createSmartRowArray)(matched);
         }),
-        generateConfigPrompt: () => __awaiter(void 0, void 0, void 0, function* () {
+        generateConfig: () => __awaiter(void 0, void 0, void 0, function* () {
             const html = yield _getCleanHtml(rootLocator);
             const separator = "=".repeat(50);
             const content = `\n${separator} \n🤖 COPY INTO GEMINI / ChatGPT 🤖\n${separator} \nI am using 'playwright-smart-table'.\nTarget Table Locator: ${rootLocator.toString()} \nGenerate config for: \n\`\`\`html\n${html.substring(0, 10000)} ...\n\`\`\`\n${separator}\n`;
             yield _handlePrompt('Smart Table Config', content);
+        }),
+        generateConfigPrompt: () => __awaiter(void 0, void 0, void 0, function* () {
+            console.warn('⚠️ [playwright-smart-table] generateConfigPrompt() is deprecated and will be removed in v7.0.0. Please use generateConfig() instead.');
+            return result.generateConfig();
         }),
     };
     finalTable = result;

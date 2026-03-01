@@ -243,4 +243,76 @@ test.describe('Stateful Cross-Page Navigation & PaginationPrimitives', () => {
         await expect(page.locator('#status')).toHaveText('Page 3');
     });
 
+    test('bringIntoView with windowed goToPage uses retry loop (step then goToPage until in range)', async ({ page }) => {
+        await setupThreePageTable(page);
+
+        const table = useTable(page.locator('#my-table'), {
+            strategies: {
+                pagination: {
+                    goNext: async (ctx) => {
+                        const btn = ctx.page.locator('#next');
+                        if (await btn.isDisabled()) return false;
+                        await btn.click();
+                        await ctx.page.waitForTimeout(50);
+                        return true;
+                    },
+                    goToFirst: async (ctx) => {
+                        await ctx.page.locator('#first').click();
+                        await ctx.page.waitForTimeout(50);
+                        return true;
+                    },
+                    goToPage: async (pageIndex, ctx) => {
+                        const text = await ctx.page.locator('#status').innerText();
+                        const current = parseInt(text.replace('Page ', ''), 10) - 1;
+                        if (Math.abs(current - pageIndex) > 1) return false;
+                        await ctx.page.locator('#page-input').fill((pageIndex + 1).toString());
+                        await ctx.page.locator('#jump').click();
+                        await ctx.page.waitForTimeout(50);
+                        return true;
+                    }
+                }
+            },
+            maxPages: 3,
+        });
+
+        await table.findRows({});
+        expect(table.currentPageIndex).toBe(2);
+
+        await table.reset();
+        expect(table.currentPageIndex).toBe(0);
+        await expect(page.locator('#status')).toHaveText('Page 1');
+
+        const rows = await table.findRows({});
+        await rows[4].bringIntoView();
+
+        expect(table.currentPageIndex).toBe(2);
+        await expect(page.locator('#status')).toHaveText('Page 3');
+    });
+
+    test('bringIntoView from page 0 with next+nextBulk only (no prev) uses goNextBulk when exact, not when overshoot', async ({ page }) => {
+        await setupThreePageTable(page);
+        // findRows with goNextBulk(2) visits pages 0 then 2, so rows[2] is on page 2. No-overshoot case (0→1) is in unit tests (paginationPath.test.ts).
+
+        const table = useTable(page.locator('#my-table'), {
+            strategies: {
+                pagination: Strategies.Pagination.click(
+                    { next: '#next', nextBulk: '#next-bulk', first: '#first' },
+                    { nextBulkPages: 2 }
+                )
+            },
+            maxPages: 3,
+        });
+
+        await table.findRows({});
+        expect(table.currentPageIndex).toBe(2);
+        await table.reset();
+        expect(table.currentPageIndex).toBe(0);
+
+        const rows = await table.findRows({});
+        await rows[2].bringIntoView();
+
+        expect(table.currentPageIndex).toBe(2);
+        await expect(page.locator('#status')).toHaveText('Page 3');
+    });
+
 });

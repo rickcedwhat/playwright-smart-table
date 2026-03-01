@@ -29,12 +29,16 @@ exports.PaginationStrategies = {
                 })).then(stabilized => stabilized ? returnVal : false);
             });
         };
+        const nextBulk = (_b = options.nextBulkPages) !== null && _b !== void 0 ? _b : 10;
+        const prevBulk = (_c = options.previousBulkPages) !== null && _c !== void 0 ? _c : 10;
         return {
             goNext: createClicker(selectors.next),
             goPrevious: createClicker(selectors.previous),
-            goNextBulk: createClicker(selectors.nextBulk, (_b = options.nextBulkPages) !== null && _b !== void 0 ? _b : 10),
-            goPreviousBulk: createClicker(selectors.previousBulk, (_c = options.previousBulkPages) !== null && _c !== void 0 ? _c : 10),
-            goToFirst: createClicker(selectors.first)
+            goNextBulk: createClicker(selectors.nextBulk, nextBulk),
+            goPreviousBulk: createClicker(selectors.previousBulk, prevBulk),
+            goToFirst: createClicker(selectors.first),
+            nextBulkPages: nextBulk,
+            previousBulkPages: prevBulk,
         };
     },
     /**
@@ -78,9 +82,26 @@ exports.PaginationStrategies = {
                 return yield stabilization(context, doScroll);
             });
         };
+        const createGoToFirst = () => {
+            return (context) => __awaiter(void 0, void 0, void 0, function* () {
+                const { root, resolve } = context;
+                const scrollTarget = options.scrollTarget
+                    ? resolve(options.scrollTarget, root)
+                    : root;
+                const doScroll = () => __awaiter(void 0, void 0, void 0, function* () {
+                    yield scrollTarget.evaluate((el) => {
+                        el.scrollTop = 0;
+                        el.scrollLeft = 0;
+                    });
+                });
+                // Stabilization: Wait for content to reset
+                return yield stabilization(context, doScroll);
+            });
+        };
         return {
             goNext: createScroller(1),
-            goPrevious: createScroller(-1)
+            goPrevious: createScroller(-1),
+            goToFirst: createGoToFirst()
         };
     }
 };

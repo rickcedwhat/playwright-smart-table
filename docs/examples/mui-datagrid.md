@@ -29,9 +29,9 @@ const table = useTable(page.locator('.MuiDataGrid-root'), {
     sorting: Strategies.Sorting.AriaSort(),
     
     // Pagination (if using paginated view)
-    pagination: Strategies.Pagination.ClickNext(
+    pagination: Strategies.Pagination.click({ next: 
       'button[title="Go to next page"]'
-    )
+    })
   }
 });
 
@@ -48,7 +48,7 @@ The library's `findRow` naturally handles searching across pages, but for virtua
 
 ```typescript
 strategies: {
-  pagination: Strategies.Pagination.InfiniteScroll({
+  pagination: Strategies.Pagination.infiniteScroll({
     scrollContainer: page.locator('.MuiDataGrid-virtualScroller'),
     waitForNewRows: 500 // Wait for virtualization to render
   })

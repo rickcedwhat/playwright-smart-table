@@ -1,7 +1,7 @@
-import type { PaginationStrategy, SortingStrategy, FillStrategy } from '../types';
+import type { SortingStrategy, FillStrategy } from '../types';
 
 /**
- * Validates that a pagination strategy returns a boolean.
+ * Validates that a pagination strategy returns a boolean or number (pages jumped).
  * @param result - The result from a pagination strategy
  * @param strategyName - Name of the strategy for error messages
  */
@@ -18,19 +18,6 @@ export function validatePaginationResult(result: any, strategyName: string = 'Cu
     }
 
     return result;
-}
-
-/**
- * Validates that a pagination strategy is properly configured.
- * @param strategy - The pagination strategy to validate
- */
-export function validatePaginationStrategy(strategy: any): strategy is PaginationStrategy {
-    if (typeof strategy !== 'function') {
-        throw new Error(
-            `Pagination strategy must be a function. Received: ${typeof strategy}`
-        );
-    }
-    return true;
 }
 
 /**

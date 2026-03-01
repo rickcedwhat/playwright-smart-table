@@ -20,7 +20,7 @@ import { useTable, Strategies } from '@rickcedwhat/playwright-smart-table';
 
 const table = useTable(page.locator('#table'), {
   strategies: {
-    pagination: Strategies.Pagination.ClickNext('.next-btn'),
+    pagination: Strategies.Pagination.click({ next: '.next-btn' }),
     sorting: Strategies.Sorting.AriaSort(),
     fill: Strategies.Fill.ClickAndType()
   }
@@ -43,7 +43,7 @@ Strategies.Pagination.ClickNext(selector: string | Locator)
 
 ```typescript
 strategies: {
-  pagination: Strategies.Pagination.ClickNext('.pagination .next')
+  pagination: Strategies.Pagination.click({ next: '.pagination .next' })
 }
 ```
 
@@ -74,7 +74,7 @@ strategies: {
 Handle infinite scroll tables.
 
 ```typescript
-Strategies.Pagination.InfiniteScroll(options?: {
+Strategies.Pagination.infiniteScroll(options?: {
   scrollContainer?: Locator,
   waitForNewRows?: number
 })
@@ -84,7 +84,7 @@ Strategies.Pagination.InfiniteScroll(options?: {
 
 ```typescript
 strategies: {
-  pagination: Strategies.Pagination.InfiniteScroll({
+  pagination: Strategies.Pagination.infiniteScroll({
     scrollContainer: page.locator('.table-container'),
     waitForNewRows: 500
   })
@@ -97,18 +97,20 @@ Create your own pagination logic:
 
 ```typescript
 strategies: {
-  pagination: async ({ page, rootLocator }) => {
-    // Your custom logic
-    const nextBtn = page.locator('.custom-next');
-    
-    if (await nextBtn.isDisabled()) {
-      return false; // Stop pagination
+  pagination: {
+    goNext: async ({ page, rootLocator }) => {
+      // Your custom logic
+      const nextBtn = page.locator('.custom-next');
+      
+      if (await nextBtn.isDisabled()) {
+        return false; // Stop pagination
+      }
+      
+      await nextBtn.click();
+      await page.waitForLoadState('networkidle');
+      
+      return true; // Continue pagination
     }
-    
-    await nextBtn.click();
-    await page.waitForLoadState('networkidle');
-    
-    return true; // Continue pagination
   }
 }
 
@@ -285,7 +287,7 @@ const table = useTable(page.locator('#complex-table'), {
   
   strategies: {
     // Pagination
-    pagination: Strategies.Pagination.ClickNext('.pagination .next'),
+    pagination: Strategies.Pagination.click({ next: '.pagination .next' }),
     
     // Sorting
     sorting: Strategies.Sorting.AriaSort(),

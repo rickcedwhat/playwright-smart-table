@@ -81,7 +81,7 @@ import { Strategies } from 'playwright-smart-table';
 const table = useTable(loc, {
   strategies: {
     // Handle "Load More" buttons
-    pagination: Strategies.Pagination.ClickNext('.load-more-btn'),
+    pagination: Strategies.Pagination.click({ next: '.load-more-btn' }),
     
     // Handle column sorting
     sorting: Strategies.Sorting.AriaSort()

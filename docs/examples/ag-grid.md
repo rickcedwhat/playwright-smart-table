@@ -26,7 +26,7 @@ const table = useTable(page.locator('.ag-root-wrapper'), {
     sorting: Strategies.Sorting.AriaSort(),
     
     // Custom pagination (if using standard paging)
-    pagination: Strategies.Pagination.ClickNext('.ag-paging-button[aria-label="Next Page"]')
+    pagination: Strategies.Pagination.click({ next: '.ag-paging-button[aria-label="Next Page"]' })
   }
 });
 
@@ -89,7 +89,7 @@ graph TD
 
 ```typescript
 strategies: {
-  pagination: Strategies.Pagination.InfiniteScroll({
+  pagination: Strategies.Pagination.infiniteScroll({
     scrollContainer: page.locator('.ag-body-viewport'),
   })
 }

@@ -31,8 +31,8 @@
   },
   {
     "name": "getRowByIndex",
-    "signature": "getRowByIndex: (\n  index: number,\n  options?: { bringIntoView?: boolean }",
-    "comment": "/**\n* Gets a row by 1-based index on the current page.\n* Throws error if table is not initialized.\n* @param index 1-based row index\n* @param options Optional settings including bringIntoView\n*/"
+    "signature": "getRowByIndex(index: number): SmartRow",
+    "comment": "/**\n* Gets a row by 0-based index on the current page.\n* Throws error if table is not initialized.\n* @param index 0-based row index\n*/"
   },
   {
     "name": "findRow",
@@ -60,19 +60,9 @@
     "comment": "/**\n* Revalidates the table's structure (headers, columns) without resetting pagination or state.\n* Useful when columns change visibility or order dynamically.\n*/"
   },
   {
-    "name": "getColumnValues",
-    "signature": "getColumnValues: <V = string>(column: string, options?: { mapper?: (cell: Locator) => Promise<V> | V, maxPages?: number }) => Promise<V[]>",
-    "comment": "/**\n* Scans a specific column across all pages and returns the values.\n*/"
-  },
-  {
     "name": "sorting",
     "signature": "sorting: {\n  apply(columnName: string, direction: 'asc' | 'desc'): Promise<void>;\n  getState(columnName: string): Promise<'asc' | 'desc' | 'none'>;\n  }",
     "comment": "/**\n* Gets the current sort state of a column using the configured sorting strategy.\n* @param columnName The name of the column to check.\n* @returns A promise that resolves to 'asc', 'desc', or 'none'.\n*/"
-  },
-  {
-    "name": "iterateThroughTable",
-    "signature": "iterateThroughTable: <T = any>(\n  callback: (context: {\n  index: number;\n  isFirst: boolean;\n  isLast: boolean;\n  rows: SmartRowArray;\n  allData: T[];\n  table: RestrictedTableResult;\n  batchInfo?: {\n  startIndex: number;\n  endIndex: number;\n  size: number;\n  };\n  }) => T | T[] | Promise<T | T[]>,\n  options?: {\n  pagination?: PaginationStrategy;\n  dedupeStrategy?: DedupeStrategy;\n  maxIterations?: number;\n  batchSize?: number;\n  getIsFirst?: (context: { index: number }) => boolean;\n  getIsLast?: (context: { index: number, paginationResult: boolean }) => boolean;\n  beforeFirst?: (context: { index: number, rows: SmartRowArray, allData: any[] }) => void | Promise<void>;\n  afterLast?: (context: { index: number, rows: SmartRowArray, allData: any[] }) => void | Promise<void>;\n  autoFlatten?: boolean;\n  }",
-    "comment": "/**\n* If true, flattens array results from callback into the main data array.\n* If false (default), pushes the return value as-is (preserves batching/arrays).\n*/"
   },
   {
     "name": "generateConfigPrompt",

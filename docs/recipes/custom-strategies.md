@@ -15,21 +15,23 @@ import { useTable, Strategies } from 'playwright-smart-table';
 
 const table = useTable(page.locator('table'), {
   strategies: {
-    pagination: async ({ page, rootLocator }) => {
-        // 1. Detect if there's a next page
-        const loadMore = page.locator('button:has-text("Load More")');
-        
-        if (await loadMore.isDisabled() || !(await loadMore.isVisible())) {
-            return false; // No more pages
-        }
-        
-        // 2. Perform navigation
-        await loadMore.click();
-        
-        // 3. Wait for new content
-        await page.waitForResponse(resp => resp.url().includes('/api/data'));
-        
-        return true; // Successfully navigated
+    pagination: {
+      goNext: async ({ page, rootLocator }) => {
+          // 1. Detect if there's a next page
+          const loadMore = page.locator('button:has-text("Load More")');
+          
+          if (await loadMore.isDisabled() || !(await loadMore.isVisible())) {
+              return false; // No more pages
+          }
+          
+          // 2. Perform navigation
+          await loadMore.click();
+          
+          // 3. Wait for new content
+          await page.waitForResponse(resp => resp.url().includes('/api/data'));
+          
+          return true; // Successfully navigated
+      }
     }
   }
 });
@@ -85,7 +87,7 @@ Strategies are just functions, so you can easily reuse and share them.
 ```typescript
 // my-strategies.ts
 export const MyCompanyTableStrategies = {
-    pagination: async (...) => { ... },
+    pagination: { goNext: async (...) => { ... } },
     fill: async (...) => { ... }
 };
 

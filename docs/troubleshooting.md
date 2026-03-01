@@ -96,7 +96,7 @@ import { Strategies } from '@rickcedwhat/playwright-smart-table';
 
 const table = useTable(page.locator('#table'), {
   strategies: {
-    pagination: Strategies.Pagination.ClickNext('.next-button')
+    pagination: Strategies.Pagination.click({ next: '.next-button' })
   }
 });
 ```

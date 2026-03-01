@@ -14,7 +14,7 @@ const table = useTable(page.locator('.feed-container'), {
   rowSelector: '.feed-item',
   
   strategies: {
-    pagination: Strategies.Pagination.InfiniteScroll({
+    pagination: Strategies.Pagination.infiniteScroll({
       // The element that has the overflow-y: scroll style
       scrollContainer: page.locator('.feed-scroll-view'),
       

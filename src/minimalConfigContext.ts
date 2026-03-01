@@ -57,9 +57,6 @@ export interface TableConfig<T = any> {
   
   /** Advanced: Custom strategies for pagination, sorting, navigation, etc. */
   strategies?: TableStrategies;
-  
-  /** Custom data mappers for extracting complex types (boolean, number) */
-  dataMapper?: Partial<Record<keyof T, (cell: Locator) => Promise<T[keyof T]> | T[keyof T]>>;
 }
 
 /**

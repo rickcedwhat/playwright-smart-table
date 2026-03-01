@@ -112,7 +112,7 @@ Custom strategies for pagination, sorting, filling, etc. See [Strategies](/api/s
 
 ```typescript
 strategies: {
-  pagination: Strategies.Pagination.ClickNext('.next-button'),
+  pagination: Strategies.Pagination.click({ next: '.next-button' }),
   sorting: Strategies.Sorting.AriaSort(),
   fill: Strategies.Fill.ClickAndType()
 }
@@ -177,7 +177,7 @@ const table = useTable<Employee>(page.locator('#employees'), {
   },
   
   strategies: {
-    pagination: Strategies.Pagination.ClickNext('.pagination .next'),
+    pagination: Strategies.Pagination.click({ next: '.pagination .next' }),
     sorting: Strategies.Sorting.AriaSort()
   },
   

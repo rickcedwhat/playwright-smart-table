@@ -25,9 +25,11 @@ test('DedupeStrategies.byTopPosition handles duplicate rows', async ({ page }) =
   const table = useTable(page.locator('table'), {
     strategies: {
       dedupe: DedupeStrategies.byTopPosition(5), // 5px tolerance
-      pagination: async () => {
-        pageCount++;
-        return pageCount < 2;
+      pagination: {
+        goNext: async () => {
+          pageCount++;
+          return pageCount < 2;
+        }
       }
     }
   });

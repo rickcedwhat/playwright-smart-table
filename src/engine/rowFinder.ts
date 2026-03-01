@@ -102,17 +102,13 @@ export class RowFinder<T = any> {
                     page: this.rootLocator.page()
                 };
 
-                let paginationResult: boolean | number | PaginationPrimitives;
-                if (typeof this.config.strategies.pagination === 'function') {
-                    paginationResult = await this.config.strategies.pagination(context);
+                let paginationResult: boolean | number | PaginationPrimitives | undefined;
+                if (this.config.strategies.pagination?.goNextBulk) {
+                    paginationResult = await this.config.strategies.pagination.goNextBulk(context);
+                } else if (this.config.strategies.pagination?.goNext) {
+                    paginationResult = await this.config.strategies.pagination.goNext(context);
                 } else {
-                    if (this.config.strategies.pagination!.goNextBulk) {
-                        paginationResult = await this.config.strategies.pagination!.goNextBulk(context);
-                    } else if (this.config.strategies.pagination!.goNext) {
-                        paginationResult = await this.config.strategies.pagination!.goNext(context);
-                    } else {
-                        break;
-                    }
+                    break;
                 }
 
                 const didPaginate = validatePaginationResult(paginationResult, 'Pagination Strategy');
@@ -198,18 +194,14 @@ export class RowFinder<T = any> {
                     page: this.rootLocator.page()
                 };
 
-                let paginationResult: boolean | number | PaginationPrimitives;
-                if (typeof this.config.strategies.pagination === 'function') {
-                    paginationResult = await this.config.strategies.pagination(context);
+                let paginationResult: boolean | number | PaginationPrimitives | undefined;
+                if (this.config.strategies.pagination?.goNextBulk) {
+                    paginationResult = await this.config.strategies.pagination.goNextBulk(context);
+                } else if (this.config.strategies.pagination?.goNext) {
+                    paginationResult = await this.config.strategies.pagination.goNext(context);
                 } else {
-                    if (this.config.strategies.pagination!.goNextBulk) {
-                        paginationResult = await this.config.strategies.pagination!.goNextBulk(context);
-                    } else if (this.config.strategies.pagination!.goNext) {
-                        paginationResult = await this.config.strategies.pagination!.goNext(context);
-                    } else {
-                        this.log(`Page ${this.tableState.currentPageIndex}: Pagination failed (no goNext or goNextBulk primitive).`);
-                        return null;
-                    }
+                    this.log(`Page ${this.tableState.currentPageIndex}: Pagination failed (no goNext or goNextBulk primitive).`);
+                    return null;
                 }
 
                 const didLoadMore = validatePaginationResult(paginationResult, 'Pagination Strategy');

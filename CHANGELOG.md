@@ -1,5 +1,13 @@
 # Changelog
 
+## [6.7.4] - 2026-02-28
+
+### Documentation
+- **getRowByIndex**: JSDoc and API docs now correctly describe the index as **0-based** (was incorrectly documented as 1-based since v6.1.0). Removed non-existent `options` / `bringIntoView` parameter from signatures.
+- **README**: Added note on `useBulkPagination` for `map`/`forEach`/`filter` when using strategies with `goNextBulk`.
+- **API signature JSON**: Removed deprecated `getColumnValues`, `iterateThroughTable`, and `getRows` from VitePress signature files; updated `getRowByIndex` signature and params.
+- **CHANGELOG [6.5.0]**: Clarified that `currentPageIndex` is updated by `findRows` and iteration methods (`map`, `forEach`, `filter`).
+
 ## [6.7.3] - 2026-02-26
 
 ### Fixed
@@ -105,7 +113,7 @@
   - Uses `goToPage` for instant O(1) jumps if provided.
   - Falls back to looping `goPrevious` N times based on the tracked page diff.
   - Falls back to `goToFirst` + N loops of `goNext` if no backward primitive exists.
-- **`TableResult.currentPageIndex`**: Tracks the current DOM page index as `findRows` and `iterateThroughTable` paginate forward. Updated by `bringIntoView` when navigating backwards.
+- **`TableResult.currentPageIndex`**: Tracks the current DOM page index as `findRows` and iteration methods (`map`, `forEach`, `filter`) paginate forward. Updated by `bringIntoView` when navigating backwards.
 - **`SmartRow.table`**: Back-reference to the parent `TableResult` instance, enabling state queries like `rows[0].table.currentPageIndex`.
 - **`SmartRow.tablePageIndex`**: Records which page index the row was originally found on during `findRows`.
 

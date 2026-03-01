@@ -67,13 +67,11 @@ export default defineConfig({
                                 { text: 'getRowByIndex()', link: '/api/table-methods#getrowbyindex' },
                                 { text: 'findRow()', link: '/api/table-methods#findrow' },
                                 { text: 'findRows()', link: '/api/table-methods#findrows' },
-                                { text: 'getColumnValues()', link: '/api/table-methods#getcolumnvalues' },
                                 { text: 'getHeaders()', link: '/api/table-methods#getheaders' },
                                 { text: 'getHeaderCell()', link: '/api/table-methods#getheadercell' },
-                                { text: 'iterateThroughTable()', link: '/api/table-methods#iteratethroughtable' },
                                 { text: 'reset()', link: '/api/table-methods#reset' },
                                 { text: 'sorting', link: '/api/table-methods#sorting' },
-                                { text: 'generatePromptConfig()', link: '/api/table-methods#generatepromptconfig' }
+                                { text: 'generateConfig()', link: '/api/table-methods#generateconfig' }
                             ]
                         },
                         {

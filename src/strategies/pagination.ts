@@ -43,12 +43,16 @@ export const PaginationStrategies = {  /**
       };
     };
 
+    const nextBulk = options.nextBulkPages ?? 10;
+    const prevBulk = options.previousBulkPages ?? 10;
     return {
       goNext: createClicker(selectors.next),
       goPrevious: createClicker(selectors.previous),
-      goNextBulk: createClicker(selectors.nextBulk, options.nextBulkPages ?? 10),
-      goPreviousBulk: createClicker(selectors.previousBulk, options.previousBulkPages ?? 10),
-      goToFirst: createClicker(selectors.first)
+      goNextBulk: createClicker(selectors.nextBulk, nextBulk),
+      goPreviousBulk: createClicker(selectors.previousBulk, prevBulk),
+      goToFirst: createClicker(selectors.first),
+      nextBulkPages: nextBulk,
+      previousBulkPages: prevBulk,
     };
   },
 
@@ -104,9 +108,29 @@ export const PaginationStrategies = {  /**
       };
     };
 
+    const createGoToFirst = () => {
+      return async (context: TableContext) => {
+        const { root, resolve } = context;
+        const scrollTarget = options.scrollTarget
+          ? resolve(options.scrollTarget, root)
+          : root;
+
+        const doScroll = async () => {
+          await scrollTarget.evaluate((el: HTMLElement) => {
+            el.scrollTop = 0;
+            el.scrollLeft = 0;
+          });
+        };
+
+        // Stabilization: Wait for content to reset
+        return await stabilization(context, doScroll);
+      };
+    };
+
     return {
       goNext: createScroller(1),
-      goPrevious: createScroller(-1)
+      goPrevious: createScroller(-1),
+      goToFirst: createGoToFirst()
     };
   }
 };

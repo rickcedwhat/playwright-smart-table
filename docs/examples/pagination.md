@@ -8,7 +8,7 @@ import { useTable, Strategies } from '@rickcedwhat/playwright-smart-table';
 
 const table = useTable(page.locator('#table'), {
   strategies: {
-    pagination: Strategies.Pagination.ClickNext('.pagination .next')
+    pagination: Strategies.Pagination.click({ next: '.pagination .next' })
   }
 });
 
@@ -71,20 +71,22 @@ const emails = await table.map(({ row }) => row.getCell('Email').innerText(), {
 ```typescript
 const table = useTable(page.locator('#table'), {
   strategies: {
-    pagination: async ({ page, rootLocator }) => {
-      const nextBtn = page.locator('.custom-next-button');
-      
-      // Check if there are more pages
-      const isDisabled = await nextBtn.isDisabled();
-      if (isDisabled) {
-        return { hasMore: false };
+    pagination: {
+      goNext: async ({ page, rootLocator }) => {
+        const nextBtn = page.locator('.custom-next-button');
+        
+        // Check if there are more pages
+        const isDisabled = await nextBtn.isDisabled();
+        if (isDisabled) {
+          return false;
+        }
+        
+        // Navigate to next page
+        await nextBtn.click();
+        await page.waitForLoadState('networkidle');
+        
+        return true;
       }
-      
-      // Navigate to next page
-      await nextBtn.click();
-      await page.waitForLoadState('networkidle');
-      
-      return { hasMore: true };
     }
   }
 });
@@ -115,7 +117,7 @@ test('paginated table search', async ({ page }) => {
   const table = useTable(page.locator('#example'), {
     headerSelector: 'thead th',
     strategies: {
-      pagination: Strategies.Pagination.ClickNext('#example_next')
+      pagination: Strategies.Pagination.click({ next: '#example_next' })
     },
     maxPages: 10
   });
