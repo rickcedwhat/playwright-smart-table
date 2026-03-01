@@ -1,8 +1,15 @@
 # Plugin Development Guide 🧩
 
-In v5, `playwright-smart-table` has adopted a lean core philosophy. While we provide essential strategies for standard tables, we encourage creating custom plugins for complex grids (like AG-Grid, Glide, or custom virtual lists).
+`playwright-smart-table` uses a lean core: essential strategies for standard tables, with custom plugins for complex grids (AG-Grid, Glide, React Data Grid, MUI Data Grid, or custom virtual lists).
 
 This guide shows you how to build robust, reusable strategies.
+
+**Adding a library plugin to the core repo?** Put it in `src/plugins/<name>/` as a directory with `index.ts` as the entry point. Add helper modules in that same directory if needed (e.g. `glide/columns.ts`). Register the preset in `src/plugins/index.ts`. Follow [PLUGIN_TEMPLATE.md](./PLUGIN_TEMPLATE.md) for the standard structure (preset + default strategies + full Strategies, non-enumerable getter, etc.) used by MUI, RDG, and Glide.
+
+**Plugin file layout (in-repo):**
+- `src/plugins/<name>/index.ts` — preset and strategies; exports `Xxx` and `XxxStrategies`.
+- `src/plugins/<name>/*.ts` — optional helpers (e.g. `columns.ts`, `headers.ts`).
+- `src/plugins/index.ts` — imports each plugin from `./<name>` and exposes `Plugins`.
 
 ## Core Concepts
 

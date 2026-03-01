@@ -95,4 +95,19 @@ test.describe('AriaSort Strategy', () => {
     // The 'City' column in our test HTML doesn't have `aria-sort` and is not part of the script
     await expect(table.sorting.apply('City', 'asc')).rejects.toThrow();
   });
+
+  test('sorting.apply throws after max retries when strategy never reaches target state', async ({ page }) => {
+    await page.goto(testFile);
+    const table = useTable(page.locator('#sortable-table'), {
+      strategies: {
+        sorting: {
+          doSort: async () => { /* no-op: never actually sort */ },
+          getSortState: async () => 'none' as const,
+        },
+      },
+    });
+    await table.init();
+
+    await expect(table.sorting.apply('Name', 'asc')).rejects.toThrow(/Failed to sort column "Name" to "asc" after 3 attempts/);
+  });
 });

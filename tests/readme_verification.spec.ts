@@ -4,7 +4,7 @@ import { Strategies } from '../src/index';
 
 test.describe('README.md Examples Verification', () => {
 
-  test('Quick Start: Standard Table', async ({ page }) => {
+  test('Quick Start + SmartRow: init, getRow, getCell, toJSON', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');
 
     // #region quick-start
@@ -19,20 +19,11 @@ test.describe('README.md Examples Verification', () => {
     const positionCell = row.getCell('Position');
     await expect(positionCell).toHaveText('Accountant');
     // #endregion quick-start
-  });
-
-  test('SmartRow: Core Pattern', async ({ page }) => {
-    await page.goto('https://datatables.net/examples/data_sources/dom');
-    const table = await useTable(page.locator('#example'), { headerSelector: 'thead th' }).init();
 
     // #region smart-row
     // Example from: https://datatables.net/examples/data_sources/dom
 
-    // Get SmartRow via getRow
-    const row = table.getRow({ Name: 'Airi Satou' });
-
     // Interact with cell using column name (resilient to column reordering)
-    const positionCell = row.getCell('Position');
     await positionCell.click();
 
     // Extract row data as JSON

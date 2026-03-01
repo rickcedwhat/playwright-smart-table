@@ -6,6 +6,7 @@ import { logDebug, debugDelay } from '../utils/debugUtils';
 import { createSmartRowArray, SmartRowArray } from '../utils/smartRowArray';
 import { validatePaginationResult } from '../strategies/validation';
 import { ElementTracker } from '../utils/elementTracker';
+import { SENTINEL_ROW } from '../utils/sentinel';
 
 export class RowFinder<T = any> {
     private resolve: (item: Selector, parent: Locator | Page) => Locator;
@@ -48,15 +49,15 @@ export class RowFinder<T = any> {
         const sentinel = this.resolve(this.config.rowSelector, this.rootLocator)
             .filter({ hasText: "___SENTINEL_ROW_NOT_FOUND___" + Date.now() });
         const smartRow = this.makeSmartRow(sentinel, await this.tableMapper.getMap(), 0);
-        (smartRow as any)._isSentinel = true;
+        (smartRow as any)[SENTINEL_ROW] = true;
         return smartRow;
     }
 
     public async findRows(
-        filters?: Partial<T> | Record<string, FilterValue>,
+        filters: Record<string, FilterValue> = {},
         options?: { exact?: boolean, maxPages?: number }
     ): Promise<SmartRowArray<T>> {
-        const filtersRecord = (filters as Record<string, FilterValue>) || {};
+        const filtersRecord = filters;
         const map = await this.tableMapper.getMap();
         const allRows: SmartRow<T>[] = [];
         const effectiveMaxPages = options?.maxPages ?? this.config.maxPages ?? Infinity;

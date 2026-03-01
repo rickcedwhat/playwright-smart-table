@@ -10,6 +10,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.RDG = exports.RDGStrategies = void 0;
+const pagination_1 = require("../../strategies/pagination");
+const stabilization_1 = require("../../strategies/stabilization");
 /**
  * Scrolls the grid horizontally to collect all column headers.
  * Handles empty headers by labeling them (e.g. "Checkbox").
@@ -20,14 +22,12 @@ const scrollRightHeaderRDG = (context) => __awaiter(void 0, void 0, void 0, func
     const gridHandle = yield root.evaluateHandle((el) => {
         return el.querySelector('[role="grid"]') || el.closest('[role="grid"]');
     });
-    const scrollContainer = gridHandle; // RDG usually scrolls the grid container itself
     const expectedColumns = yield gridHandle.evaluate(el => el ? parseInt(el.getAttribute('aria-colcount') || '0', 10) : 0);
     const getVisible = () => __awaiter(void 0, void 0, void 0, function* () {
         const headerLoc = resolve(config.headerSelector, root);
         const texts = yield headerLoc.allInnerTexts();
         return texts.map(t => {
             const trimmed = t.trim();
-            // Assign a name to empty headers (like selection checkboxes)
             return trimmed.length > 0 ? trimmed : 'Checkbox';
         });
     });
@@ -38,7 +38,6 @@ const scrollRightHeaderRDG = (context) => __awaiter(void 0, void 0, void 0, func
         yield gridHandle.evaluate(el => el.scrollLeft = 0);
         yield page.waitForTimeout(200);
         let iteration = 0;
-        // Safety break at 30 iterations to prevent infinite loops
         while (collectedHeaders.size < expectedColumns && iteration < 30) {
             yield gridHandle.evaluate(el => el.scrollLeft += 500);
             yield page.waitForTimeout(300);
@@ -54,22 +53,10 @@ const scrollRightHeaderRDG = (context) => __awaiter(void 0, void 0, void 0, func
     }
     return Array.from(collectedHeaders);
 });
-/**
- * Uses a row-relative locator to avoid issues with absolute aria-rowindex
- * changing during pagination/scrolling.
- */
 const rdgGetCellLocator = ({ row, columnIndex }) => {
     const ariaColIndex = columnIndex + 1;
     return row.locator(`[role="gridcell"][aria-colindex="${ariaColIndex}"]`);
 };
-/**
- * Scrolls the grid vertically to load more virtualized rows.
- */
-const pagination_1 = require("./pagination");
-const stabilization_1 = require("./stabilization");
-/**
- * Scrolls the grid vertically to load more virtualized rows.
- */
 const rdgPaginationStrategy = pagination_1.PaginationStrategies.infiniteScroll({
     action: 'js-scroll',
     scrollAmount: 500,
@@ -78,7 +65,6 @@ const rdgPaginationStrategy = pagination_1.PaginationStrategies.infiniteScroll({
 const rdgNavigation = {
     goRight: (_a) => __awaiter(void 0, [_a], void 0, function* ({ root, page }) {
         yield root.evaluate((el) => {
-            // Find grid container
             const grid = el.querySelector('[role="grid"]') || el.closest('[role="grid"]') || el;
             if (grid)
                 grid.scrollLeft += 150;

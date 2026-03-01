@@ -32,6 +32,7 @@ const smartRow_1 = require("./smartRow");
 const filterEngine_1 = require("./filterEngine");
 const tableMapper_1 = require("./engine/tableMapper");
 const rowFinder_1 = require("./engine/rowFinder");
+const tableIteration_1 = require("./engine/tableIteration");
 const debugUtils_1 = require("./utils/debugUtils");
 const smartRowArray_1 = require("./utils/smartRowArray");
 const elementTracker_1 = require("./utils/elementTracker");
@@ -95,6 +96,8 @@ const useTable = (rootLocator, configOptions = {}) => {
     };
     const tableState = { currentPageIndex: 0 };
     const rowFinder = new rowFinder_1.RowFinder(rootLocator, config, resolve, filterEngine, tableMapper, _makeSmart, tableState);
+    /** Builds a full TableContext/StrategyContext with getHeaderCell, getHeaders, scrollToColumn. Set after result is created. */
+    let createStrategyContext = () => ({ root: rootLocator, config, page: rootLocator.page(), resolve });
     const _getCleanHtml = (loc) => __awaiter(void 0, void 0, void 0, function* () {
         return loc.evaluate((el) => {
             const clone = el.cloneNode(true);
@@ -128,7 +131,7 @@ const useTable = (rootLocator, configOptions = {}) => {
     });
     // Default: goNext (one page). Pass useBulk true to prefer goNextBulk. "How far" uses numeric return when strategy provides it.
     const _advancePage = (...args_1) => __awaiter(void 0, [...args_1], void 0, function* (useBulk = false) {
-        const context = { root: rootLocator, config, page: rootLocator.page(), resolve, getHeaderCell: result.getHeaderCell, getHeaders: result.getHeaders, scrollToColumn: result.scrollToColumn };
+        const context = createStrategyContext();
         const pagination = config.strategies.pagination;
         let rawResult;
         if (useBulk && (pagination === null || pagination === void 0 ? void 0 : pagination.goNextBulk)) {
@@ -183,11 +186,10 @@ const useTable = (rootLocator, configOptions = {}) => {
         reset: () => __awaiter(void 0, void 0, void 0, function* () {
             var _a;
             log("Resetting table...");
-            const context = { root: rootLocator, config, page: rootLocator.page(), resolve, getHeaderCell: result.getHeaderCell };
-            yield config.onReset(context);
+            yield config.onReset(createStrategyContext());
             if ((_a = config.strategies.pagination) === null || _a === void 0 ? void 0 : _a.goToFirst) {
                 log("Auto-navigating to first page...");
-                yield config.strategies.pagination.goToFirst(context);
+                yield config.strategies.pagination.goToFirst(createStrategyContext());
             }
             else if (hasPaginationInConfig) {
                 log("No goToFirst strategy configured. Table may not be on page 1.");
@@ -220,11 +222,10 @@ const useTable = (rootLocator, configOptions = {}) => {
             return _makeSmart(rowLocator, map, index);
         },
         findRow: (filters, options) => __awaiter(void 0, void 0, void 0, function* () {
-            // @ts-ignore
             return rowFinder.findRow(filters, options);
         }),
         findRows: (filters, options) => __awaiter(void 0, void 0, void 0, function* () {
-            return rowFinder.findRows(filters, options);
+            return rowFinder.findRows(filters !== null && filters !== void 0 ? filters : {}, options);
         }),
         isInitialized: () => {
             return tableMapper.isInitialized();
@@ -236,7 +237,7 @@ const useTable = (rootLocator, configOptions = {}) => {
                 if (!config.strategies.sorting)
                     throw new Error('No sorting strategy has been configured.');
                 log(`Applying sort for column "${columnName}" (${direction})`);
-                const context = { root: rootLocator, config, page: rootLocator.page(), resolve, getHeaderCell: result.getHeaderCell };
+                const context = Object.assign(Object.assign({}, createStrategyContext()), { getHeaderCell: result.getHeaderCell });
                 const maxRetries = 3;
                 for (let i = 0; i < maxRetries; i++) {
                     const currentState = yield config.strategies.sorting.getSortState({ columnName, context });
@@ -264,7 +265,7 @@ const useTable = (rootLocator, configOptions = {}) => {
                 yield _autoInit();
                 if (!config.strategies.sorting)
                     throw new Error('No sorting strategy has been configured.');
-                const context = { root: rootLocator, config, page: rootLocator.page(), resolve, getHeaderCell: result.getHeaderCell };
+                const context = Object.assign(Object.assign({}, createStrategyContext()), { getHeaderCell: result.getHeaderCell });
                 return config.strategies.sorting.getSortState({ columnName, context });
             })
         },
@@ -299,189 +300,42 @@ const useTable = (rootLocator, configOptions = {}) => {
                 }
             });
         },
-        // ─── Private row-iteration engine ────────────────────────────────────────
+        // ─── Row iteration (delegated to engine/tableIteration) ──────────────────
         forEach: (callback_1, ...args_1) => __awaiter(void 0, [callback_1, ...args_1], void 0, function* (callback, options = {}) {
-            var _a, _b, _c, _d;
             yield _autoInit();
-            const map = tableMapper.getMapSync();
-            const effectiveMaxPages = (_a = options.maxPages) !== null && _a !== void 0 ? _a : config.maxPages;
-            const dedupeStrategy = (_b = options.dedupe) !== null && _b !== void 0 ? _b : config.strategies.dedupe;
-            const dedupeKeys = dedupeStrategy ? new Set() : null;
-            const parallel = (_c = options.parallel) !== null && _c !== void 0 ? _c : false;
-            const useBulk = (_d = options.useBulkPagination) !== null && _d !== void 0 ? _d : false;
-            const tracker = new elementTracker_1.ElementTracker('forEach');
-            try {
-                let rowIndex = 0;
-                let stopped = false;
-                let pagesScanned = 1;
-                const stop = () => { stopped = true; };
-                while (!stopped) {
-                    const rowLocators = resolve(config.rowSelector, rootLocator);
-                    const newIndices = yield tracker.getUnseenIndices(rowLocators);
-                    const pageRows = yield rowLocators.all();
-                    const smartRows = newIndices.map((idx, i) => _makeSmart(pageRows[idx], map, rowIndex + i));
-                    if (parallel) {
-                        yield Promise.all(smartRows.map((row) => __awaiter(void 0, void 0, void 0, function* () {
-                            if (stopped)
-                                return;
-                            if (dedupeKeys) {
-                                const key = yield dedupeStrategy(row);
-                                if (dedupeKeys.has(key))
-                                    return;
-                                dedupeKeys.add(key);
-                            }
-                            yield callback({ row, rowIndex: row.rowIndex, stop });
-                        })));
-                    }
-                    else {
-                        for (const row of smartRows) {
-                            if (stopped)
-                                break;
-                            if (dedupeKeys) {
-                                const key = yield dedupeStrategy(row);
-                                if (dedupeKeys.has(key))
-                                    continue;
-                                dedupeKeys.add(key);
-                            }
-                            yield callback({ row, rowIndex: row.rowIndex, stop });
-                        }
-                    }
-                    rowIndex += smartRows.length;
-                    if (stopped || pagesScanned >= effectiveMaxPages)
-                        break;
-                    if (!(yield _advancePage(useBulk)))
-                        break;
-                    pagesScanned++;
-                }
-            }
-            finally {
-                yield tracker.cleanup(rootLocator.page());
-            }
+            yield (0, tableIteration_1.runForEach)({
+                getRowLocators: () => resolve(config.rowSelector, rootLocator),
+                getMap: () => tableMapper.getMapSync(),
+                advancePage: _advancePage,
+                makeSmartRow: (loc, map, idx, pageIdx) => _makeSmart(loc, map, idx, pageIdx),
+                createSmartRowArray: smartRowArray_1.createSmartRowArray,
+                config,
+                getPage: () => rootLocator.page(),
+            }, callback, options);
         }),
         map: (callback_1, ...args_1) => __awaiter(void 0, [callback_1, ...args_1], void 0, function* (callback, options = {}) {
-            var _a, _b, _c, _d;
             yield _autoInit();
-            const map = tableMapper.getMapSync();
-            const effectiveMaxPages = (_a = options.maxPages) !== null && _a !== void 0 ? _a : config.maxPages;
-            const dedupeStrategy = (_b = options.dedupe) !== null && _b !== void 0 ? _b : config.strategies.dedupe;
-            const dedupeKeys = dedupeStrategy ? new Set() : null;
-            const parallel = (_c = options.parallel) !== null && _c !== void 0 ? _c : true;
-            const useBulk = (_d = options.useBulkPagination) !== null && _d !== void 0 ? _d : false;
-            const tracker = new elementTracker_1.ElementTracker('map');
-            const results = [];
-            try {
-                let rowIndex = 0;
-                let stopped = false;
-                let pagesScanned = 1;
-                const stop = () => { stopped = true; };
-                while (!stopped) {
-                    const rowLocators = resolve(config.rowSelector, rootLocator);
-                    const newIndices = yield tracker.getUnseenIndices(rowLocators);
-                    const pageRows = yield rowLocators.all();
-                    const smartRows = newIndices.map((idx, i) => _makeSmart(pageRows[idx], map, rowIndex + i));
-                    if (parallel) {
-                        const SKIP = Symbol('skip');
-                        const pageResults = yield Promise.all(smartRows.map((row) => __awaiter(void 0, void 0, void 0, function* () {
-                            if (dedupeKeys) {
-                                const key = yield dedupeStrategy(row);
-                                if (dedupeKeys.has(key))
-                                    return SKIP;
-                                dedupeKeys.add(key);
-                            }
-                            return callback({ row, rowIndex: row.rowIndex, stop });
-                        })));
-                        for (const r of pageResults) {
-                            if (r !== SKIP)
-                                results.push(r);
-                        }
-                    }
-                    else {
-                        for (const row of smartRows) {
-                            if (stopped)
-                                break;
-                            if (dedupeKeys) {
-                                const key = yield dedupeStrategy(row);
-                                if (dedupeKeys.has(key))
-                                    continue;
-                                dedupeKeys.add(key);
-                            }
-                            results.push(yield callback({ row, rowIndex: row.rowIndex, stop }));
-                        }
-                    }
-                    rowIndex += smartRows.length;
-                    if (stopped || pagesScanned >= effectiveMaxPages)
-                        break;
-                    if (!(yield _advancePage(useBulk)))
-                        break;
-                    pagesScanned++;
-                }
-            }
-            finally {
-                yield tracker.cleanup(rootLocator.page());
-            }
-            return results;
+            return (0, tableIteration_1.runMap)({
+                getRowLocators: () => resolve(config.rowSelector, rootLocator),
+                getMap: () => tableMapper.getMapSync(),
+                advancePage: _advancePage,
+                makeSmartRow: (loc, map, idx, pageIdx) => _makeSmart(loc, map, idx, pageIdx),
+                createSmartRowArray: smartRowArray_1.createSmartRowArray,
+                config,
+                getPage: () => rootLocator.page(),
+            }, callback, options);
         }),
         filter: (predicate_1, ...args_1) => __awaiter(void 0, [predicate_1, ...args_1], void 0, function* (predicate, options = {}) {
-            var _a, _b, _c, _d;
             yield _autoInit();
-            const map = tableMapper.getMapSync();
-            const effectiveMaxPages = (_a = options.maxPages) !== null && _a !== void 0 ? _a : config.maxPages;
-            const dedupeStrategy = (_b = options.dedupe) !== null && _b !== void 0 ? _b : config.strategies.dedupe;
-            const dedupeKeys = dedupeStrategy ? new Set() : null;
-            const parallel = (_c = options.parallel) !== null && _c !== void 0 ? _c : false;
-            const useBulk = (_d = options.useBulkPagination) !== null && _d !== void 0 ? _d : false;
-            const tracker = new elementTracker_1.ElementTracker('filter');
-            const matched = [];
-            try {
-                let rowIndex = 0;
-                let stopped = false;
-                let pagesScanned = 1;
-                const stop = () => { stopped = true; };
-                while (!stopped) {
-                    const rowLocators = resolve(config.rowSelector, rootLocator);
-                    const newIndices = yield tracker.getUnseenIndices(rowLocators);
-                    const pageRows = yield rowLocators.all();
-                    const smartRows = newIndices.map((idx, i) => _makeSmart(pageRows[idx], map, rowIndex + i, pagesScanned - 1));
-                    if (parallel) {
-                        const flags = yield Promise.all(smartRows.map((row) => __awaiter(void 0, void 0, void 0, function* () {
-                            if (dedupeKeys) {
-                                const key = yield dedupeStrategy(row);
-                                if (dedupeKeys.has(key))
-                                    return false;
-                                dedupeKeys.add(key);
-                            }
-                            return predicate({ row, rowIndex: row.rowIndex, stop });
-                        })));
-                        smartRows.forEach((row, i) => { if (flags[i])
-                            matched.push(row); });
-                    }
-                    else {
-                        for (const row of smartRows) {
-                            if (stopped)
-                                break;
-                            if (dedupeKeys) {
-                                const key = yield dedupeStrategy(row);
-                                if (dedupeKeys.has(key))
-                                    continue;
-                                dedupeKeys.add(key);
-                            }
-                            if (yield predicate({ row, rowIndex: row.rowIndex, stop })) {
-                                matched.push(row);
-                            }
-                        }
-                    }
-                    rowIndex += smartRows.length;
-                    if (stopped || pagesScanned >= effectiveMaxPages)
-                        break;
-                    if (!(yield _advancePage(useBulk)))
-                        break;
-                    pagesScanned++;
-                }
-            }
-            finally {
-                yield tracker.cleanup(rootLocator.page());
-            }
-            return (0, smartRowArray_1.createSmartRowArray)(matched);
+            return (0, tableIteration_1.runFilter)({
+                getRowLocators: () => resolve(config.rowSelector, rootLocator),
+                getMap: () => tableMapper.getMapSync(),
+                advancePage: _advancePage,
+                makeSmartRow: (loc, map, idx, pageIdx) => _makeSmart(loc, map, idx, pageIdx),
+                createSmartRowArray: smartRowArray_1.createSmartRowArray,
+                config,
+                getPage: () => rootLocator.page(),
+            }, predicate, options);
         }),
         generateConfig: () => __awaiter(void 0, void 0, void 0, function* () {
             const html = yield _getCleanHtml(rootLocator);
@@ -494,6 +348,15 @@ const useTable = (rootLocator, configOptions = {}) => {
             return result.generateConfig();
         }),
     };
+    createStrategyContext = () => ({
+        root: rootLocator,
+        config,
+        page: rootLocator.page(),
+        resolve,
+        getHeaderCell: result.getHeaderCell,
+        getHeaders: result.getHeaders,
+        scrollToColumn: result.scrollToColumn,
+    });
     finalTable = result;
     return result;
 };

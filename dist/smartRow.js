@@ -14,6 +14,7 @@ const fill_1 = require("./strategies/fill");
 const stringUtils_1 = require("./utils/stringUtils");
 const debugUtils_1 = require("./utils/debugUtils");
 const paginationPath_1 = require("./utils/paginationPath");
+const sentinel_1 = require("./utils/sentinel");
 /**
  * Internal helper to navigate to a cell with active cell optimization.
  * Uses navigation primitives (goUp, goDown, goLeft, goRight, goHome) for orchestration.
@@ -76,18 +77,32 @@ const _navigateToCell = (params) => __awaiter(void 0, void 0, void 0, function* 
                 yield nav.goLeft(context);
             }
         }
-        yield page.waitForTimeout(50);
-        // Get the active cell locator after navigation (for virtualized tables)
+        // Wait for active cell to match target: poll getActiveCell or fallback to fixed delay
         if (config.strategies.getActiveCell) {
-            const updatedActiveCell = yield config.strategies.getActiveCell({
+            const pollIntervalMs = 10;
+            const maxWaitMs = 50;
+            const start = Date.now();
+            while (Date.now() - start < maxWaitMs) {
+                const updatedActiveCell = yield config.strategies.getActiveCell({
+                    config,
+                    root: rootLocator,
+                    page,
+                    resolve
+                });
+                if (updatedActiveCell && updatedActiveCell.rowIndex === rowIndex && updatedActiveCell.columnIndex === index) {
+                    return updatedActiveCell.locator;
+                }
+                yield page.waitForTimeout(pollIntervalMs);
+            }
+            const final = yield config.strategies.getActiveCell({
                 config,
                 root: rootLocator,
                 page,
                 resolve
             });
-            if (updatedActiveCell) {
-                return updatedActiveCell.locator;
-            }
+            if (final)
+                return final.locator;
+            return null;
         }
         return null;
     }
@@ -121,7 +136,7 @@ const createSmartRow = (rowLocator, map, rowIndex, config, rootLocator, resolve,
         return resolve(config.cellSelector, rowLocator).nth(idx);
     };
     smart.wasFound = () => {
-        return !smart._isSentinel;
+        return !smart[sentinel_1.SENTINEL_ROW];
     };
     smart.toJSON = (options) => __awaiter(void 0, void 0, void 0, function* () {
         var _a;

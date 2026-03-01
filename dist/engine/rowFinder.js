@@ -14,6 +14,7 @@ const debugUtils_1 = require("../utils/debugUtils");
 const smartRowArray_1 = require("../utils/smartRowArray");
 const validation_1 = require("../strategies/validation");
 const elementTracker_1 = require("../utils/elementTracker");
+const sentinel_1 = require("../utils/sentinel");
 class RowFinder {
     constructor(rootLocator, config, resolve, filterEngine, tableMapper, makeSmartRow, tableState = { currentPageIndex: 0 }) {
         this.rootLocator = rootLocator;
@@ -42,14 +43,14 @@ class RowFinder {
             const sentinel = this.resolve(this.config.rowSelector, this.rootLocator)
                 .filter({ hasText: "___SENTINEL_ROW_NOT_FOUND___" + Date.now() });
             const smartRow = this.makeSmartRow(sentinel, yield this.tableMapper.getMap(), 0);
-            smartRow._isSentinel = true;
+            smartRow[sentinel_1.SENTINEL_ROW] = true;
             return smartRow;
         });
     }
-    findRows(filters, options) {
-        return __awaiter(this, void 0, void 0, function* () {
+    findRows() {
+        return __awaiter(this, arguments, void 0, function* (filters = {}, options) {
             var _a, _b, _c, _d;
-            const filtersRecord = filters || {};
+            const filtersRecord = filters;
             const map = yield this.tableMapper.getMap();
             const allRows = [];
             const effectiveMaxPages = (_b = (_a = options === null || options === void 0 ? void 0 : options.maxPages) !== null && _a !== void 0 ? _a : this.config.maxPages) !== null && _b !== void 0 ? _b : Infinity;

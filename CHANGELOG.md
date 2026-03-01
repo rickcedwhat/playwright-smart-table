@@ -1,5 +1,30 @@
 # Changelog
 
+## [6.7.5] - 2026-03-01
+
+### Added
+- **MUI (Material UI) plugin**: `Plugins.MUI` preset for MUI Data Grid (selectors, header transformer for empty "Actions" column, pagination). Use: `useTable(loc, { ...Plugins.MUI, maxPages: 5 })`. Dedicated tests in `tests/mui.spec.ts`; more MUI table types to be supported in future.
+- **Plugin shape unified**: All plugins now expose both `Plugins.X` (full preset: selectors + headerTransformer if any + strategies) and `Plugins.X.Strategies` (strategies only). Use preset: `useTable(loc, { ...Plugins.MUI, maxPages: 5 })`. Use strategies only: `useTable(loc, { rowSelector: '...', strategies: Plugins.MUI.Strategies })`. Applied to RDG, Glide, and MUI.
+- **Tests**: Reset + goToFirst, revalidate (no DOM change), sorting when no strategy, scrollToColumn, getRow exact match, findRow maxPages sentinel, columnOverrides.read-only, beforeCellRead hook. Core/edge tests moved from removed compatibility suite into `edge-cases.spec.ts`.
+
+### Changed
+- **SmartRow cell navigation**: After keyboard navigation (goUp/goDown/goLeft/goRight), the engine now polls `getActiveCell` until the active cell matches the target (10ms interval, 50ms max) when the strategy is set, then returns the cell locator. If no match within 50ms, a final `getActiveCell` call is used. When `getActiveCell` is not configured, no delay is used and the function returns immediately. This reduces reliance on fixed delays when virtualized grids expose the strategy.
+- **Sentinel row**: "Not found" rows are now marked with an internal symbol (`SENTINEL_ROW`) instead of `_isSentinel`. Use `SmartRow.wasFound()` to detect; do not rely on internal properties.
+- **Strategy context**: `useTable` now builds strategy/table context via a single `createStrategyContext()` helper so `getHeaderCell`, `getHeaders`, and `scrollToColumn` are consistently available to reset, sorting, and pagination.
+- **Iteration engine**: `forEach`, `map`, and `filter` logic moved to `engine/tableIteration.ts` (`runForEach`, `runMap`, `runFilter`) to shorten `useTable.ts` and centralize the row-iteration loop.
+- **JSDoc**: `FilterStrategy`, `LoadingStrategy`, and `getRow` (note on `rowIndex` when using `getRow()` vs `getRowByIndex`) improved in `types.ts`.
+
+### Removed
+- **compatibility.spec.ts**: Removed; useful cases (core methods, init timeout/chaining, lazy load, getRow vs findRow, revalidate, scrollToColumn) moved into `edge-cases.spec.ts` or covered by existing error-handling/readme tests.
+
+### Tests
+- **strategies.spec.ts**: Now only HTMX infinite-scroll example. MUI Data Grid tests moved to `tests/mui.spec.ts`.
+- **readme_verification.spec.ts**: "Quick Start" and "SmartRow: Core Pattern" merged into one test with both `#region` blocks for doc generation.
+
+### Moved
+- **Plugins to `src/plugins/`**: All library plugins (MUI, RDG, Glide) now live in `src/plugins/` instead of `src/strategies/`. Entry point is `src/plugins/index.ts`; `src/plugins.ts` removed. Plugin template and docs updated to use `src/plugins/` as the plugin directory.
+- **Plugin layout (directory per plugin)**: Each plugin is now a directory with `index.ts` (e.g. `src/plugins/glide/index.ts`, `src/plugins/rdg/index.ts`, `src/plugins/mui/index.ts`). Helper modules live alongside (e.g. `glide/columns.ts`, `glide/headers.ts`). Public API unchanged; imports like `Plugins.Glide` are unchanged.
+
 ## [6.7.4] - 2026-02-28
 
 ### Documentation

@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { useTable } from '../src/index';
 import { MINIMAL_CONFIG_CONTEXT } from '../src/minimalConfigContext';
 
-test.describe('generateConfigPrompt', () => {
+test.describe('generateConfig', () => {
     test('should throw an error containing the prompt and TypeScript types', async ({ page }) => {
         const tableHTML = `
             <table id="my-table">
@@ -16,25 +16,27 @@ test.describe('generateConfigPrompt', () => {
 
         const table = useTable(page.locator('#my-table'));
 
-        // It should throw an error rather than just console.log
-        await expect(table.generateConfigPrompt()).rejects.toThrow(/COPY INTO GEMINI/);
+        await expect(table.generateConfig()).rejects.toThrow(/COPY INTO GEMINI/);
 
         try {
-            await table.generateConfigPrompt();
+            await table.generateConfig();
         } catch (e: any) {
             const message = e.message;
-            // Should contain the table HTML
             expect(message).toContain('Val 1');
             expect(message).toContain('Val 2');
-
-            // Should contain the table HTML exactly as rendered
             expect(message).toContain(tableHTML.trim());
-
-            // Should contain the TypeScript config types automatically
             expect(message).toContain(MINIMAL_CONFIG_CONTEXT);
-
-            // Should prompt the user to copy into Gemini / ChatGPT
             expect(message).toContain('COPY INTO GEMINI / ChatGPT');
         }
+    });
+
+    test('generateConfigPrompt (deprecated) delegates to generateConfig', async ({ page }) => {
+        await page.setContent(`
+            <table id="t"><thead><tr><th>A</th></tr></thead><tbody><tr><td>1</td></tr></tbody></table>
+        `);
+        const table = useTable(page.locator('#t'));
+
+        await expect(table.generateConfigPrompt()).rejects.toThrow(/COPY INTO GEMINI/);
+        // Implementation also calls console.warn with deprecation message
     });
 });

@@ -12,20 +12,13 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.Glide = exports.GlideStrategies = void 0;
 const columns_1 = require("./glide/columns");
 const headers_1 = require("./glide/headers");
-const pagination_1 = require("./pagination");
-const stabilization_1 = require("./stabilization");
-/**
- * Fill strategy for Glide Data Grid with textarea validation.
- * This is the default strategy that works with the standard Glide Data Grid editor.
- */
+const pagination_1 = require("../strategies/pagination");
+const stabilization_1 = require("../strategies/stabilization");
 const glideFillStrategy = (_a) => __awaiter(void 0, [_a], void 0, function* ({ value, page }) {
-    // Edit Cell
     yield page.keyboard.press('Enter');
-    // Wait for editor to appear
     const textarea = page.locator('textarea.gdg-input');
     yield textarea.waitFor({ state: 'visible', timeout: 2000 });
     yield page.keyboard.type(String(value));
-    // Wait for textarea value to match what we typed
     yield textarea.evaluate((el, expectedValue) => {
         return new Promise((resolve) => {
             const checkValue = () => {
@@ -39,19 +32,11 @@ const glideFillStrategy = (_a) => __awaiter(void 0, [_a], void 0, function* ({ v
             checkValue();
         });
     }, String(value));
-    // Small delay to let the grid process the value
     yield page.waitForTimeout(50);
     yield page.keyboard.press('Enter');
-    // Wait for editor to close (commit completed)
     yield textarea.waitFor({ state: 'detached', timeout: 2000 });
-    // Wait for accessibility layer to sync with canvas state
     yield page.waitForTimeout(300);
 });
-/**
- * Simple fill strategy for Glide Data Grid.
- * Use this if your Glide implementation doesn't use the standard textarea editor.
- * This is faster but may not work for all Glide configurations.
- */
 const glideFillSimple = (_a) => __awaiter(void 0, [_a], void 0, function* ({ value, page }) {
     yield page.keyboard.press('Enter');
     yield page.keyboard.type(String(value));
@@ -62,36 +47,22 @@ const glidePaginationStrategy = pagination_1.PaginationStrategies.infiniteScroll
     scrollAmount: 500,
     action: 'js-scroll',
     stabilization: stabilization_1.StabilizationStrategies.contentChanged({ timeout: 5000 }),
-    timeout: 5000 // Overall timeout
+    timeout: 5000
 });
 const glideGetCellLocator = ({ row, columnIndex }) => {
-    // Use relative locator to support virtualization (where rowIndex resets or is offsets)
-    // The accessibility DOM usually contains 'td' elements with the data.
     return row.locator('td').nth(columnIndex);
 };
 const glideGetActiveCell = (_a) => __awaiter(void 0, [_a], void 0, function* ({ page }) {
-    // Find the focused cell/element
-    // Use broad selector for focused element
     const focused = page.locator('*:focus').first();
     if ((yield focused.count()) === 0)
         return null;
-    // Debug log
-    if (process.env.DEBUG)
-        console.log('Found focused element:', yield focused.evaluate((e) => e.outerHTML));
-    // Try to extract position from ID if possible
     const id = (yield focused.getAttribute('id')) || '';
-    // Expected format: glide-cell-COL-ROW
     const parts = id.split('-');
     let rowIndex = -1;
     let columnIndex = -1;
     if (parts.length >= 4 && parts[0] === 'glide' && parts[1] === 'cell') {
-        columnIndex = parseInt(parts[2]) - 1; // 1-based in ID to 0-based
+        columnIndex = parseInt(parts[2]) - 1;
         rowIndex = parseInt(parts[3]);
-    }
-    else {
-        // Fallback: If we can't parse ID, we assume it's the correct cell 
-        // because we just navigated to it. 
-        // Returning -1 indices might be confusing but won't stop smartRow from using the locator.
     }
     return {
         rowIndex,
@@ -112,7 +83,7 @@ const GlideDefaultStrategies = {
         goHome: columns_1.glideGoHome
     },
     loading: {
-        isHeaderLoading: () => __awaiter(void 0, void 0, void 0, function* () { return false; }) // Glide renders headers on a canvas, there is no innerText delay
+        isHeaderLoading: () => __awaiter(void 0, void 0, void 0, function* () { return false; })
     },
     getCellLocator: glideGetCellLocator,
     getActiveCell: glideGetActiveCell
