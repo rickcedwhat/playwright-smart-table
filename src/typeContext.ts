@@ -295,7 +295,8 @@ export type { HeaderStrategy } from './strategies/headers';
 export type { ColumnResolutionStrategy } from './strategies/resolution';
 
 /**
- * Strategy to filter rows based on criteria.
+ * Strategy to filter rows based on criteria. Applied when using getRow/findRow/findRows with filters.
+ * The default engine handles string, RegExp, number, and function (cell) => Locator filters.
  */
 export interface FilterStrategy {
   apply(options: {
@@ -307,7 +308,8 @@ export interface FilterStrategy {
 }
 
 /**
- * Strategy to check if the table or rows are loading.
+ * Strategy to check if the table or rows are loading. Used after pagination/sort to wait for content.
+ * E.g. isHeaderLoading for init stability; isTableLoading after sort/pagination.
  */
 export interface LoadingStrategy {
   isTableLoading?: (context: TableContext) => Promise<boolean>;
@@ -342,13 +344,10 @@ export interface TableStrategies {
    * Useful for scrolling off-screen columns into view in horizontally virtualized tables.
    */
   beforeCellRead?: BeforeCellReadFn;
-  /** Custom helper to check if a table is fully loaded/ready */
-  isTableLoaded?: (args: TableContext) => Promise<boolean>;
-  /** Custom helper to check if a row is fully loaded/ready */
-  isRowLoaded?: (args: { row: Locator, index: number }) => Promise<boolean>;
-  /** Custom helper to check if a cell is fully loaded/ready (e.g. for editing) */
-  isCellLoaded?: (args: { cell: Locator, column: string, row: Locator }) => Promise<boolean>;
-  /** Strategy for detecting loading states */
+  /**
+   * Strategy for detecting loading states. Use this for table-, row-, and header-level readiness.
+   * E.g. after sort/pagination, the engine uses loading.isTableLoading when present.
+   */
   loading?: LoadingStrategy;
 }
 
@@ -456,6 +455,8 @@ export interface TableResult<T = any> extends AsyncIterable<{ row: SmartRow<T>; 
   /**
    * Finds a row by filters on the current page only. Returns immediately (sync).
    * Throws error if table is not initialized.
+   * @note The returned SmartRow may have \`rowIndex\` as 0 when the match is not the first row.
+   * Use getRowByIndex(index) when you need a known index (e.g. for bringIntoView()).
    */
   getRow: (
     filters: Record<string, FilterValue>,
@@ -485,11 +486,11 @@ export interface TableResult<T = any> extends AsyncIterable<{ row: SmartRow<T>; 
   /**
    * ASYNC: Searches for all matching rows across pages using pagination.
    * Auto-initializes the table if not already initialized.
-   * @param filters - The filter criteria to match
+   * @param filters - The filter criteria to match (omit or pass {} for all rows)
    * @param options - Search options including exact match and max pages
    */
   findRows: (
-    filters: Record<string, FilterValue>,
+    filters?: Record<string, FilterValue>,
     options?: { exact?: boolean, maxPages?: number }
   ) => Promise<SmartRowArray<T>>;
 

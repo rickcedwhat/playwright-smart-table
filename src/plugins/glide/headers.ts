@@ -15,11 +15,9 @@ export const scrollRightHeader = async (context: StrategyContext, options?: { li
         return texts.map(t => t.trim());
     };
 
-    // Initial capture
     let currentHeaders = await getVisible();
     currentHeaders.forEach(h => collectedHeaders.add(h));
 
-    // Find scroller using JS for better iframe/shadow support
     const scrollerHandle = await root.evaluateHandle((el, selector) => {
         if (selector && el.matches(selector)) return el;
         const effectiveSelector = selector || '.dvn-scroller';
@@ -55,7 +53,6 @@ export const scrollRightHeader = async (context: StrategyContext, options?: { li
         console.warn("HeaderStrategies.scrollRight: Could not find scroller. Returning visible headers.");
     }
 
-    // Scroll back to start
     await scrollerHandle.evaluate(el => el!.scrollLeft = 0);
     await page.waitForTimeout(200);
 

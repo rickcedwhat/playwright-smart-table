@@ -1,19 +1,18 @@
-import { TableContext, Selector } from '../types';
+import { TableContext, Selector, TableConfig } from '../../types';
+import { PaginationStrategies } from '../../strategies/pagination';
+import { StabilizationStrategies } from '../../strategies/stabilization';
 
 /**
  * Scrolls the grid horizontally to collect all column headers.
  * Handles empty headers by labeling them (e.g. "Checkbox").
  */
-export const scrollRightHeaderRDG = async (context: TableContext) => {
+const scrollRightHeaderRDG = async (context: TableContext) => {
     const { resolve, config, root, page } = context;
     const collectedHeaders = new Set<string>();
 
     const gridHandle = await root.evaluateHandle((el) => {
         return el.querySelector('[role="grid"]') || el.closest('[role="grid"]');
     });
-
-    const scrollContainer = gridHandle; // RDG usually scrolls the grid container itself
-
 
     const expectedColumns = await gridHandle.evaluate(el =>
         el ? parseInt(el.getAttribute('aria-colcount') || '0', 10) : 0
@@ -24,7 +23,6 @@ export const scrollRightHeaderRDG = async (context: TableContext) => {
         const texts = await headerLoc.allInnerTexts();
         return texts.map(t => {
             const trimmed = t.trim();
-            // Assign a name to empty headers (like selection checkboxes)
             return trimmed.length > 0 ? trimmed : 'Checkbox';
         });
     };
@@ -41,7 +39,6 @@ export const scrollRightHeaderRDG = async (context: TableContext) => {
         await page.waitForTimeout(200);
 
         let iteration = 0;
-        // Safety break at 30 iterations to prevent infinite loops
         while (collectedHeaders.size < expectedColumns && iteration < 30) {
             await gridHandle.evaluate(el => el!.scrollLeft += 500);
             await page.waitForTimeout(300);
@@ -64,36 +61,20 @@ export const scrollRightHeaderRDG = async (context: TableContext) => {
     return Array.from(collectedHeaders);
 };
 
-/**
- * Uses a row-relative locator to avoid issues with absolute aria-rowindex 
- * changing during pagination/scrolling.
- */
-export const rdgGetCellLocator = ({ row, columnIndex }: any) => {
+const rdgGetCellLocator = ({ row, columnIndex }: any) => {
     const ariaColIndex = columnIndex + 1;
     return row.locator(`[role="gridcell"][aria-colindex="${ariaColIndex}"]`);
 };
 
-
-
-/**
- * Scrolls the grid vertically to load more virtualized rows.
- */
-import { PaginationStrategies } from './pagination';
-import { StabilizationStrategies } from './stabilization';
-
-/**
- * Scrolls the grid vertically to load more virtualized rows.
- */
-export const rdgPaginationStrategy = PaginationStrategies.infiniteScroll({
+const rdgPaginationStrategy = PaginationStrategies.infiniteScroll({
     action: 'js-scroll',
     scrollAmount: 500,
     stabilization: StabilizationStrategies.contentChanged({ timeout: 5000 })
 });
 
-export const rdgNavigation = {
+const rdgNavigation = {
     goRight: async ({ root, page }: any) => {
         await root.evaluate((el: HTMLElement) => {
-            // Find grid container
             const grid = el.querySelector('[role="grid"]') || el.closest('[role="grid"]') || el;
             if (grid) grid.scrollLeft += 150;
         });
@@ -127,9 +108,30 @@ export const rdgNavigation = {
     }
 };
 
-export const RDGStrategies = {
+/** Default strategies for the RDG preset (used when you spread Plugins.RDG). */
+const RDGDefaultStrategies = {
     header: scrollRightHeaderRDG,
     getCellLocator: rdgGetCellLocator,
     navigation: rdgNavigation,
     pagination: rdgPaginationStrategy
 };
+
+/** Full strategies for React Data Grid. Use when you want to supply your own selectors: strategies: Plugins.RDG.Strategies */
+export const RDGStrategies = RDGDefaultStrategies;
+
+/**
+ * Full preset for React Data Grid (selectors + default strategies).
+ * Spread: useTable(loc, { ...Plugins.RDG, maxPages: 5 }).
+ * Strategies only: useTable(loc, { rowSelector: '...', strategies: Plugins.RDG.Strategies }).
+ */
+const RDGPreset: Partial<TableConfig> = {
+    rowSelector: '[role="row"].rdg-row',
+    headerSelector: '[role="columnheader"]',
+    cellSelector: '[role="gridcell"]',
+    strategies: RDGDefaultStrategies
+};
+export const RDG: Partial<TableConfig> & { Strategies: typeof RDGStrategies } = Object.defineProperty(
+    RDGPreset,
+    'Strategies',
+    { get: () => RDGStrategies, enumerable: false }
+) as Partial<TableConfig> & { Strategies: typeof RDGStrategies };

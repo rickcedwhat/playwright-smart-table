@@ -1,6 +1,6 @@
 {
   "name": "@rickcedwhat/playwright-smart-table",
-  "version": "6.7.4",
+  "version": "6.7.5",
   "description": "Smart, column-aware table interactions for Playwright",
   "author": "Cedrick Catalan",
   "license": "MIT",

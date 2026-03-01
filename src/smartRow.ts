@@ -4,6 +4,7 @@ import { FillStrategies } from './strategies/fill';
 import { buildColumnNotFoundError } from './utils/stringUtils';
 import { debugDelay, logDebug } from './utils/debugUtils';
 import { planNavigationPath, executeNavigationPath, executeNavigationWithGoToPageRetry } from './utils/paginationPath';
+import { SENTINEL_ROW } from './utils/sentinel';
 
 type StrategyContext = {
     config: FinalTableConfig<any>;
@@ -91,20 +92,31 @@ const _navigateToCell = async (params: {
             }
         }
 
-        await page.waitForTimeout(50);
-
-
-        // Get the active cell locator after navigation (for virtualized tables)
+        // Wait for active cell to match target: poll getActiveCell or fallback to fixed delay
         if (config.strategies.getActiveCell) {
-            const updatedActiveCell = await config.strategies.getActiveCell({
+            const pollIntervalMs = 10;
+            const maxWaitMs = 50;
+            const start = Date.now();
+            while (Date.now() - start < maxWaitMs) {
+                const updatedActiveCell = await config.strategies.getActiveCell({
+                    config,
+                    root: rootLocator,
+                    page,
+                    resolve
+                });
+                if (updatedActiveCell && updatedActiveCell.rowIndex === rowIndex && updatedActiveCell.columnIndex === index) {
+                    return updatedActiveCell.locator;
+                }
+                await page.waitForTimeout(pollIntervalMs);
+            }
+            const final = await config.strategies.getActiveCell({
                 config,
                 root: rootLocator,
                 page,
                 resolve
             });
-            if (updatedActiveCell) {
-                return updatedActiveCell.locator;
-            }
+            if (final) return final.locator;
+            return null;
         }
 
         return null;
@@ -154,7 +166,7 @@ export const createSmartRow = <T = any>(
     };
 
     smart.wasFound = (): boolean => {
-        return !(smart as any)._isSentinel;
+        return !(smart as any)[SENTINEL_ROW];
     };
 
     smart.toJSON = async (options?: { columns?: string[] }): Promise<T> => {

@@ -4,13 +4,13 @@
  * - Plugins.X.Strategies — strategies only. Use with your own selectors: useTable(loc, { rowSelector: '...', strategies: Plugins.MUI.Strategies }).
  */
 export declare const Plugins: {
-    RDG: Partial<import("./types").TableConfig<any>> & {
-        Strategies: typeof import("./strategies/rdg").RDGStrategies;
+    RDG: Partial<import("..").TableConfig<any>> & {
+        Strategies: typeof import("./rdg").RDGStrategies;
     };
-    Glide: Partial<import("./types").TableConfig<any>> & {
-        Strategies: typeof import("./strategies/glide").GlideStrategies;
+    Glide: Partial<import("..").TableConfig<any>> & {
+        Strategies: typeof import("./glide").GlideStrategies;
     };
-    MUI: Partial<import("./types").TableConfig<any>> & {
-        Strategies: typeof import("./strategies/mui").MUIStrategies;
+    MUI: Partial<import("..").TableConfig<any>> & {
+        Strategies: typeof import("./mui").MUIStrategies;
     };
 };

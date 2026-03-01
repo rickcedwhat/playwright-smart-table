@@ -19,7 +19,7 @@ export declare class RowFinder<T = any> {
         exact?: boolean;
         maxPages?: number;
     }): Promise<SmartRow<T>>;
-    findRows(filters?: Partial<T> | Record<string, FilterValue>, options?: {
+    findRows(filters?: Record<string, FilterValue>, options?: {
         exact?: boolean;
         maxPages?: number;
     }): Promise<SmartRowArray<T>>;

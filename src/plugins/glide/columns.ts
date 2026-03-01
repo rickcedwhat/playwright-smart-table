@@ -1,4 +1,3 @@
-import { Page, Locator } from '@playwright/test';
 import { StrategyContext } from '../../types';
 
 /**
@@ -27,9 +26,7 @@ export const glideGoHome = async (context: StrategyContext) => {
     const { root, page } = context;
 
     // Glide renders to canvas - the accessibility table (root) is inside the canvas
-    // We need to find and focus the canvas element that contains our root
     await root.evaluate((el) => {
-        // Find the closest canvas ancestor
         const canvas = el.closest('canvas') || el.parentElement?.querySelector('canvas');
         if (canvas instanceof HTMLCanvasElement) {
             canvas.tabIndex = 0;
@@ -38,9 +35,8 @@ export const glideGoHome = async (context: StrategyContext) => {
     });
     await page.waitForTimeout(100);
 
-    // Reset to top-left - Cross-OS sequence (Mac/Windows)
     await page.keyboard.press('Control+Home');
-    await page.keyboard.press('Meta+ArrowUp'); // Mac Go-To-Top
-    await page.keyboard.press('Home'); // Ensure start of row
+    await page.keyboard.press('Meta+ArrowUp');
+    await page.keyboard.press('Home');
     await page.waitForTimeout(150);
 };
