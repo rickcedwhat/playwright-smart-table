@@ -32,7 +32,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     fill: FillStrategies.default,
     header: HeaderStrategies.visible,
 
-    pagination: async () => false,
+    pagination: {},
     loading: {
       isHeaderLoading: ImportedLoadingStrategies.Headers.stable(200)
     }
@@ -138,18 +138,24 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     await tableMapper.getMap();
   };
 
-  const _advancePage = async (): Promise<boolean> => {
+  // Default: goNext (one page). Pass useBulk true to prefer goNextBulk. "How far" uses numeric return when strategy provides it.
+  const _advancePage = async (useBulk: boolean = false): Promise<boolean> => {
     const context: TableContext = { root: rootLocator, config, page: rootLocator.page(), resolve, getHeaderCell: result.getHeaderCell, getHeaders: result.getHeaders, scrollToColumn: result.scrollToColumn };
-    let advanced: boolean;
-    if (typeof config.strategies.pagination === 'function') {
-      advanced = !!(await config.strategies.pagination(context));
-    } else {
-      advanced = !!(config.strategies.pagination?.goNext && await config.strategies.pagination.goNext(context));
+    const pagination = config.strategies.pagination;
+    let rawResult: boolean | number | undefined;
+    if (useBulk && pagination?.goNextBulk) {
+      rawResult = await pagination.goNextBulk(context);
+    } else if (pagination?.goNext) {
+      rawResult = await pagination.goNext(context);
+    } else if (pagination?.goNextBulk) {
+      rawResult = await pagination.goNextBulk(context);
     }
-    if (advanced) {
-      tableState.currentPageIndex++;
+    const didAdvance = rawResult !== undefined && validatePaginationResult(rawResult, 'Pagination Strategy');
+    const pagesJumped = typeof rawResult === 'number' ? rawResult : (didAdvance ? 1 : 0);
+    if (pagesJumped > 0) {
+      tableState.currentPageIndex += pagesJumped;
     }
-    return advanced;
+    return didAdvance;
   };
 
   const result: TableResult<T> = {
@@ -195,7 +201,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       const context: TableContext = { root: rootLocator, config, page: rootLocator.page(), resolve, getHeaderCell: result.getHeaderCell };
       await config.onReset(context);
 
-      if (typeof config.strategies.pagination !== 'function' && config.strategies.pagination?.goToFirst) {
+      if (config.strategies.pagination?.goToFirst) {
         log("Auto-navigating to first page...");
         await config.strategies.pagination.goToFirst(context);
       } else if (hasPaginationInConfig) {
@@ -296,6 +302,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       const map = tableMapper.getMapSync()!;
       const effectiveMaxPages = config.maxPages;
       const tracker = new ElementTracker('iterator');
+      const useBulk = false; // iterator has no options; default goNext
 
       try {
         let rowIndex = 0;
@@ -312,7 +319,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
           }
 
           if (pagesScanned >= effectiveMaxPages) break;
-          if (!await _advancePage()) break;
+          if (!await _advancePage(useBulk)) break;
           pagesScanned++;
         }
       } finally {
@@ -329,6 +336,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       const dedupeStrategy = options.dedupe ?? config.strategies.dedupe;
       const dedupeKeys = dedupeStrategy ? new Set<string | number>() : null;
       const parallel = options.parallel ?? false;
+      const useBulk = options.useBulkPagination ?? false;
       const tracker = new ElementTracker('forEach');
 
       try {
@@ -367,7 +375,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
           rowIndex += smartRows.length;
 
           if (stopped || pagesScanned >= effectiveMaxPages) break;
-          if (!await _advancePage()) break;
+          if (!await _advancePage(useBulk)) break;
           pagesScanned++;
         }
       } finally {
@@ -382,6 +390,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       const dedupeStrategy = options.dedupe ?? config.strategies.dedupe;
       const dedupeKeys = dedupeStrategy ? new Set<string | number>() : null;
       const parallel = options.parallel ?? true;
+      const useBulk = options.useBulkPagination ?? false;
       const tracker = new ElementTracker('map');
 
       const results: R[] = [];
@@ -424,7 +433,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
           rowIndex += smartRows.length;
 
           if (stopped || pagesScanned >= effectiveMaxPages) break;
-          if (!await _advancePage()) break;
+          if (!await _advancePage(useBulk)) break;
           pagesScanned++;
         }
       } finally {
@@ -440,6 +449,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       const dedupeStrategy = options.dedupe ?? config.strategies.dedupe;
       const dedupeKeys = dedupeStrategy ? new Set<string | number>() : null;
       const parallel = options.parallel ?? false;
+      const useBulk = options.useBulkPagination ?? false;
       const tracker = new ElementTracker('filter');
 
       const matched: SmartRowType<T>[] = [];
@@ -481,7 +491,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
           rowIndex += smartRows.length;
 
           if (stopped || pagesScanned >= effectiveMaxPages) break;
-          if (!await _advancePage()) break;
+          if (!await _advancePage(useBulk)) break;
           pagesScanned++;
         }
       } finally {
@@ -492,11 +502,16 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
 
 
 
-    generateConfigPrompt: async () => {
+    generateConfig: async () => {
       const html = await _getCleanHtml(rootLocator);
       const separator = "=".repeat(50);
       const content = `\n${separator} \n🤖 COPY INTO GEMINI / ChatGPT 🤖\n${separator} \nI am using 'playwright-smart-table'.\nTarget Table Locator: ${rootLocator.toString()} \nGenerate config for: \n\`\`\`html\n${html.substring(0, 10000)} ...\n\`\`\`\n${separator}\n`;
       await _handlePrompt('Smart Table Config', content);
+    },
+
+    generateConfigPrompt: async () => {
+      console.warn('⚠️ [playwright-smart-table] generateConfigPrompt() is deprecated and will be removed in v7.0.0. Please use generateConfig() instead.');
+      return result.generateConfig();
     },
   };
 

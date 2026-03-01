@@ -42,15 +42,11 @@
   {
     "name": "getRowByIndex",
     "description": "*",
-    "signature": "getRowByIndex: (\n  index: number,\n  options?: { bringIntoView?: boolean }",
+    "signature": "getRowByIndex(index: number): SmartRow",
     "params": [
       {
         "name": "index",
-        "desc": "1-based row index"
-      },
-      {
-        "name": "options",
-        "desc": "Optional settings including bringIntoView"
+        "desc": "0-based row index (0 = first row)"
       }
     ],
     "returns": ""
@@ -95,18 +91,6 @@
     "returns": ""
   },
   {
-    "name": "getRows",
-    "description": "*",
-    "signature": "getRows: (options?: { filter?: Record<string, any>, exact?: boolean }) => Promise<SmartRowArray>",
-    "params": [
-      {
-        "name": "options",
-        "desc": "Filter options"
-      }
-    ],
-    "returns": ""
-  },
-  {
     "name": "reset",
     "description": "*",
     "signature": "reset: () => Promise<void>",
@@ -121,13 +105,6 @@
     "returns": ""
   },
   {
-    "name": "getColumnValues",
-    "description": "*",
-    "signature": "getColumnValues: <V = string>(column: string, options?: { mapper?: (cell: Locator) => Promise<V> | V, maxPages?: number }) => Promise<V[]>",
-    "params": [],
-    "returns": ""
-  },
-  {
     "name": "sorting",
     "description": "*",
     "signature": "sorting: {\n  apply(columnName: string, direction: 'asc' | 'desc'):\n  Promise<void>;\n  getState(columnName: string",
@@ -138,12 +115,5 @@
       }
     ],
     "returns": "A promise that resolves to 'asc', 'desc', or 'none'."
-  },
-  {
-    "name": "iterateThroughTable",
-    "description": "*",
-    "signature": "iterateThroughTable: <T = any>(\n  callback: (context: {\n  index: number;\n  isFirst: boolean;\n  isLast: boolean;\n  rows: SmartRow[];\n  allData: T[];\n  table: RestrictedTableResult;\n  batchInfo?: {\n  startIndex: number;\n  endIndex: number;\n  size: number;\n  };\n  }) => T | Promise<T>,\n  options?: {\n  pagination?: PaginationStrategy;\n  dedupeStrategy?: DedupeStrategy;\n  maxIterations?: number;\n  batchSize?: number;\n  getIsFirst?: (context: { index: number }) => boolean;\n  getIsLast?: (context: { index: number, paginationResult: boolean }) => boolean;\n  beforeFirst?: (context: { index: number, rows: SmartRow[], allData: any[] }) => void | Promise<void>;\n  afterLast?: (context: { index: number, rows: SmartRow[], allData: any[] }) => void | Promise<void>;\n  }",
-    "params": [],
-    "returns": ""
   }
 ]

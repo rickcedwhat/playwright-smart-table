@@ -13,6 +13,7 @@ exports.createSmartRow = void 0;
 const fill_1 = require("./strategies/fill");
 const stringUtils_1 = require("./utils/stringUtils");
 const debugUtils_1 = require("./utils/debugUtils");
+const paginationPath_1 = require("./utils/paginationPath");
 /**
  * Internal helper to navigate to a cell with active cell optimization.
  * Uses navigation primitives (goUp, goDown, goLeft, goRight, goHome) for orchestration.
@@ -257,43 +258,37 @@ const createSmartRow = (rowLocator, map, rowIndex, config, rootLocator, resolve,
             throw new Error('Cannot bring row into view - row index is unknown. Use getRowByIndex() instead of getRow().');
         }
         const parentTable = smart.table;
-        // Cross-page Navigation using PaginationPrimitives
+        // Cross-page Navigation: when goToPage exists use retry loop (supports windowed UIs); otherwise use path planner or goToFirst+goNext
         if (tablePageIndex !== undefined && config.strategies.pagination) {
             const primitives = config.strategies.pagination;
-            // Only orchestrate if it's an object of primitives, not a single function
-            if (typeof config.strategies.pagination !== 'function') {
-                const context = { root: rootLocator, config, page: rootLocator.page(), resolve };
-                if (primitives.goToPage) {
-                    (0, debugUtils_1.logDebug)(config, 'info', `bringIntoView: Jumping to page ${tablePageIndex} using goToPage primitive`);
-                    yield primitives.goToPage(tablePageIndex, context);
+            const context = { root: rootLocator, config, page: rootLocator.page(), resolve };
+            const getCurrent = () => parentTable.currentPageIndex;
+            const setCurrent = (n) => { parentTable.currentPageIndex = n; };
+            if (primitives.goToPage) {
+                (0, debugUtils_1.logDebug)(config, 'info', `bringIntoView: Navigating to page ${tablePageIndex} (goToPage retry loop)`);
+                yield (0, paginationPath_1.executeNavigationWithGoToPageRetry)(tablePageIndex, primitives, context, getCurrent, setCurrent);
+            }
+            else {
+                const path = (0, paginationPath_1.planNavigationPath)(getCurrent(), tablePageIndex, primitives);
+                if (path.length > 0) {
+                    (0, debugUtils_1.logDebug)(config, 'info', `bringIntoView: Executing navigation path to page ${tablePageIndex} (${path.length} step(s))`);
+                    yield (0, paginationPath_1.executeNavigationPath)(path, primitives, context, getCurrent, setCurrent);
                 }
-                else if (primitives.goPrevious) {
-                    (0, debugUtils_1.logDebug)(config, 'info', `bringIntoView: Looping goPrevious until we reach page ${tablePageIndex}`);
-                    const diff = parentTable.currentPageIndex - tablePageIndex;
-                    for (let i = 0; i < diff; i++) {
-                        const success = yield primitives.goPrevious(context);
-                        if (!success) {
-                            throw new Error(`bringIntoView: Failed to paginate backwards. Strategy aborted before reaching page ${tablePageIndex}.`);
-                        }
-                    }
-                }
-                else if (primitives.goToFirst && primitives.goNext) {
+                else if (primitives.goToFirst && primitives.goNext && tablePageIndex >= 0) {
                     (0, debugUtils_1.logDebug)(config, 'info', `bringIntoView: going to first page and looping goNext until we reach page ${tablePageIndex}`);
                     yield primitives.goToFirst(context);
                     for (let i = 0; i < tablePageIndex; i++) {
-                        yield primitives.goNext(context);
+                        const ok = yield primitives.goNext(context);
+                        if (!ok)
+                            throw new Error(`bringIntoView: goNext failed before reaching page ${tablePageIndex}.`);
                     }
+                    parentTable.currentPageIndex = tablePageIndex;
                 }
                 else {
-                    (0, debugUtils_1.logDebug)(config, 'error', `Cannot bring row on page ${tablePageIndex} into view. No backwards pagination strategies (goToPage, goPrevious, or goToFirst) provided.`);
+                    (0, debugUtils_1.logDebug)(config, 'error', `Cannot bring row on page ${tablePageIndex} into view. No backwards pagination strategies (goToPage, goPrevious, goPreviousBulk, or goToFirst+goNext) provided.`);
                     throw new Error(`Cannot bring row on page ${tablePageIndex} into view: Row is on a different page and no backward pagination primitive found.`);
                 }
             }
-            else {
-                throw new Error(`Cannot bring row on page ${tablePageIndex} into view: Pagination is a single function. Provide an object with 'goPrevious', 'goToPage', or 'goToFirst' primitives.`);
-            }
-            // Successfully orchestrated backwards navigation, now update the state pointer
-            parentTable.currentPageIndex = tablePageIndex;
         }
         // Delay after pagination/finding before scrolling
         yield (0, debugUtils_1.debugDelay)(config, 'findRow');

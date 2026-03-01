@@ -10,14 +10,14 @@ export declare const Plugins: {
                 goUp: ({ root, page }: any) => Promise<void>;
                 goHome: ({ root, page }: any) => Promise<void>;
             };
-            pagination: import("./types").PaginationStrategy;
+            pagination: import("./types").PaginationPrimitives;
         };
     };
     Glide: {
         Strategies: {
             fill: import("./types").FillStrategy;
             fillSimple: import("./types").FillStrategy;
-            pagination: import("./types").PaginationStrategy;
+            pagination: import("./types").PaginationPrimitives;
             header: (context: import("./types").StrategyContext, options?: {
                 limit?: number;
                 selector?: string;

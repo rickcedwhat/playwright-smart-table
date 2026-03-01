@@ -10,7 +10,7 @@ export declare const glideFillStrategy: FillStrategy;
  * This is faster but may not work for all Glide configurations.
  */
 export declare const glideFillSimple: FillStrategy;
-export declare const glidePaginationStrategy: import("../types").PaginationStrategy;
+export declare const glidePaginationStrategy: import("../types").PaginationPrimitives;
 export declare const glideGetCellLocator: ({ row, columnIndex }: any) => any;
 export declare const glideGetActiveCell: ({ page }: any) => Promise<{
     rowIndex: number;
@@ -20,7 +20,7 @@ export declare const glideGetActiveCell: ({ page }: any) => Promise<{
 export declare const GlideStrategies: {
     fill: FillStrategy;
     fillSimple: FillStrategy;
-    pagination: import("../types").PaginationStrategy;
+    pagination: import("../types").PaginationPrimitives;
     header: (context: import("../types").StrategyContext, options?: {
         limit?: number;
         selector?: string;

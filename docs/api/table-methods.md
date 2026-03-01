@@ -111,7 +111,7 @@ const gmailRow = table.getRow({
 
 ## getRowByIndex()
 
-Get a row by its index on the current page.
+Get a row by its 0-based index on the current page.
 
 > [!TIP]
 > Use this when you need stable iteration or access by position, which is faster than filtering by content.
@@ -122,16 +122,12 @@ Get a row by its index on the current page.
 ### Signature
 
 ```typescript
-getRowByIndex(
-  index: number,
-  options?: { bringIntoView?: boolean }
-): SmartRow
+getRowByIndex(index: number): SmartRow
 ```
 
 ### Parameters
 
-- `index` - 1-based row index
-- `options` - Optional settings including bringIntoView
+- `index` - 0-based row index
 
 <!-- /api-signature: getRowByIndex -->
 
@@ -208,7 +204,7 @@ findRows(
 
 <!-- /api-signature: findRows -->
 
-To get the JSON content of the rows (using `dataMapper` if configured), simply chain `.toJSON()` to the result:
+To get the JSON content of the rows (using `columnOverrides.read` if configured), simply chain `.toJSON()` to the result:
 
 ```ts
 const rows = await table.findRows({ Status: 'Active' });
@@ -406,6 +402,6 @@ console.log(state); // { column: 'Name', direction: 'asc' }
 ### Example
 
 ```typescript
-const config = await table.generatePromptConfig();
+const config = await table.generateConfig();
 console.log(config);
 ```

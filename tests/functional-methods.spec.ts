@@ -41,6 +41,40 @@ const TABLE_HTML = `
 </html>
 `;
 
+// 3-page table with both Next and Next Bulk (bulk jumps 2 pages) for useBulkPagination tests.
+const TABLE_HTML_WITH_BULK = `
+<!DOCTYPE html>
+<html><head><style> table { border-collapse: collapse; } td, th { padding: 4px 8px; border: 1px solid #ccc; } </style></head><body>
+  <div id="current-page">1</div>
+  <table id="tbl">
+    <thead><tr><th>ID</th><th>Name</th></tr></thead>
+    <tbody id="tbody"></tbody>
+  </table>
+  <button id="next">Next</button>
+  <button id="next-bulk">Next Bulk</button>
+  <script>
+    const pages = [
+      [['1','Alice'],['2','Bob']],
+      [['3','Carol'],['4','Dave']],
+      [['5','Eve'],['6','Frank']],
+    ];
+    let currentPage = 0;
+    const nextBtn = document.getElementById('next');
+    const nextBulkBtn = document.getElementById('next-bulk');
+    function render() {
+      const tbody = document.getElementById('tbody');
+      tbody.innerHTML = pages[currentPage].map(r => '<tr>' + r.map(c => '<td>' + c + '</td>').join('') + '</tr>').join('');
+      document.getElementById('current-page').textContent = String(currentPage + 1);
+      nextBtn.disabled = currentPage >= 2;
+      nextBulkBtn.disabled = currentPage >= 2;
+    }
+    document.getElementById('next').addEventListener('click', () => { if (currentPage < 2) { currentPage++; render(); } });
+    document.getElementById('next-bulk').addEventListener('click', () => { if (currentPage < 2) { currentPage = Math.min(currentPage + 2, 2); render(); } });
+    render();
+  </script>
+</body></html>
+`;
+
 function makeTable(page: import('@playwright/test').Page) {
     return useTable(page.locator('#tbl'), {
         maxPages: 3,
@@ -270,15 +304,17 @@ test.describe('dedupe option', () => {
         const table = useTable(page.locator('#dup-table'), {
             strategies: {
                 dedupe: async (row) => row.getCell('ID').innerText(),
-                pagination: async () => {
-                    if (paginationCalled) return false;
-                    paginationCalled = true;
-                    // Mock pagination by appending the identical rows again
-                    await page.evaluate(() => {
-                        const tbody = document.querySelector('tbody');
-                        tbody!.innerHTML += '<tr><td>1</td><td>Active</td></tr><tr><td>1</td><td>Active</td></tr>';
-                    });
-                    return true;
+                pagination: {
+                    goNext: async () => {
+                        if (paginationCalled) return false;
+                        paginationCalled = true;
+                        // Mock pagination by appending the identical rows again
+                        await page.evaluate(() => {
+                            const tbody = document.querySelector('tbody');
+                            tbody!.innerHTML += '<tr><td>1</td><td>Active</td></tr><tr><td>1</td><td>Active</td></tr>';
+                        });
+                        return true;
+                    }
                 }
             }
         });
@@ -290,5 +326,90 @@ test.describe('dedupe option', () => {
 
         // 4 rows in DOM matching 'Active', but all have ID '1', so dedupe should return exactly 1
         expect(activeRows.length).toBe(1);
+    });
+});
+
+// ─── useBulkPagination option ─────────────────────────────────────────────────
+test.describe('useBulkPagination option', () => {
+    test('map with useBulkPagination: true uses goNextBulk and collects all rows', async ({ page }) => {
+        await page.setContent(TABLE_HTML_WITH_BULK);
+        const table = useTable(page.locator('#tbl'), {
+            maxPages: 3,
+            strategies: {
+                pagination: {
+                    goNext: async (ctx) => {
+                        const b = ctx.page.locator('#next');
+                        if (await b.isDisabled()) return false;
+                        await b.click();
+                        return true;
+                    },
+                    goNextBulk: async (ctx) => {
+                        const b = ctx.page.locator('#next');
+                        if (await b.isDisabled()) return false;
+                        await b.click();
+                        return 1;
+                    },
+                    nextBulkPages: 1,
+                },
+            },
+        });
+
+        const ids = await table.map(({ row }) => row.getCell('ID').innerText(), {
+            useBulkPagination: true,
+        });
+
+        expect(ids).toEqual(['1', '2', '3', '4', '5', '6']);
+        expect(table.currentPageIndex).toBe(2);
+    });
+
+    test('forEach with useBulkPagination: false uses goNext (default)', async ({ page }) => {
+        await page.setContent(TABLE_HTML);
+        const table = makeTable(page);
+        const ids: string[] = [];
+        await table.forEach(
+            async ({ row }) => { ids.push(await row.getCell('ID').innerText()); },
+            { useBulkPagination: false }
+        );
+        expect(ids).toEqual(['1', '2', '3', '4', '5', '6']);
+        expect(table.currentPageIndex).toBe(2);
+    });
+});
+
+// ─── numeric pagination result (useTable path) ─────────────────────────────────
+test.describe('numeric pagination result in useTable iteration', () => {
+    test('currentPageIndex increases by numeric return from goNextBulk', async ({ page }) => {
+        await page.setContent(TABLE_HTML_WITH_BULK);
+        let advanceCount = 0;
+        const table = useTable(page.locator('#tbl'), {
+            maxPages: 3,
+            strategies: {
+                pagination: {
+                    goNext: async (ctx) => {
+                        const btn = ctx.page.locator('#next');
+                        if (await btn.isDisabled()) return false;
+                        await btn.click();
+                        return true;
+                    },
+                    goNextBulk: async (ctx) => {
+                        const btn = ctx.page.locator('#next-bulk');
+                        if (await btn.isDisabled()) return false;
+                        advanceCount++;
+                        await btn.click();
+                        // Wait for fixture to update so next _advancePage sees button disabled
+                        await expect(ctx.page.locator('#next-bulk')).toBeDisabled();
+                        return 2;
+                    },
+                    nextBulkPages: 2,
+                },
+            },
+        });
+
+        const ids = await table.map(({ row }) => row.getCell('ID').innerText(), {
+            useBulkPagination: true,
+        });
+
+        expect(ids).toEqual(['1', '2', '5', '6']);
+        expect(table.currentPageIndex).toBe(2);
+        expect(advanceCount).toBe(1);
     });
 });

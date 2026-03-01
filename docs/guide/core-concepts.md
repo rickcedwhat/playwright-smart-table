@@ -29,7 +29,7 @@ import { Strategies } from '@rickcedwhat/playwright-smart-table';
 
 const table = useTable(page.locator('#table'), {
   strategies: {
-    pagination: Strategies.Pagination.ClickNext('.next-btn'),
+    pagination: Strategies.Pagination.click({ next: '.next-btn' }),
     sorting: Strategies.Sorting.AriaSort(),
     fill: Strategies.Fill.ClickAndType()
   }

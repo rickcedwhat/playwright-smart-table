@@ -25,19 +25,21 @@ The library asks: *"I need to see more rows. Please execute the pagination logic
 
 ```typescript
 // Your custom strategy
-const myPaginationStrategy = async (context) => {
-    const nextBtn = context.page.locator('.next-page-button');
-    
-    // 1. Perform the action (The "How")
-    if (await nextBtn.isVisible() && await nextBtn.isEnabled()) {
-        await nextBtn.click();
-        await context.page.waitForLoadState('networkidle');
+const myPaginationStrategy = {
+    goNext: async (context) => {
+        const nextBtn = context.page.locator('.next-page-button');
         
-        // 2. Return the result (Crucial!)
-        return true; // "Yes, I successfully navigated to a new page"
+        // 1. Perform the action (The "How")
+        if (await nextBtn.isVisible() && await nextBtn.isEnabled()) {
+            await nextBtn.click();
+            await context.page.waitForLoadState('networkidle');
+            
+            // 2. Return the result (Crucial!)
+            return true; // "Yes, I successfully navigated to a new page"
+        }
+        
+        return false; // "No, I couldn't paginate anymore (end of data)"
     }
-    
-    return false; // "No, I couldn't paginate anymore (end of data)"
 };
 
 // Configuring it

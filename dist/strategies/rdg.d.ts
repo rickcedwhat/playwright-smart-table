@@ -12,7 +12,7 @@ export declare const rdgGetCellLocator: ({ row, columnIndex }: any) => any;
 /**
  * Scrolls the grid vertically to load more virtualized rows.
  */
-export declare const rdgPaginationStrategy: import("../types").PaginationStrategy;
+export declare const rdgPaginationStrategy: import("../types").PaginationPrimitives;
 export declare const rdgNavigation: {
     goRight: ({ root, page }: any) => Promise<void>;
     goLeft: ({ root, page }: any) => Promise<void>;
@@ -30,5 +30,5 @@ export declare const RDGStrategies: {
         goUp: ({ root, page }: any) => Promise<void>;
         goHome: ({ root, page }: any) => Promise<void>;
     };
-    pagination: import("../types").PaginationStrategy;
+    pagination: import("../types").PaginationPrimitives;
 };
