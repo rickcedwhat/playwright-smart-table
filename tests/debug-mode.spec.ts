@@ -17,7 +17,7 @@ test.describe('Debug Mode', () => {
         const elapsed = Date.now() - start;
 
         // Verify functionality
-        const row = await table.getRow({ Name: 'Airi Satou' });
+        const row = table.getRow({ Name: 'Airi Satou' });
         expect(row).toBeDefined();
 
         // Should be much faster than with delays (typically < 100ms locally, but can be ~700ms in CI)
@@ -104,7 +104,7 @@ test.describe('Debug Mode', () => {
         });
 
         await table.init();
-        const row = await table.getRow({ Name: 'Airi Satou' });
+        const row = table.getRow({ Name: 'Airi Satou' });
         expect(row).toBeDefined();
     });
 

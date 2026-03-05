@@ -1,7 +1,6 @@
 
 import { test, expect } from '@playwright/test';
-import { useTable } from '../src/index';
-import { DedupeStrategies } from '../src/strategies/dedupe';
+import { useTable, Strategies } from '../src/index';
 
 test('DedupeStrategies.byTopPosition handles duplicate rows', async ({ page }) => {
   await page.setContent(`
@@ -24,7 +23,7 @@ test('DedupeStrategies.byTopPosition handles duplicate rows', async ({ page }) =
   let pageCount = 0;
   const table = useTable(page.locator('table'), {
     strategies: {
-      dedupe: DedupeStrategies.byTopPosition(5), // 5px tolerance
+      dedupe: Strategies.Dedupe.byTopPosition(5), // 5px tolerance
       pagination: {
         goNext: async () => {
           pageCount++;

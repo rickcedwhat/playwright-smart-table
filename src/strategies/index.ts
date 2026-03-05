@@ -6,6 +6,8 @@ import { FillStrategies } from './fill';
 import { ResolutionStrategies } from './resolution';
 import { DedupeStrategies } from './dedupe';
 import { LoadingStrategies } from './loading';
+import { StabilizationStrategies } from './stabilization';
+import { FilterStrategies } from './filter';
 
 export * from './pagination';
 export * from './sorting';
@@ -15,6 +17,8 @@ export * from './fill';
 export * from './resolution';
 export * from './dedupe';
 export * from './loading';
+export * from './stabilization';
+export * from './filter';
 
 export const Strategies = {
     Pagination: PaginationStrategies,
@@ -25,4 +29,6 @@ export const Strategies = {
     Resolution: ResolutionStrategies,
     Dedupe: DedupeStrategies,
     Loading: LoadingStrategies,
+    Stabilization: StabilizationStrategies,
+    Filter: FilterStrategies,
 };

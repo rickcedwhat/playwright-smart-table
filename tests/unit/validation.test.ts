@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validatePaginationResult } from '../../src/strategies/validation';
+import { validatePaginationResult, validateSortingStrategy, validateFillStrategy } from '../../src/strategies/validation';
 
 describe('validatePaginationResult', () => {
   it('returns true for boolean true', () => {
@@ -39,5 +39,30 @@ describe('validatePaginationResult', () => {
     expect(() => validatePaginationResult(undefined, 'MyStrategy')).toThrow(
       /\[MyStrategy\]/
     );
+  });
+});
+
+describe('validateSortingStrategy', () => {
+  it('throws for non-object', () => {
+    expect(() => validateSortingStrategy(null as any)).toThrow();
+  });
+  it('throws when doSort missing', () => {
+    expect(() => validateSortingStrategy({ getSortState: () => 'none' } as any)).toThrow();
+  });
+  it('throws when getSortState missing', () => {
+    expect(() => validateSortingStrategy({ doSort: async () => {} } as any)).toThrow();
+  });
+  it('returns true for valid strategy', () => {
+    const s = { doSort: async () => {}, getSortState: async () => 'none' };
+    expect(validateSortingStrategy(s as any)).toBe(true);
+  });
+});
+
+describe('validateFillStrategy', () => {
+  it('throws when not a function', () => {
+    expect(() => validateFillStrategy({} as any)).toThrow();
+  });
+  it('returns true for function', () => {
+    expect(validateFillStrategy(() => {})).toBe(true);
   });
 });

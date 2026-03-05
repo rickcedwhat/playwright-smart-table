@@ -22,16 +22,22 @@ Learn more: [SmartRow API](/api/smart-row)
 
 ## Strategies
 
-Strategies define how the library interacts with different table implementations.
+Strategies define how the library interacts with different table implementations. Use built-in strategies or provide your own.
 
 ```typescript
-import { Strategies } from '@rickcedwhat/playwright-smart-table';
+import { Strategies, useTable } from '@rickcedwhat/playwright-smart-table';
 
+// Built-in strategies
 const table = useTable(page.locator('#table'), {
   strategies: {
     pagination: Strategies.Pagination.click({ next: '.next-btn' }),
     sorting: Strategies.Sorting.AriaSort(),
-    fill: Strategies.Fill.ClickAndType()
+    // Custom fill: click cell, then type (e.g. for inline editors)
+    fill: async ({ row, columnName, value, page }) => {
+      const cell = row.getCell(columnName);
+      await cell.click();
+      await page.keyboard.type(String(value));
+    }
   }
 });
 ```
@@ -45,7 +51,7 @@ Most methods auto-initialize the table:
 ```typescript
 // No need to call init() for async methods
 const row = await table.findRow({ Name: 'John' }); // Auto-initializes
-const rows = await table.getRows(); // Auto-initializes
+const rows = await table.findRows({}, { maxPages: 1 }); // Auto-initializes
 
 // Only needed for sync methods
 await table.init();

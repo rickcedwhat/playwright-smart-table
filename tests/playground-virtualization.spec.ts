@@ -1,6 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
 import { useTable, Strategies } from '../src/index';
-import { StabilizationStrategies } from '../src/strategies/stabilization';
 
 // Helper to set config
 async function setPlaygroundConfig(page: Page, config: any) {
@@ -59,7 +58,7 @@ test.describe('Playground: Virtualized Table', () => {
                     scrollTarget: '[data-testid="virtuoso-scroller"]',
                     scrollAmount: 500,
                     action: 'js-scroll',
-                    stabilization: StabilizationStrategies.contentChanged()
+                    stabilization: Strategies.Stabilization.contentChanged()
                 })
             }
         });
@@ -100,7 +99,7 @@ test.describe('Playground: Virtualized Table', () => {
                     scrollTarget: '[data-testid="virtuoso-scroller"]',
                     scrollAmount: 1000,
                     action: 'js-scroll',
-                    stabilization: StabilizationStrategies.contentChanged({ timeout: 500 })
+                    stabilization: Strategies.Stabilization.contentChanged({ timeout: 500 })
                 })
             },
             debug: {
@@ -137,7 +136,7 @@ test.describe('Playground: Virtualized Table', () => {
                     scrollTarget: '[data-testid="virtuoso-scroller"]',
                     scrollAmount: 1000,
                     action: 'js-scroll',
-                    stabilization: StabilizationStrategies.contentChanged({ timeout: 500 })
+                    stabilization: Strategies.Stabilization.contentChanged({ timeout: 500 })
                 })
             }
         });
@@ -179,7 +178,7 @@ test.describe('Playground: Virtualized Table', () => {
                     scrollTarget: '[data-testid="virtuoso-scroller"]',
                     scrollAmount: 300,
                     action: 'js-scroll',
-                    stabilization: StabilizationStrategies.contentChanged({ timeout: 1000 })
+                    stabilization: Strategies.Stabilization.contentChanged({ timeout: 1000 })
                 }),
                 dedupe: async (row) => {
                     const data = await row.toJSON();
@@ -232,7 +231,7 @@ test.describe('Playground: Virtualized Table', () => {
                     scrollTarget: '[data-testid="virtuoso-scroller"]',
                     scrollAmount: 500,
                     action: 'js-scroll',
-                    stabilization: StabilizationStrategies.contentChanged({ timeout: 200 })
+                    stabilization: Strategies.Stabilization.contentChanged({ timeout: 200 })
                 }),
                 loading: {
                     isTableLoading: async ({ root }) => {

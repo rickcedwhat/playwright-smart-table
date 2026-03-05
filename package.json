@@ -1,6 +1,6 @@
 {
   "name": "@rickcedwhat/playwright-smart-table",
-  "version": "6.7.5",
+  "version": "6.7.6",
   "description": "Smart, column-aware table interactions for Playwright",
   "author": "Cedrick Catalan",
   "license": "MIT",
@@ -27,12 +27,11 @@
     "pretest": "npm run clean-port",
     "posttest": "npm run clean-port",
     "test": "npm run test:unit && npx playwright test",
-    "test:unit": "vitest run --reporter=verbose --reporter=html",
+    "test:unit": "vitest run --coverage --reporter=verbose --reporter=html",
     "test:unit:ui": "vitest --ui",
     "pretest:e2e": "npm run clean-port",
     "posttest:e2e": "npm run clean-port",
     "test:e2e": "npx playwright test",
-    "test:compatibility": "npm run clean-port && npx playwright test compatibility",
     "prepare": "husky install"
   },
   "keywords": [
@@ -47,6 +46,7 @@
   "devDependencies": {
     "@playwright/test": "^1.49.1",
     "@types/node": "^22.10.5",
+    "@vitest/coverage-v8": "^4.0.18",
     "@vitest/ui": "^4.0.18",
     "happy-dom": "^20.6.1",
     "husky": "^9.1.7",

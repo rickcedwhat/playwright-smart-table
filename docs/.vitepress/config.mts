@@ -63,13 +63,17 @@ export default defineConfig({
                             items: [
                                 { text: 'init()', link: '/api/table-methods#init' },
                                 { text: 'getRow()', link: '/api/table-methods#getrow' },
-                                { text: 'getRows()', link: '/api/table-methods#getrows' },
                                 { text: 'getRowByIndex()', link: '/api/table-methods#getrowbyindex' },
                                 { text: 'findRow()', link: '/api/table-methods#findrow' },
                                 { text: 'findRows()', link: '/api/table-methods#findrows' },
+                                { text: 'forEach()', link: '/api/table-methods#foreach' },
+                                { text: 'map()', link: '/api/table-methods#map' },
+                                { text: 'filter()', link: '/api/table-methods#filter' },
                                 { text: 'getHeaders()', link: '/api/table-methods#getheaders' },
                                 { text: 'getHeaderCell()', link: '/api/table-methods#getheadercell' },
+                                { text: 'scrollToColumn()', link: '/api/table-methods#scrolltocolumn' },
                                 { text: 'reset()', link: '/api/table-methods#reset' },
+                                { text: 'revalidate()', link: '/api/table-methods#revalidate' },
                                 { text: 'sorting', link: '/api/table-methods#sorting' },
                                 { text: 'generateConfig()', link: '/api/table-methods#generateconfig' }
                             ]

@@ -41,8 +41,23 @@
   },
   {
     "name": "findRows",
-    "signature": "findRows: (\n  filters: Record<string, FilterValue>,\n  options?: { exact?: boolean, maxPages?: number }",
+    "signature": "findRows: (\n  filters?: Record<string, FilterValue>,\n  options?: { exact?: boolean, maxPages?: number }",
     "comment": "/**\n* ASYNC: Searches for all matching rows across pages using pagination.\n* Auto-initializes the table if not already initialized.\n* @param filters - The filter criteria to match\n* @param options - Search options including exact match and max pages\n*/"
+  },
+  {
+    "name": "forEach",
+    "signature": "forEach(\n  callback: (ctx: RowIterationContext<T>) => void | Promise<void>,\n  options?: RowIterationOptions\n): Promise<void>",
+    "comment": "/**\n* Iterate every row across all pages. Call stop() in callback to end early.\n* @param callback - Function receiving { row, rowIndex, stop }\n* @param options - maxPages, parallel, dedupe, useBulkPagination\n*/"
+  },
+  {
+    "name": "map",
+    "signature": "map<R>(\n  callback: (ctx: RowIterationContext<T>) => R | Promise<R>,\n  options?: RowIterationOptions\n): Promise<R[]>",
+    "comment": "/**\n* Transform every row across all pages into a value. Returns flat array.\n* @param callback - Function receiving { row, rowIndex, stop }\n* @param options - maxPages, parallel, dedupe, useBulkPagination\n*/"
+  },
+  {
+    "name": "filter",
+    "signature": "filter(\n  predicate: (ctx: RowIterationContext<T>) => boolean | Promise<boolean>,\n  options?: RowIterationOptions\n): Promise<SmartRowArray<T>>",
+    "comment": "/**\n* Filter rows across all pages by async predicate. Returns SmartRowArray.\n* @param predicate - Function receiving { row, rowIndex, stop }\n* @param options - maxPages, parallel, dedupe, useBulkPagination\n*/"
   },
   {
     "name": "scrollToColumn",
@@ -65,8 +80,8 @@
     "comment": "/**\n* Gets the current sort state of a column using the configured sorting strategy.\n* @param columnName The name of the column to check.\n* @returns A promise that resolves to 'asc', 'desc', or 'none'.\n*/"
   },
   {
-    "name": "generateConfigPrompt",
-    "signature": "generateConfigPrompt: (options?: PromptOptions) => Promise<void>",
-    "comment": "/**\n* Generate an AI-friendly configuration prompt for debugging.\n* Outputs table HTML and TypeScript definitions to help AI assistants generate config.\n*/"
+    "name": "generateConfig",
+    "signature": "generateConfig(): Promise<void>",
+    "comment": "/**\n* Generate an AI-friendly configuration prompt for debugging.\n* Outputs table HTML and TypeScript definitions. Throws Error containing the prompt.\n*/"
   }
 ]

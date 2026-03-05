@@ -3,10 +3,6 @@
 
 Simple examples of common table interactions.
 
-Simple examples of common table interactions.
-
-Simple examples of common table interactions.
-
 ## Setup
 
 ```typescript

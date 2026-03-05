@@ -14,6 +14,7 @@ Read the following to get oriented:
 - `src/useTable.ts` - main entry point logic
 - `src/smartRow.ts` - SmartRow implementation
 - `src/plugins.ts` - plugin/preset exports
+ - `src/plugins/index.ts` (or `src/plugins/`) - plugin/preset exports
 - `src/strategies/` directory - all strategy implementations
 - `CHANGELOG.md` (last 3 versions) - recent changes
 - `ROADMAP.md` - planned work
