@@ -15,3 +15,13 @@ html/
 .agent/
 .continue/
 .cursorrules
+.agents/
+/.playground.pid
+/coverage/
+/.cache/
+/.idea/
+*.log
+.nyc_output/
+/.playground/
+/.vscode/.history
+dist/
