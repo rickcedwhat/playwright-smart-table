@@ -70,7 +70,7 @@ const table = await useTable(page.locator('#my-table')).init();
 const row = await table.findRow({ Name: 'John Doe' });
 
 // Access cells by column name
-const email = await row.getCell('Email').textContent();
+const email = await row.getCell('Email').innerText();
 
 // Search across paginated tables
 const allActive = await table.findRows({ Status: 'Active' });
@@ -146,9 +146,9 @@ const table = useTable(page.locator('#table'), {
     },
     // Override how data is written to the 'Tags' column (for .smartFill())
     Tags: {
-      write: async (cell, value) => {
+      write: async ({ cell, targetValue }) => {
         await cell.click();
-        await page.keyboard.type(value);
+        await page.keyboard.type(targetValue);
         await page.keyboard.press('Enter');
       }
     }
@@ -218,6 +218,10 @@ for (const row of active) {
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
+
+## Deprecations
+
+- `generateConfigPrompt()` — deprecated. Use `generateConfig()` instead. `generateConfigPrompt()` will be removed in v7.0.0.
 
 ## License
 
