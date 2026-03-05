@@ -47,7 +47,7 @@
 
 ### 🔌 Ecosystem
 - [ ] **Community Presets**:
-    - **Goal**: `useTable(loc, { preset: MUI })`
+    - **Goal**: `useTable(loc, { ...Plugins.MUI, maxPages: 5 })` (see existing MUI plugin)
     - **Repository**: Create a separate repo (or monorepo workspace) for `@playwright-smart-table/presets`.
     - **Targets**: Material UI, AgGrid, Ant Design, TanStack Table.
     - **Vision**: Enable community contributions for specific library support, removing the burden of manual configuration for popular libraries.

@@ -25,8 +25,8 @@ columnOverrides: {
   },
   // Custom click logic for the 'Active' column checkbox when writing data
   Active: {
-    write: async (cell, value) => {
-      if (value) await cell.locator('input').check();
+    write: async ({ cell, targetValue }) => {
+      if (targetValue) await cell.locator('input').check();
       else await cell.locator('input').uncheck();
     }
   }
@@ -84,13 +84,13 @@ cellSelector: 'td'
 
 ### headerTransformer
 
-**Type:** `(context: HeaderContext) => string | Promise<string>`  
+**Type:** `(args: { text, index, locator, seenHeaders }) => string | Promise<string>`  
 **Required:** No
 
 Transform header text before mapping to column names. Useful for normalizing column names.
 
 ```typescript
-headerTransformer: async ({ text, index, locator }) => {
+headerTransformer: async ({ text, index, locator, seenHeaders }) => {
   // Normalize: "First Name" → "firstName"
   return text.toLowerCase().replace(/\s+/g, '');
 }
@@ -135,8 +135,7 @@ debug: true
 // Advanced
 debug: {
   slow: 500,
-  logLevel: 'verbose',
-  strictValidation: true
+  logLevel: 'verbose'
 }
 ```
 
@@ -148,7 +147,7 @@ See the debug configuration options above for more details.
 
 **Type:** `number`  
 **Required:** No  
-**Default:** `Infinity`
+**Default:** `1`
 
 Maximum number of pages to traverse when using pagination methods like `findRows()`.
 

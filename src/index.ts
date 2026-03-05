@@ -16,6 +16,7 @@ export type {
     BeforeCellReadFn,
     GetCellLocatorFn,
     GetActiveCellFn,
+    DebugConfig,
 } from './types';
 
 // Export namespace-like strategy collections

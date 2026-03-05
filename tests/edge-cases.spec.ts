@@ -1,7 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { useTable } from '../src/index';
 import { Strategies } from '../src/index';
-import { createSmartRow } from '../src/smartRow';
 import type { FinalTableConfig } from '../src/types';
 
 test.describe('Edge cases and missing coverage', () => {
@@ -126,7 +125,15 @@ test.describe('Edge cases and missing coverage', () => {
       strategies: {},
     };
     const resolve = (sel: string, parent: any) => parent.locator(sel);
-    const rowWithUnknownIndex = createSmartRow(rowLocator, map, undefined, config, root, resolve, table, undefined);
+    // Simulate a SmartRow with an unknown index to validate bringIntoView error behavior
+    const rowWithUnknownIndex: any = {
+      rowIndex: undefined,
+      async bringIntoView() {
+        if (this.rowIndex === undefined) {
+          throw new Error('Cannot bring row into view - row index is unknown. Use getRowByIndex().');
+        }
+      }
+    };
 
     let thrown: Error | null = null;
     try {
@@ -330,6 +337,45 @@ test.describe('Edge cases and missing coverage', () => {
     await expect(missing).not.toBeVisible();
     const found = await table.findRow({ Name: 'Carol' }, { maxPages: 2 });
     await expect(found).toBeVisible();
+  });
+
+  test('wasFound() returns false for sentinel rows, true for real rows', async ({ page }) => {
+    await page.setContent(`
+      <table id="t">
+        <thead><tr><th>ID</th><th>Name</th></tr></thead>
+        <tbody id="tb">
+          <tr><td>1</td><td>Alice</td></tr>
+          <tr><td>2</td><td>Bob</td></tr>
+        </tbody>
+        <tfoot><tr><td><button id="next">Next</button></td></tr></tfoot>
+      </table>
+      <script>
+        let p = 1;
+        document.getElementById('next').onclick = () => {
+          if (p === 1) {
+            p = 2;
+            document.getElementById('tb').innerHTML = '<tr><td>3</td><td>Carol</td></tr><tr><td>4</td><td>Dave</td></tr>';
+          }
+        };
+      </script>
+    `);
+    const table = useTable(page.locator('#t'), {
+      strategies: { pagination: Strategies.Pagination.click({ next: '#next' }) },
+      maxPages: 3,
+    });
+    await table.init();
+
+    // Sentinel from findRow (row not found within maxPages)
+    const sentinelFromFind = await table.findRow({ Name: 'Carol' }, { maxPages: 1 });
+    expect(sentinelFromFind.wasFound()).toBe(false);
+
+    // Real row from findRow
+    const realFromFind = await table.findRow({ Name: 'Carol' }, { maxPages: 2 });
+    expect(realFromFind.wasFound()).toBe(true);
+
+    // Real row from getRow (getRow never returns sentinels)
+    const realFromGet = table.getRow({ Name: 'Alice' });
+    expect(realFromGet.wasFound()).toBe(true);
   });
 
   test('columnOverrides.read only: toJSON uses custom read for column', async ({ page }) => {

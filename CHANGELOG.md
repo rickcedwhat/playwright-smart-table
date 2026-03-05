@@ -1,5 +1,17 @@
 # Changelog
 
+## [6.7.6] - 2026-03-05
+
+### Added
+- Tests: Added targeted unit tests to improve coverage for pagination planning and execution (`tests/unit/paginationPath.coverage.test.ts`), debug utilities (`tests/unit/debugUtils.coverage.test.ts`), and `TableMapper` header mapping (`tests/unit/tableMapper.unit.test.ts`).
+
+### Changed
+- Test suite cleanup: removed duplicate/overlapping unit test files and consolidated assertions to reduce CI runtime and reduce flakiness.
+- `.gitignore` updated to exclude local playground artifacts and coverage/raw output.
+
+### Fixed
+- Improved unit test coverage and CI test config (V8 coverage reporting). No runtime behavior changes.
+
 ## [6.7.5] - 2026-03-01
 
 ### Added

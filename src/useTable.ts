@@ -11,7 +11,7 @@ import { LoadingStrategies as ImportedLoadingStrategies } from './strategies/loa
 import { FillStrategies } from './strategies/fill';
 import { HeaderStrategies } from './strategies/headers';
 
-import { createSmartRow } from './smartRow';
+import createSmartRow from './smartRow';
 import { FilterEngine } from './filterEngine';
 import { TableMapper } from './engine/tableMapper';
 import { RowFinder } from './engine/rowFinder';
@@ -231,7 +231,14 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       if (!map) throw new Error('Table not initialized. Call await table.init() first, or use async methods like table.findRow() or table.findRows() which auto-initialize.');
 
       const allRows = resolve(config.rowSelector, rootLocator);
-      const matchedRows = filterEngine.applyFilters(allRows, filters as Record<string, FilterValue>, map, options.exact || false, rootLocator.page());
+      const matchedRows = filterEngine.applyFilters(
+        allRows,
+        filters as Record<string, FilterValue>,
+        map,
+        options.exact || false,
+        rootLocator.page(),
+        rootLocator
+      );
       const rowLocator = matchedRows.first();
       return _makeSmart(rowLocator, map, 0); // fallback index 0
     },

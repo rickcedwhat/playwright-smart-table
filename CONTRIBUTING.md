@@ -158,7 +158,7 @@ const row = table.getRowByIndex(0);
 const row = await table.findRow({ Name: 'John' });
 
 // ✅ Also auto-initializes
-const rows = await table.getRows();
+const rows = await table.findRows({}, { maxPages: 1 });
 ```
 
 **What "initialized" means:**

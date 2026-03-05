@@ -107,3 +107,27 @@ describe('FilterEngine', () => {
         });
     });
 });
+ 
+describe('FilterEngine pluggable strategy', () => {
+    it('delegates to strategies.filter.apply when present', () => {
+        const fakeFiltered: any = { filter: vi.fn() };
+        const strategy = {
+            apply: vi.fn().mockReturnValue(fakeFiltered)
+        };
+
+        const config: any = {
+            cellSelector: 'td',
+            strategies: { filter: strategy }
+        };
+
+        const resolve = vi.fn();
+        const engine = new FilterEngine(config, resolve as any);
+
+        const baseRows: any = { filter: vi.fn().mockReturnThis() };
+        const map = new Map([['Name', 0]]);
+
+        const out = engine.applyFilters(baseRows as any, { Name: 'X' }, map, true, {} as any, {} as any);
+        expect(strategy.apply).toHaveBeenCalled();
+        expect(out).toBe(fakeFiltered);
+    });
+});

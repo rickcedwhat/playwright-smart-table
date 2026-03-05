@@ -1,6 +1,5 @@
 import { expect, test } from '@playwright/test';
 import { useTable, Strategies } from '../src';
-import { DedupeStrategies } from '../src/strategies/dedupe';
 
 // ─── Shared HTML fixture ──────────────────────────────────────────────────────
 // A 3-page table (2 rows per page) navigated by a simple JS button.

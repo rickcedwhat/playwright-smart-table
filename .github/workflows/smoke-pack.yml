@@ -1,0 +1,38 @@
+name: Smoke — pack & consumer install
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  smoke-pack:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build (types/docs)
+        run: npm run build
+
+      - name: Pack artifact
+        run: npm pack
+
+      - name: Consumer install & smoke test
+        run: |
+          mkdir consumer-test
+          cd consumer-test
+          npm init -y
+          # install the packed tarball produced in the repo root
+          npm install ../*.tgz
+          node -e "const pkg = require('./node_modules/@rickcedwhat/playwright-smart-table'); console.log('smoke: exports ->', Object.keys(pkg));"
+

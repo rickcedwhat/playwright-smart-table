@@ -1,6 +1,5 @@
 import { test, expect, Page } from '@playwright/test';
 import { useTable, Strategies } from '../src/index';
-import { StabilizationStrategies } from '../src/strategies/stabilization';
 
 // Helper to set config
 async function setPlaygroundConfig(page: Page, config: any) {
@@ -56,7 +55,7 @@ test.describe('Performance Benchmark', () => {
                     scrollTarget: '[data-testid="virtuoso-scroller"]',
                     scrollAmount: 1500, // scroll more aggressively for performance
                     action: 'js-scroll',
-                    stabilization: StabilizationStrategies.contentChanged({ timeout: 500 })
+                    stabilization: Strategies.Stabilization.contentChanged({ timeout: 500 })
                 })
             }
         });

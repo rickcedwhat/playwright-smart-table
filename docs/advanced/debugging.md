@@ -39,7 +39,7 @@ console.log(await table.getHeaders());
 **Cause:** Data mismatch or strict matching.
 **Fix:**
 1. Disable `exact` match: `findRow({ Name: 'John' }, { exact: false })`.
-2. Inspect the cell text: `await table.getRows().then(r => r[0].toJSON())`.
+2. Inspect the cell text: `await table.findRows({}, { maxPages: 1 }).then(r => r[0].toJSON())`.
 
 ### "Element is not attached"
 **Cause:** The table re-rendered (e.g. React/Vue update) and the cached Locators are stale.

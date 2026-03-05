@@ -75,7 +75,8 @@ export class RowFinder<T = any> {
                         filtersRecord,
                         map,
                         options?.exact ?? false,
-                        this.rootLocator.page()
+                        this.rootLocator.page(),
+                        this.rootLocator
                     );
                 }
 
@@ -160,7 +161,8 @@ export class RowFinder<T = any> {
                 filters,
                 map,
                 options.exact || false,
-                this.rootLocator.page()
+                this.rootLocator.page(),
+                this.rootLocator
             );
 
             const count = await matchedRows.count();

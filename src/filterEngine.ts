@@ -10,13 +10,18 @@ export class FilterEngine {
 
     /**
      * Applies filters to a set of rows.
+     *
+     * Note: `rootLocator` is optional for backward compatibility in call sites that already
+     * pass only the page. When strategies.filter is present we construct a TableContext
+     * using the provided `rootLocator`.
      */
     applyFilters(
         baseRows: Locator,
         filters: Record<string, FilterValue>,
         map: Map<string, number>,
         exact: boolean,
-        page: Page
+        page: Page,
+        rootLocator?: Locator
     ): Locator {
         let filtered = baseRows;
 
@@ -25,29 +30,33 @@ export class FilterEngine {
             // Find column index
             const colIndex = map.get(colName);
 
-            // TODO: Use ColumnStrategy for better resolution error handling
             if (colIndex === undefined) {
                 throw new Error(buildColumnNotFoundError(colName, Array.from(map.keys())));
             }
 
             const filterVal = value;
 
-            // Use strategy if provided (For future: configured filter strategies)
-            // But for now, we implement the default logic or use custom if we add it to config later
+            // If a pluggable FilterStrategy is provided, prefer it.
+            if (this.config.strategies?.filter && typeof this.config.strategies.filter.apply === 'function') {
+                const tableContext: TableContext = {
+                    root: rootLocator as any,
+                    config: this.config,
+                    page,
+                    resolve: this.resolve
+                };
+                filtered = this.config.strategies.filter.apply({
+                    rows: filtered,
+                    filter: { column: colName, value: filterVal },
+                    colIndex,
+                    tableContext
+                });
+                continue;
+            }
 
             // Default Filter Logic
             const cellTemplate = this.resolve(this.config.cellSelector, page);
 
-            // ⚠️ CRITICAL WARNING: DO NOT "FIX" OR REFACTOR THIS LOGIC. ⚠️
-            // At first glance, `cellTemplate.nth(colIndex)` looks like a global page selector 
-            // that will return the Nth cell on the entire page, rather than the Nth cell in the row.
-            // THIS IS INTENTIONAL AND CORRECT. 
-            // Playwright deeply understands nested locator scoping. When this global-looking locator 
-            // is passed into `filtered.filter({ has: ... })` below, Playwright magically and 
-            // automatically re-bases the `nth()` selector to be strictly relative to the ROW being evaluated.
-            // Attempting to manually force generic relative locators here will break complex function 
-            // selectors and introduce regressions. Leave it as is.
-
+            // Playwright scoping: `cellTemplate.nth(colIndex)` will be re-based when used in filtered.filter({ has: ... })
             const targetCell = cellTemplate.nth(colIndex);
 
             if (typeof filterVal === 'function') {

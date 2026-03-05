@@ -72,6 +72,7 @@ Get the first row matching the filter criteria on the current **page**. This is 
 
 If you need to search across multiple pages, use [findRow()](#findrow) instead.
 
+Filters support `string`, `RegExp`, `number`, or `(cell: Locator) => Locator` for custom locator logic (e.g. checkbox checked).
 
 <!-- api-signature: getRow -->
 
@@ -79,7 +80,7 @@ If you need to search across multiple pages, use [findRow()](#findrow) instead.
 
 ```typescript
 getRow(
-  filters: Record<string, string | RegExp | number>,
+  filters: Record<string, FilterValue>,
   options?: { exact?: boolean }
 ): SmartRow
 ```
@@ -146,7 +147,7 @@ Find the first row matching the filter, searching across multiple pages.
 
 ```typescript
 findRow(
-  filters: Record<string, string | RegExp | number>,
+  filters: Record<string, FilterValue>,
   options?: { exact?: boolean, maxPages?: number }
 ): Promise<SmartRow>
 ```
@@ -192,9 +193,9 @@ Find all rows matching the filter across multiple pages.
 
 ```typescript
 findRows(
-  filters: Record<string, string | RegExp | number>,
+  filters?: Record<string, FilterValue>,
   options?: { exact?: boolean, maxPages?: number }
-): Promise<SmartRow[]>
+): Promise<SmartRowArray<T>>
 ```
 
 ### Parameters
@@ -229,6 +230,128 @@ const exactRows = await table.findRows(
   { Department: 'Engineering' },
   { exact: true }
 );
+```
+
+[Back to Top](#table-methods)
+
+---
+
+
+## forEach()
+
+Iterate every row across all pages, calling the callback for side effects. Execution is sequential by default (safe for interactions like clicking/filling). Call `stop()` in the callback to end iteration early.
+
+<!-- api-signature: forEach -->
+
+### Signature
+
+```typescript
+forEach(
+  callback: (ctx: RowIterationContext<T>) => void | Promise<void>,
+  options?: RowIterationOptions
+): Promise<void>
+```
+
+### Parameters
+
+- `callback` - Function receiving { row, rowIndex, stop }
+- `options` - maxPages, parallel, dedupe, useBulkPagination
+
+<!-- /api-signature: forEach -->
+
+### Example
+
+```typescript
+await table.forEach(async ({ row, rowIndex, stop }) => {
+  if (await row.getCell('Status').innerText() === 'Done') stop();
+  await row.getCell('Checkbox').click();
+});
+```
+
+[Back to Top](#table-methods)
+
+---
+
+
+## map()
+
+Transform every row across all pages into a value. Returns a flat array. Execution is parallel within each page by default (safe for reads). Call `stop()` to halt after the current page finishes.
+
+> [!WARNING]
+> `map` defaults to `parallel: true`. If your callback opens popovers, fills inputs, or mutates UI state, pass `{ parallel: false }`.
+
+<!-- api-signature: map -->
+
+### Signature
+
+```typescript
+map<R>(
+  callback: (ctx: RowIterationContext<T>) => R | Promise<R>,
+  options?: RowIterationOptions
+): Promise<R[]>
+```
+
+### Example
+
+```typescript
+// Data extraction — parallel is safe
+const emails = await table.map(({ row }) => row.getCell('Email').innerText());
+
+// UI interactions — use parallel: false
+const assignees = await table.map(async ({ row }) => {
+  await row.getCell('Assignee').locator('button').click();
+  const name = await page.locator('.popover .name').innerText();
+  await page.keyboard.press('Escape');
+  return name;
+}, { parallel: false });
+```
+
+[Back to Top](#table-methods)
+
+---
+
+
+## filter()
+
+Filter rows across all pages by an async predicate. Returns a [SmartRowArray](/api/smart-row-array). Execution is sequential by default. Call `bringIntoView()` on each row if you need to interact after pagination.
+
+<!-- api-signature: filter -->
+
+### Signature
+
+```typescript
+filter(
+  predicate: (ctx: RowIterationContext<T>) => boolean | Promise<boolean>,
+  options?: RowIterationOptions
+): Promise<SmartRowArray<T>>
+```
+
+### Example
+
+```typescript
+const active = await table.filter(async ({ row }) =>
+  await row.getCell('Status').innerText() === 'Active'
+);
+
+for (const row of active) {
+  await row.bringIntoView();
+  await row.getCell('Checkbox').click();
+}
+```
+
+[Back to Top](#table-methods)
+
+---
+
+
+## Async Iterator (`for await...of`)
+
+The table is async iterable. Use `for await...of` for low-level page-by-page iteration.
+
+```typescript
+for await (const { row, rowIndex } of table) {
+  console.log(rowIndex, await row.getCell('Name').innerText());
+}
 ```
 
 [Back to Top](#table-methods)
@@ -277,7 +400,7 @@ getHeaderCell(columnName: string): Promise<Locator>
 
 ## scrollToColumn()
 
-Navigate to a specific column using the configured cell navigation strategy.
+Scrolls the table horizontally to bring the given column's header into view.
 
 <!-- api-signature: scrollToColumn -->
 
@@ -383,25 +506,23 @@ await table.sorting.apply('Salary', 'desc');
 
 ### getState()
 
-Get current sort state.
+Get current sort state for a column.
 
 ```typescript
-const state = await table.sorting.getState();
-console.log(state); // { column: 'Name', direction: 'asc' }
+const state = await table.sorting.getState('Name');
+console.log(state); // 'asc' | 'desc' | 'none'
 ```
 
 [Back to Top](#table-methods)
 
 ---
 
+## generateConfig()
 
-### Returns
+Generates an AI-friendly configuration prompt for debugging. Outputs table HTML and TypeScript definitions to help AI assistants generate config. **Throws an Error** containing the prompt (does not return).
 
-`Promise<string>` - Formatted configuration string
-
-### Example
+### Signature
 
 ```typescript
-const config = await table.generateConfig();
-console.log(config);
+generateConfig(): Promise<void>
 ```

@@ -6,7 +6,7 @@ description: Live table reconnaissance — navigate to a real table and determin
 
 Use this workflow when given a URL to a live web app with a table. The goal is to determine the correct `useTable` config — specifically the **strategies** — by directly observing the table's behavior in the browser.
 
-> **Note**: Selectors (rowSelector, cellSelector, headerSelector) are usually straightforward and can be discovered via `generateConfigPrompt`. The hard part is the **strategies** (pagination, loading, stabilization, dedupe, sorting). This workflow focuses on those.
+> **Note**: Selectors (rowSelector, cellSelector, headerSelector) are usually straightforward and can be discovered via `generateConfig`. The hard part is the **strategies** (pagination, loading, stabilization, dedupe, sorting). This workflow focuses on those.
 
 ---
 
@@ -24,13 +24,13 @@ Use this workflow when given a URL to a live web app with a table. The goal is t
 
 ---
 
-## Phase 2 — Selector Discovery via `generateConfigPrompt`
+## Phase 2 — Selector Discovery via `generateConfig`
 
 Once the user confirms the table is visible:
 
 1. In the browser, open DevTools console.
 2. Try to identify the table's root locator (a wrapping element that contains both headers and rows).
-3. Call `table.generateConfigPrompt()` conceptually — inspect the DOM to capture:
+3. Call `table.generateConfig()` conceptually — inspect the DOM to capture:
    - **rowSelector**: the repeating element for each row (e.g. `tr`, `[role="row"]`, `.row-class`)
    - **cellSelector**: the cell element within a row (e.g. `td`, `[role="gridcell"]`)
    - **headerSelector**: the header element (e.g. `th`, `[role="columnheader"]`)

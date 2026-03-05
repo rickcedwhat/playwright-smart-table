@@ -8,10 +8,11 @@ if [ $? -ne 0 ]; then
   exit 1
 fi
 
+# Run build (docs/types are generated)
 npm run build
 
-# Add all generated/modified files to the commit
-git add dist README.md src/typeContext.ts
+# Add generated/modified files to the commit (dist is intentionally ignored)
+git add README.md src/typeContext.ts
 
 # Check if npm run build was successful before committing
 if [ $? -ne 0 ]; then

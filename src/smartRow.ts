@@ -128,7 +128,11 @@ const _navigateToCell = async (params: {
  * Factory to create a SmartRow by extending a Playwright Locator.
  * We avoid Class/Proxy to ensure full compatibility with Playwright's expect(locator) matchers.
  */
-export const createSmartRow = <T = any>(
+/**
+ * @internal Internal factory for creating SmartRow objects.
+ * Not part of the public package surface; tests and consumers should use public APIs.
+ */
+const createSmartRow = <T = any>(
     rowLocator: Locator,
     map: Map<string, number>,
     rowIndex: number | undefined,
@@ -360,4 +364,6 @@ export const createSmartRow = <T = any>(
 
     return smart;
 };
+
+export default createSmartRow;
 

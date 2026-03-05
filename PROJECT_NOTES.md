@@ -60,7 +60,7 @@ When `init()` is called, the library attempts to map table headers through the `
 
 3. **Auto-Initialization**:
    - Many methods auto-call `init()` if not already initialized (via `_ensureInitialized()`)
-   - This means if you call `getRows()` without explicit `init()`, it will initialize at that moment
+   - This means if you call `findRows()` without explicit `init()`, it will initialize at that moment
 
 #### Recommendations
 
@@ -78,8 +78,8 @@ When `init()` is called, the library attempts to map table headers through the `
 
 3. **Leverage Auto-Init** for simple cases:
    ```typescript
-   // Skip explicit init() - let getRows() handle it
-   const rows = await table.getRows();
+   // Skip explicit init() - let findRows() handle it
+   const rows = await table.findRows({}, { maxPages: 1 });
    ```
 
 **Potential Enhancements** (Future Consideration):

@@ -339,6 +339,11 @@ export interface TableStrategies {
   /** Function to get the currently active/focused cell */
   getActiveCell?: GetActiveCellFn;
   /**
+   * Strategy for filtering rows. If present, FilterEngine will delegate filter application
+   * to this pluggable strategy.
+   */
+  filter?: FilterStrategy;
+  /**
    * Hook called before each cell value is read in toJSON and columnOverrides.read.
    * Fires for both the default innerText extraction and custom read mappers.
    * Useful for scrolling off-screen columns into view in horizontally virtualized tables.
@@ -358,7 +363,7 @@ export interface TableConfig<T = any> {
   /** Selector for the table rows */
   rowSelector?: string;
   /** Selector for the cells within a row */
-  cellSelector?: string;
+  cellSelector?: string | ((row: Locator) => Locator);
   /** Number of pages to scan for verification */
   maxPages?: number;
   /** Hook to rename columns dynamically */
@@ -382,7 +387,7 @@ export interface TableConfig<T = any> {
 export interface FinalTableConfig<T = any> extends TableConfig<T> {
   headerSelector: string | ((root: Locator) => Locator);
   rowSelector: string;
-  cellSelector: string;
+  cellSelector: string | ((row: Locator) => Locator);
   maxPages: number;
   autoScroll: boolean;
   debug?: TableConfig['debug'];
