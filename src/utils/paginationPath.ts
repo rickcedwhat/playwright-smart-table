@@ -150,7 +150,8 @@ export async function executeNavigationWithGoToPageRetry(
         if (!stepped) throw new Error('bringIntoView: goNext failed during goToPage retry');
         setCurrentPage(getCurrentPage() + 1);
       } else {
-        throw new Error(`bringIntoView: goToPage(${targetPageIndex}) returned false and no goNext/goNextBulk to advance`);
+        const available = Object.keys(primitives).filter(k => (primitives as any)[k]);
+        throw new Error(`bringIntoView: goToPage(${targetPageIndex}) returned false and no goNext/goNextBulk to advance. Available primitives: ${available.join(', ')}`);
       }
     } else {
       const prevBulkSize = primitives.previousBulkPages ?? 1;
@@ -168,12 +169,14 @@ export async function executeNavigationWithGoToPageRetry(
         if (!stepped) throw new Error('bringIntoView: goPrevious failed during goToPage retry');
         setCurrentPage(getCurrentPage() - 1);
       } else {
-        throw new Error(`bringIntoView: goToPage(${targetPageIndex}) returned false and no goPrevious/goPreviousBulk to step back`);
+        const available = Object.keys(primitives).filter(k => (primitives as any)[k]);
+        throw new Error(`bringIntoView: goToPage(${targetPageIndex}) returned false and no goPrevious/goPreviousBulk to step back. Available primitives: ${available.join(', ')}`);
       }
     }
   }
 
-  throw new Error(`bringIntoView: failed to reach page ${targetPageIndex} after ${MAX_GO_TO_PAGE_RETRIES} goToPage retries`);
+  const available = Object.keys(primitives).filter(k => (primitives as any)[k]);
+  throw new Error(`bringIntoView: failed to reach page ${targetPageIndex} after ${MAX_GO_TO_PAGE_RETRIES} goToPage retries. Available primitives: ${available.join(', ')}`);
 }
 
 /**

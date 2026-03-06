@@ -40,7 +40,7 @@ describe('planNavigationPath - comprehensive', () => {
   });
 });
 
-describe('executeNavigationWithGoToPageRetry', () => {
+describe('executeNavigationWithGoToPageRetry - behaviors & edge cases', () => {
   const mockContext = {} as TableContext;
 
   it('returns immediately when no goToPage', async () => {
@@ -50,14 +50,36 @@ describe('executeNavigationWithGoToPageRetry', () => {
     expect(current).toBe(0);
   });
 
-  it('throws when goToPage false and no stepping primitives', async () => {
+  it('throws when goToPage false and no stepping primitives (forward)', async () => {
     const primitives: PaginationPrimitives = {
       goToPage: async () => false,
     };
     let current = 0;
     await expect(
       executeNavigationWithGoToPageRetry(1, primitives, mockContext, () => current, (n) => { current = n; })
-    ).rejects.toThrow();
+    ).rejects.toThrow(/no goNext\/goNextBulk/);
+  });
+
+  it('throws when goToPage false and no stepping primitives (backward)', async () => {
+    const primitives: PaginationPrimitives = {
+      goToPage: async () => false,
+    };
+    let current = 5;
+    await expect(
+      executeNavigationWithGoToPageRetry(3, primitives, mockContext, () => current, (n) => { current = n; })
+    ).rejects.toThrow(/no goPrevious\/goPreviousBulk/);
+  });
+
+  it('uses goPreviousBulk numeric return to step back', async () => {
+    let current = 10;
+    const primitives: PaginationPrimitives = {
+      goToPage: async () => false,
+      goPreviousBulk: async () => 3,
+      previousBulkPages: 3,
+      goPrevious: async () => true,
+    };
+    await executeNavigationWithGoToPageRetry(1, primitives, mockContext, () => current, (n) => { current = n; });
+    expect(current).toBeLessThan(10);
   });
 
   it('advances using goNextBulk numeric return', async () => {
@@ -79,7 +101,7 @@ describe('executeNavigationWithGoToPageRetry', () => {
   });
 });
 
-describe('executeNavigationPath', () => {
+describe('executeNavigationPath - failure modes & updates', () => {
   it('runs goNext/goPrevious and updates current page', async () => {
     const calls: string[] = [];
     const primitives: any = {
@@ -100,13 +122,31 @@ describe('executeNavigationPath', () => {
     expect(current).toBe(3);
   });
 
-  it('throws when a primitive fails', async () => {
+  it('throws when goToPage primitive fails', async () => {
     const primitives: any = {
-      goNext: async () => false,
+      goToPage: async () => false,
     };
     let current = 0;
-    const path = [{ type: 'goNext', count: 1 } as any];
-    await expect(executeNavigationPath(path, primitives, {} as any, () => current, (n) => { current = n; })).rejects.toThrow();
+    const path = [{ type: 'goToPage', pageIndex: 5 } as any];
+    await expect(executeNavigationPath(path, primitives, {} as any, () => current, (n) => { current = n; })).rejects.toThrow(/goToPage\(5\) failed/);
+  });
+
+  it('throws when goNextBulk fails', async () => {
+    const primitives: any = {
+      goNextBulk: async () => false,
+    };
+    let current = 0;
+    const path = [{ type: 'goNextBulk', count: 1 } as any];
+    await expect(executeNavigationPath(path, primitives, {} as any, () => current, (n) => { current = n; })).rejects.toThrow(/goNextBulk failed/);
+  });
+
+  it('throws when goPreviousBulk fails', async () => {
+    const primitives: any = {
+      goPreviousBulk: async () => false,
+    };
+    let current = 5;
+    const path = [{ type: 'goPreviousBulk', count: 1 } as any];
+    await expect(executeNavigationPath(path, primitives, {} as any, () => current, (n) => { current = n; })).rejects.toThrow(/goPreviousBulk failed/);
   });
 });
 
