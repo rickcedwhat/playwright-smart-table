@@ -1,5 +1,22 @@
 # Changelog
 
+## [6.7.7] - 2026-03-05
+
+### Added
+- Edge-case unit tests for pagination planning & execution (`tests/unit/paginationPath.edge.test.ts`).
+- CI & safety: CodeQL analysis, Dependabot weekly updates, and a smoke-pack workflow to validate `npm pack` installs.
+- Dependabot auto-merge workflow for non-major updates.
+- LICENSE (MIT).
+
+### Changed
+- Improved pagination retry/error diagnostics: errors now list available pagination primitives to aid debugging.
+- Stop tracking `dist/`; updated `.gitignore` and Husky pre-commit to avoid committing built artifacts.
+
+### Fixed
+- Consolidated duplicate unit tests and added missing tests for table mapping and debug utilities to improve coverage.
+- Merged overlapping unit test files into consolidated suites (`tests/unit/paginationPath.coverage.test.ts`, `tests/unit/debugUtils.coverage.test.ts`) and removed redundant edge/unit variants to reduce CI runtime and flakiness.
+- Updated project roadmap to include mutation testing (Stryker) to measure test effectiveness beyond line/branch coverage.
+
 ## [6.7.6] - 2026-03-05
 
 ### Added

@@ -1,0 +1,59 @@
+name: "Auto-merge Dependabot non-major updates"
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize, labeled]
+
+jobs:
+  enable-automerge:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Ensure this PR is from Dependabot
+        id: check-dependabot
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pr = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+            });
+            const author = pr.data.user.login;
+            if (!author || !author.toLowerCase().includes('dependabot')) {
+              core.setFailed(`PR author is not dependabot: ${author}`);
+            }
+            // Expose PR body for next steps
+            core.setOutput('body', pr.data.body || '');
+
+      - name: Check for major version bumps
+        id: check-major
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const body = `\${{ steps.check-dependabot.outputs.body }}`;
+            const regex = /from\\s+([0-9]+)\\.([0-9]+)\\.([0-9]+)[^\\n]*to\\s+([0-9]+)\\.([0-9]+)\\.([0-9]+)/ig;
+            let m;
+            while ((m = regex.exec(body)) !== null) {
+              const fromMajor = parseInt(m[1], 10);
+              const toMajor = parseInt(m[4], 10);
+              if (toMajor > fromMajor) {
+                core.setFailed(`Contains a major version bump: ${m[0]}`);
+              }
+            }
+            core.setOutput('ok', 'true');
+
+      - name: Enable auto-merge for Dependabot PR (squash)
+        uses: peter-evans/enable-pull-request-automerge@v2
+        if: steps.check-major.outputs.ok == 'true'
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          pull-request-number: ${{ github.event.pull_request.number }}
+          merge-method: squash
+          commit-title: "chore(deps): automatic dependency update"
+          commit-message: "Auto-merged by Dependabot when CI passes"
+

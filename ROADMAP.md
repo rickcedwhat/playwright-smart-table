@@ -21,8 +21,12 @@
     - **Deprecates**:
       - `iterateThroughTable` (use `forEach`/`map`/`filter` instead).
       - `getColumnValues` (use `map` instead).
-- [x] **Document `forEach`/`map`/`filter` in README**
-- [x] **JSDoc `@note` on `map`'s `parallel` default**
+ - [x] **Document `forEach`/`map`/`filter` in README**
+ - [x] **JSDoc `@note` on `map`'s `parallel` default**
+ - [ ] **Add mutation testing (Stryker)**
+    - **Purpose**: Measure test effectiveness beyond coverage by introducing mutation testing using Stryker for Vitest.
+    - **Goal**: Run locally and optionally as a scheduled CI job; aim for a high mutation score (>=80–90%).
+    - **Notes**: Mutation testing is compute-intensive — start as a nightly/check rather than a blocking per-PR job.
 
 ### 🧹 Cleanup (completed in v6.7.0)
 - [x] **Remove Deprecated APIs**:

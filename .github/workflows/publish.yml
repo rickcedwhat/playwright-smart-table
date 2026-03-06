@@ -9,7 +9,7 @@ jobs:
   publish-gpr:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       id-token: write
 
     steps:
@@ -35,6 +35,7 @@ jobs:
           if [ "$LOCAL_VERSION" != "$LATEST_VERSION" ]; then
             echo "✨ Version change detected!"
             echo "changed=true" >> $GITHUB_OUTPUT
+            echo "version=$LOCAL_VERSION" >> $GITHUB_OUTPUT
           else
             echo "💤 Version matches NPM. Skipping release."
             echo "changed=false" >> $GITHUB_OUTPUT
@@ -70,3 +71,30 @@ jobs:
       - name: Publish to NPM
         if: steps.check_version.outputs.changed == 'true'
         run: npm publish --provenance --access public
+      
+      - name: Prepare changelog for GitHub Release
+        if: steps.check_version.outputs.changed == 'true'
+        id: get_changelog
+        run: |
+          version=${{ steps.check_version.outputs.version }}
+          body=$(awk -v ver="$version" '
+            $0 ~ "^## \\[" ver "\\]" {found=1; next}
+            /^## \\[/ && found {exit}
+            found {print}
+          ' CHANGELOG.md)
+          if [ -z "$body" ]; then
+            body="Release $version"
+          fi
+          echo "body<<EOF" >> $GITHUB_OUTPUT
+          echo "$body" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release (from changelog)
+        if: steps.check_version.outputs.changed == 'true'
+        uses: actions/create-release@v1
+        with:
+          tag_name: v${{ steps.check_version.outputs.version }}
+          release_name: v${{ steps.check_version.outputs.version }}
+          body: ${{ steps.get_changelog.outputs.body }}
+          draft: false
+          prerelease: false
