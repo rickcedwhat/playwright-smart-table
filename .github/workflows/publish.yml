@@ -77,11 +77,9 @@ jobs:
         id: get_changelog
         run: |
           version=${{ steps.check_version.outputs.version }}
-          body=$(awk -v ver="$version" '
-            $0 ~ "^## \\[" ver "\\]" {found=1; next}
-            /^## \\[/ && found {exit}
-            found {print}
-          ' CHANGELOG.md)
+          # Try robust Node-based extraction first
+          body=$(node ./scripts/extract-changelog.mjs "$version" 2>/dev/null || echo "")
+          # Fallback: default release body if extraction failed or returned empty
           if [ -z "$body" ]; then
             body="Release $version"
           fi

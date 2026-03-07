@@ -272,6 +272,7 @@ export type FillStrategy = (options: {
 export interface ColumnOverride<TValue = any> {
   /** 
    * How to extract the value from the cell.
+   * \`context\` provides access to the parent row, permitting multi-cell logic or bypassing the default cell locator.
    */
   read?: (cell: Locator) => Promise<TValue> | TValue;
 

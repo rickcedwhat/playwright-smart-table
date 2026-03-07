@@ -28,6 +28,11 @@
     - **Goal**: Run locally and optionally as a scheduled CI job; aim for a high mutation score (>=80–90%).
     - **Notes**: Mutation testing is compute-intensive — start as a nightly/check rather than a blocking per-PR job.
 
+- [ ] **Improve verbose debug logging across internals**
+    - **Purpose**: Ensure key internal modules (useTable orchestration, pagination/ stabilization strategies, rowFinder, tableMapper, smartRow) emit informative logs when `config.debug.logLevel` is `verbose`.
+    - **Examples**: pagination attempts/result, stabilization success/failure, currentPageIndex changes, dedupe keys, header mapping/remap, and bringIntoView navigation steps.
+    - **Acceptance**: Add unit/integration tests that assert logs are emitted under `verbose` and include a short CI smoke job to prevent regressions.
+
 ### 🧹 Cleanup (completed in v6.7.0)
 - [x] **Remove Deprecated APIs**:
     - `iterateThroughTable` → replaced by `forEach`/`map`/`filter`.
