@@ -1,17 +1,17 @@
-<!-- Last Reviewed: 02/06/2026 -->
+<!-- Last Reviewed: 03/07/2026 -->
 # Strategies
 
-Strategies define how the library interacts with different table implementations. They handle pagination, sorting, filling, and more.
+Strategies define how the library interacts with different table implementations. They handle pagination, sorting, header scanning, cell resolution, and more.
 
 ## Strategy Types & Usage
 
 | Strategy Type | Used By Methods | Description |
 |--------------|----------------|-------------|
-| **Pagination** | `findRow()`, `findRows()`, `forEach`, `map` | Navigating to next pages |
-| **Sorting** | `sorting.apply()` | applying sort order |
+| **Pagination** | `findRow()`, `findRows()`, `forEach`, `map`, `filter` | Navigating to next pages |
+| **Sorting** | `sorting.apply()` | Applying sort order |
 | **Fill** | `row.smartFill()` | Entering data into cells |
 | **Header** | `init()`, `revalidate()` | Finding and parsing column headers |
-| **Resolution** | `getCell()` | Locating specific cells within a row |
+| **Cell Locator** | `getCell()`, `toJSON()` | Custom cell resolution within a row |
 
 ## Overview
 
@@ -22,119 +22,87 @@ const table = useTable(page.locator('#table'), {
   strategies: {
     pagination: Strategies.Pagination.click({ next: '.next-btn' }),
     sorting: Strategies.Sorting.AriaSort(),
-    fill: Strategies.Fill.ClickAndType()
   }
 });
 ```
+
+---
 
 ## Pagination Strategies
 
 Control how the library navigates through pages.
 
-### ClickNext
+### `Strategies.Pagination.click(selectors, options?)`
 
-Click a "Next" button to navigate to the next page.
-
-```typescript
-Strategies.Pagination.ClickNext(selector: string | Locator)
-```
-
-**Example:**
+Click pagination buttons (Next, Previous, First, bulk jump). The built-in strategy handles stabilization automatically.
 
 ```typescript
 strategies: {
-  pagination: Strategies.Pagination.click({ next: '.pagination .next' })
-}
-```
-
-### ClickPageNumber
-
-Click specific page numbers.
-
-```typescript
-Strategies.Pagination.ClickPageNumber(options: {
-  pageNumberSelector: string | ((page: number) => Locator),
-  currentPageSelector?: string
-})
-```
-
-**Example:**
-
-```typescript
-strategies: {
-  pagination: Strategies.Pagination.ClickPageNumber({
-    pageNumberSelector: (page) => 
-      page.locator(`.pagination button:has-text("${page}")`)
+  pagination: Strategies.Pagination.click({
+    next: '.pagination .next',      // required for forward navigation
+    previous: '.pagination .prev',  // optional — enables bringIntoView backward nav
+    first: '.pagination .first',    // optional — enables reset() auto-nav to page 1
+    nextBulk: '.pagination .skip',  // optional — jumps N pages at once
+  }, {
+    nextBulkPages: 10,  // how many pages nextBulk advances (default: 10)
   })
 }
 ```
 
-### InfiniteScroll
+Selectors can be a CSS string, a function returning a `Locator`, or a `Locator` directly.
 
-Handle infinite scroll tables.
+### `Strategies.Pagination.infiniteScroll(options?)`
 
-```typescript
-Strategies.Pagination.infiniteScroll(options?: {
-  scrollContainer?: Locator,
-  waitForNewRows?: number
-})
-```
-
-**Example:**
+Handle infinite scroll tables (append-only or virtualized).
 
 ```typescript
 strategies: {
   pagination: Strategies.Pagination.infiniteScroll({
-    scrollContainer: page.locator('.table-container'),
-    waitForNewRows: 500
+    action: 'js-scroll',          // 'scroll' (mouse wheel) or 'js-scroll' (scrollTop)
+    scrollAmount: 500,            // pixels per step
+    scrollTarget: (root) => root, // defaults to table root
+    stabilization: Strategies.Stabilization.rowCountIncreased({ timeout: 2000 })
   })
 }
 ```
 
 ### Custom Pagination
 
-Create your own pagination logic:
+Implement `goNext` (and optionally `goPrevious`, `goToFirst`, `goToPage`) directly as async functions. Each returns `true` if navigation succeeded, `false` if there are no more pages.
 
 ```typescript
 strategies: {
   pagination: {
-    goNext: async ({ page, rootLocator }) => {
-      // Your custom logic
-      const nextBtn = page.locator('.custom-next');
-      
-      if (await nextBtn.isDisabled()) {
-        return false; // Stop pagination
-      }
-      
-      await nextBtn.click();
-      await page.waitForLoadState('networkidle');
-      
-      return true; // Continue pagination
+    goNext: async ({ root, page }) => {
+      const btn = page.locator('.custom-next');
+      if (await btn.isDisabled()) return false;
+      await btn.click();
+      return true;
+    },
+    goPrevious: async ({ root, page }) => {
+      const btn = page.locator('.custom-prev');
+      if (await btn.isDisabled()) return false;
+      await btn.click();
+      return true;
+    },
+    goToFirst: async ({ root, page }) => {
+      await page.locator('.custom-first').click();
+      return true;
     }
   }
 }
+```
 
 > [!NOTE]
-> Return `true` if a new page was loaded successfully, or `false` if there are no more pages.
-```
+> The context object provides `{ root, page, config, resolve }`. Use `root` (not `rootLocator`) to access the table's root locator.
 
 ---
 
 ## Sorting Strategies
 
-Define how sorting is applied.
+### `Strategies.Sorting.AriaSort()`
 
-### ClickHeader
-
-Click column headers to sort.
-
-```typescript
-Strategies.Sorting.ClickHeader(options?: {
-  detectState?: (header: Locator) => Promise<'asc' | 'desc' | null>
-})
-```
-
-**Example:**
+The built-in strategy. Clicks the column header to trigger sorting and reads the `aria-sort` attribute (`ascending`/`descending`) to detect the current state. The library handles retry logic — your `doSort` only needs to issue the click.
 
 ```typescript
 strategies: {
@@ -144,16 +112,22 @@ strategies: {
 
 ### Custom Sorting
 
+Implement `doSort` (trigger) and `getSortState` (state detection). The library calls `doSort` and then polls `getSortState` until the target state is reached (up to 3 retries).
+
 ```typescript
 strategies: {
   sorting: {
-    apply: async ({ columnName, direction, page }) => {
-      // Custom sort logic
-      await page.locator(`[data-sort="${columnName}"]`).click();
+    doSort: async ({ columnName, direction, context }) => {
+      // Only issue the trigger — the library handles retry/verification
+      const header = await context.getHeaderCell(columnName);
+      await header.click();
     },
-    getState: async ({ page }) => {
-      // Return current sort state
-      return { column: 'Name', direction: 'asc' };
+    getSortState: async ({ columnName, context }) => {
+      const header = await context.getHeaderCell(columnName);
+      const cls = await header.getAttribute('class') ?? '';
+      if (cls.includes('sort-asc')) return 'asc';
+      if (cls.includes('sort-desc')) return 'desc';
+      return 'none';
     }
   }
 }
@@ -161,118 +135,107 @@ strategies: {
 
 ---
 
+## Fill Strategy
 
-## Fill Strategies
+### Default (Auto-Detection)
 
-Control how cells are filled.
-
-### ClickAndType
-
-Click cell, clear, and type (default).
+`smartFill()` uses a built-in auto-detection strategy by default — it detects `<input>`, `<select>`, `<textarea>`, checkbox, and `contenteditable` elements automatically. No configuration needed in most cases.
 
 ```typescript
-Strategies.Fill.ClickAndType(options?: {
-  clearFirst?: boolean,
-  pressEnter?: boolean
-})
+await row.smartFill({
+  Name: 'John',        // fills <input type="text">
+  Status: 'Active',    // selects <option> in <select>
+  Active: true,        // checks/unchecks <input type="checkbox">
+  Notes: 'Some text'  // fills <textarea>
+});
 ```
 
-**Example:**
+### Custom Fill via `columnOverrides.write`
+
+For cells with nonstandard input widgets (e.g., a rich-text editor, a date picker with a custom popover), define a `write` handler in `columnOverrides`:
 
 ```typescript
-strategies: {
-  fill: Strategies.Fill.ClickAndType({
-    clearFirst: true,
-    pressEnter: true
-  })
-}
-```
-
-### DoubleClickAndType
-
-Double-click to enter edit mode.
-
-```typescript
-Strategies.Fill.DoubleClickAndType(options?: {
-  clearFirst?: boolean
-})
-```
-
-### Custom Fill
-
-```typescript
-strategies: {
-  fill: async ({ cell, value, columnName }) => {
-    // Custom fill logic
-    await cell.dblclick();
-    await cell.locator('input').fill(value);
-    await cell.press('Enter');
+columnOverrides: {
+  Tags: {
+    write: async ({ cell, targetValue }) => {
+      // e.g. a tag input: type and press Enter
+      await cell.locator('.tag-input').click();
+      await cell.page().keyboard.type(targetValue);
+      await cell.page().keyboard.press('Enter');
+    }
+  },
+  Price: {
+    write: async ({ cell, targetValue, currentValue }) => {
+      // currentValue is automatically provided when `read` is also defined
+      if (currentValue === targetValue) return;
+      await cell.locator('input').fill(String(targetValue));
+    }
   }
 }
 ```
 
+### Custom Fill via `inputMappers`
+
+For one-off overrides at call time (without modifying config), use `inputMappers` in the `smartFill` call:
+
+```typescript
+await row.smartFill(
+  { Name: 'John' },
+  {
+    inputMappers: {
+      // Target a specific input inside the cell
+      Name: (cell) => cell.locator('.primary-input')
+    }
+  }
+);
+```
+
 ---
 
-## Header Strategies
-
-Customize header detection.
+## Header Strategy
 
 ### Default
 
-Standard `thead th` selector.
+The default strategy reads visible `thead th` text (or whatever `headerSelector` resolves to) using `innerText`.
 
-### Custom
+### Custom Header Strategy
+
+Provide a function that returns `Promise<string[]>`. The array must be in DOM order (index 0 = first column).
 
 ```typescript
 strategies: {
-  header: async ({ rootLocator }) => {
-    // Return array of header locators
-    return rootLocator.locator('.custom-header').all();
+  header: async ({ root, resolve, config }) => {
+    // Example: read from aria-label attributes instead of text
+    const headers = await resolve(config.headerSelector, root).all();
+    return Promise.all(
+      headers.map(h => h.getAttribute('aria-label').then(v => v ?? ''))
+    );
   }
 }
 ```
 
 ---
 
-## Resolution Strategies
+## Cell Locator Strategy
 
-Control how cells are resolved within rows.
+### Default
 
-### NthChild
+The default strategy resolves cells using `.nth(columnIndex)` on the `cellSelector` within a row.
 
-Use nth-child selectors (default).
+### Custom Cell Locator
 
-```typescript
-Strategies.Resolution.NthChild()
-```
-
-### DataAttribute
-
-Use data attributes to find cells.
-
-```typescript
-Strategies.Resolution.DataAttribute('data-column')
-```
-
-**Example:**
-
-```typescript
-// HTML: <td data-column="email">...</td>
-strategies: {
-  resolution: Strategies.Resolution.DataAttribute('data-column')
-}
-```
-
-### Custom Resolution
+When the DOM doesn't use predictable nth-child ordering (e.g. horizontally virtualized grids using `aria-colindex`), provide a `getCellLocator` function:
 
 ```typescript
 strategies: {
   getCellLocator: ({ row, columnName, columnIndex }) => {
-    // Custom cell resolution
-    return row.locator(`[data-col="${columnName}"]`);
+    // e.g. react-data-grid with aria-colindex attributes
+    return row.locator(`[aria-colindex="${columnIndex}"]`);
   }
 }
 ```
+
+The function receives `{ row, columnName, columnIndex, rowIndex?, page }` and returns a `Locator`.
 
 ---
 
@@ -284,22 +247,32 @@ import { useTable, Strategies } from '@rickcedwhat/playwright-smart-table';
 const table = useTable(page.locator('#complex-table'), {
   headerSelector: 'thead th',
   rowSelector: 'tbody tr',
-  
+
   strategies: {
-    // Pagination
-    pagination: Strategies.Pagination.click({ next: '.pagination .next' }),
-    
-    // Sorting
-    sorting: Strategies.Sorting.AriaSort(),
-    
-    // Fill
-    fill: Strategies.Fill.DoubleClickAndType({
-      clearFirst: true
+    pagination: Strategies.Pagination.click({
+      next: '.pagination .next',
+      previous: '.pagination .prev',
+      first: '.pagination .first',
     }),
-    
-    // Custom resolution
-    getCellLocator: ({ row, columnName }) => {
-      return row.locator(`[data-column="${columnName}"]`);
+
+    sorting: Strategies.Sorting.AriaSort(),
+
+    getCellLocator: ({ row, columnIndex }) =>
+      row.locator(`[data-column-index="${columnIndex}"]`),
+  },
+
+  columnOverrides: {
+    Status: {
+      read: async (cell) => {
+        return (await cell.locator('input[type="checkbox"]').isChecked())
+          ? 'Active' : 'Inactive';
+      },
+      write: async ({ cell, targetValue }) => {
+        const checkbox = cell.locator('input[type="checkbox"]');
+        if ((await checkbox.isChecked()) !== (targetValue === 'Active')) {
+          await checkbox.click();
+        }
+      }
     }
   }
 });

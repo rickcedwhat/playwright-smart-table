@@ -63,6 +63,8 @@ export class RowFinder<T = any> {
         const effectiveMaxPages = options?.maxPages ?? this.config.maxPages ?? Infinity;
         let pagesScanned = 1;
 
+        this.log(`findRows: starting (maxPages=${effectiveMaxPages}, filters=${JSON.stringify(filtersRecord)})`);
+
         const tracker = new ElementTracker('findRows');
 
         try {
@@ -84,12 +86,18 @@ export class RowFinder<T = any> {
                 const newIndices = await tracker.getUnseenIndices(rowLocators);
                 const currentRows = await rowLocators.all();
                 const isRowLoading = this.config.strategies.loading?.isRowLoading;
+                let added = 0;
 
                 for (const idx of newIndices) {
                     const smartRow = this.makeSmartRow(currentRows[idx], map, allRows.length, this.tableState.currentPageIndex);
-                    if (isRowLoading && await isRowLoading(smartRow)) continue;
+                    if (isRowLoading && await isRowLoading(smartRow)) {
+                        this.log(`findRows: page ${this.tableState.currentPageIndex} — row skipped (isRowLoading=true)`);
+                        continue;
+                    }
                     allRows.push(smartRow);
+                    added++;
                 }
+                this.log(`findRows: page ${this.tableState.currentPageIndex} — ${added} new match(es) (total: ${allRows.length})`);
             };
 
             // Scan first page
@@ -110,21 +118,27 @@ export class RowFinder<T = any> {
                 } else if (this.config.strategies.pagination?.goNext) {
                     paginationResult = await this.config.strategies.pagination.goNext(context);
                 } else {
+                    this.log(`findRows: no pagination primitive — stopping`);
                     break;
                 }
 
                 const didPaginate = validatePaginationResult(paginationResult, 'Pagination Strategy');
-                if (!didPaginate) break;
+                if (!didPaginate) {
+                    this.log(`findRows: pagination returned false — end of data`);
+                    break;
+                }
 
                 const pagesJumped = typeof paginationResult === 'number' ? paginationResult : 1;
                 this.tableState.currentPageIndex += pagesJumped;
                 pagesScanned += pagesJumped;
+                this.log(`findRows: advanced ${pagesJumped} page(s), now at page ${this.tableState.currentPageIndex}`);
                 await collectMatches();
             }
         } finally {
             await tracker.cleanup(this.rootLocator.page());
         }
 
+        this.log(`findRows: done — ${allRows.length} row(s) collected across ${pagesScanned} page(s)`);
         return createSmartRowArray(allRows);
     }
 
