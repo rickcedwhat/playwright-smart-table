@@ -297,26 +297,27 @@ const table = useTable<Record<string, string>>(page.locator('#table'));
 
 ### Problem
 
-Not getting helpful error messages with suggestions.
+Not getting helpful error messages with column suggestions or pagination diagnostics.
 
 ### Solutions
 
-**1. Enable strict validation**
+**Enable verbose logging**
+
+Smart errors (column not found, pagination failures) are emitted automatically. For maximum diagnostic output, enable verbose logging:
 
 ```typescript
 const table = useTable(page.locator('#table'), {
   debug: {
-    strictValidation: true
+    logLevel: 'verbose'
   }
 });
 ```
 
-**2. Check error messages**
-
 Smart errors are automatic for:
-- `getCell()` - Column not found
-- `findRow()` - No matching rows
-- `init()` - Empty or duplicate columns
+- `getCell()` — Column not found (with nearest-match suggestion)
+- `findRow()` — No matching rows found
+- `init()` — Empty or duplicate column names detected
+- Pagination — Lists available primitives when navigation fails
 
 ---
 

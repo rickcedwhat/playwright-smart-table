@@ -7,11 +7,12 @@ on:
 jobs:
   enable-automerge:
     runs-on: ubuntu-latest
+    if: github.actor == 'dependabot[bot]'
     permissions:
       contents: write
       pull-requests: write
     steps:
-      - name: Ensure this PR is from Dependabot
+      - name: Get PR body
         id: check-dependabot
         uses: actions/github-script@v6
         with:
@@ -22,11 +23,6 @@ jobs:
               repo: context.repo.repo,
               pull_number: context.payload.pull_request.number,
             });
-            const author = pr.data.user.login;
-            if (!author || !author.toLowerCase().includes('dependabot')) {
-              core.setFailed(`PR author is not dependabot: ${author}`);
-            }
-            // Expose PR body for next steps
             core.setOutput('body', pr.data.body || '');
 
       - name: Check for major version bumps
@@ -35,8 +31,8 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const body = `\${{ steps.check-dependabot.outputs.body }}`;
-            const regex = /from\\s+([0-9]+)\\.([0-9]+)\\.([0-9]+)[^\\n]*to\\s+([0-9]+)\\.([0-9]+)\\.([0-9]+)/ig;
+            const body = `${{ steps.check-dependabot.outputs.body }}`;
+            const regex = /from\s+([0-9]+)\.([0-9]+)\.([0-9]+)[^\n]*to\s+([0-9]+)\.([0-9]+)\.([0-9]+)/ig;
             let m;
             while ((m = regex.exec(body)) !== null) {
               const fromMajor = parseInt(m[1], 10);
@@ -48,12 +44,9 @@ jobs:
             core.setOutput('ok', 'true');
 
       - name: Enable auto-merge for Dependabot PR (squash)
-        uses: peter-evans/enable-pull-request-automerge@v2
+        uses: peter-evans/enable-pull-request-automerge@v3
         if: steps.check-major.outputs.ok == 'true'
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           pull-request-number: ${{ github.event.pull_request.number }}
           merge-method: squash
-          commit-title: "chore(deps): automatic dependency update"
-          commit-message: "Auto-merged by Dependabot when CI passes"
-
