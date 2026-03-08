@@ -1,0 +1,47 @@
+name: Mutation Testing
+
+on:
+  schedule:
+    # Run at 02:00 UTC every day
+    - cron: '0 2 * * *'
+  workflow_dispatch: # Allow manual triggering
+
+jobs:
+  mutate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Cache Playwright Browsers
+        id: playwright-cache
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
+      - name: Install Playwright Browsers
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps
+
+      - name: Run Stryker Mutation Testing
+        run: npm run test:mutate
+
+      - name: Upload Mutation Report
+        uses: actions/upload-artifact@v4
+        if: always() # Upload report even if tests fail
+        with:
+          name: stryker-report
+          path: reports/mutation/
+          retention-days: 7
