@@ -3,6 +3,7 @@ import type { SmartRow, RowIterationContext, RowIterationOptions } from '../type
 import type { FinalTableConfig } from '../types';
 import type { SmartRowArray } from '../utils/smartRowArray';
 import { ElementTracker } from '../utils/elementTracker';
+import { logDebug } from '../utils/debugUtils';
 
 export interface TableIterationEnv<T = any> {
   getRowLocators: () => Locator;
@@ -12,6 +13,10 @@ export interface TableIterationEnv<T = any> {
   createSmartRowArray: (rows: SmartRow<T>[]) => SmartRowArray<T>;
   config: FinalTableConfig<T>;
   getPage: () => Page;
+}
+
+function log(config: FinalTableConfig, msg: string) {
+  logDebug(config, 'verbose', msg);
 }
 
 /**
@@ -30,11 +35,17 @@ export async function runForEach<T>(
   const useBulk = options.useBulkPagination ?? false;
   const tracker = new ElementTracker('forEach');
 
+  log(env.config, `forEach: starting (maxPages=${effectiveMaxPages}, parallel=${parallel}, dedupe=${!!dedupeStrategy})`);
+
   try {
     let rowIndex = 0;
     let stopped = false;
     let pagesScanned = 1;
-    const stop = () => { stopped = true; };
+    let totalProcessed = 0;
+    const stop = () => {
+      log(env.config, `forEach: stop() called — halting after current page`);
+      stopped = true;
+    };
 
     while (!stopped) {
       const rowLocators = env.getRowLocators();
@@ -42,33 +53,48 @@ export async function runForEach<T>(
       const pageRows = await rowLocators.all();
       const smartRows = newIndices.map((idx, i) => env.makeSmartRow(pageRows[idx], map, rowIndex + i));
 
+      log(env.config, `forEach: page ${pagesScanned} — ${newIndices.length} new row(s) found`);
+
       if (parallel) {
         await Promise.all(smartRows.map(async (row) => {
           if (stopped) return;
           if (dedupeKeys && dedupeStrategy) {
             const key = await dedupeStrategy(row);
-            if (dedupeKeys.has(key)) return;
+            if (dedupeKeys.has(key)) {
+              log(env.config, `forEach: dedupe skip key="${key}"`);
+              return;
+            }
             dedupeKeys.add(key);
           }
           await callback({ row, rowIndex: row.rowIndex!, stop });
+          totalProcessed++;
         }));
       } else {
         for (const row of smartRows) {
           if (stopped) break;
           if (dedupeKeys && dedupeStrategy) {
             const key = await dedupeStrategy(row);
-            if (dedupeKeys.has(key)) continue;
+            if (dedupeKeys.has(key)) {
+              log(env.config, `forEach: dedupe skip key="${key}"`);
+              continue;
+            }
             dedupeKeys.add(key);
           }
           await callback({ row, rowIndex: row.rowIndex!, stop });
+          totalProcessed++;
         }
       }
       rowIndex += smartRows.length;
 
       if (stopped || pagesScanned >= effectiveMaxPages) break;
-      if (!await env.advancePage(useBulk)) break;
+      log(env.config, `forEach: advancing to next page (${pagesScanned} → ${pagesScanned + 1})`);
+      if (!await env.advancePage(useBulk)) {
+        log(env.config, `forEach: no more pages — done`);
+        break;
+      }
       pagesScanned++;
     }
+    log(env.config, `forEach: complete — ${totalProcessed} row(s) processed across ${pagesScanned} page(s)`);
   } finally {
     await tracker.cleanup(env.getPage());
   }
@@ -90,6 +116,8 @@ export async function runMap<T, R>(
   const useBulk = options.useBulkPagination ?? false;
   const tracker = new ElementTracker('map');
 
+  log(env.config, `map: starting (maxPages=${effectiveMaxPages}, parallel=${parallel}, dedupe=${!!dedupeStrategy})`);
+
   const results: R[] = [];
   const SKIP = Symbol('skip');
 
@@ -97,7 +125,10 @@ export async function runMap<T, R>(
     let rowIndex = 0;
     let stopped = false;
     let pagesScanned = 1;
-    const stop = () => { stopped = true; };
+    const stop = () => {
+      log(env.config, `map: stop() called — halting after current page`);
+      stopped = true;
+    };
 
     while (!stopped) {
       const rowLocators = env.getRowLocators();
@@ -105,11 +136,16 @@ export async function runMap<T, R>(
       const pageRows = await rowLocators.all();
       const smartRows = newIndices.map((idx, i) => env.makeSmartRow(pageRows[idx], map, rowIndex + i));
 
+      log(env.config, `map: scanning page ${pagesScanned} — ${newIndices.length} new row(s)`);
+
       if (parallel) {
         const pageResults = await Promise.all(smartRows.map(async (row) => {
           if (dedupeKeys && dedupeStrategy) {
             const key = await dedupeStrategy(row);
-            if (dedupeKeys.has(key)) return SKIP;
+            if (dedupeKeys.has(key)) {
+              log(env.config, `map: dedupe skip key="${key}"`);
+              return SKIP;
+            }
             dedupeKeys.add(key);
           }
           return callback({ row, rowIndex: row.rowIndex!, stop });
@@ -122,7 +158,10 @@ export async function runMap<T, R>(
           if (stopped) break;
           if (dedupeKeys && dedupeStrategy) {
             const key = await dedupeStrategy(row);
-            if (dedupeKeys.has(key)) continue;
+            if (dedupeKeys.has(key)) {
+              log(env.config, `map: dedupe skip key="${key}"`);
+              continue;
+            }
             dedupeKeys.add(key);
           }
           results.push(await callback({ row, rowIndex: row.rowIndex!, stop }));
@@ -131,9 +170,14 @@ export async function runMap<T, R>(
       rowIndex += smartRows.length;
 
       if (stopped || pagesScanned >= effectiveMaxPages) break;
-      if (!await env.advancePage(useBulk)) break;
+      log(env.config, `map: advancing to next page (${pagesScanned} → ${pagesScanned + 1})`);
+      if (!await env.advancePage(useBulk)) {
+        log(env.config, `map: no more pages — done`);
+        break;
+      }
       pagesScanned++;
     }
+    log(env.config, `map: complete — ${results.length} result(s) across ${pagesScanned} page(s)`);
   } finally {
     await tracker.cleanup(env.getPage());
   }
@@ -156,13 +200,18 @@ export async function runFilter<T>(
   const useBulk = options.useBulkPagination ?? false;
   const tracker = new ElementTracker('filter');
 
+  log(env.config, `filter: starting (maxPages=${effectiveMaxPages}, parallel=${parallel}, dedupe=${!!dedupeStrategy})`);
+
   const matched: SmartRow<T>[] = [];
 
   try {
     let rowIndex = 0;
     let stopped = false;
     let pagesScanned = 1;
-    const stop = () => { stopped = true; };
+    const stop = () => {
+      log(env.config, `filter: stop() called — halting after current page`);
+      stopped = true;
+    };
 
     while (!stopped) {
       const rowLocators = env.getRowLocators();
@@ -172,11 +221,16 @@ export async function runFilter<T>(
         env.makeSmartRow(pageRows[idx], map, rowIndex + i, pagesScanned - 1)
       );
 
+      log(env.config, `filter: scanning page ${pagesScanned} — ${newIndices.length} new row(s)`);
+
       if (parallel) {
         const flags = await Promise.all(smartRows.map(async (row) => {
           if (dedupeKeys && dedupeStrategy) {
             const key = await dedupeStrategy(row);
-            if (dedupeKeys.has(key)) return false;
+            if (dedupeKeys.has(key)) {
+              log(env.config, `filter: dedupe skip key="${key}"`);
+              return false;
+            }
             dedupeKeys.add(key);
           }
           return predicate({ row, rowIndex: row.rowIndex!, stop });
@@ -187,7 +241,10 @@ export async function runFilter<T>(
           if (stopped) break;
           if (dedupeKeys && dedupeStrategy) {
             const key = await dedupeStrategy(row);
-            if (dedupeKeys.has(key)) continue;
+            if (dedupeKeys.has(key)) {
+              log(env.config, `filter: dedupe skip key="${key}"`);
+              continue;
+            }
             dedupeKeys.add(key);
           }
           if (await predicate({ row, rowIndex: row.rowIndex!, stop })) {
@@ -198,9 +255,14 @@ export async function runFilter<T>(
       rowIndex += smartRows.length;
 
       if (stopped || pagesScanned >= effectiveMaxPages) break;
-      if (!await env.advancePage(useBulk)) break;
+      log(env.config, `filter: advancing to next page (${pagesScanned} → ${pagesScanned + 1})`);
+      if (!await env.advancePage(useBulk)) {
+        log(env.config, `filter: no more pages — done`);
+        break;
+      }
       pagesScanned++;
     }
+    log(env.config, `filter: complete — ${matched.length} match(es) across ${pagesScanned} page(s)`);
   } finally {
     await tracker.cleanup(env.getPage());
   }

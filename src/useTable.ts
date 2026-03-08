@@ -147,17 +147,27 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     const context = createStrategyContext();
     const pagination = config.strategies.pagination;
     let rawResult: boolean | number | undefined;
+    let primitive: string;
     if (useBulk && pagination?.goNextBulk) {
+      primitive = 'goNextBulk';
       rawResult = await pagination.goNextBulk(context);
     } else if (pagination?.goNext) {
+      primitive = 'goNext';
       rawResult = await pagination.goNext(context);
     } else if (pagination?.goNextBulk) {
+      primitive = 'goNextBulk (fallback)';
       rawResult = await pagination.goNextBulk(context);
+    } else {
+      log('_advancePage: no pagination primitive available — returning false');
+      return false;
     }
     const didAdvance = rawResult !== undefined && validatePaginationResult(rawResult, 'Pagination Strategy');
     const pagesJumped = typeof rawResult === 'number' ? rawResult : (didAdvance ? 1 : 0);
     if (pagesJumped > 0) {
       tableState.currentPageIndex += pagesJumped;
+      log(`_advancePage: ${primitive} advanced ${pagesJumped} page(s) — now at page ${tableState.currentPageIndex}`);
+    } else {
+      log(`_advancePage: ${primitive} returned false — end of data`);
     }
     return didAdvance;
   };

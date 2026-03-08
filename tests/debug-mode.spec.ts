@@ -108,24 +108,37 @@ test.describe('Debug Mode', () => {
         expect(row).toBeDefined();
     });
 
-    test('Verbose logging can be enabled', async ({ page }) => {
+    test('Verbose logging emits expected messages during map()', async ({ page }) => {
         await page.goto('https://datatables.net/examples/data_sources/dom');
         await page.waitForSelector('#example_wrapper');
 
-        // This test just verifies verbose mode doesn't crash
-        const table = useTable(page.locator('#example'), {
-            headerSelector: 'thead th',
-            debug: {
-                logLevel: 'verbose'
-            }
-        });
+        // logDebug runs in the Node test process — intercept console.log at the Node level
+        const messages: string[] = [];
+        const originalLog = console.log;
+        console.log = (...args: any[]) => {
+            messages.push(args.join(' '));
+            originalLog(...args);
+        };
 
-        await table.init();
-        await table.findRow({ Name: 'Airi Satou' });
+        try {
+            const table = useTable(page.locator('#example'), {
+                headerSelector: 'thead th',
+                debug: { logLevel: 'verbose' }
+            });
 
-        // If we got here without errors, verbose logging works
-        expect(true).toBe(true);
+            await table.init();
+
+            // Run a 1-page map to get iteration log output
+            await table.map(({ row }) => row.getCell('Name').innerText(), { maxPages: 1 });
+        } finally {
+            console.log = originalLog;
+        }
+
+        // Assert key verbose messages were emitted
+        expect(messages.some(m => m.includes('map: starting'))).toBe(true);
+        expect(messages.some(m => m.includes('map: scanning page'))).toBe(true);
+        expect(messages.some(m => m.includes('map: complete'))).toBe(true);
     });
 
-
 });
+
