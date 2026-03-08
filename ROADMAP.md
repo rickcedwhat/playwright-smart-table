@@ -23,10 +23,11 @@
       - `getColumnValues` (use `map` instead).
  - [x] **Document `forEach`/`map`/`filter` in README**
  - [x] **JSDoc `@note` on `map`'s `parallel` default**
- - [ ] **Add mutation testing (Stryker)**
+ - [x] **Add mutation testing (Stryker)**
     - **Purpose**: Measure test effectiveness beyond coverage by introducing mutation testing using Stryker for Vitest.
     - **Goal**: Run locally and optionally as a scheduled CI job; aim for a high mutation score (>=80–90%).
     - **Notes**: Mutation testing is compute-intensive — start as a nightly/check rather than a blocking per-PR job.
+    - **Completed**: Installed Stryker and Vitest runner plugins. Created a nightly GitHub action workflow (`mutation-testing.yml`) that runs `npm run test:mutate` and uploads the HTML report as an artifact.
 
 - [x] **Improve verbose debug logging across internals**
     - **Purpose**: Ensure key internal modules (useTable orchestration, pagination/ stabilization strategies, rowFinder, tableMapper, smartRow) emit informative logs when `config.debug.logLevel` is `verbose`.
