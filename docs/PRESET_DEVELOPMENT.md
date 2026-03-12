@@ -1,15 +1,14 @@
-# Plugin Development Guide 🧩
+# Preset Development Guide 🧩
 
-`playwright-smart-table` uses a lean core: essential strategies for standard tables, with custom plugins for complex grids (AG-Grid, Glide, React Data Grid, MUI Data Grid, or custom virtual lists).
+`playwright-smart-table` uses a lean core: essential strategies for standard tables, with custom presets for complex grids (AG-Grid, Glide, React Data Grid, MUI Data Grid, or custom virtual lists).
 
 This guide shows you how to build robust, reusable strategies.
 
-**Adding a library plugin to the core repo?** Put it in `src/plugins/<name>/` as a directory with `index.ts` as the entry point. Add helper modules in that same directory if needed (e.g. `glide/columns.ts`). Register the preset in `src/plugins/index.ts`. Follow [PLUGIN_TEMPLATE.md](./PLUGIN_TEMPLATE.md) for the standard structure (preset + default strategies + full Strategies, non-enumerable getter, etc.) used by MUI, RDG, and Glide.
+**Adding a library preset to the core repo?** Put it in `src/presets/` (either as a single file `<name>.ts` or a directory `<name>/` with `index.ts` as the entry point). Add helper modules in that same directory if needed (e.g. `glide/columns.ts`). Register the preset in `src/presets/index.ts`. Follow [PRESET_TEMPLATE.md](./PRESET_TEMPLATE.md) for the standard structure.
 
-**Plugin file layout (in-repo):**
-- `src/plugins/<name>/index.ts` — preset and strategies; exports `Xxx` and `XxxStrategies`.
-- `src/plugins/<name>/*.ts` — optional helpers (e.g. `columns.ts`, `headers.ts`).
-- `src/plugins/index.ts` — imports each plugin from `./<name>` and exposes `Plugins`.
+**Preset file layout (in-repo):**
+- `src/presets/<name>.ts` (or `src/presets/<name>/index.ts`) — preset and strategies; exports a `TableConfig` object.
+- `src/presets/index.ts` — imports each preset and exposes them for the public API.
 
 ## Core Concepts
 
@@ -99,7 +98,6 @@ export const customFill: FillStrategy = async ({ row, data, options }) => {
     }
 
     // Fallback to default logic for other columns?
-    // You might need to implement standard filling here or compose strategies.
     const input = cell.locator('input');
     await input.fill(String(value));
   }
@@ -129,8 +127,8 @@ export const ariaHeaderStrategy: HeaderStrategy = async ({ root, config, resolve
 1. **Use `resolve`**: Always use the `resolve` helper from context instead of `page.locator()` when finding elements inside the table. It handles the `Selector` type (string vs function) correctly.
 2. **Wait for Stability**: Pagination strategies should wait for the table to stabilize (Spinner to disappear, row count to change) before returning `true`.
 3. **Return False**: Ensure your pagination strategy clearly returns `false` when it's logically impossible to go further (button disabled, end of list).
-4. **Type Safety**: Import types from `@rickcedwhat/playwright-smart-table` to ensure your plugins comply with the interface.
+4. **Type Safety**: Import types from `@rickcedwhat/playwright-smart-table` to ensure your presets comply with the interface.
 
-## Sharing Plugins
+## Sharing Presets
 
 If you build a strategy for a popular library (like Material UI v6, TanStack Table v9), consider contributing it back to the core library or publishing it as a separate package!

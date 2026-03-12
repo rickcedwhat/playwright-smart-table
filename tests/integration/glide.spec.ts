@@ -1,7 +1,6 @@
 import { test, expect, Locator, Page } from '@playwright/test';
-import { useTable } from '../src/index';
-import { Plugins } from '../src/index';
-import type { TableConfig, TableContext } from '../src/types';
+import { useTable, presets } from '../../src/index';
+import type { TableConfig, TableContext } from '../../src/types';
 
 test.describe('Live Glide Data Grid', () => {
     test.setTimeout(60000); // Increase timeout for CI
@@ -9,10 +8,7 @@ test.describe('Live Glide Data Grid', () => {
     // Shared Strategies & Configuration
 
     const glideConfig: TableConfig = {
-        headerSelector: 'table[role="grid"] thead tr th',
-        rowSelector: 'table[role="grid"] tbody tr',
-        cellSelector: 'td',
-        strategies: Plugins.Glide.Strategies
+        ...presets.glide
     };
 
     test('should scan headers and write to multiple columns', async ({ page }) => {
