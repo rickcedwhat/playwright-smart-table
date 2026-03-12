@@ -35,6 +35,20 @@
     "test:e2e": "npx playwright test",
     "prepare": "husky install"
   },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./presets": {
+      "types": "./dist/presets/index.d.ts",
+      "default": "./dist/presets/index.js"
+    },
+    "./presets/mui": {
+      "types": "./dist/presets/mui.d.ts",
+      "default": "./dist/presets/mui.js"
+    }
+  },
   "keywords": [
     "playwright",
     "testing",

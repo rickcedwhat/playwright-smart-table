@@ -21,4 +21,7 @@ export type {
 
 // Export namespace-like strategy collections
 export { Strategies } from './strategies';
+export * as presets from './presets';
+
+/** @deprecated Use `presets` instead. Plugins will be removed in v7.0.0. */
 export { Plugins } from './plugins';
