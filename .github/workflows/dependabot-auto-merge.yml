@@ -14,7 +14,7 @@ jobs:
     steps:
       - name: Get PR body
         id: check-dependabot
-        uses: actions/github-script@v6
+        uses: actions/github-script@v8
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -27,7 +27,7 @@ jobs:
 
       - name: Check for major version bumps
         id: check-major
-        uses: actions/github-script@v6
+        uses: actions/github-script@v8
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
