@@ -8,11 +8,20 @@ test.describe('MUI Table Preset Integration', () => {
         // Wait for the docs page to fully load
         await page.waitForSelector('.MuiTableContainer-root', { state: 'attached' });
 
-        // Dismiss the cookie banner if it exists
-        const cookieBtn = page.getByRole('button', { name: /accept( all)? cookies/i });
-        if (await cookieBtn.isVisible().catch(() => false)) {
-            await cookieBtn.click();
-            await page.waitForTimeout(500); // Wait for banner to animate out
+        // Dismiss any cookie banner or preferences dialog if it exists
+        const cookieSelectors = [
+            '#docs-cookie-consent button:has-text("Accept all")',
+            'button:has-text("Allow analytics")',
+            'button:has-text("Essential only")',
+            'button:has-text("Accept all cookies")'
+        ];
+
+        for (const selector of cookieSelectors) {
+            const btn = page.locator(selector).first();
+            if (await btn.isVisible().catch(() => false)) {
+                await btn.click().catch(() => {});
+                await page.waitForTimeout(500); // Wait for animation
+            }
         }
     });
 
