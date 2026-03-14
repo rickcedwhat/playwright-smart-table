@@ -63,12 +63,12 @@
     "@stryker-mutator/core": "^9.6.0",
     "@stryker-mutator/vitest-runner": "^9.6.0",
     "@types/node": "^25.3.5",
-    "@vitest/coverage-v8": "^4.0.18",
-    "@vitest/ui": "^4.0.18",
+    "@vitest/coverage-v8": "^4.1.0",
+    "@vitest/ui": "^4.1.0",
     "happy-dom": "^20.8.3",
     "husky": "^9.1.7",
     "typescript": "^5.7.2",
     "vitepress": "^1.6.4",
-    "vitest": "^4.0.18"
+    "vitest": "^4.1.0"
   }
 }
