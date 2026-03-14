@@ -5,10 +5,20 @@ test.describe('MUI DataGrid Recon', () => {
     test.beforeEach(async ({ page }) => {
         await page.goto('https://mui.com/x/react-data-grid/pagination/');
 
-        // Handle cookie banner if present
-        const acceptBtn = page.locator('#docs-cookie-consent button:has-text("Accept all")').first();
-        if (await acceptBtn.isVisible()) {
-            await acceptBtn.click();
+        // Dismiss any cookie banner or preferences dialog if it exists
+        const cookieSelectors = [
+            '#docs-cookie-consent button:has-text("Accept all")',
+            'button:has-text("Allow analytics")',
+            'button:has-text("Essential only")',
+            'button:has-text("Accept all cookies")'
+        ];
+
+        for (const selector of cookieSelectors) {
+            const btn = page.locator(selector).first();
+            if (await btn.isVisible().catch(() => false)) {
+                await btn.click().catch(() => {});
+                await page.waitForTimeout(500); // Wait for animation
+            }
         }
     });
 
