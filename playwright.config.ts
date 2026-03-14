@@ -38,6 +38,7 @@ export default defineConfig({
     command: 'npm run dev',
     cwd: 'playground',
     port: 3000,
-    reuseExistingServer: false,
+    reuseExistingServer: !process.env.CI,
+    timeout: 120 * 1000, // Increase to 2 minutes for slow CI environments
   },
 });
