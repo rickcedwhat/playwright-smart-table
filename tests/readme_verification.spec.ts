@@ -3,9 +3,10 @@ import { useTable } from '../src/index';
 import { Strategies } from '../src/index';
 
 test.describe('README.md Examples Verification', () => {
+  test.describe.configure({ retries: 2 });
 
   test('Quick Start + SmartRow: init, getRow, getCell, toJSON', async ({ page }) => {
-    await page.goto('https://datatables.net/examples/data_sources/dom');
+    await page.goto('https://datatables.net/examples/data_sources/dom', { timeout: 60000 });
 
     // #region quick-start
     // Example from: https://datatables.net/examples/data_sources/dom
@@ -36,7 +37,7 @@ test.describe('README.md Examples Verification', () => {
   });
 
   test('Pagination: Click Next Strategy', async ({ page }) => {
-    await page.goto('https://datatables.net/examples/data_sources/dom');
+    await page.goto('https://datatables.net/examples/data_sources/dom', { timeout: 60000 });
     await page.waitForSelector('#example_wrapper');
 
     // #region pagination
@@ -65,7 +66,7 @@ test.describe('README.md Examples Verification', () => {
   });
 
   test('getRow: Strict Retrieval & Negative Assertion', async ({ page }) => {
-    await page.goto('https://datatables.net/examples/data_sources/dom');
+    await page.goto('https://datatables.net/examples/data_sources/dom', { timeout: 60000 });
 
     // #region get-by-row
     // Example from: https://datatables.net/examples/data_sources/dom
@@ -82,7 +83,7 @@ test.describe('README.md Examples Verification', () => {
   });
 
   test('findRows: Multiple Usage Patterns', async ({ page }) => {
-    await page.goto('https://datatables.net/examples/data_sources/dom');
+    await page.goto('https://datatables.net/examples/data_sources/dom', { timeout: 60000 });
     const table = useTable(page.locator('#example'), { headerSelector: 'thead th' });
     await table.init();
 
@@ -106,7 +107,7 @@ test.describe('README.md Examples Verification', () => {
   });
 
   test('headerTransformer: Renaming Empty Columns', async ({ page }) => {
-    await page.goto('https://mui.com/material-ui/react-table/');
+    await page.goto('https://mui.com/material-ui/react-table/', { timeout: 60000 });
 
     // #region header-transformer
     // Example from: https://mui.com/material-ui/react-table/
@@ -179,7 +180,7 @@ test.describe('README.md Examples Verification', () => {
   });
 
   test('Advanced: Debug Mode', async ({ page }) => {
-    await page.goto('https://datatables.net/examples/data_sources/dom');
+    await page.goto('https://datatables.net/examples/data_sources/dom', { timeout: 60000 });
 
     // #region advanced-debug
     // Example from: https://datatables.net/examples/data_sources/dom
@@ -197,7 +198,7 @@ test.describe('README.md Examples Verification', () => {
   });
 
   test('Advanced: Reset Table State', async ({ page }) => {
-    await page.goto('https://datatables.net/examples/data_sources/dom');
+    await page.goto('https://datatables.net/examples/data_sources/dom', { timeout: 60000 });
     const table = useTable(page.locator('#example'), {
       headerSelector: 'thead th',
       strategies: {
@@ -234,7 +235,7 @@ test.describe('README.md Examples Verification', () => {
   });
 
   test('Advanced: Column Scanning', async ({ page }) => {
-    await page.goto('https://datatables.net/examples/data_sources/dom');
+    await page.goto('https://datatables.net/examples/data_sources/dom', { timeout: 60000 });
     const table = useTable(page.locator('#example'), {
       headerSelector: 'thead th',
       strategies: {
@@ -255,7 +256,7 @@ test.describe('README.md Examples Verification', () => {
   });
 
   test('findRows: Filtering with Exact Match', async ({ page }) => {
-    await page.goto('https://datatables.net/examples/data_sources/dom');
+    await page.goto('https://datatables.net/examples/data_sources/dom', { timeout: 60000 });
     const table = useTable(page.locator('#example'), { headerSelector: 'thead th' });
     await table.init();
 
@@ -271,7 +272,7 @@ test.describe('README.md Examples Verification', () => {
   });
 
   test('table.map: Iterate through paginated data', async ({ page }) => {
-    await page.goto('https://datatables.net/examples/data_sources/dom');
+    await page.goto('https://datatables.net/examples/data_sources/dom', { timeout: 60000 });
     await page.waitForSelector('#example_wrapper');
 
     const table = useTable(page.locator('#example'), {
