@@ -169,15 +169,23 @@ export const muiDataGrid: Partial<TableConfig> = {
             goNext: async (context) => {
                 const footer = context.root.locator('.MuiDataGrid-footerContainer');
                 const nextBtn = footer.locator('button[aria-label="Go to next page"]');
-                if (await nextBtn.count() === 0 || await nextBtn.isDisabled()) return false;
+                
+                try {
+                    await nextBtn.waitFor({ state: 'visible', timeout: 2000 });
+                } catch (e) {
+                    return false;
+                }
+
+                if (await nextBtn.isDisabled()) return false;
 
                 const displayedRows = footer.locator('.MuiTablePagination-displayedRows');
                 const oldText = await displayedRows.innerText().catch(() => '');
 
+                await nextBtn.scrollIntoViewIfNeeded().catch(() => {});
                 await nextBtn.click({ force: true });
 
                 // Poll for content update (React async render)
-                let retries = 50; // Increased for CI
+                let retries = 50; 
                 while (oldText && retries-- > 0 && await displayedRows.innerText().catch(() => '') === oldText) {
                     await context.page.waitForTimeout(100);
                 }
@@ -193,11 +201,19 @@ export const muiDataGrid: Partial<TableConfig> = {
             goPrevious: async (context) => {
                 const footer = context.root.locator('.MuiDataGrid-footerContainer');
                 const prevBtn = footer.locator('button[aria-label="Go to previous page"]');
-                if (await prevBtn.count() === 0 || await prevBtn.isDisabled()) return false;
+                
+                try {
+                    await prevBtn.waitFor({ state: 'visible', timeout: 2000 });
+                } catch (e) {
+                    return false;
+                }
+
+                if (await prevBtn.isDisabled()) return false;
 
                 const displayedRows = footer.locator('.MuiTablePagination-displayedRows');
                 const oldText = await displayedRows.innerText().catch(() => '');
 
+                await prevBtn.scrollIntoViewIfNeeded().catch(() => {});
                 await prevBtn.click({ force: true });
 
                 let retries = 50;

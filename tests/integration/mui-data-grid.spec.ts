@@ -4,69 +4,46 @@ import { useTable, presets } from '../../src/index';
 test.describe('MUI DataGrid Recon', () => {
     test.describe.configure({ retries: 2 });
     test.beforeEach(async ({ page }) => {
-        await page.goto('https://mui.com/x/react-data-grid/pagination/', { timeout: 60000 });
-
-        // Dismiss any cookie banner or preferences dialog if it exists
-        const cookieSelectors = [
-            '#docs-cookie-consent button:has-text("Accept all")',
-            'button:has-text("Allow analytics")',
-            'button:has-text("Essential only")',
-            'button:has-text("Accept all cookies")'
-        ];
-
-        for (const selector of cookieSelectors) {
-            const btn = page.locator(selector).first();
-            if (await btn.isVisible().catch(() => false)) {
-                await btn.click().catch(() => {});
-                await page.waitForTimeout(1000); // Wait for animation
-            }
-        }
+        await page.goto('http://localhost:3050');
+        await expect(page.locator('[role="grid"]')).toBeVisible();
+        await expect(page.locator('.MuiDataGrid-footerContainer')).toBeVisible();
     });
 
     test('should scrape a virtualized DataGrid using preset', async ({ page }) => {
-        const root = page.locator('.MuiDataGrid-root').first();
+        const root = page.locator('[role="grid"]').first();
         await expect(root).toBeVisible();
 
-        const table = await useTable(root, { ...presets.muiDataGrid as any }).init();
+        const table = await useTable(root, { 
+            ...presets.muiDataGrid as any,
+            maxPages: 10
+        }).init();
 
         // 1. Verify Headers
         const headers = await table.getHeaders();
-        console.log('Headers:', headers);
-        expect(headers).toContain('Desk');
-        expect(headers).toContain('Commodity');
+        console.log('DEBUG: Found Headers:', headers);
         expect(headers).toContain('Trader Name');
+        expect(headers).toContain('Trader Email');
 
-        // 2. Map current page rows
-        const currentRows = await table.map(({ row }) => row.toJSON());
-        console.log(`Found ${currentRows.length} rows on first page.`);
-        expect(currentRows.length).toBeGreaterThan(0);
-
-        // 3. Test Pagination
-        console.log('Testing pagination: next page...');
+        // 2. Test Pagination
+        console.log('Testing pagination: finding row on page 2...');
         await table.sorting.apply('Desk', 'asc'); // Ensure stable order
 
-        const firstRowBefore = (await table.getRowByIndex(0).toJSON()).Desk;
-        await table.reset(); // reset after sort
+        // D-1011 should be on page 2 (index 10-19) since pageSize is 10
+        const rowOnPage2 = await table.findRow({ Desk: 'D-1011' });
+        expect(rowOnPage2.wasFound()).toBe(true);
+        expect(table.currentPageIndex).toBe(1);
 
-        // Use the internal goNext via raw primitives for debug check
-        const moved = await presets.muiDataGrid.strategies!.pagination!.goNext!({
-            root,
-            page,
-            config: {} as any, // Dummy for cast
-            resolve: (s: any, p: any) => (typeof s === 'string' ? p.locator(s) : (s as any)(p))
-        });
-
-        expect(moved).toBe(true);
-        await table.revalidate();
-
-        const firstRowAfter = (await table.getRowByIndex(0).toJSON()).Desk;
-        console.log(`Row 0 before: ${firstRowBefore}, after: ${firstRowAfter}`);
-        expect(firstRowAfter).not.toBe(firstRowBefore);
+        const deskValue = (await rowOnPage2.toJSON()).Desk;
+        console.log(`Found row on page 2: ${deskValue}`);
+        expect(deskValue).toBe('D-1011');
     });
 
     test('should handle sorting via preset', async ({ page }) => {
-        const root = page.locator('.MuiDataGrid-root').first();
-        const table = await useTable(root, { ...presets.muiDataGrid as any }).init();
+        const root = page.locator('[role="grid"]').first();
+        const table = await useTable(root, { 
+            ...presets.muiDataGrid as any,
+            maxPages: 10
+        }).init();
 
         console.log('Testing sort: Desk...');
         // DataGrid Name header is usually sortable
