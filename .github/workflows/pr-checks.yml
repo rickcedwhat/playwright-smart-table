@@ -41,6 +41,9 @@ jobs:
       - name: Install Playground Dependencies
         run: cd playground && npm install
 
+      - name: Install MUI App Dependencies
+        run: cd tests/apps/mui-datagrid && npm install
+
       - name: Run Tests
         run: npm test
 

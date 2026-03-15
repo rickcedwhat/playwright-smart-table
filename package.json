@@ -33,6 +33,8 @@
     "pretest:e2e": "npm run clean-port",
     "posttest:e2e": "npm run clean-port",
     "test:e2e": "npx playwright test",
+    "dev:playground": "cd playground && npm run dev",
+    "dev:mui": "cd tests/apps/mui-datagrid && npm run dev",
     "prepare": "husky install"
   },
   "exports": {
