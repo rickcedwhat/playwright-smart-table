@@ -55,10 +55,10 @@
     - **Benefit**: Removes the footgun where users must manually navigate to page 1 inside `onReset` even though they've already declared a `first:` selector in their pagination strategy.
 
 ### 🔌 Ecosystem
-- [ ] **Community Presets**:
-    - **Goal**: `useTable(loc, { ...Plugins.MUI, maxPages: 5 })` (see existing MUI plugin)
-    - **Repository**: Create a separate repo (or monorepo workspace) for `@playwright-smart-table/presets`.
-    - **Targets**: Material UI, AgGrid, Ant Design, TanStack Table.
+- [x] **Community Presets**:
+    - **Goal**: `useTable(loc, { ...presets.muiDataGrid, maxPages: 5 })` (see existing MUI preset)
+    - **Repository**: Created `src/presets` directory for official library support.
+    - **Targets**: Material UI Table, MUI DataGrid, React Data Grid (RDG), Glide Data Grid.
     - **Vision**: Enable community contributions for specific library support, removing the burden of manual configuration for popular libraries.
 
 ## Non-Goals

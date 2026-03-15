@@ -1,7 +1,6 @@
 import { test, expect } from '@playwright/test';
-import { useTable } from '../src/index';
-import { Plugins } from '../src/index';
-import type { TableContext } from '../src/types';
+import { useTable, presets } from '../../src/index';
+import type { TableContext } from '../../src/types';
 
 test.describe('React Data Grid (RDG)', () => {
     test.setTimeout(60000);
@@ -13,10 +12,7 @@ test.describe('React Data Grid (RDG)', () => {
         await expect(grid).toBeAttached({ timeout: 10000 });
 
         const table = useTable(grid, {
-            rowSelector: '[role="row"].rdg-row',
-            cellSelector: '[role="gridcell"]',
-            headerSelector: '[role="columnheader"]',
-            strategies: Plugins.RDG.Strategies
+            ...presets.rdg
         });
 
         await table.init();
@@ -38,10 +34,7 @@ test.describe('React Data Grid (RDG)', () => {
         await expect(grid).toBeAttached({ timeout: 10000 });
 
         const table = useTable(grid, {
-            rowSelector: '[role="row"].rdg-row',
-            cellSelector: '[role="gridcell"]',
-            headerSelector: '[role="columnheader"]',
-            strategies: Plugins.RDG.Strategies
+            ...presets.rdg
         });
 
         await table.init();
@@ -67,11 +60,9 @@ test.describe('React Data Grid (RDG)', () => {
         await expect(grid).toBeAttached({ timeout: 10000 });
 
         const table = useTable(grid, {
-            rowSelector: '[role="row"].rdg-row',
-            cellSelector: '[role="gridcell"]',
-            headerSelector: '[role="columnheader"]',
+            ...presets.rdg,
             strategies: {
-                ...Plugins.RDG.Strategies,
+                ...presets.rdg.strategies,
                 dedupe: async (row) => row.getCell('ID').innerText()
             },
             maxPages: 3  // Reduced to avoid virtualization issues
@@ -105,10 +96,7 @@ test.describe('React Data Grid (RDG)', () => {
         await expect(grid).toBeAttached({ timeout: 10000 });
 
         const table = useTable(grid, {
-            rowSelector: '[role="row"].rdg-row',
-            cellSelector: '[role="gridcell"]',
-            headerSelector: '[role="columnheader"]',
-            strategies: Plugins.RDG.Strategies
+            ...presets.rdg
         });
 
         await table.init();
