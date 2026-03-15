@@ -2,8 +2,9 @@ import { test, expect } from '@playwright/test';
 import { useTable, presets } from '../../src/index';
 
 test.describe('MUI DataGrid Recon', () => {
+    test.describe.configure({ retries: 2 });
     test.beforeEach(async ({ page }) => {
-        await page.goto('https://mui.com/x/react-data-grid/pagination/');
+        await page.goto('https://mui.com/x/react-data-grid/pagination/', { timeout: 60000 });
 
         // Dismiss any cookie banner or preferences dialog if it exists
         const cookieSelectors = [
@@ -17,7 +18,7 @@ test.describe('MUI DataGrid Recon', () => {
             const btn = page.locator(selector).first();
             if (await btn.isVisible().catch(() => false)) {
                 await btn.click().catch(() => {});
-                await page.waitForTimeout(500); // Wait for animation
+                await page.waitForTimeout(1000); // Wait for animation
             }
         }
     });
