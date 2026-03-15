@@ -1,6 +1,6 @@
-import { TableContext, Selector, TableConfig } from '../../types';
-import { PaginationStrategies } from '../../strategies/pagination';
-import { StabilizationStrategies } from '../../strategies/stabilization';
+import { TableContext, Selector, TableConfig } from '../types';
+import { PaginationStrategies } from '../strategies/pagination';
+import { StabilizationStrategies } from '../strategies/stabilization';
 
 /**
  * Scrolls the grid horizontally to collect all column headers.

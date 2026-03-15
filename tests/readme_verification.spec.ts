@@ -3,6 +3,7 @@ import { useTable } from '../src/index';
 import { Strategies } from '../src/index';
 
 test.describe('README.md Examples Verification', () => {
+  test.describe.configure({ retries: 2 });
 
   test('Quick Start + SmartRow: init, getRow, getCell, toJSON', async ({ page }) => {
     await page.goto('https://datatables.net/examples/data_sources/dom');

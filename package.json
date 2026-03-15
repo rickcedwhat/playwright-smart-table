@@ -33,7 +33,23 @@
     "pretest:e2e": "npm run clean-port",
     "posttest:e2e": "npm run clean-port",
     "test:e2e": "npx playwright test",
+    "dev:playground": "cd playground && npm run dev",
+    "dev:mui": "cd tests/apps/mui-datagrid && npm run dev",
     "prepare": "husky install"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./presets": {
+      "types": "./dist/presets/index.d.ts",
+      "default": "./dist/presets/index.js"
+    },
+    "./presets/mui": {
+      "types": "./dist/presets/mui.d.ts",
+      "default": "./dist/presets/mui.js"
+    }
   },
   "keywords": [
     "playwright",
@@ -49,12 +65,12 @@
     "@stryker-mutator/core": "^9.6.0",
     "@stryker-mutator/vitest-runner": "^9.6.0",
     "@types/node": "^25.3.5",
-    "@vitest/coverage-v8": "^4.0.18",
-    "@vitest/ui": "^4.0.18",
+    "@vitest/coverage-v8": "^4.1.0",
+    "@vitest/ui": "^4.1.0",
     "happy-dom": "^20.8.3",
     "husky": "^9.1.7",
     "typescript": "^5.7.2",
     "vitepress": "^1.6.4",
-    "vitest": "^4.0.18"
+    "vitest": "^4.1.0"
   }
 }

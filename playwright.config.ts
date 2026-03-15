@@ -34,10 +34,20 @@ export default defineConfig({
   },
 
   /* Run your local dev server before starting the tests */
-  webServer: {
-    command: 'npm run dev',
-    cwd: 'playground',
-    port: 3000,
-    reuseExistingServer: false,
-  },
+  webServer: [
+    {
+      command: 'npm run dev',
+      cwd: 'playground',
+      port: 3000,
+      reuseExistingServer: !process.env.CI,
+      timeout: 120 * 1000, // Increase to 2 minutes for slow CI environments
+    },
+    {
+      command: 'npm run dev',
+      cwd: 'tests/apps/mui-datagrid',
+      port: 3050,
+      reuseExistingServer: !process.env.CI,
+      timeout: 120 * 1000,
+    },
+  ],
 });
