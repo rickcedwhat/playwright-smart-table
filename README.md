@@ -40,10 +40,10 @@ const email = await row.locator('td').nth(emailIndex).textContent();
 
 ```typescript
 // ✅ Column-aware - survives column reordering
-const row = await table.findRow({ Name: 'John Doe' });
+const row = table.getRow({ Name: 'John Doe' });
 const email = await row.getCell('Email').textContent();
 
-// ✅ Auto-pagination
+// ✅ Auto-pagination across all pages
 const allEngineers = await table.findRows({ Department: 'Engineering' });
 
 // ✅ Type-safe
@@ -66,8 +66,8 @@ import { useTable } from '@rickcedwhat/playwright-smart-table';
 
 const table = await useTable(page.locator('#my-table')).init();
 
-// Find row by column values
-const row = await table.findRow({ Name: 'John Doe' });
+// Get row by column values (current page)
+const row = table.getRow({ Name: 'John Doe' });
 
 // Access cells by column name
 const email = await row.getCell('Email').innerText();
