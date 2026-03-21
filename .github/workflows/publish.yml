@@ -57,11 +57,8 @@ jobs:
         if: steps.playwright-cache.outputs.cache-hit != 'true'
         run: npx playwright install --with-deps
 
-      - name: Install Playground Dependencies
-        run: cd playground && npm ci
-
-      - name: Install MUI DataGrid Test App Dependencies
-        run: cd tests/apps/mui-datagrid && npm ci
+      - name: Install Sub-App Dependencies
+        run: node scripts/install-apps.mjs
 
       - name: Run Tests
         run: npm test
