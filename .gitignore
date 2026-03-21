@@ -21,6 +21,8 @@ html/
 /.cache/
 /.idea/
 *.log
+debug_test.*
+test_failures*.log
 .nyc_output/
 /.playground/
 /.vscode/.history

@@ -4,6 +4,7 @@
 
 [![npm version](https://img.shields.io/github/package-json/v/rickcedwhat/playwright-smart-table?label=npm&color=blue&t=2)](https://www.npmjs.com/package/@rickcedwhat/playwright-smart-table)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![CI](https://github.com/rickcedwhat/playwright-smart-table/actions/workflows/pr-checks.yml/badge.svg)](https://github.com/rickcedwhat/playwright-smart-table/actions/workflows/pr-checks.yml)
 
 ---
 
