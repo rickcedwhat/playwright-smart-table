@@ -26,8 +26,8 @@ const table = useTable(page.locator('#my-table'), {
 
 await table.init();
 
-// Find a row
-const row = await table.findRow({ Name: 'John Doe' });
+// Get a row by content (current page)
+const row = table.getRow({ Name: 'John Doe' });
 
 // Get a cell value
 const email = await row.getCell('Email').textContent();

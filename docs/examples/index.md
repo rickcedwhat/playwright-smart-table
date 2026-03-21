@@ -16,7 +16,7 @@ Real-world examples of using Playwright Smart Table with different table librari
 ### Finding and Asserting
 
 ```typescript
-const row = await table.findRow({ Name: 'John Doe' });
+const row = table.getRow({ Name: 'John Doe' });
 await expect(row.getCell('Email')).toHaveText('john@example.com');
 ```
 
@@ -42,7 +42,7 @@ console.log(JSON.stringify(data, null, 2));
 ### Editing Cells
 
 ```typescript
-const row = await table.findRow({ ID: '12345' });
+const row = table.getRow({ ID: '12345' });
 await row.smartFill({
   Email: 'new.email@example.com',
   Phone: '555-1234'
