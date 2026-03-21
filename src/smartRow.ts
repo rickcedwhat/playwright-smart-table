@@ -42,7 +42,7 @@ const _navigateToCell = async (params: {
 
         // Optimization: Check if we are ALREADY at the target cell
         if (activeCell && activeCell.rowIndex === rowIndex && activeCell.columnIndex === index) {
-            // Skip navigation - we're already there!
+            logDebug(config, 'verbose', `_navigateToCell: Already at target cell {row: ${rowIndex}, col: ${index}}`);
             return activeCell.locator;
         }
     }
@@ -77,8 +77,10 @@ const _navigateToCell = async (params: {
         // Navigate vertically
         for (let i = 0; i < Math.abs(rowDiff); i++) {
             if (rowDiff > 0 && nav.goDown) {
+                logDebug(config, 'verbose', '_navigateToCell: moving down');
                 await nav.goDown(context);
             } else if (rowDiff < 0 && nav.goUp) {
+                logDebug(config, 'verbose', '_navigateToCell: moving up');
                 await nav.goUp(context);
             }
         }
@@ -86,8 +88,10 @@ const _navigateToCell = async (params: {
         // Navigate horizontally
         for (let i = 0; i < Math.abs(colDiff); i++) {
             if (colDiff > 0 && nav.goRight) {
+                logDebug(config, 'verbose', '_navigateToCell: moving right');
                 await nav.goRight(context);
             } else if (colDiff < 0 && nav.goLeft) {
+                logDebug(config, 'verbose', '_navigateToCell: moving left');
                 await nav.goLeft(context);
             }
         }

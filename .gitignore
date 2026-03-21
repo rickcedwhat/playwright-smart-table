@@ -26,3 +26,5 @@ html/
 /.vscode/.history
 dist/
 table-recon/
+playground/pst-unpack/
+*.tgz
