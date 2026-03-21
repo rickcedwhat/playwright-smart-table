@@ -17,5 +17,6 @@
       ]
     }
   },
-  "postCreateCommand": "npm install"
+  "postCreateCommand": "npm ci || npm install",
+  "remoteUser": "root"
 }
