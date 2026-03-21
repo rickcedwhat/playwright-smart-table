@@ -6,7 +6,7 @@ A SmartRow is a Playwright Locator enhanced with column-aware methods. It extend
 ## Overview
 
 ```typescript
-const row = await table.findRow({ Name: 'John Doe' });
+const row = table.getRow({ Name: 'John Doe' });
 
 // SmartRow methods
 const email = row.getCell('Email');
@@ -45,7 +45,7 @@ getCell(columnName: string): Locator
 #### Examples
 
 ```typescript
-const row = await table.findRow({ Name: 'Airi Satou' });
+const row = table.getRow({ Name: 'Airi Satou' });
 
 // Get cell locator
 const emailCell = row.getCell('Email');
@@ -108,7 +108,7 @@ toJSON(options?: { columns?: string[] }): Promise<T>
 #### Examples
 
 ```typescript
-const row = await table.findRow({ Name: 'Airi Satou' });
+const row = table.getRow({ Name: 'Airi Satou' });
 
 // Export all columns
 const data = await row.toJSON();
@@ -160,7 +160,7 @@ bringIntoView(): Promise<void>
 #### Example
 
 ```typescript
-const row = await table.findRow({ Name: 'Cedric Kelly' });
+const row = table.getRow({ Name: 'Cedric Kelly' });
 
 // Ensure row is visible before interacting
 await row.bringIntoView();
@@ -201,7 +201,7 @@ smartFill(
 #### Examples
 
 ```typescript
-const row = await table.findRow({ Name: 'John Doe' });
+const row = table.getRow({ Name: 'John Doe' });
 
 // Fill single cell
 await row.smartFill({ 
@@ -242,7 +242,7 @@ See [Fill Strategies](/api/strategies#fill) for more details.
 SmartRow extends Playwright's Locator, so all standard methods work:
 
 ```typescript
-const row = await table.findRow({ Name: 'Airi Satou' });
+const row = table.getRow({ Name: 'Airi Satou' });
 
 // Playwright assertions
 await expect(row).toBeVisible();
@@ -274,7 +274,7 @@ test('SmartRow example', async ({ page }) => {
   await table.init();
   
   // Find a row
-  const row = await table.findRow({ Name: 'Airi Satou' });
+  const row = table.getRow({ Name: 'Airi Satou' });
   
   // Column-aware access
   const email = row.getCell('Email');

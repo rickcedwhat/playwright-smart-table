@@ -419,7 +419,7 @@ scrollToColumn(columnName: string): Promise<void>
 await table.scrollToColumn('Email');
 
 // Now interact with cells in that column
-const row = await table.findRow({ Name: 'John' });
+const row = table.getRow({ Name: 'John' });
 await row.getCell('Email').click();
 ```
 
@@ -477,7 +477,7 @@ await page.click('#toggle-columns');
 await table.revalidate();
 
 // Now you can access the new columns
-const row = await table.findRow({ Name: 'John' });
+const row = table.getRow({ Name: 'John' });
 await row.getCell('NewColumn').click();
 ```
 

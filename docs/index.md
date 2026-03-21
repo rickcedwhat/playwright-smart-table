@@ -35,10 +35,10 @@ const email = await row.locator('td').nth(emailIndex).textContent();
 
 ```typescript
 // ✅ Column-aware - survives column reordering
-const row = await table.findRow({ Name: 'John Doe' });
+const row = table.getRow({ Name: 'John Doe' });
 const email = await row.getCell('Email').textContent();
 
-// ✅ Auto-pagination
+// ✅ Auto-pagination across all pages
 const allEngineers = await table.findRows({ Department: 'Engineering' });
 
 // ✅ Type-safe
@@ -53,7 +53,7 @@ const table = useTable<Employee>(page.locator('#table'));
 Find rows by content, not position:
 
 ```typescript
-const row = await table.findRow({ Name: 'Airi Satou', Office: 'Tokyo' });
+const row = table.getRow({ Name: 'Airi Satou', Office: 'Tokyo' });
 ```
 
 ### 📄 Auto-Pagination
@@ -61,7 +61,7 @@ const row = await table.findRow({ Name: 'Airi Satou', Office: 'Tokyo' });
 Search across all pages automatically:
 
 ```typescript
-const row = await table.findRow({ ID: '12345' }); // Searches all pages
+const row = await table.findRow({ ID: '12345' }); // Searches across ALL pages
 ```
 
 ### 🔍 Column-Aware Access
@@ -120,7 +120,7 @@ const table = useTable(page.locator('#table'), {
 
 | Task | Traditional | Smart Table |
 |------|------------|-------------|
-| Find row | `page.locator('//tr[td[contains(text(), "John")]]')` | `table.findRow({ Name: 'John' })` |
+| Find row | `page.locator('//tr[td[contains(text(), "John")]]')` | `table.getRow({ Name: 'John' })` |
 | Get cell | `row.locator('td').nth(3)` | `row.getCell('Email')` |
 | Pagination | Manual loop + click logic | `table.findRows({ ... })` |
 | Type safety | None | Full TypeScript support |
