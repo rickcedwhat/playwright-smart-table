@@ -1,5 +1,21 @@
 # Project Notes
 
+## Version Bumping
+
+Always use `npm version` to bump — it updates both `package.json` **and** `package-lock.json` atomically:
+
+```bash
+npm version patch   # 6.7.7 → 6.7.8
+npm version minor   # 6.7.7 → 6.8.0
+npm version major   # 6.7.7 → 7.0.0
+```
+
+Never manually edit `package.json` version — the pre-commit hook will reject the commit if `package-lock.json` is out of sync.
+
+The publish to npm happens automatically when the PR merges to `main` (CI detects the version diff vs npm registry).
+
+---
+
 ## Table Loading Behavior & Init Timing
 
 ### What Happens When `init()` is Called on a Loading Table?

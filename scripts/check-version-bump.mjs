@@ -52,6 +52,21 @@ try {
         }
 
         console.log('✅ CHANGELOG.md update confirmed.');
+
+        // 7. Verify package-lock.json is in sync
+        try {
+            const lockRaw = fs.readFileSync('package-lock.json', 'utf8');
+            const lockVersion = JSON.parse(lockRaw).version;
+            if (lockVersion !== currentVersion) {
+                console.error(`\n❌ ERROR: package-lock.json version (${lockVersion}) does not match package.json (${currentVersion}).`);
+                console.error('👉 Run: npm version patch (or minor/major) instead of editing package.json directly.');
+                console.error('   Or run: npm install --package-lock-only  to sync the lockfile.\n');
+                process.exit(1);
+            }
+            console.log('✅ package-lock.json is in sync.');
+        } catch (e) {
+            console.warn('⚠️ Could not verify package-lock.json:', e.message);
+        }
     }
 
 } catch (error) {
