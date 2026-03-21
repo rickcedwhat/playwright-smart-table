@@ -90,6 +90,8 @@ jobs:
       - name: Create GitHub Release (from changelog)
         if: steps.check_version.outputs.changed == 'true'
         uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: v${{ steps.check_version.outputs.version }}
           release_name: v${{ steps.check_version.outputs.version }}

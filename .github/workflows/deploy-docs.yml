@@ -32,6 +32,9 @@ jobs:
           node-version: 20
           cache: npm
 
+      - name: Update npm
+        run: npm install -g npm@latest
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
