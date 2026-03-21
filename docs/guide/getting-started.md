@@ -24,9 +24,10 @@ test('find and verify employee', async ({ page }) => {
   
   // Initialize table
   const table = useTable(page.locator('#example'));
-  
-  // Find a row by content (auto-initializes!)
-  const row = await table.findRow({ Name: 'Airi Satou' });
+  await table.init();
+
+  // Get a row by content (current page)
+  const row = table.getRow({ Name: 'Airi Satou' });
   
   // Verify cell values (returns Locator)
   await expect(row.getCell('Position')).toHaveText('Accountant');
@@ -37,9 +38,12 @@ test('find and verify employee', async ({ page }) => {
 ## Why This Works
 
 Notice how we:
-- **Find rows by content** (`Name: 'Airi Satou'`) instead of fragile XPath
+- **Get rows by content** (`Name: 'Airi Satou'`) instead of fragile XPath
 - **Access cells by column name** (`getCell('Position')`) instead of index
 - **No manual column mapping** - the library reads headers automatically
+
+> [!TIP]
+> Use `getRow()` for fast lookups on the current page. Use `findRow()` when you need to search across multiple paginated pages.
 
 ## Configuration
 
