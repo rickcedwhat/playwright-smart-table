@@ -4,9 +4,13 @@
   "description": "Smart, column-aware table interactions for Playwright",
   "author": "Cedrick Catalan",
   "license": "MIT",
+  "homepage": "https://rickcedwhat.github.io/playwright-smart-table/",
   "repository": {
     "type": "git",
     "url": "https://github.com/rickcedwhat/playwright-smart-table.git"
+  },
+  "bugs": {
+    "url": "https://github.com/rickcedwhat/playwright-smart-table/issues"
   },
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -55,7 +59,15 @@
     "playwright",
     "testing",
     "table",
-    "automation"
+    "automation",
+    "locators",
+    "e2e",
+    "qa",
+    "typescript",
+    "datagrid",
+    "smart-table",
+    "ag-grid",
+    "mui"
   ],
   "peerDependencies": {
     "@playwright/test": "^1.40.0"
