@@ -1,5 +1,18 @@
 # Changelog
 
+## [6.7.8] - 2026-03-20
+
+### Added
+- `Strategies.Header.horizontalScroll()` — a built-in header discovery strategy that uses DOM-level `scrollLeft` to pan across virtualized, horizontally-scrolled tables and collect all column headers.
+- `Strategies.Header` namespace now exported alongside existing strategy namespaces.
+- New integration tests for horizontal virtualization (`tests/horizontal-virtualization.spec.ts`, `tests/integration/virtualized-horizontal-dedupe.spec.ts`).
+- Stryker mutation testing framework set up with daily scheduled CI runs (`stryker.config.json`, `.github/workflows/mutation-testing.yml`).
+- `debug: { logLevel: 'verbose' }` support added to `useTable` for detailed runtime logging.
+
+### Changed
+- MUI DataGrid support refactored under `Presets.MUIDataGrid` (from `Plugins`).
+- `src/strategies/index.ts` now correctly exports `Header: HeaderStrategies`.
+
 ## [6.7.7] - 2026-03-05
 
 ### Added
