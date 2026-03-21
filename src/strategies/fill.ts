@@ -13,7 +13,7 @@ export const FillStrategies = {
         const columnOverride = config?.columnOverrides?.[columnName as keyof any];
         if (columnOverride?.write) {
             let currentValue;
-            // Auto-sync: If read exists, fetch current state first
+            // Auto-sync: If read exists, get current state first
             if (columnOverride.read) {
                 currentValue = await columnOverride.read(cell);
             }
