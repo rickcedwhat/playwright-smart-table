@@ -238,7 +238,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
 
     getRow: (filters: Partial<T> | Record<string, FilterValue>, options: { exact?: boolean } = { exact: false }): SmartRowType<T> => {
       const map = tableMapper.getMapSync();
-      if (!map) throw new Error('Table not initialized. Call await table.init() first, or use async methods like table.findRow() or table.findRows() which auto-initialize.');
+      if (!map) throw new Error('Initialization Error: You attempted to access a row before the table structure was mapped. Please call "await table.init()" once before using synchronous row access.');
 
       const allRows = resolve(config.rowSelector, rootLocator);
       const matchedRows = filterEngine.applyFilters(
@@ -255,7 +255,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
 
     getRowByIndex: (index: number): SmartRowType<T> => {
       const map = tableMapper.getMapSync();
-      if (!map) throw new Error('Table not initialized. Call await table.init() first, or use async methods like table.findRow() or table.findRows() which auto-initialize.');
+      if (!map) throw new Error('Initialization Error: You attempted to access a row before the table structure was mapped. Please call "await table.init()" once before using synchronous row access.');
 
       const rowLocator = resolve(config.rowSelector, rootLocator).nth(index);
       return _makeSmart(rowLocator, map, index);

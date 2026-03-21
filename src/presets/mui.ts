@@ -1,5 +1,34 @@
+import { Locator } from '@playwright/test';
 import { TableConfig, TableContext } from '../types';
 import { PaginationStrategies } from '../strategies';
+
+/** 
+ * Safely wait for MUI pagination to stabilize.
+ * Polls for displayed row text changes and waits for loading overlays to disappear.
+ */
+async function waitForMuiPaginationStabilization(context: TableContext, displayedRows: Locator, oldText: string) {
+    let retries = 50; // 5 second timeout for client-side render
+    while (oldText && retries-- > 0 && await displayedRows.innerText().catch(() => '') === oldText) {
+        await context.page.waitForTimeout(100);
+    }
+
+    // Standard MUI loading strategy check
+    if (context.config.strategies.loading?.isTableLoading) {
+        let loadingRetries = 30;
+        while (loadingRetries-- > 0 && await context.config.strategies.loading.isTableLoading(context)) {
+            await context.page.waitForTimeout(100);
+        }
+    }
+
+    // DataGrid specific fallback (if not using loading strategy)
+    const overlay = context.root.locator('.MuiDataGrid-overlay');
+    if (await overlay.count() > 0) {
+        let loadingRetries = 30;
+        while (loadingRetries-- > 0 && await overlay.isVisible().catch(() => false)) {
+            await context.page.waitForTimeout(100);
+        }
+    }
+}
 
 /** safely locate the pagination container related to our table context */
 async function getPaginationRoot(context: TableContext) {
@@ -46,19 +75,7 @@ export const muiTable: Partial<TableConfig> = {
 
                 // Force click ignores cookie banners obscuring the footer
                 await nextBtn.click({ force: true });
-
-                let retries = 30; // 3 second timeout for client-side render
-                while (oldText && retries-- > 0 && await displayedRows.innerText().catch(() => '') === oldText) {
-                    await context.page.waitForTimeout(100);
-                }
-                
-                // Extra stabilization: wait for any loading overlays to disappear
-                if (context.config.strategies.loading?.isTableLoading) {
-                    let loadingRetries = 20;
-                    while (loadingRetries-- > 0 && await context.config.strategies.loading.isTableLoading(context)) {
-                        await context.page.waitForTimeout(100);
-                    }
-                }
+                await waitForMuiPaginationStabilization(context, displayedRows, oldText);
                 return true;
             },
             goPrevious: async (context) => {
@@ -70,18 +87,7 @@ export const muiTable: Partial<TableConfig> = {
                 const oldText = await displayedRows.innerText().catch(() => '');
 
                 await prevBtn.click({ force: true });
-
-                let retries = 30; // 3 second timeout for client-side render
-                while (oldText && retries-- > 0 && await displayedRows.innerText().catch(() => '') === oldText) {
-                    await context.page.waitForTimeout(100);
-                }
-
-                if (context.config.strategies.loading?.isTableLoading) {
-                    let loadingRetries = 20;
-                    while (loadingRetries-- > 0 && await context.config.strategies.loading.isTableLoading(context)) {
-                        await context.page.waitForTimeout(100);
-                    }
-                }
+                await waitForMuiPaginationStabilization(context, displayedRows, oldText);
                 return true;
             },
             goToFirst: async (context) => {
@@ -94,11 +100,7 @@ export const muiTable: Partial<TableConfig> = {
                 while (maxRetries-- > 0 && await prevBtn.count() > 0 && !(await prevBtn.isDisabled())) {
                     const oldText = await displayedRows.innerText().catch(() => '');
                     await prevBtn.click();
-
-                    let renderRetries = 30;
-                    while (oldText && renderRetries-- > 0 && await displayedRows.innerText().catch(() => '') === oldText) {
-                        await context.page.waitForTimeout(100);
-                    }
+                    await waitForMuiPaginationStabilization(context, displayedRows, oldText);
                     clicked = true;
                 }
                 return clicked;
@@ -183,19 +185,7 @@ export const muiDataGrid: Partial<TableConfig> = {
 
                 await nextBtn.scrollIntoViewIfNeeded().catch(() => {});
                 await nextBtn.click({ force: true });
-
-                // Poll for content update (React async render)
-                let retries = 50; 
-                while (oldText && retries-- > 0 && await displayedRows.innerText().catch(() => '') === oldText) {
-                    await context.page.waitForTimeout(100);
-                }
-                
-                // DataGrid specific: wait for overlay to disappear
-                let loadingRetries = 30;
-                const overlay = context.root.locator('.MuiDataGrid-overlay');
-                while (loadingRetries-- > 0 && await overlay.isVisible().catch(() => false)) {
-                    await context.page.waitForTimeout(100);
-                }
+                await waitForMuiPaginationStabilization(context, displayedRows, oldText);
                 return true;
             },
             goPrevious: async (context) => {
@@ -215,17 +205,7 @@ export const muiDataGrid: Partial<TableConfig> = {
 
                 await prevBtn.scrollIntoViewIfNeeded().catch(() => {});
                 await prevBtn.click({ force: true });
-
-                let retries = 50;
-                while (oldText && retries-- > 0 && await displayedRows.innerText().catch(() => '') === oldText) {
-                    await context.page.waitForTimeout(100);
-                }
-
-                let loadingRetries = 30;
-                const overlay = context.root.locator('.MuiDataGrid-overlay');
-                while (loadingRetries-- > 0 && await overlay.isVisible().catch(() => false)) {
-                    await context.page.waitForTimeout(100);
-                }
+                await waitForMuiPaginationStabilization(context, displayedRows, oldText);
                 return true;
             }
         },
@@ -256,12 +236,11 @@ export const muiDataGrid: Partial<TableConfig> = {
                     // Sorting can trigger large re-renders/virtualization shifts
                     await context.page.waitForTimeout(500); 
                     
-                    // Wait for loading overlay
-                    let loadingRetries = 30;
-                    const overlay = context.root.locator('.MuiDataGrid-overlay');
-                    while (loadingRetries-- > 0 && await overlay.isVisible().catch(() => false)) {
-                        await context.page.waitForTimeout(100);
-                    }
+                    // Wait for stabilization (using DataGrid specific overlay check inside helper)
+                    const displayedRows = context.root.locator('.MuiTablePagination-displayedRows');
+                    const text = await displayedRows.innerText().catch(() => '');
+                    await waitForMuiPaginationStabilization(context, displayedRows, text);
+
                     current = await context.config.strategies.sorting?.getSortState({ columnName, context }) || 'none';
                     attempts++;
                 }

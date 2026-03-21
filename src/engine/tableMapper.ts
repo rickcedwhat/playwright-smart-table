@@ -75,7 +75,7 @@ export class TableMapper {
 
             } catch (e) {
                 lastError = e as Error;
-                this.log(`Header mapping failed (retrying): ${(e as Error).message}`);
+                this.log(`Header mapping failed. Attempt ${Math.floor((Date.now() - startTime) / 100)}: ${(e as Error).message}`);
                 await new Promise(r => setTimeout(r, 100));
             }
         }
