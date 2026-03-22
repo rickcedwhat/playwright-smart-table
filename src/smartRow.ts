@@ -5,6 +5,7 @@ import { buildColumnNotFoundError } from './utils/stringUtils';
 import { debugDelay, logDebug } from './utils/debugUtils';
 import { planNavigationPath, executeNavigationPath, executeNavigationWithGoToPageRetry } from './utils/paginationPath';
 import { SENTINEL_ROW } from './utils/sentinel';
+import { NavigationBarrier } from './utils/navigationBarrier';
 
 type StrategyContext = {
     config: FinalTableConfig<any>;
@@ -15,7 +16,7 @@ type StrategyContext = {
 
 /**
  * Internal helper to navigate to a cell with active cell optimization.
- * Uses navigation primitives (goUp, goDown, goLeft, goRight, goHome) for orchestration.
+ * Uses `strategies.navigation` primitives (goUp/goDown/goLeft/goRight, optional snap/seek/goHome).
  * Returns the target cell locator after navigation.
  */
 const _navigateToCell = async (params: {
@@ -27,8 +28,9 @@ const _navigateToCell = async (params: {
     index: number;
     rowLocator: Locator;
     rowIndex?: number;
+    barrier?: NavigationBarrier;
 }): Promise<Locator | null> => {
-    const { config, rootLocator, page, resolve, column, index, rowLocator, rowIndex } = params;
+    const { config, rootLocator, page, resolve, column, index, rowLocator, rowIndex, barrier } = params;
     logDebug(config, 'verbose', `_navigateToCell: navigating to column "${column}" (index ${index})`);
 
     // Get active cell if strategy is available
@@ -58,72 +60,202 @@ const _navigateToCell = async (params: {
             throw new Error('Row index is required for navigation');
         }
 
-        // Determine starting position
-        let startRow = 0;
-        let startCol = 0;
+        const navigateOnce = async () => {
+            // Get current position again to be sure
+            let currRow = 0;
+            let currCol = 0;
+            if (config.strategies.getActiveCell) {
+                const ac = await config.strategies.getActiveCell({ config, root: rootLocator, page, resolve });
+                if (ac) {
+                    currRow = ac.rowIndex;
+                    currCol = ac.columnIndex;
+                }
+            }
 
-        if (activeCell && activeCell.rowIndex >= 0 && activeCell.columnIndex >= 0) {
-            // Use current position
-            startRow = activeCell.rowIndex;
-            startCol = activeCell.columnIndex;
-        } else if (nav.goHome) {
-            // Reset to top-left
-            await nav.goHome(context);
-        }
+            const rDiff = rowIndex - currRow;
+            const cDiff = index - currCol;
 
-        // Calculate movement needed
-        const rowDiff = rowIndex - startRow;
-        const colDiff = index - startCol;
-
-        // Navigate vertically
-        for (let i = 0; i < Math.abs(rowDiff); i++) {
-            if (rowDiff > 0 && nav.goDown) {
+            // Move one step vertically
+            if (rDiff > 0 && nav.goDown) {
                 logDebug(config, 'verbose', '_navigateToCell: moving down');
                 await nav.goDown(context);
-            } else if (rowDiff < 0 && nav.goUp) {
+            } else if (rDiff < 0 && nav.goUp) {
                 logDebug(config, 'verbose', '_navigateToCell: moving up');
                 await nav.goUp(context);
             }
-        }
 
-        // Navigate horizontally
-        for (let i = 0; i < Math.abs(colDiff); i++) {
-            if (colDiff > 0 && nav.goRight) {
+            // Move one step horizontally
+            if (cDiff > 0 && nav.goRight) {
                 logDebug(config, 'verbose', '_navigateToCell: moving right');
                 await nav.goRight(context);
-            } else if (colDiff < 0 && nav.goLeft) {
+            } else if (cDiff < 0 && nav.goLeft) {
                 logDebug(config, 'verbose', '_navigateToCell: moving left');
                 await nav.goLeft(context);
             }
+        };
+
+        const targetReached = async () => {
+            if (config.strategies.getActiveCell) {
+                const ac = await config.strategies.getActiveCell({ config, root: rootLocator, page, resolve });
+                if (ac && ac.rowIndex === rowIndex && ac.columnIndex === index) return true;
+            }
+            // Locator presence: virtualized grids (e.g. Glide) often attach the target `td` after scroll
+            // while focus id lags; do not require getActiveCell to match for this to count as reached.
+            const cell = config.strategies.getCellLocator
+                ? config.strategies.getCellLocator({ row: rowLocator, columnName: column, columnIndex: index, page })
+                : resolve(config.cellSelector, rowLocator).nth(index);
+
+            return (await cell.count() > 0);
+        };
+
+        if (await targetReached()) {
+            // Already there. If we have a barrier, check-in to stay in lock-step.
+            if (barrier) await barrier.sync(index);
+            const cell = config.strategies.getCellLocator
+                ? config.strategies.getCellLocator({ row: rowLocator, columnName: column, columnIndex: index, page })
+                : resolve(config.cellSelector, rowLocator).nth(index);
+            return cell;
         }
 
-        // Wait for active cell to match target: poll getActiveCell or fallback to fixed delay
+        // If getActiveCell is present but returns null (no focus), and cell is in DOM,
+        // try to focus it once before entering navigation loop.
         if (config.strategies.getActiveCell) {
+            const ac = await config.strategies.getActiveCell({ config, root: rootLocator, page, resolve });
+            if (!ac) {
+                const cell = resolve(config.cellSelector, rowLocator).nth(index);
+                if (await cell.count() > 0) {
+                    logDebug(config, 'verbose', `_navigateToCell: cell "${column}" found but not focused; focusing.`);
+                    await cell.focus();
+                    // Re-check target
+                    if (await targetReached()) {
+                        if (barrier) await barrier.sync(index);
+                        return cell;
+                    }
+                }
+            }
+        }
+
+        const navigateUntilReached = async () => {
+            let currRow = 0;
+            let currCol = 0;
+            if (config.strategies.getActiveCell) {
+                const ac = await config.strategies.getActiveCell({ config, root: rootLocator, page, resolve });
+                if (ac) {
+                    currRow = ac.rowIndex;
+                    currCol = ac.columnIndex;
+                }
+            }
+
+            const rDiff = rowIndex - currRow;
+
+            // Navigate vertically (tight loop)
+            for (let i = 0; i < Math.abs(rDiff); i++) {
+                if (rDiff > 0 && nav.goDown) await nav.goDown(context);
+                else if (rDiff < 0 && nav.goUp) await nav.goUp(context);
+            }
+
+            if (config.strategies.getActiveCell) {
+                const ac = await config.strategies.getActiveCell({ config, root: rootLocator, page, resolve });
+                if (ac) {
+                    currRow = ac.rowIndex;
+                    currCol = ac.columnIndex;
+                }
+            }
+
+            if (index === 0 && nav.snapFirstColumnIntoView) {
+                logDebug(config, 'verbose', '_navigateToCell: snapFirstColumnIntoView for column index 0');
+                await nav.snapFirstColumnIntoView(context);
+                if (config.strategies.getActiveCell) {
+                    const ac = await config.strategies.getActiveCell({ config, root: rootLocator, page, resolve });
+                    if (ac) {
+                        currRow = ac.rowIndex;
+                        currCol = ac.columnIndex;
+                    }
+                }
+                // Home moves a11y focus within the current row to column 0. If focus row !== target row
+                // (e.g. still on previous row), Home jumps to grid origin and breaks `tr.nth(k)` reads.
+                if (typeof rowIndex === 'number' && currRow === rowIndex) {
+                    await rootLocator.evaluate((el) => {
+                        const canvas = el.closest('canvas') || el.parentElement?.querySelector('canvas');
+                        if (canvas instanceof HTMLCanvasElement) {
+                            canvas.tabIndex = 0;
+                            canvas.focus();
+                        }
+                    });
+                    await page.keyboard.press('Home');
+                    await page.waitForTimeout(120);
+                    if (config.strategies.getActiveCell) {
+                        const ac = await config.strategies.getActiveCell({ config, root: rootLocator, page, resolve });
+                        if (ac) {
+                            currRow = ac.rowIndex;
+                            currCol = ac.columnIndex;
+                        }
+                    }
+                }
+            }
+
+            let cDiff = index - currCol;
+            if (Math.abs(cDiff) > 12 && nav.seekColumnIndex) {
+                logDebug(config, 'verbose', `_navigateToCell: seekColumnIndex approx for column ${index}`);
+                await nav.seekColumnIndex(context, index);
+                if (config.strategies.getActiveCell) {
+                    const ac = await config.strategies.getActiveCell({ config, root: rootLocator, page, resolve });
+                    if (ac) {
+                        currRow = ac.rowIndex;
+                        currCol = ac.columnIndex;
+                    }
+                }
+                cDiff = index - currCol;
+            }
+            for (let i = 0; i < Math.abs(cDiff); i++) {
+                if (cDiff > 0 && nav.goRight) await nav.goRight(context);
+                else if (cDiff < 0 && nav.goLeft) await nav.goLeft(context);
+            }
+
+            const horizontalSteps = Math.abs(cDiff);
+            if (horizontalSteps > 0) {
+                const settleMs = Math.min(2500, 60 + horizontalSteps * 12);
+                await page.waitForTimeout(settleMs);
+            }
+
+            // Wait for active cell to match target: poll getActiveCell or fallback to fixed delay
+            // This is the "Midas Touch" buffer needed for Glide's async accessibility updates.
             const pollIntervalMs = 10;
-            const maxWaitMs = 50;
+            const maxWaitMs = Math.min(6000, 250 + horizontalSteps * 25);
             const start = Date.now();
             while (Date.now() - start < maxWaitMs) {
-                const updatedActiveCell = await config.strategies.getActiveCell({
-                    config,
-                    root: rootLocator,
-                    page,
-                    resolve
-                });
-                if (updatedActiveCell && updatedActiveCell.rowIndex === rowIndex && updatedActiveCell.columnIndex === index) {
-                    return updatedActiveCell.locator;
+                if (config.strategies.getActiveCell) {
+                    const ac = await config.strategies.getActiveCell({ config, root: rootLocator, page, resolve });
+                    if (ac && ac.rowIndex === rowIndex && ac.columnIndex === index) {
+                        return ac.locator;
+                    }
+                }
+                if (await targetReached()) {
+                    break;
                 }
                 await page.waitForTimeout(pollIntervalMs);
             }
-            const final = await config.strategies.getActiveCell({
-                config,
-                root: rootLocator,
-                page,
-                resolve
-            });
-            if (final) return final.locator;
-            return null;
+        };
+
+        // Not there, perform (coordinated) navigation
+        let navResult: Locator | null | void;
+        if (barrier) {
+            navResult = await barrier.sync(index, navigateUntilReached);
+        } else {
+            navResult = await navigateUntilReached();
         }
 
+        if (navResult instanceof Object && (navResult as any)._isLocator) {
+            const loc = navResult as unknown as Locator;
+            if (await loc.count() > 0) return loc;
+        }
+
+        // Return final locator if reached
+        const finalCell = config.strategies.getCellLocator
+            ? config.strategies.getCellLocator({ row: rowLocator, columnName: column, columnIndex: index, page })
+            : resolve(config.cellSelector, rowLocator).nth(index);
+            
+        if (await finalCell.count() > 0) return finalCell;
         return null;
     }
     return null;
@@ -145,14 +277,16 @@ const createSmartRow = <T = any>(
     rootLocator: Locator,
     resolve: (item: any, parent: Locator | Page) => Locator,
     table: TableResult<T> | null,
-    tablePageIndex?: number
+    tablePageIndex?: number,
+    barrier?: NavigationBarrier
 ): SmartRowType<T> => {
-    const smart = rowLocator as unknown as SmartRowType<T>;
+    const smart = rowLocator as unknown as SmartRowType<T> & { _barrier?: NavigationBarrier };
 
     // Attach State
     smart.rowIndex = rowIndex;
     smart.tablePageIndex = tablePageIndex;
     smart.table = table as any;
+    smart._barrier = barrier;
 
     // Attach Methods
     smart.getCell = (colName: string): Locator => {
@@ -213,24 +347,22 @@ const createSmartRow = <T = any>(
                 : resolve(config.cellSelector, rowLocator).nth(idx);
 
             let targetCell = cell;
-            const count = await cell.count();
+            // Always call _navigateToCell to ensure Lock-Step synchronization
+            // even if the cell is already present (it handles check-in inside)
+            const navigatedCell = await _navigateToCell({
+                config,
+                rootLocator,
+                page,
+                resolve,
+                column: col,
+                index: idx,
+                rowLocator,
+                rowIndex,
+                barrier: (smart as any)._barrier
+            });
 
-            if (count === 0) {
-                // Cell not in DOM (virtualized) - navigate to it
-                const navigatedCell = await _navigateToCell({
-                    config,
-                    rootLocator,
-                    page,
-                    resolve,
-                    column: col,
-                    index: idx,
-                    rowLocator,
-                    rowIndex
-                });
-
-                if (navigatedCell) {
-                    targetCell = navigatedCell;
-                }
+            if (navigatedCell) {
+                targetCell = navigatedCell;
             }
             // --- Navigation Logic End ---
 
@@ -280,7 +412,8 @@ const createSmartRow = <T = any>(
                 column: colName,
                 index: colIdx,
                 rowLocator,
-                rowIndex
+                rowIndex,
+                barrier: (smart as any)._barrier
             });
 
             const columnOverride = config.columnOverrides?.[colName as keyof T];
