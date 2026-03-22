@@ -114,6 +114,7 @@ export class TableMapper {
                     seenHeaders
                 });
             }
+            this.log(`Header mapping index ${i}: "${text}"`);
             entries.push([text, i]);
             seenHeaders.add(text);
         }

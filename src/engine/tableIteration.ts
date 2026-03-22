@@ -66,6 +66,7 @@ export async function runForEach<T>(
             }
             dedupeKeys.add(key);
           }
+          log(env.config, `forEach: processing row ${row.rowIndex}`);
           await callback({ row, rowIndex: row.rowIndex!, stop });
           totalProcessed++;
         }));
@@ -80,6 +81,7 @@ export async function runForEach<T>(
             }
             dedupeKeys.add(key);
           }
+          log(env.config, `forEach: processing row ${row.rowIndex}`);
           await callback({ row, rowIndex: row.rowIndex!, stop });
           totalProcessed++;
         }
@@ -148,6 +150,7 @@ export async function runMap<T, R>(
             }
             dedupeKeys.add(key);
           }
+          log(env.config, `map: processing row ${row.rowIndex}`);
           return callback({ row, rowIndex: row.rowIndex!, stop });
         }));
         for (const r of pageResults) {
@@ -164,6 +167,7 @@ export async function runMap<T, R>(
             }
             dedupeKeys.add(key);
           }
+          log(env.config, `map: processing row ${row.rowIndex}`);
           results.push(await callback({ row, rowIndex: row.rowIndex!, stop }));
         }
       }
@@ -233,6 +237,7 @@ export async function runFilter<T>(
             }
             dedupeKeys.add(key);
           }
+          log(env.config, `filter: processing row ${row.rowIndex}`);
           return predicate({ row, rowIndex: row.rowIndex!, stop });
         }));
         smartRows.forEach((row, i) => { if (flags[i]) matched.push(row); });
@@ -247,6 +252,7 @@ export async function runFilter<T>(
             }
             dedupeKeys.add(key);
           }
+          log(env.config, `filter: processing row ${row.rowIndex}`);
           if (await predicate({ row, rowIndex: row.rowIndex!, stop })) {
             matched.push(row);
           }
