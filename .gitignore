@@ -28,3 +28,10 @@ dist/
 table-recon/
 playground/pst-unpack/
 *.tgz
+
+# Local scratch / one-off reports (do not commit)
+/all_results.txt
+/mapper_errors.txt
+/mapper_failures.txt
+/mapper_report.txt
+/test_results.txt

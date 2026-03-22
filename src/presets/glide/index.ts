@@ -1,13 +1,39 @@
 import { TableContext, FillStrategy, TableConfig } from '../../types';
-import { glideGoUp, glideGoDown, glideGoLeft, glideGoRight, glideGoHome } from './columns';
+import {
+    glideGoUp,
+    glideGoDown,
+    glideGoLeft,
+    glideGoRight,
+    glideSnapFirstColumnIntoView,
+    glideSeekColumnIndex
+} from './columns';
 import { scrollRightHeader } from './headers';
 import { PaginationStrategies } from '../../strategies/pagination';
 import { StabilizationStrategies } from '../../strategies/stabilization';
 
-const glideFillStrategy: FillStrategy = async ({ value, page }) => {
+const glideFillStrategy: FillStrategy = async ({ row, columnName, value, page }) => {
+    // Canvas-aware click: Glide is a canvas grid. The accessibility 'td' elements
+    // may not trigger internal focus on a simple click. We click the canvas at the cell's location.
+    const cell = row.getCell(columnName);
+    const box = await cell.boundingBox();
+    const canvas = page.locator('canvas').first();
+    const cBox = await canvas.boundingBox();
+
+    if (box && cBox) {
+        await canvas.click({
+            position: {
+                x: box.x - cBox.x + box.width / 2,
+                y: box.y - cBox.y + box.height / 2
+            }
+        });
+    } else {
+        // Fallback
+        await cell.focus();
+    }
+
     await page.keyboard.press('Enter');
     const textarea = page.locator('textarea.gdg-input');
-    await textarea.waitFor({ state: 'visible', timeout: 2000 });
+    await textarea.waitFor({ state: 'visible', timeout: 5000 });
     await page.keyboard.type(String(value));
     await textarea.evaluate((el, expectedValue) => {
         return new Promise<void>((resolve) => {
@@ -23,7 +49,7 @@ const glideFillStrategy: FillStrategy = async ({ value, page }) => {
     }, String(value));
     await page.waitForTimeout(50);
     await page.keyboard.press('Enter');
-    await textarea.waitFor({ state: 'detached', timeout: 2000 });
+    await textarea.waitFor({ state: 'detached', timeout: 5000 });
     await page.waitForTimeout(300);
 };
 
@@ -42,7 +68,9 @@ const glidePaginationStrategy = PaginationStrategies.infiniteScroll({
 });
 
 const glideGetCellLocator = ({ row, columnIndex }: any) => {
-    return row.locator('td').nth(columnIndex);
+    // WAI-ARIA: aria-colindex is 1-based; header map index 0 → "1", index 59 → "60".
+    // Rows are virtualized: only a window of `td`s exists; navigation must scroll `.dvn-scroller`.
+    return row.locator(`td[aria-colindex="${columnIndex + 1}"]`);
 };
 
 const glideGetActiveCell = async ({ page }: any) => {
@@ -78,7 +106,9 @@ const GlideDefaultStrategies = {
         goDown: glideGoDown,
         goLeft: glideGoLeft,
         goRight: glideGoRight,
-        goHome: glideGoHome
+        goHome: glideSnapFirstColumnIntoView,
+        snapFirstColumnIntoView: glideSnapFirstColumnIntoView,
+        seekColumnIndex: glideSeekColumnIndex
     },
     loading: {
         isHeaderLoading: async () => false
@@ -102,6 +132,7 @@ const GlidePreset: Partial<TableConfig> = {
     headerSelector: 'table[role="grid"] thead tr th',
     rowSelector: 'table[role="grid"] tbody tr',
     cellSelector: 'td',
+    concurrency: 'sequential',
     strategies: GlideDefaultStrategies
 };
 export const Glide: Partial<TableConfig> & { Strategies: typeof GlideStrategies } = Object.defineProperty(

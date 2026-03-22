@@ -367,6 +367,11 @@ export interface TableConfig<T = any> {
   cellSelector?: string | ((row: Locator) => Locator);
   /** Number of pages to scan for verification */
   maxPages?: number;
+  /**
+   * Default concurrency strategy for iteration methods.
+   * Can be overridden by the options passed to forEach, map, or filter.
+   */
+  concurrency?: RowIterationMode;
   /** Hook to rename columns dynamically */
   headerTransformer?: (args: { text: string, index: number, locator: Locator, seenHeaders: Set<string> }) => string | Promise<string>;
   /** Automatically scroll to table on init */
@@ -391,6 +396,7 @@ export interface FinalTableConfig<T = any> extends TableConfig<T> {
   cellSelector: string | ((row: Locator) => Locator);
   maxPages: number;
   autoScroll: boolean;
+  concurrency?: RowIterationMode;
   debug?: TableConfig['debug'];
   headerTransformer: (args: { text: string, index: number, locator: Locator, seenHeaders: Set<string> }) => string | Promise<string>;
   onReset: (context: TableContext) => Promise<void>;
@@ -415,15 +421,27 @@ export type RowIterationContext<T = any> = {
   stop: () => void;
 };
 
+/** Concurrency modes for row iteration. */
+export type RowIterationMode = 'parallel' | 'sequential' | 'synchronized';
+
 /** Shared options for forEach, map, and filter. */
 export type RowIterationOptions = {
   /** Maximum number of pages to iterate. Defaults to config.maxPages. */
   maxPages?: number;
   /**
-   * Whether to process rows within a page concurrently.
-   * @default false for forEach/filter, true for map
+   * @deprecated Use 'concurrency' mode instead.
+   * - parallel: true -> concurrency: 'parallel'
+   * - parallel: false -> concurrency: 'sequential'
    */
   parallel?: boolean;
+  /**
+   * Concurrency strategy for iteration.
+   * - 'parallel': Full parallel execution of both navigation and actions.
+   * - 'synchronized': Parallel navigation (lock-step) with serial actions.
+   * - 'sequential': Strictly serial one-at-a-time execution. No parallel navigation.
+   * @default 'parallel' (for map), 'sequential' (for forEach/filter)
+   */
+  concurrency?: RowIterationMode;
   /**
    * Deduplication strategy. Use when rows may repeat across iterations
    * (e.g. infinite scroll tables). Returns a unique key per row.
