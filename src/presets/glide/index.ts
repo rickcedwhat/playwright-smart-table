@@ -33,7 +33,7 @@ const glideFillStrategy: FillStrategy = async ({ row, columnName, value, page })
 
     await page.keyboard.press('Enter');
     const textarea = page.locator('textarea.gdg-input');
-    await textarea.waitFor({ state: 'visible', timeout: 5000 });
+    await textarea.waitFor({ state: 'visible', timeout: 2000 });
     await page.keyboard.type(String(value));
     await textarea.evaluate((el, expectedValue) => {
         return new Promise<void>((resolve) => {
@@ -49,7 +49,7 @@ const glideFillStrategy: FillStrategy = async ({ row, columnName, value, page })
     }, String(value));
     await page.waitForTimeout(50);
     await page.keyboard.press('Enter');
-    await textarea.waitFor({ state: 'detached', timeout: 5000 });
+    await textarea.waitFor({ state: 'detached', timeout: 2000 });
     await page.waitForTimeout(300);
 };
 
