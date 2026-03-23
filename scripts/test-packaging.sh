@@ -27,26 +27,42 @@ npm install typescript @types/node @playwright/test --save-dev
 echo "📥 Installing tarball..."
 npm install ../$TARBALL
 
-# 6. Create smoke test file
+# 6. Create smoke test file + local tsconfig (do not pass .ts files on the CLI: TS 5.8+ errors
+#    with TS5112 when a tsconfig.json exists nearby, e.g. the repo root ../tsconfig.json)
 echo "📝 Creating smoke test..."
 cat <<EOF > smoke-test.ts
 import { useTable } from '@rickcedwhat/playwright-smart-table';
-import { Page, Locator } from '@playwright/test';
+import { Page } from '@playwright/test';
 
 // Just verify types are exported and usable
 const test = async (page: Page) => {
     const table = useTable(page.locator('table'));
     await table.init();
-    
+
     // Check if types are correct
     const headers: string[] = await table.getHeaders();
     console.log('Headers:', headers);
 };
 EOF
 
+cat <<'EOF' > tsconfig.json
+{
+  "compilerOptions": {
+    "strict": true,
+    "noEmit": true,
+    "target": "ES2022",
+    "module": "Node16",
+    "moduleResolution": "Node16",
+    "esModuleInterop": true,
+    "skipLibCheck": true
+  },
+  "include": ["smoke-test.ts"]
+}
+EOF
+
 # 7. Compile smoke test
 echo "Running tsc..."
-npx tsc smoke-test.ts --noEmit --esModuleInterop
+npx tsc --project tsconfig.json
 
 echo "✅ Packaging test passed! Types are correctly exported."
 

@@ -12,8 +12,8 @@
   "bugs": {
     "url": "https://github.com/rickcedwhat/playwright-smart-table/issues"
   },
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "dist/src/index.js",
+  "types": "dist/src/index.d.ts",
   "files": [
     "dist"
   ],
@@ -44,8 +44,8 @@
   },
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
+      "types": "./dist/src/index.d.ts",
+      "default": "./dist/src/index.js"
     },
     "./presets": {
       "types": "./dist/presets/index.d.ts",
