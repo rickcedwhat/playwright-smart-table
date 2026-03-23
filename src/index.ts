@@ -1,3 +1,8 @@
+import { version } from '../package.json';
+
+/** Semver of this package (from `package.json`). Use in logs or diagnostics to confirm the installed build. */
+export const PLAYWRIGHT_SMART_TABLE_VERSION = version;
+
 export { useTable } from './useTable';
 
 export type {
