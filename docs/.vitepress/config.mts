@@ -1,5 +1,16 @@
 import { defineConfig } from 'vitepress'
 
+const presetSidebar = [
+    {
+        text: 'Presets (maintainers)',
+        items: [
+            { text: 'Preset development', link: '/PRESET_DEVELOPMENT' },
+            { text: 'Preset template', link: '/PRESET_TEMPLATE' },
+            { text: '← Advanced overview', link: '/advanced/' }
+        ]
+    }
+]
+
 export default defineConfig({
     title: "Playwright Smart Table",
     description: "Production-ready table testing for Playwright",
@@ -7,6 +18,7 @@ export default defineConfig({
     themeConfig: {
         nav: [
             { text: 'Guide', link: '/guide/getting-started' },
+            { text: 'Concepts', link: '/concepts/strategies' },
             { text: 'API', link: '/api/' },
             { text: 'Examples', link: '/examples/' },
             { text: 'Recipes', link: '/recipes/' },
@@ -21,8 +33,16 @@ export default defineConfig({
                     items: [
                         { text: 'Getting Started', link: '/guide/getting-started' },
                         { text: 'Core Concepts', link: '/guide/core-concepts' },
-                        { text: 'Configuration', link: '/guide/configuration' }
+                        { text: 'Configuration', link: '/guide/configuration' },
+                        { text: 'Debugging', link: '/guide/debugging' },
+                        { text: 'Recipes', link: '/guide/recipes' }
                     ]
+                }
+            ],
+            '/concepts/': [
+                {
+                    text: 'Concepts',
+                    items: [{ text: 'Strategies', link: '/concepts/strategies' }]
                 }
             ],
             '/examples/': [
@@ -48,11 +68,16 @@ export default defineConfig({
                             link: '/api/table-config',
                             collapsed: false,
                             items: [
+                                { text: 'columnOverrides', link: '/api/table-config#columnoverrides' },
                                 { text: 'headerSelector', link: '/api/table-config#headerselector' },
                                 { text: 'rowSelector', link: '/api/table-config#rowselector' },
                                 { text: 'cellSelector', link: '/api/table-config#cellselector' },
+                                { text: 'maxPages', link: '/api/table-config#maxpages' },
+                                { text: 'concurrency', link: '/api/table-config#concurrency' },
                                 { text: 'headerTransformer', link: '/api/table-config#headertransformer' },
                                 { text: 'strategies', link: '/api/table-config#strategies' },
+                                { text: 'autoScroll', link: '/api/table-config#autoscroll' },
+                                { text: 'onReset', link: '/api/table-config#onreset' },
                                 { text: 'debug', link: '/api/table-config#debug' }
                             ]
                         },
@@ -62,6 +87,7 @@ export default defineConfig({
                             collapsed: false,
                             items: [
                                 { text: 'init()', link: '/api/table-methods#init' },
+                                { text: 'isInitialized()', link: '/api/table-methods#isinitialized' },
                                 { text: 'getRow()', link: '/api/table-methods#getrow' },
                                 { text: 'getRowByIndex()', link: '/api/table-methods#getrowbyindex' },
                                 { text: 'findRow()', link: '/api/table-methods#findrow' },
@@ -69,6 +95,10 @@ export default defineConfig({
                                 { text: 'forEach()', link: '/api/table-methods#foreach' },
                                 { text: 'map()', link: '/api/table-methods#map' },
                                 { text: 'filter()', link: '/api/table-methods#filter' },
+                                {
+                                    text: 'Async iterator',
+                                    link: '/api/table-methods#async-iterator-for-await-of'
+                                },
                                 { text: 'getHeaders()', link: '/api/table-methods#getheaders' },
                                 { text: 'getHeaderCell()', link: '/api/table-methods#getheadercell' },
                                 { text: 'scrollToColumn()', link: '/api/table-methods#scrolltocolumn' },
@@ -98,11 +128,11 @@ export default defineConfig({
                             link: '/api/strategies',
                             collapsed: false,
                             items: [
-                                { text: 'Pagination', link: '/api/strategies#pagination' },
-                                { text: 'Sorting', link: '/api/strategies#sorting' },
-                                { text: 'Fill', link: '/api/strategies#fill' },
-                                { text: 'Header', link: '/api/strategies#header' },
-                                { text: 'Resolution', link: '/api/strategies#resolution' }
+                                { text: 'Pagination', link: '/api/strategies#pagination-strategies' },
+                                { text: 'Sorting', link: '/api/strategies#sorting-strategies' },
+                                { text: 'Fill', link: '/api/strategies#fill-strategy' },
+                                { text: 'Header', link: '/api/strategies#header-strategy' },
+                                { text: 'Cell locator', link: '/api/strategies#cell-locator-strategy' }
                             ]
                         }
                     ]
@@ -126,10 +156,14 @@ export default defineConfig({
                         { text: 'Overview', link: '/advanced/' },
                         { text: 'Debugging', link: '/advanced/debugging' },
                         { text: 'Custom Resolution', link: '/advanced/custom-resolution' },
-                        { text: 'TypeScript Tips', link: '/advanced/typescript' }
+                        { text: 'TypeScript Tips', link: '/advanced/typescript' },
+                        { text: 'Preset development', link: '/PRESET_DEVELOPMENT' },
+                        { text: 'Preset template', link: '/PRESET_TEMPLATE' }
                     ]
                 }
             ],
+            '/PRESET_DEVELOPMENT': presetSidebar,
+            '/PRESET_TEMPLATE': presetSidebar,
             '/troubleshooting': [
                 {
                     text: 'Help',

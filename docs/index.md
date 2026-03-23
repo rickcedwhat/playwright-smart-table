@@ -1,4 +1,3 @@
-<!-- NEEDS REVIEW -->
 # Introduction
 
 ## Why Playwright Smart Table?

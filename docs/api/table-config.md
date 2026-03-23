@@ -1,4 +1,3 @@
-<!-- NEEDS REVIEW -->
 # TableConfig
 
 Configuration options for initializing a table with `useTable()`.
@@ -154,6 +153,42 @@ Maximum number of pages to traverse when using pagination methods like `findRows
 ```typescript
 maxPages: 10 // Stop after 10 pages
 ```
+
+---
+
+### concurrency
+
+**Type:** `'parallel' | 'sequential' | 'synchronized'`  
+**Required:** No
+
+Default concurrency for `forEach`, `map`, and `filter`. Per-call options override this value.
+
+- **`parallel`** — full parallelism where the engine allows it (default for `map`).
+- **`sequential`** — one row at a time (default for `forEach` / `filter`).
+- **`synchronized`** — parallel lock-step navigation with serialized callbacks (for virtualized grids where overlapping navigation would desync the viewport).
+
+The legacy `parallel: true | false` option on iteration is deprecated; prefer `concurrency`.
+
+---
+
+### autoScroll
+
+**Type:** `boolean`  
+**Required:** No  
+**Default:** `false`
+
+When `true`, scrolls the table root into view during initialization.
+
+---
+
+### onReset
+
+**Type:** `(context: TableContext) => Promise<void>`  
+**Required:** No
+
+Hook invoked when `table.reset()` runs, after pagination `goToFirst` (if configured) and before internal caches are cleared. Use for app-specific cleanup.
+
+---
 
 ## Complete Example
 
