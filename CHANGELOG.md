@@ -1,5 +1,21 @@
 # Changelog
 
+## [6.8.0] - 2026-03-22
+
+### Added
+- **`concurrency` for row iteration** — `TableConfig` and `forEach` / `map` / `filter` options accept `concurrency: 'parallel' | 'sequential' | 'synchronized'`. `synchronized` runs navigation in parallel lock-step while serializing row callbacks (via `NavigationBarrier`), for grids where concurrent navigation would desync the viewport.
+- **`Mutex`** and **`NavigationBarrier`** utilities (`src/utils/mutex.ts`, `src/utils/navigationBarrier.ts`) with unit tests.
+- **Glide preset**: `aria-colindex`-based cell resolution, horizontal navigation on `.dvn-scroller`, `seekColumnIndex` / `snapFirstColumnIntoView`, default `concurrency: 'sequential'`, and canvas-aware fill with tighter textarea wait timeouts.
+
+### Changed
+- **`runMap`** (`src/engine/tableIteration.ts`) implements the three concurrency modes above; `parallel` option on iteration is deprecated in favor of `concurrency`.
+- **SmartRow** navigation: improved virtualized grid handling (`targetReached`, conditional `Home`, removal of row `scrollIntoViewIfNeeded` where it hung); navigation primitives extended on `NavigationPrimitives` (`snapFirstColumnIntoView`, `seekColumnIndex`).
+- **`.gitignore`**: local mapper / scratch `.txt` artifacts.
+
+### Documentation
+- README and API docs now describe `concurrency` for iteration; JSDoc on `TableResult` iteration methods updated accordingly.
+- `scripts/generate-all-api-docs.mjs`: match `TableResult` / `TableConfig` declarations correctly, fix single-line JSDoc leaving the parser stuck in “comment” mode, and recognize multi-line `forEach` / `map` / `filter` signatures so `tableresult-signatures.json` stays in sync with `types.ts`.
+
 ## [6.7.9] - 2026-03-21
 
 ### Fixed

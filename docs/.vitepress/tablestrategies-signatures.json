@@ -1,5 +1,45 @@
 [
   {
+    "name": "header?",
+    "signature": "header?: HeaderStrategy",
+    "comment": "/** Strategy for discovering/scanning headers */"
+  },
+  {
+    "name": "navigation?",
+    "signature": "navigation?: NavigationPrimitives",
+    "comment": "/** Primitive navigation functions (goUp, goDown, goLeft, goRight, goHome) */"
+  },
+  {
+    "name": "fill?",
+    "signature": "fill?: FillStrategy",
+    "comment": "/** Strategy for filling form inputs */"
+  },
+  {
+    "name": "pagination?",
+    "signature": "pagination?: PaginationStrategy",
+    "comment": "/** Strategy for paginating through data */"
+  },
+  {
+    "name": "sorting?",
+    "signature": "sorting?: SortingStrategy",
+    "comment": "/** Strategy for sorting columns */"
+  },
+  {
+    "name": "dedupe?",
+    "signature": "dedupe?: DedupeStrategy",
+    "comment": "/** Strategy for deduplicating rows during iteration/scrolling */"
+  },
+  {
+    "name": "getCellLocator?",
+    "signature": "getCellLocator?: GetCellLocatorFn",
+    "comment": "/** Function to get a cell locator */"
+  },
+  {
+    "name": "getActiveCell?",
+    "signature": "getActiveCell?: GetActiveCellFn",
+    "comment": "/** Function to get the currently active/focused cell */"
+  },
+  {
     "name": "filter?",
     "signature": "filter?: FilterStrategy",
     "comment": "/**\n* Strategy for filtering rows. If present, FilterEngine will delegate filter application\n* to this pluggable strategy.\n*/"

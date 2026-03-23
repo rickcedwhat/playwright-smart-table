@@ -1,1 +1,57 @@
-[]
+[
+  {
+    "name": "headerSelector?",
+    "signature": "headerSelector?: string | ((root: Locator) => Locator)",
+    "comment": "/** Selector for the table headers */"
+  },
+  {
+    "name": "rowSelector?",
+    "signature": "rowSelector?: string",
+    "comment": "/** Selector for the table rows */"
+  },
+  {
+    "name": "cellSelector?",
+    "signature": "cellSelector?: string | ((row: Locator) => Locator)",
+    "comment": "/** Selector for the cells within a row */"
+  },
+  {
+    "name": "maxPages?",
+    "signature": "maxPages?: number",
+    "comment": "/** Number of pages to scan for verification */"
+  },
+  {
+    "name": "concurrency?",
+    "signature": "concurrency?: RowIterationMode",
+    "comment": "/**\n* Default concurrency strategy for iteration methods.\n* Can be overridden by the options passed to forEach, map, or filter.\n*/"
+  },
+  {
+    "name": "headerTransformer?",
+    "signature": "headerTransformer?: (args: { text: string, index: number, locator: Locator, seenHeaders: Set<string> }) => string | Promise<string>",
+    "comment": "/** Hook to rename columns dynamically */"
+  },
+  {
+    "name": "autoScroll?",
+    "signature": "autoScroll?: boolean",
+    "comment": "/** Automatically scroll to table on init */"
+  },
+  {
+    "name": "debug?",
+    "signature": "debug?: DebugConfig",
+    "comment": "/** Debug options for development and troubleshooting */"
+  },
+  {
+    "name": "onReset?",
+    "signature": "onReset?: (context: TableContext) => Promise<void>",
+    "comment": "/** Reset hook */"
+  },
+  {
+    "name": "strategies?",
+    "signature": "strategies?: TableStrategies",
+    "comment": "/** All interaction strategies */"
+  },
+  {
+    "name": "columnOverrides?",
+    "signature": "columnOverrides?: Partial<Record<keyof T, ColumnOverride<T[keyof T]>>>",
+    "comment": "/**\n* Unified interface for reading and writing data to specific columns.\n* Overrides both default extraction (toJSON) and filling (smartFill) logic.\n*/"
+  }
+]

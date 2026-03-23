@@ -200,7 +200,7 @@ findRows(
 
 ### Parameters
 
-- `filters` - The filter criteria to match
+- `filters` - The filter criteria to match (omit or pass {} for all rows)
 - `options` - Search options including exact match and max pages
 
 <!-- /api-signature: findRows -->
@@ -255,7 +255,7 @@ forEach(
 ### Parameters
 
 - `callback` - Function receiving { row, rowIndex, stop }
-- `options` - maxPages, parallel, dedupe, useBulkPagination
+- `options` - maxPages, concurrency, dedupe, useBulkPagination (`parallel` is deprecated; use `concurrency`)
 
 <!-- /api-signature: forEach -->
 
@@ -278,7 +278,7 @@ await table.forEach(async ({ row, rowIndex, stop }) => {
 Transform every row across all pages into a value. Returns a flat array. Execution is parallel within each page by default (safe for reads). Call `stop()` to halt after the current page finishes.
 
 > [!WARNING]
-> `map` defaults to `parallel: true`. If your callback opens popovers, fills inputs, or mutates UI state, pass `{ parallel: false }`.
+> `map` defaults to `concurrency: 'parallel'`. If your callback opens popovers, fills inputs, or mutates UI state, pass `{ concurrency: 'sequential' }` or `{ concurrency: 'synchronized' }` as appropriate.
 
 <!-- api-signature: map -->
 
@@ -297,13 +297,13 @@ map<R>(
 // Data extraction — parallel is safe
 const emails = await table.map(({ row }) => row.getCell('Email').innerText());
 
-// UI interactions — use parallel: false
+// UI interactions — use sequential (or synchronized) concurrency
 const assignees = await table.map(async ({ row }) => {
   await row.getCell('Assignee').locator('button').click();
   const name = await page.locator('.popover .name').innerText();
   await page.keyboard.press('Escape');
   return name;
-}, { parallel: false });
+}, { concurrency: 'sequential' });
 ```
 
 [Back to Top](#table-methods)

@@ -18,8 +18,10 @@ const typesContent = fs.readFileSync(typesPath, 'utf-8');
 
 // Extract multiple interfaces
 const interfaces = {
-    TableResult: /export interface TableResult<T = any> \{([\s\S]*?)\n\}/,
-    TableConfig: /export interface TableConfig \{([\s\S]*?)\n\}/,
+    // TableResult extends AsyncIterable — keep regex in sync with src/types.ts declaration line.
+    TableResult:
+        /export interface TableResult<T = any> extends AsyncIterable<\{ row: SmartRow<T>; rowIndex: number \}> \{([\s\S]*?)\n\}/,
+    TableConfig: /export interface TableConfig<T = any> \{([\s\S]*?)\n\}/,
     SmartRow: /export type SmartRow<T = any> = Locator & \{([\s\S]*?)\n\};/,
     TableStrategies: /export interface TableStrategies \{([\s\S]*?)\n\}/
 };
@@ -48,6 +50,9 @@ function extractMethods(content, interfaceName) {
         if (line.startsWith('/**')) {
             inComment = true;
             currentComment = [line];
+            if (line.endsWith('*/')) {
+                inComment = false;
+            }
             continue;
         }
         if (inComment) {
@@ -59,6 +64,29 @@ function extractMethods(content, interfaceName) {
         }
 
         if (!line || line.startsWith('//')) continue;
+
+        // Multi-line method: forEach( / map<R>( / filter( — first line has no `name:` before `(`
+        const multiMethod = line.match(/^([a-zA-Z_]\w*)(<[^>]+>)?\(\s*$/);
+        if (multiMethod && !currentSignature) {
+            const methodName = multiMethod[1];
+            currentSignature = line;
+            let parenDepth =
+                (line.match(/\(/g) || []).length - (line.match(/\)/g) || []).length;
+            while (parenDepth > 0 && i + 1 < lines.length) {
+                i++;
+                const cont = lines[i].trim();
+                currentSignature += '\n  ' + cont;
+                parenDepth += (cont.match(/\(/g) || []).length - (cont.match(/\)/g) || []).length;
+            }
+            methods.push({
+                name: methodName,
+                signature: currentSignature,
+                comment: currentComment.join('\n')
+            });
+            currentSignature = '';
+            currentComment = [];
+            continue;
+        }
 
         if (line.includes(':') && !currentSignature) {
             currentSignature = line;

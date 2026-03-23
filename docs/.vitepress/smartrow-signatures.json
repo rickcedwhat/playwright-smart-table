@@ -1,5 +1,20 @@
 [
   {
+    "name": "rowIndex?",
+    "signature": "rowIndex?: number",
+    "comment": "/** Optional row index (0-based) if known */"
+  },
+  {
+    "name": "tablePageIndex?",
+    "signature": "tablePageIndex?: number",
+    "comment": "/** Optional page index this row was found on (0-based) */"
+  },
+  {
+    "name": "table",
+    "signature": "table: TableResult<T>",
+    "comment": "/** Reference to the parent TableResult */"
+  },
+  {
     "name": "getCell",
     "signature": "getCell(column: string): Locator",
     "comment": "/**\n* Get a cell locator by column name.\n* @param column - Column name (case-sensitive)\n* @returns Locator for the cell\n* @example\n* const emailCell = row.getCell('Email');\n* await expect(emailCell).toHaveText('john@example.com');\n*/"
