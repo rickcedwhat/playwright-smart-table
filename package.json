@@ -12,8 +12,8 @@
   "bugs": {
     "url": "https://github.com/rickcedwhat/playwright-smart-table/issues"
   },
-  "main": "dist/src/index.js",
-  "types": "dist/src/index.d.ts",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "files": [
     "dist"
   ],
@@ -26,7 +26,8 @@
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
     "docs:verify-links": "node scripts/verify-vitepress-links.mjs",
-    "build": "npm run generate-types && npm run generate-config-types && npm run generate-docs && npm run generate-all-api-docs && npm run update-all-api-signatures && tsc",
+    "embed-version": "node scripts/embed-version.mjs",
+    "build": "npm run embed-version && npm run generate-types && npm run generate-config-types && npm run generate-docs && npm run generate-all-api-docs && npm run update-all-api-signatures && tsc",
     "prepublishOnly": "npm run build",
     "clean-port": "lsof -ti:3000 | xargs kill -9 || true",
     "pretest": "npm run clean-port",
@@ -44,8 +45,8 @@
   },
   "exports": {
     ".": {
-      "types": "./dist/src/index.d.ts",
-      "default": "./dist/src/index.js"
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
     },
     "./presets": {
       "types": "./dist/presets/index.d.ts",

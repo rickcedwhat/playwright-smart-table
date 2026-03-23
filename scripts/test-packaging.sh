@@ -27,8 +27,9 @@ npm install typescript @types/node @playwright/test --save-dev
 echo "📥 Installing tarball..."
 npm install ../$TARBALL
 
-# 6. Create smoke test file + local tsconfig (do not pass .ts files on the CLI: TS 5.8+ errors
-#    with TS5112 when a tsconfig.json exists nearby, e.g. the repo root ../tsconfig.json)
+# 6. Smoke test + local tsconfig. TypeScript 5.8+ TS5112: if you pass .ts files on the tsc CLI while
+#    any tsconfig.json is discoverable (e.g. repo ../tsconfig.json), tsc errors. Use -p and a tiny
+#    project in this folder instead — do not "fix" that by repointing npm at the wrong dist path.
 echo "📝 Creating smoke test..."
 cat <<EOF > smoke-test.ts
 import { useTable } from '@rickcedwhat/playwright-smart-table';
