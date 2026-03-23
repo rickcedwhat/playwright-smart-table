@@ -53,6 +53,9 @@ jobs:
       - name: Build Documentation
         run: npm run docs:build
 
+      - name: Verify VitePress nav/sidebar links
+        run: npm run docs:verify-links
+
       - name: Check for TODO/FIXME
         run: |
           if grep -r "TODO\|FIXME" src/ --exclude-dir=node_modules; then
