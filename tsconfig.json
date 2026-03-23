@@ -4,11 +4,12 @@
     "module": "commonjs",
     "declaration": true,            /* Generates .d.ts files so users get Intellisense */
     "outDir": "./dist",             /* Where the compiled JS goes */
+    "rootDir": "./src",             /* Flat dist/index.js (not dist/src/...) */
     "strict": true,                 /* Enable strict type checking */
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src/**/*", "scripts"],
+  "include": ["src/**/*"],
   "exclude": ["node_modules", "**/*.spec.ts"]
 }

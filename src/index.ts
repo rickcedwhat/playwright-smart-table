@@ -1,3 +1,5 @@
+export { PLAYWRIGHT_SMART_TABLE_VERSION } from './packageVersion';
+
 export { useTable } from './useTable';
 
 export type {
