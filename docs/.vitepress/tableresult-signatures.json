@@ -27,11 +27,11 @@
   {
     "name": "getRow",
     "signature": "getRow: (\n  filters: Record<string, FilterValue>,\n  options?: { exact?: boolean }",
-    "comment": "/**\n* Finds a row by filters on the current page only. Returns immediately (sync).\n* Throws error if table is not initialized.\n*/"
+    "comment": "/**\n* Finds a row by filters on the current page only. Returns immediately (sync).\n* Throws error if table is not initialized.\n* @note The returned SmartRow may have `rowIndex` as 0 when the match is not the first row.\n* Use getRowByIndex(index) when you need a known index (e.g. for bringIntoView()).\n*/"
   },
   {
     "name": "getRowByIndex",
-    "signature": "getRowByIndex(index: number): SmartRow",
+    "signature": "getRowByIndex: (\n  index: number\n  ) => SmartRow",
     "comment": "/**\n* Gets a row by 0-based index on the current page.\n* Throws error if table is not initialized.\n* @param index 0-based row index\n*/"
   },
   {
@@ -42,22 +42,7 @@
   {
     "name": "findRows",
     "signature": "findRows: (\n  filters?: Record<string, FilterValue>,\n  options?: { exact?: boolean, maxPages?: number }",
-    "comment": "/**\n* ASYNC: Searches for all matching rows across pages using pagination.\n* Auto-initializes the table if not already initialized.\n* @param filters - The filter criteria to match\n* @param options - Search options including exact match and max pages\n*/"
-  },
-  {
-    "name": "forEach",
-    "signature": "forEach(\n  callback: (ctx: RowIterationContext<T>) => void | Promise<void>,\n  options?: RowIterationOptions\n): Promise<void>",
-    "comment": "/**\n* Iterate every row across all pages. Call stop() in callback to end early.\n* @param callback - Function receiving { row, rowIndex, stop }\n* @param options - maxPages, parallel, dedupe, useBulkPagination\n*/"
-  },
-  {
-    "name": "map",
-    "signature": "map<R>(\n  callback: (ctx: RowIterationContext<T>) => R | Promise<R>,\n  options?: RowIterationOptions\n): Promise<R[]>",
-    "comment": "/**\n* Transform every row across all pages into a value. Returns flat array.\n* @param callback - Function receiving { row, rowIndex, stop }\n* @param options - maxPages, parallel, dedupe, useBulkPagination\n*/"
-  },
-  {
-    "name": "filter",
-    "signature": "filter(\n  predicate: (ctx: RowIterationContext<T>) => boolean | Promise<boolean>,\n  options?: RowIterationOptions\n): Promise<SmartRowArray<T>>",
-    "comment": "/**\n* Filter rows across all pages by async predicate. Returns SmartRowArray.\n* @param predicate - Function receiving { row, rowIndex, stop }\n* @param options - maxPages, parallel, dedupe, useBulkPagination\n*/"
+    "comment": "/**\n* ASYNC: Searches for all matching rows across pages using pagination.\n* Auto-initializes the table if not already initialized.\n* @param filters - The filter criteria to match (omit or pass {} for all rows)\n* @param options - Search options including exact match and max pages\n*/"
   },
   {
     "name": "scrollToColumn",
@@ -75,13 +60,33 @@
     "comment": "/**\n* Revalidates the table's structure (headers, columns) without resetting pagination or state.\n* Useful when columns change visibility or order dynamically.\n*/"
   },
   {
+    "name": "forEach",
+    "signature": "forEach(\n  callback: (ctx: RowIterationContext<T>) => void | Promise<void>,\n  options?: RowIterationOptions\n  ): Promise<void>",
+    "comment": "/**\n* Iterates every row across all pages, calling the callback for side effects.\n* Execution is sequential by default (safe for interactions like clicking/filling).\n* Call `stop()` in the callback to end iteration early.\n*\n* @param callback - Function receiving { row, rowIndex, stop }\n* @param options - maxPages, concurrency, dedupe, useBulkPagination (`parallel` is deprecated; use `concurrency`)\n*\n* @example\n* await table.forEach(async ({ row, stop }) => {\n*   if (await row.getCell('Status').innerText() === 'Done') stop();\n*   await row.getCell('Checkbox').click();\n* });\n*/"
+  },
+  {
+    "name": "map",
+    "signature": "map<R>(\n  callback: (ctx: RowIterationContext<T>) => R | Promise<R>,\n  options?: RowIterationOptions\n  ): Promise<R[]>",
+    "comment": "/**\n* Transforms every row across all pages into a value. Returns a flat array.\n* Execution is parallel within each page by default (safe for reads).\n* Call `stop()` to halt after the current page finishes.\n*\n* > **⚠️ UI Interactions:** `map` defaults to `concurrency: 'parallel'`. If your callback opens popovers,\n* > fills inputs, or otherwise mutates UI state, pass `concurrency: 'sequential'` (or `'synchronized'`\n* > when navigation must stay lock-step) to avoid overlapping interactions.\n*\n* @param callback - Function receiving { row, rowIndex, stop }\n* @param options - maxPages, concurrency, dedupe, useBulkPagination (`parallel` is deprecated; use `concurrency`)\n*\n* @example\n* // Data extraction — parallel is safe\n* const emails = await table.map(({ row }) => row.getCell('Email').innerText());\n*\n* @example\n* // UI interactions — use sequential (or synchronized) concurrency\n* const assignees = await table.map(async ({ row }) => {\n*   await row.getCell('Assignee').locator('button').click();\n*   const name = await page.locator('.popover .name').innerText();\n*   await page.keyboard.press('Escape');\n*   return name;\n* }, { concurrency: 'sequential' });\n*/"
+  },
+  {
+    "name": "filter",
+    "signature": "filter(\n  predicate: (ctx: RowIterationContext<T>) => boolean | Promise<boolean>,\n  options?: RowIterationOptions\n  ): Promise<SmartRowArray<T>>",
+    "comment": "/**\n* Filters rows across all pages by an async predicate. Returns a SmartRowArray.\n* Rows are returned as-is — call `bringIntoView()` on each if needed.\n* Execution is sequential by default.\n*\n* @param predicate - Function receiving { row, rowIndex, stop }\n* @param options - maxPages, concurrency, dedupe, useBulkPagination (`parallel` is deprecated; use `concurrency`)\n*\n* @example\n* const active = await table.filter(async ({ row }) =>\n*   await row.getCell('Status').innerText() === 'Active'\n* );\n*/"
+  },
+  {
     "name": "sorting",
     "signature": "sorting: {\n  apply(columnName: string, direction: 'asc' | 'desc'): Promise<void>;\n  getState(columnName: string): Promise<'asc' | 'desc' | 'none'>;\n  }",
     "comment": "/**\n* Gets the current sort state of a column using the configured sorting strategy.\n* @param columnName The name of the column to check.\n* @returns A promise that resolves to 'asc', 'desc', or 'none'.\n*/"
   },
   {
     "name": "generateConfig",
-    "signature": "generateConfig(): Promise<void>",
-    "comment": "/**\n* Generate an AI-friendly configuration prompt for debugging.\n* Outputs table HTML and TypeScript definitions. Throws Error containing the prompt.\n*/"
+    "signature": "generateConfig: () => Promise<void>",
+    "comment": "/**\n* Generate an AI-friendly configuration prompt for debugging.\n* Outputs table HTML and TypeScript definitions to help AI assistants generate config.\n* Automatically throws an Error containing the prompt.\n*/"
+  },
+  {
+    "name": "generateConfigPrompt",
+    "signature": "generateConfigPrompt: () => Promise<void>",
+    "comment": "/**\n* @deprecated Use `generateConfig()` instead. Will be removed in v7.0.0.\n*/"
   }
 ]

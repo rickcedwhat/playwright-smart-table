@@ -79,16 +79,16 @@ const allActive = await table.findRows({ Status: 'Active' });
 ### Iterating Across Pages
 
 ```typescript
-// forEach — sequential, safe for interactions (parallel: false default)
+// forEach — sequential by default (concurrency: 'sequential') — safe for interactions
 await table.forEach(async ({ row, rowIndex, stop }) => {
   if (await row.getCell('Status').innerText() === 'Done') stop();
   await row.getCell('Checkbox').click();
 });
 
-// map — parallel within page, safe for reads (parallel: true default)
+// map — parallel by default (concurrency: 'parallel') — safe for reads
 const emails = await table.map(({ row }) => row.getCell('Email').innerText());
 
-// filter — async predicate across all pages, returns SmartRowArray
+// filter — sequential by default; returns SmartRowArray
 const active = await table.filter(async ({ row }) =>
   await row.getCell('Status').innerText() === 'Active'
 );
@@ -99,10 +99,14 @@ for await (const { row, rowIndex } of table) {
 }
 ```
 
+Set a default for all iteration calls with `useTable(..., { concurrency: 'sequential' })`, or per call: `table.map(fn, { concurrency: 'synchronized' })`. Modes: **`parallel`** (full parallelism), **`sequential`** (strictly one row at a time), **`synchronized`** (parallel navigation with serialized callbacks — useful for virtualized grids).
+
 When your pagination strategy supports bulk jumps (`goNextBulk`), pass `{ useBulkPagination: true }` to `map`/`forEach`/`filter` to advance by multiple pages at once.
 
-> **`map` + UI interactions:** `map` defaults to `parallel: true`. If your callback opens popovers,
-> fills inputs, or otherwise mutates UI state, pass `{ parallel: false }` to avoid overlapping interactions.
+> **`map` + UI interactions:** `map` defaults to `concurrency: 'parallel'`. If your callback opens popovers,
+> fills inputs, or otherwise mutates UI state, pass `{ concurrency: 'sequential' }` (or `'synchronized'` if you need lock-step navigation with serialized work).
+
+The legacy `{ parallel: true | false }` option still works but is deprecated; prefer `concurrency`.
 
 ### `filter` vs `findRows`
 

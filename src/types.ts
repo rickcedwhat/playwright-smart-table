@@ -541,6 +541,9 @@ export interface TableResult<T = any> extends AsyncIterable<{ row: SmartRow<T>; 
    * Execution is sequential by default (safe for interactions like clicking/filling).
    * Call `stop()` in the callback to end iteration early.
    *
+   * @param callback - Function receiving { row, rowIndex, stop }
+   * @param options - maxPages, concurrency, dedupe, useBulkPagination (`parallel` is deprecated; use `concurrency`)
+   *
    * @example
    * await table.forEach(async ({ row, stop }) => {
    *   if (await row.getCell('Status').innerText() === 'Done') stop();
@@ -557,22 +560,25 @@ export interface TableResult<T = any> extends AsyncIterable<{ row: SmartRow<T>; 
    * Execution is parallel within each page by default (safe for reads).
    * Call `stop()` to halt after the current page finishes.
    *
-   * > **⚠️ UI Interactions:** `map` defaults to `parallel: true`. If your callback opens popovers,
-   * > fills inputs, or otherwise mutates UI state, pass `{ parallel: false }` to avoid concurrent
-   * > interactions interfering with each other.
+   * > **⚠️ UI Interactions:** `map` defaults to `concurrency: 'parallel'`. If your callback opens popovers,
+   * > fills inputs, or otherwise mutates UI state, pass `concurrency: 'sequential'` (or `'synchronized'`
+   * > when navigation must stay lock-step) to avoid overlapping interactions.
+   *
+   * @param callback - Function receiving { row, rowIndex, stop }
+   * @param options - maxPages, concurrency, dedupe, useBulkPagination (`parallel` is deprecated; use `concurrency`)
    *
    * @example
    * // Data extraction — parallel is safe
    * const emails = await table.map(({ row }) => row.getCell('Email').innerText());
    *
    * @example
-   * // UI interactions — must use parallel: false
+   * // UI interactions — use sequential (or synchronized) concurrency
    * const assignees = await table.map(async ({ row }) => {
    *   await row.getCell('Assignee').locator('button').click();
    *   const name = await page.locator('.popover .name').innerText();
    *   await page.keyboard.press('Escape');
    *   return name;
-   * }, { parallel: false });
+   * }, { concurrency: 'sequential' });
    */
   map<R>(
     callback: (ctx: RowIterationContext<T>) => R | Promise<R>,
@@ -583,6 +589,9 @@ export interface TableResult<T = any> extends AsyncIterable<{ row: SmartRow<T>; 
    * Filters rows across all pages by an async predicate. Returns a SmartRowArray.
    * Rows are returned as-is — call `bringIntoView()` on each if needed.
    * Execution is sequential by default.
+   *
+   * @param predicate - Function receiving { row, rowIndex, stop }
+   * @param options - maxPages, concurrency, dedupe, useBulkPagination (`parallel` is deprecated; use `concurrency`)
    *
    * @example
    * const active = await table.filter(async ({ row }) =>
