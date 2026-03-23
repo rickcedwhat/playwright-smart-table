@@ -8,7 +8,7 @@ This workflow performs an in-depth review of all documentation files in the `pla
 
 ### Step 1: Understand Current Capabilities
 
-Read the following core files to establish the "ground truth" of the v6.7.0+ library:
+Read the following core files to establish the "ground truth" of the **current** library (v6.8+; check `package.json`):
 - `src/types.ts`
 - `src/useTable.ts`
 - `CHANGELOG.md`
@@ -16,9 +16,11 @@ Read the following core files to establish the "ground truth" of the v6.7.0+ lib
 
 Pay special attention to recent architectural shifts:
 - The removal of `iterateThroughTable`, `dataMapper`, `getColumnValues`, and `clickNext`.
-- The introduction of `table.map()`, `table.forEach()`, and `table.filter()`.
+- The introduction of `table.map()`, `table.forEach()`, and `table.filter()` (plus async iteration).
+- **`concurrency`** on `TableConfig` and iteration options: `'parallel' | 'sequential' | 'synchronized'` (legacy `parallel` boolean is deprecated).
 - The unification of custom cell handling into `columnOverrides.read` and `.write`.
 - The simplification of `SortingStrategy` and how standard pagination handles `nextBulk/previousBulk`.
+- **VitePress**: `docs/.vitepress/config.mts` sidebar/nav must match real pages and heading anchors under `docs/` (run `npm run docs:build` and spot-check `#` links).
 
 ### Step 2: Audit `README.md`
 
@@ -45,7 +47,7 @@ Scan the public signatures in `src/types.ts` and `src/useTable.ts`.
 
 ### Step 5: Produce the Unified Documentation Report
 
-Once all files are reviewed, DO NOT MAKE CHANGES YET. Instead, output a unified markdown report structured like this:
+Output a unified markdown report structured like this (use this as the audit deliverable):
 
 ```markdown
 # Documentation Audit Report
@@ -72,4 +74,6 @@ Once all files are reviewed, DO NOT MAKE CHANGES YET. Instead, output a unified 
 Summary of the exact Markdown/Code edits required to bring docs up to 100% accuracy.
 ```
 
-Present this unified report to the user and ask for completely explicit permission on which sections they want you to automatically fix. Wait for their response.
+**When the user only asks for an audit:** present the report and wait for explicit permission before editing.
+
+**When the user asks to fix docs** (e.g. sidebar, stale anchors, missing pages): implement the agreed edits in `docs/`, `README.md`, `ROADMAP.md`, and `src` JSDoc as appropriate, then run `npm run docs:build` to verify the site builds.
