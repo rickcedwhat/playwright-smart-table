@@ -429,12 +429,6 @@ export type RowIterationOptions = {
   /** Maximum number of pages to iterate. Defaults to config.maxPages. */
   maxPages?: number;
   /**
-   * @deprecated Use 'concurrency' mode instead.
-   * - parallel: true -> concurrency: 'parallel'
-   * - parallel: false -> concurrency: 'sequential'
-   */
-  parallel?: boolean;
-  /**
    * Concurrency strategy for iteration.
    * - 'parallel': Full parallel execution of both navigation and actions.
    * - 'synchronized': Parallel navigation (lock-step) with serial actions.
@@ -542,7 +536,7 @@ export interface TableResult<T = any> extends AsyncIterable<{ row: SmartRow<T>; 
    * Call \`stop()\` in the callback to end iteration early.
    *
    * @param callback - Function receiving { row, rowIndex, stop }
-   * @param options - maxPages, concurrency, dedupe, useBulkPagination (\`parallel\` is deprecated; use \`concurrency\`)
+   * @param options - maxPages, concurrency, dedupe, useBulkPagination
    *
    * @example
    * await table.forEach(async ({ row, stop }) => {
@@ -565,7 +559,7 @@ export interface TableResult<T = any> extends AsyncIterable<{ row: SmartRow<T>; 
    * > when navigation must stay lock-step) to avoid overlapping interactions.
    *
    * @param callback - Function receiving { row, rowIndex, stop }
-   * @param options - maxPages, concurrency, dedupe, useBulkPagination (\`parallel\` is deprecated; use \`concurrency\`)
+   * @param options - maxPages, concurrency, dedupe, useBulkPagination
    *
    * @example
    * // Data extraction — parallel is safe
@@ -591,7 +585,7 @@ export interface TableResult<T = any> extends AsyncIterable<{ row: SmartRow<T>; 
    * Execution is sequential by default.
    *
    * @param predicate - Function receiving { row, rowIndex, stop }
-   * @param options - maxPages, concurrency, dedupe, useBulkPagination (\`parallel\` is deprecated; use \`concurrency\`)
+   * @param options - maxPages, concurrency, dedupe, useBulkPagination
    *
    * @example
    * const active = await table.filter(async ({ row }) =>

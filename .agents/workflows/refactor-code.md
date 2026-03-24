@@ -25,7 +25,7 @@ Read the provided code snippet and identify any deprecated or older patterns. Sp
 
 Based on what the snippet is trying to achieve, determine the cleanest modern approach:
 - If the snippet is collecting data into an array (`const data = []; await table.iterateThroughTable... data.push()`), use **`const data = await table.map()`**.
-- If the snippet is performing a side-effect (clicking a button, asserting visibility) on every row, use **`await table.forEach({ parallel: false })`**.
+- If the snippet is performing a side-effect (clicking a button, asserting visibility) on every row, rely on **`forEach`**’s default sequential mode, or pass **`{ concurrency: 'sequential' }`** to **`map`** / **`filter`** when needed.
 - If the snippet is looking for multiple specific rows to return them, use **`const rows = await table.filter()`**.
 - If the snippet relies on `batchSize` limits during iteration, translate that to the `maxPages` option in the new iterators to bound the search.
 - If the snippet provides custom input logic for `smartFill` or extraction via `dataMapper`, roll that into `config.columnOverrides`.

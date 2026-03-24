@@ -92,7 +92,7 @@ test.describe('integration: virtualized horizontal + dedupe', () => {
     return table;
   }
 
-  test('map sequential (parallel:false) collects all rows with dedupe by ID', async ({ page }) => {
+  test('map sequential concurrency collects all rows with dedupe by ID', async ({ page }) => {
     test.setTimeout(120000);
     await page.setContent(makeWideTableHtml(10, 50));
     const table = await makeTable(page);
@@ -111,7 +111,7 @@ test.describe('integration: virtualized horizontal + dedupe', () => {
         dedupe: async (row) => {
           return (await row.getCell('ID').innerText()).trim();
         },
-        parallel: false,
+        concurrency: 'sequential',
         maxPages: 20
       }
     );
@@ -123,7 +123,7 @@ test.describe('integration: virtualized horizontal + dedupe', () => {
   });
 
 
-  test('map parallel:true also collects all rows (may be slower)', async ({ page }) => {
+  test('map concurrency parallel also collects all rows (may be slower)', async ({ page }) => {
     test.setTimeout(120000);
     await page.setContent(makeWideTableHtml(10, 50));
     const table = await makeTable(page);
@@ -141,7 +141,7 @@ test.describe('integration: virtualized horizontal + dedupe', () => {
         dedupe: async (row) => {
           return (await row.getCell('ID').innerText()).trim();
         },
-        parallel: true,
+        concurrency: 'parallel',
         maxPages: 20
       }
     );

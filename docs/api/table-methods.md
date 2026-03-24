@@ -255,7 +255,7 @@ forEach(
 ### Parameters
 
 - `callback` - Function receiving { row, rowIndex, stop }
-- `options` - maxPages, concurrency, dedupe, useBulkPagination (`parallel` is deprecated; use `concurrency`)
+- `options` - maxPages, concurrency, dedupe, useBulkPagination
 
 <!-- /api-signature: forEach -->
 

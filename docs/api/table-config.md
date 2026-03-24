@@ -167,8 +167,6 @@ Default concurrency for `forEach`, `map`, and `filter`. Per-call options overrid
 - **`sequential`** — one row at a time (default for `forEach` / `filter`).
 - **`synchronized`** — parallel lock-step navigation with serialized callbacks (for virtualized grids where overlapping navigation would desync the viewport).
 
-The legacy `parallel: true | false` option on iteration is deprecated; prefer `concurrency`.
-
 ---
 
 ### autoScroll

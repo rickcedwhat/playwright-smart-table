@@ -47,10 +47,8 @@ export async function runMap<T, R>(
   const dedupeStrategy = options.dedupe ?? env.config.strategies.dedupe;
   const dedupeKeys = dedupeStrategy ? new Set<string | number>() : null;
   const defaultMode = label === 'map' ? 'parallel' : 'sequential';
-  const concurrency = options.concurrency || 
-                     (options.parallel === true ? 'parallel' : 
-                      options.parallel === false ? 'sequential' : 
-                      env.config.concurrency || defaultMode);
+  const concurrency =
+    options.concurrency ?? env.config.concurrency ?? defaultMode;
   const useBarrier = concurrency !== 'sequential';
   // Mutex must not pair with the navigation barrier: synchronized mode needs every row
   // to enter barrier.sync concurrently; serializing callbacks here deadlocks (first row waits

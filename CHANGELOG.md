@@ -1,5 +1,13 @@
 # Changelog
 
+## [6.9.0] - 2026-03-24
+
+### Breaking
+- **`RowIterationOptions.parallel` removed** — use `concurrency: 'parallel' | 'sequential' | 'synchronized'` only. Replace `{ parallel: true }` with `{ concurrency: 'parallel' }` and `{ parallel: false }` with `{ concurrency: 'sequential' }`.
+
+### Changed
+- **`runMap`** resolves concurrency with `options.concurrency ?? config.concurrency ?? defaultMode` (no boolean `parallel` branch).
+
 ## [6.8.2] - 2026-03-24
 
 ### Added

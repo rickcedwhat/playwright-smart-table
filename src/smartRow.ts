@@ -31,7 +31,12 @@ const _navigateToCell = async (params: {
     barrier?: NavigationBarrier;
 }): Promise<Locator | null> => {
     const { config, rootLocator, page, resolve, column, index, rowLocator, rowIndex, barrier } = params;
-    logDebug(config, 'verbose', `_navigateToCell: navigating to column "${column}" (index ${index})`);
+    const rowLabel = typeof rowIndex === 'number' ? `row ${rowIndex}` : 'row ?';
+    logDebug(
+        config,
+        'verbose',
+        `_navigateToCell: navigating to column "${column}" (colIndex ${index}), ${rowLabel}`,
+    );
 
     // Get active cell if strategy is available
     let activeCell = null;
