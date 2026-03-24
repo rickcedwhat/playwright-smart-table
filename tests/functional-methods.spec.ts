@@ -121,15 +121,15 @@ test.describe('forEach', () => {
         expect(count).toBe(2); // only page 1 (2 rows)
     });
 
-    test('parallel: true runs within-page concurrently', async ({ page }) => {
+    test('concurrency: parallel runs within-page concurrently', async ({ page }) => {
         await page.setContent(TABLE_HTML);
         const table = makeTable(page);
         const ids: string[] = [];
 
-        // parallel=true should still produce all rows (just concurrent within each page)
+        // parallel mode should still produce all rows (concurrent within each page)
         await table.forEach(async ({ row }) => {
             ids.push(await row.getCell('ID').innerText());
-        }, { parallel: true });
+        }, { concurrency: 'parallel' });
 
         expect(ids.sort()).toEqual(['1', '2', '3', '4', '5', '6']);
     });
@@ -168,11 +168,13 @@ test.describe('map', () => {
         expect(names).toEqual(['Alice', 'Bob']);
     });
 
-    test('parallel: false produces ordered results', async ({ page }) => {
+    test('concurrency: sequential produces ordered results', async ({ page }) => {
         await page.setContent(TABLE_HTML);
         const table = makeTable(page);
 
-        const names = await table.map(({ row }) => row.getCell('Name').innerText(), { parallel: false });
+        const names = await table.map(({ row }) => row.getCell('Name').innerText(), {
+          concurrency: 'sequential',
+        });
 
         expect(names).toEqual(['Alice', 'Bob', 'Carol', 'Dave', 'Eve', 'Frank']);
     });

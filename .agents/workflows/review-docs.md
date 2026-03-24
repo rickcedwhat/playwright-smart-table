@@ -17,7 +17,7 @@ Read the following core files to establish the "ground truth" of the **current**
 Pay special attention to recent architectural shifts:
 - The removal of `iterateThroughTable`, `dataMapper`, `getColumnValues`, and `clickNext`.
 - The introduction of `table.map()`, `table.forEach()`, and `table.filter()` (plus async iteration).
-- **`concurrency`** on `TableConfig` and iteration options: `'parallel' | 'sequential' | 'synchronized'` (legacy `parallel` boolean is deprecated).
+- **`concurrency`** on `TableConfig` and iteration options: `'parallel' | 'sequential' | 'synchronized'`.
 - The unification of custom cell handling into `columnOverrides.read` and `.write`.
 - The simplification of `SortingStrategy` and how standard pagination handles `nextBulk/previousBulk`.
 - **VitePress**: `docs/.vitepress/config.mts` sidebar/nav must match real pages and heading anchors under `docs/` (run `npm run docs:build` and spot-check `#` links).

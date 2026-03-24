@@ -14,7 +14,7 @@
 - [x] **Array-like Iteration Methods (`map`, `forEach`, `filter`)**:
     - **Purpose**: Introduce familiar, high-level array methods on the `TableResult` interface with a public async iterator as the engine.
     - **Callback**: `{ row, rowIndex, stop }` — call `stop()` to end iteration early.
-    - **Options**: `{ concurrency?: 'parallel' | 'sequential' | 'synchronized', maxPages?: number, dedupe?: DedupeStrategy }` (legacy `parallel?: boolean` deprecated).
+    - **Options**: `{ concurrency?: 'parallel' | 'sequential' | 'synchronized', maxPages?: number, dedupe?: DedupeStrategy }`.
       - `forEach` and `filter`: default `concurrency: 'sequential'` (interaction ordering matters).
       - `map`: default `concurrency: 'parallel'` (reads are safely concurrent within a page).
       - `synchronized`: lock-step navigation with serialized callbacks (virtualized grids).

@@ -106,8 +106,6 @@ When your pagination strategy supports bulk jumps (`goNextBulk`), pass `{ useBul
 > **`map` + UI interactions:** `map` defaults to `concurrency: 'parallel'`. If your callback opens popovers,
 > fills inputs, or otherwise mutates UI state, pass `{ concurrency: 'sequential' }` (or `'synchronized'` if you need lock-step navigation with serialized work).
 
-The legacy `{ parallel: true | false }` option still works but is deprecated; prefer `concurrency`.
-
 ### `filter` vs `findRows`
 
 | Use case | Best tool |
