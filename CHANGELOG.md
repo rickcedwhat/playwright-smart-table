@@ -1,5 +1,10 @@
 # Changelog
 
+## [6.8.1] - 2026-03-23
+
+### Changed
+- Patch release only: `package.json` / embedded `PLAYWRIGHT_SMART_TABLE_VERSION` bumped so consumers can pin and verify the published build after the 6.8.0 packaging fixes.
+
 ## [6.8.0] - 2026-03-22
 
 ### Added
