@@ -1,6 +1,6 @@
 {
   "name": "@rickcedwhat/playwright-smart-table",
-  "version": "6.8.1",
+  "version": "6.8.2",
   "description": "Smart, column-aware table interactions for Playwright",
   "author": "Cedrick Catalan",
   "license": "MIT",
@@ -46,6 +46,12 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./types": {
+      "types": "./dist/types.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
       "default": "./dist/index.js"
     },
     "./presets": {
