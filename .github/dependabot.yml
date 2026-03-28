@@ -9,6 +9,11 @@ updates:
       - "dependencies"
       - "auto-approve"
     rebase-strategy: "auto"
+    groups:
+      vitest:
+        patterns:
+          - "vitest"
+          - "@vitest/*"
 
   - package-ecosystem: "github-actions"
     directory: "/"
