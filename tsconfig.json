@@ -1,7 +1,9 @@
 {
   "compilerOptions": {
-    "target": "es2016",
+    "target": "es2017",
+    "lib": ["es2017", "dom"],
     "module": "commonjs",
+    "types": ["node"],
     "declaration": true,            /* Generates .d.ts files so users get Intellisense */
     "outDir": "./dist",             /* Where the compiled JS goes */
     "rootDir": "./src",             /* Flat dist/index.js (not dist/src/...) */
