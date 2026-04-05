@@ -1,3 +1,4 @@
+# CODEOWNERS + Dependabot: see .github/DEPENDABOT.md (ruleset Dependabot bypass).
 version: 2
 updates:
   - package-ecosystem: "npm"
