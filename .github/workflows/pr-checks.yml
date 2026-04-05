@@ -19,9 +19,6 @@ jobs:
           node-version: '22'
           cache: 'npm'
 
-      - name: Update npm
-        run: npm install -g npm@latest
-
       - name: Install Dependencies
         run: npm install
 
