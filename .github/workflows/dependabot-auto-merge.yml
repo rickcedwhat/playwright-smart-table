@@ -1,3 +1,5 @@
+# Dependabot PRs: enable auto-merge (squash) for non-major bumps.
+# CODEOWNERS / review bypass: ruleset Dependabot bypass — see .github/DEPENDABOT.md
 name: "Auto-merge Dependabot non-major updates"
 
 on:
