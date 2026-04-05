@@ -1,6 +1,20 @@
 import { test, expect } from '@playwright/test';
 import { useTable } from '../src/index';
 
+/** Shorter delays in CI so debug.slow tests stay valid but do not dominate runtime. */
+const isCI = !!process.env.CI;
+const slow = {
+    uniformMs: isCI ? 80 : 500,
+    granularDefaultMs: isCI ? 120 : 800,
+    granularFindRowMs: isCI ? 25 : 100,
+    findRowOnlyMs: isCI ? 100 : 600,
+    combinedUniformMs: isCI ? 40 : 200,
+};
+
+function minElapsedForDelay(ms: number): number {
+    return Math.max(15, Math.floor(ms * 0.85));
+}
+
 test.describe('Debug Mode', () => {
     test('No debug mode works normally (performance check)', async ({ page }) => {
         await page.goto('https://datatables.net/examples/data_sources/dom');
@@ -31,17 +45,16 @@ test.describe('Debug Mode', () => {
         const table = useTable(page.locator('#example'), {
             headerSelector: 'thead th',
             debug: {
-                slow: 500,  // 500ms delay
+                slow: slow.uniformMs,
                 logLevel: 'info'
             }
         });
 
-        // Init should take at least 500ms due to delay
         const start = Date.now();
         await table.init();
         const elapsed = Date.now() - start;
 
-        expect(elapsed).toBeGreaterThanOrEqual(450); // Small margin for error
+        expect(elapsed).toBeGreaterThanOrEqual(minElapsedForDelay(slow.uniformMs));
     });
 
     test('Granular delays work', async ({ page }) => {
@@ -52,19 +65,18 @@ test.describe('Debug Mode', () => {
             headerSelector: 'thead th',
             debug: {
                 slow: {
-                    default: 800,
-                    findRow: 100
+                    default: slow.granularDefaultMs,
+                    findRow: slow.granularFindRowMs
                 },
                 logLevel: 'info'
             }
         });
 
-        // Init should use default delay (800ms)
         const start = Date.now();
         await table.init();
         const elapsed = Date.now() - start;
 
-        expect(elapsed).toBeGreaterThanOrEqual(750);
+        expect(elapsed).toBeGreaterThanOrEqual(minElapsedForDelay(slow.granularDefaultMs));
     });
 
     test('FindRow with delays', async ({ page }) => {
@@ -75,7 +87,7 @@ test.describe('Debug Mode', () => {
             headerSelector: 'thead th',
             debug: {
                 slow: {
-                    findRow: 600
+                    findRow: slow.findRowOnlyMs
                 },
                 logLevel: 'info'
             }
@@ -83,12 +95,11 @@ test.describe('Debug Mode', () => {
 
         await table.init();
 
-        // FindRow should take at least 600ms
         const start = Date.now();
         await table.findRow({ Name: 'Airi Satou' });
         const elapsed = Date.now() - start;
 
-        expect(elapsed).toBeGreaterThanOrEqual(550);
+        expect(elapsed).toBeGreaterThanOrEqual(minElapsedForDelay(slow.findRowOnlyMs));
     });
 
     test('Combined debug features', async ({ page }) => {
@@ -98,8 +109,8 @@ test.describe('Debug Mode', () => {
         const table = useTable(page.locator('#example'), {
             headerSelector: 'thead th',
             debug: {
-                slow: 200,                   // 200ms delays
-                logLevel: 'info'             // Info-level logging
+                slow: slow.combinedUniformMs,
+                logLevel: 'info'
             }
         });
 
