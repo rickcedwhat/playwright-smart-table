@@ -39,7 +39,6 @@
     "pretest:e2e": "npm run clean-port",
     "posttest:e2e": "npm run clean-port",
     "test:e2e": "npx playwright test",
-    "test:braintrust": "npx playwright test --config tests-external/braintrust/playwright.config.ts --project=braintrust 2>&1 | tee \"tests-external/braintrust/logs/run-$(date +%Y%m%d-%H%M%S).log\"",
     "test:playground": "npx playwright test --config tests-external/playground/playwright.config.ts 2>&1 | tee \"tests-external/playground/logs/run-$(date +%Y%m%d-%H%M%S).log\"",
     "dev:playground": "cd playground && npm run dev",
     "dev:mui": "cd tests/apps/mui-datagrid && npm run dev",
