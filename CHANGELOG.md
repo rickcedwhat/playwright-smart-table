@@ -1,5 +1,17 @@
 # Changelog
 
+## [6.10.0] - 2026-04-26
+
+### Added
+- **Viewport strategies for 2D virtualized grids** — `TableStrategies.viewport` can report visible row/column ranges and jump directly to target rows or columns, helping `SmartRow.getCell()` recover when horizontal scrolling knocks the target row out of the DOM.
+- **`Strategies.Viewport.dataAttribute()`** — reusable viewport strategy for grids that expose row and column indexes via DOM attributes.
+- **MUI DataGrid viewport support** — the MUI preset now supplies viewport range and scroll helpers for row and column virtualization.
+- **2D virtualized playground page** for exercising row and column virtualization together.
+
+### Changed
+- `GetCellLocatorFn` now receives the table root and final config so strategies can re-query safely when row locators become stale.
+- `useTable()` memoizes viewport range lookups by default and invalidates them after viewport scroll operations.
+
 ## [6.9.0] - 2026-03-24
 
 ### Breaking

@@ -254,6 +254,64 @@ export const muiDataGrid: Partial<TableConfig> = {
             // Horizontal virtualization uses aria-colindex (1-indexed)
             return row.locator(`[aria-colindex="${columnIndex + 1}"]`);
         },
+        // MUI DataGrid virtualizes rows vertically (always) and columns horizontally (when
+        // columnBuffer is configured). The virtualScroller is a descendant of root, so
+        // scroll methods use querySelector rather than closest().
+        viewport: {
+            getVisibleRowRange: async ({ root, config }) => {
+                const rowSel = config.rowSelector;
+                return root.evaluate((el, rowSel) => {
+                    const indices = [...el.querySelectorAll(rowSel)]
+                        .map(r => Number(r.getAttribute('data-rowindex')))
+                        .filter(n => !isNaN(n));
+                    if (!indices.length) return { first: 0, last: 0 };
+                    return { first: Math.min(...indices), last: Math.max(...indices) };
+                }, rowSel);
+            },
+            getVisibleColumnRange: async ({ root, config }) => {
+                const rowSel = config.rowSelector;
+                const cellSel = typeof config.cellSelector === 'string' ? config.cellSelector : '[aria-colindex]';
+                return root.evaluate((el, { rowSel, cellSel }) => {
+                    const firstRow = el.querySelector(rowSel);
+                    if (!firstRow) return { first: 0, last: 0 };
+                    const indices = [...firstRow.querySelectorAll(cellSel)]
+                        .map(c => Number(c.getAttribute('aria-colindex')) - 1)
+                        .filter(n => !isNaN(n));
+                    if (!indices.length) return { first: 0, last: 0 };
+                    return { first: Math.min(...indices), last: Math.max(...indices) };
+                }, { rowSel, cellSel });
+            },
+            scrollToRow: async ({ root, config }, rowIndex) => {
+                const rowSel = config.rowSelector;
+                await root.evaluate((el, { rowSel, idx }) => {
+                    const row = el.querySelector(`${rowSel}[data-rowindex="${idx}"]`);
+                    if (row) row.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+                }, { rowSel, idx: rowIndex });
+                await root.locator(`${rowSel}[data-rowindex="${rowIndex}"]`)
+                    .waitFor({ state: 'attached', timeout: 3000 });
+            },
+            scrollToColumn: async ({ root, config }, colIndex) => {
+                const headerSel = typeof config.headerSelector === 'string' ? config.headerSelector : null;
+                await root.evaluate((el, { headerSel, idx }) => {
+                    // virtualScroller is a descendant — querySelector, not closest
+                    const scroller = el.querySelector('.MuiDataGrid-virtualScroller') as HTMLElement;
+                    if (!scroller || !headerSel) return;
+                    const headers = [...el.querySelectorAll(headerSel)];
+                    const target = headers[idx] as HTMLElement | undefined;
+                    if (!target) return;
+                    const cRect = scroller.getBoundingClientRect();
+                    const tRect = target.getBoundingClientRect();
+                    if (tRect.left < cRect.left) {
+                        scroller.scrollLeft -= (cRect.right - tRect.right) - 20;
+                    } else if (tRect.right > cRect.right) {
+                        scroller.scrollLeft += (tRect.left - cRect.left) - 20;
+                    }
+                }, { headerSel, idx: colIndex });
+                await root.locator(`${config.rowSelector} [aria-colindex="${colIndex + 1}"]`)
+                    .first()
+                    .waitFor({ state: 'attached', timeout: 3000 });
+            },
+        },
         loading: {
             isTableLoading: async (context) => {
                 return await context.root.locator('.MuiDataGrid-overlay').isVisible().catch(() => false);

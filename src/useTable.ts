@@ -55,6 +55,43 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     }
   };
 
+  // Automatically memoize viewport range oracles so user-provided functions are
+  // pure DOM queries with no cache bookkeeping. Invalidated after each scroll call.
+  if (config.strategies.viewport && !config.strategies.viewport.disableCache) {
+    const vp = config.strategies.viewport;
+    let colRangeCache: { first: number; last: number } | null = null;
+    let rowRangeCache: { first: number; last: number } | null = null;
+
+    config.strategies.viewport = {
+      ...vp,
+      getVisibleColumnRange: vp.getVisibleColumnRange
+        ? async (ctx) => {
+            if (!colRangeCache) colRangeCache = await vp.getVisibleColumnRange!(ctx);
+            return colRangeCache;
+          }
+        : undefined,
+      getVisibleRowRange: vp.getVisibleRowRange
+        ? async (ctx) => {
+            if (!rowRangeCache) rowRangeCache = await vp.getVisibleRowRange!(ctx);
+            return rowRangeCache;
+          }
+        : undefined,
+      scrollToColumn: vp.scrollToColumn
+        ? async (ctx, colIndex) => {
+            colRangeCache = null;
+            rowRangeCache = null;
+            await vp.scrollToColumn!(ctx, colIndex);
+          }
+        : undefined,
+      scrollToRow: vp.scrollToRow
+        ? async (ctx, rowIndex) => {
+            rowRangeCache = null;
+            await vp.scrollToRow!(ctx, rowIndex);
+          }
+        : undefined,
+    };
+  }
+
   const resolve = (item: Selector, parent: Locator | Page): Locator => {
     if (typeof item === 'string') return parent.locator(item);
     if (typeof item === 'function') return (item as any)(parent);
