@@ -261,7 +261,7 @@ export const muiDataGrid: Partial<TableConfig> = {
             getVisibleRowRange: async ({ root, config }) => {
                 const rowSel = config.rowSelector;
                 return root.evaluate((el, rowSel) => {
-                    const indices = [...el.querySelectorAll(rowSel)]
+                    const indices = Array.from(el.querySelectorAll(rowSel))
                         .map(r => Number(r.getAttribute('data-rowindex')))
                         .filter(n => !isNaN(n));
                     if (!indices.length) return { first: 0, last: 0 };
@@ -274,7 +274,7 @@ export const muiDataGrid: Partial<TableConfig> = {
                 return root.evaluate((el, { rowSel, cellSel }) => {
                     const firstRow = el.querySelector(rowSel);
                     if (!firstRow) return { first: 0, last: 0 };
-                    const indices = [...firstRow.querySelectorAll(cellSel)]
+                    const indices = Array.from(firstRow.querySelectorAll(cellSel))
                         .map(c => Number(c.getAttribute('aria-colindex')) - 1)
                         .filter(n => !isNaN(n));
                     if (!indices.length) return { first: 0, last: 0 };
@@ -291,7 +291,7 @@ export const muiDataGrid: Partial<TableConfig> = {
                         row.scrollIntoView({ block: 'nearest', inline: 'nearest' });
                         return;
                     }
-                    const visibleRows = [...el.querySelectorAll(rowSel)] as HTMLElement[];
+                    const visibleRows = Array.from(el.querySelectorAll(rowSel)) as HTMLElement[];
                     const heights = visibleRows
                         .map(visibleRow => visibleRow.getBoundingClientRect().height)
                         .filter(height => height > 0);
@@ -309,7 +309,7 @@ export const muiDataGrid: Partial<TableConfig> = {
                     // virtualScroller is a descendant — querySelector, not closest
                     const scroller = el.querySelector('.MuiDataGrid-virtualScroller') as HTMLElement;
                     if (!scroller || !headerSel) return;
-                    const headers = [...el.querySelectorAll(headerSel)];
+                    const headers = Array.from(el.querySelectorAll(headerSel));
                     const target = headers[idx] as HTMLElement | undefined;
                     if (!target) {
                         const widths = headers

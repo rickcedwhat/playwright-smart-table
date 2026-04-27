@@ -85,7 +85,7 @@ const dataAttribute = (options?: DataAttributeViewportOptions): ViewportStrategy
             return root.evaluate((el, { rowSel, cellSel, colAttr, colOffset }) => {
                 const firstRow = el.querySelector(rowSel);
                 if (!firstRow) return { first: 0, last: 0 };
-                const indices = [...firstRow.querySelectorAll(cellSel)]
+                const indices = Array.from(firstRow.querySelectorAll(cellSel))
                     .map(c => Number(c.getAttribute(colAttr)) - colOffset)
                     .filter(n => !isNaN(n));
                 if (!indices.length) return { first: 0, last: 0 };
@@ -96,7 +96,7 @@ const dataAttribute = (options?: DataAttributeViewportOptions): ViewportStrategy
         getVisibleRowRange: async ({ root, config }) => {
             const rowSel = config.rowSelector;
             return root.evaluate((el, { rowSel, rowAttr, rowOffset }) => {
-                const indices = [...el.querySelectorAll(rowSel)]
+                const indices = Array.from(el.querySelectorAll(rowSel))
                     .map(r => Number(r.getAttribute(rowAttr)) - rowOffset)
                     .filter(n => !isNaN(n));
                 if (!indices.length) return { first: 0, last: 0 };
@@ -110,10 +110,10 @@ const dataAttribute = (options?: DataAttributeViewportOptions): ViewportStrategy
             await root.evaluate((el, { containerSel, headerSel, cellSel, idx, columnWidth, scrollPadding }) => {
                 const container = el.closest(containerSel) as HTMLElement;
                 if (!container || !headerSel) return;
-                const headers = [...el.querySelectorAll(headerSel)];
+                const headers = Array.from(el.querySelectorAll(headerSel));
                 const target = headers[idx] as HTMLElement | undefined;
                 if (!target) {
-                    const widthSources = headers.length ? headers : [...el.querySelectorAll(cellSel)];
+                    const widthSources = headers.length ? headers : Array.from(el.querySelectorAll(cellSel));
                     const widths = widthSources
                         .map(node => (node as HTMLElement).getBoundingClientRect().width)
                         .filter(width => width > 0);
@@ -152,7 +152,7 @@ const dataAttribute = (options?: DataAttributeViewportOptions): ViewportStrategy
                     row.scrollIntoView({ block: 'nearest', inline: 'nearest' });
                     return;
                 }
-                const visibleRows = [...container.querySelectorAll(rowSel)] as HTMLElement[];
+                const visibleRows = Array.from(container.querySelectorAll(rowSel)) as HTMLElement[];
                 const heights = visibleRows
                     .map(visibleRow => visibleRow.getBoundingClientRect().height)
                     .filter(height => height > 0);
