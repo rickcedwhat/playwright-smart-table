@@ -61,7 +61,7 @@ export const muiTable: Partial<TableConfig> = {
     cellSelector: 'td, th, .MuiTableCell-body',
     headerSelector: 'thead th, .MuiTableCell-head',
 
-    headerTransformer: ({ text }) => text.replace(/\s*sorted\s+(a|de)scending/i, '').trim(),
+    headerTransformer: ({ text }) => text.replace(/\bsorted\s+(?:ascending|descending)\b/i, '').trim(),
 
     strategies: {
         pagination: {
