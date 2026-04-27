@@ -53,6 +53,7 @@ type Range = { first: number; last: number };
 
 export const Grid2DPage = () => {
     const scrollerRef = useRef<HTMLDivElement>(null);
+    const updateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [rowRange, setRowRange] = useState<Range>({ first: 0, last: 24 });
     const [colRange, setColRange] = useState<Range>({ first: 0, last: 9 });
 
@@ -67,13 +68,19 @@ export const Grid2DPage = () => {
         const firstCol = Math.max(0, Math.floor(scrollLeft / COL_WIDTH) - OVERSCAN_COLS);
         const lastCol = Math.min(TOTAL_COLS - 1, Math.ceil((scrollLeft + clientWidth) / COL_WIDTH) - 1 + OVERSCAN_COLS);
 
-        setTimeout(() => {
+        if (updateTimerRef.current) clearTimeout(updateTimerRef.current);
+        updateTimerRef.current = setTimeout(() => {
             setRowRange({ first: firstRow, last: lastRow });
             setColRange({ first: firstCol, last: lastCol });
         }, VIRTUALIZATION_DELAY_MS);
     }, []);
 
-    useEffect(() => { onScroll(); }, [onScroll]);
+    useEffect(() => {
+        onScroll();
+        return () => {
+            if (updateTimerRef.current) clearTimeout(updateTimerRef.current);
+        };
+    }, [onScroll]);
 
     const totalWidth = TOTAL_COLS * COL_WIDTH;
     const totalHeight = TOTAL_ROWS * ROW_HEIGHT;

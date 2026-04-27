@@ -85,8 +85,14 @@ const _navigateToCell = async (params: {
         if (viewport.getVisibleColumnRange) {
             const colRange = await viewport.getVisibleColumnRange(context);
             if (colRange && index >= colRange.first && index <= colRange.last) {
-                logDebug(config, 'verbose', `_navigateToCell: col ${index} in visible range [${colRange.first}-${colRange.last}], reading directly`);
-                return getCellLocator();
+                const rowRange = viewport.getVisibleRowRange
+                    ? await viewport.getVisibleRowRange(context)
+                    : null;
+                const rowVisible = !rowRange || (rowIndex >= rowRange.first && rowIndex <= rowRange.last);
+                if (rowVisible && await targetReached()) {
+                    logDebug(config, 'verbose', `_navigateToCell: col ${index} in visible range [${colRange.first}-${colRange.last}], reading directly`);
+                    return getCellLocator();
+                }
             }
         } else if (await targetReached()) {
             // No range oracle — fall back to DOM count() check.

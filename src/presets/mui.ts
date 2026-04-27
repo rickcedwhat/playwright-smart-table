@@ -284,8 +284,21 @@ export const muiDataGrid: Partial<TableConfig> = {
             scrollToRow: async ({ root, config }, rowIndex) => {
                 const rowSel = config.rowSelector;
                 await root.evaluate((el, { rowSel, idx }) => {
+                    const scroller = el.querySelector('.MuiDataGrid-virtualScroller') as HTMLElement;
+                    if (!scroller) return;
                     const row = el.querySelector(`${rowSel}[data-rowindex="${idx}"]`);
-                    if (row) row.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+                    if (row) {
+                        row.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+                        return;
+                    }
+                    const visibleRows = [...el.querySelectorAll(rowSel)] as HTMLElement[];
+                    const heights = visibleRows
+                        .map(visibleRow => visibleRow.getBoundingClientRect().height)
+                        .filter(height => height > 0);
+                    const estimatedHeight = heights.length
+                        ? heights.reduce((sum, height) => sum + height, 0) / heights.length
+                        : 52;
+                    scroller.scrollTop = Math.max(0, idx * estimatedHeight - 20);
                 }, { rowSel, idx: rowIndex });
                 await root.locator(`${rowSel}[data-rowindex="${rowIndex}"]`)
                     .waitFor({ state: 'attached', timeout: 3000 });
@@ -298,7 +311,16 @@ export const muiDataGrid: Partial<TableConfig> = {
                     if (!scroller || !headerSel) return;
                     const headers = [...el.querySelectorAll(headerSel)];
                     const target = headers[idx] as HTMLElement | undefined;
-                    if (!target) return;
+                    if (!target) {
+                        const widths = headers
+                            .map(header => (header as HTMLElement).getBoundingClientRect().width)
+                            .filter(width => width > 0);
+                        const estimatedWidth = widths.length
+                            ? widths.reduce((sum, width) => sum + width, 0) / widths.length
+                            : 100;
+                        scroller.scrollLeft = Math.max(0, idx * estimatedWidth - 20);
+                        return;
+                    }
                     const cRect = scroller.getBoundingClientRect();
                     const tRect = target.getBoundingClientRect();
                     if (tRect.left < cRect.left) {

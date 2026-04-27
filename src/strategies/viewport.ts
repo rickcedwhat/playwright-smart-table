@@ -23,6 +23,21 @@ export type DataAttributeViewportOptions = {
      */
     columnAttribute?: string;
     /**
+     * Estimated row height used when the target virtualized row is not mounted.
+     * If omitted, the strategy infers it from visible rows and falls back to 40px.
+     */
+    rowHeight?: number;
+    /**
+     * Estimated column width used when the target virtualized header is not mounted.
+     * If omitted, the strategy infers it from visible headers/cells and falls back to 120px.
+     */
+    columnWidth?: number;
+    /**
+     * Pixel padding applied when jumping to an estimated row or column position.
+     * Defaults to 20.
+     */
+    scrollPadding?: number;
+    /**
      * Value subtracted from the attribute to get the 0-based row index.
      * Defaults to 0. Use 1 for 'aria-rowindex' which is 1-based.
      */
@@ -46,11 +61,11 @@ export type DataAttributeViewportOptions = {
  *
  * @example
  * // TanStack / Braintrust (data-index, 0-based — default)
- * viewport: Strategies.Viewport.dataIndex()
+ * viewport: Strategies.Viewport.dataAttribute()
  *
  * @example
  * // ARIA grid (aria-rowindex / aria-colindex, 1-based)
- * viewport: Strategies.Viewport.dataIndex({ rowAttribute: 'aria-rowindex', columnAttribute: 'aria-colindex', rowOffset: 1, columnOffset: 1 })
+ * viewport: Strategies.Viewport.dataAttribute({ rowAttribute: 'aria-rowindex', columnAttribute: 'aria-colindex', rowOffset: 1, columnOffset: 1 })
  */
 const dataAttribute = (options?: DataAttributeViewportOptions): ViewportStrategy => {
     const containerSel = options?.scrollContainer ?? 'div[class*="overflow-auto"]';
@@ -59,6 +74,9 @@ const dataAttribute = (options?: DataAttributeViewportOptions): ViewportStrategy
     const colAttr = options?.columnAttribute ?? 'data-index';
     const rowOffset = options?.rowOffset ?? 0;
     const colOffset = options?.columnOffset ?? 0;
+    const rowHeight = options?.rowHeight;
+    const columnWidth = options?.columnWidth;
+    const scrollPadding = options?.scrollPadding ?? 20;
 
     return {
         getVisibleColumnRange: async ({ root, config }) => {
@@ -88,23 +106,34 @@ const dataAttribute = (options?: DataAttributeViewportOptions): ViewportStrategy
 
         scrollToColumn: async ({ root, config }, colIndex) => {
             const headerSel = typeof config.headerSelector === 'string' ? config.headerSelector : null;
-            await root.evaluate((el, { containerSel, headerSel, idx }) => {
+            const cellSel = typeof config.cellSelector === 'string' ? config.cellSelector : `[${colAttr}]`;
+            await root.evaluate((el, { containerSel, headerSel, cellSel, idx, columnWidth, scrollPadding }) => {
                 const container = el.closest(containerSel) as HTMLElement;
                 if (!container || !headerSel) return;
                 const headers = [...el.querySelectorAll(headerSel)];
                 const target = headers[idx] as HTMLElement | undefined;
-                if (!target) return;
+                if (!target) {
+                    const widthSources = headers.length ? headers : [...el.querySelectorAll(cellSel)];
+                    const widths = widthSources
+                        .map(node => (node as HTMLElement).getBoundingClientRect().width)
+                        .filter(width => width > 0);
+                    const estimatedWidth = columnWidth ?? (widths.length
+                        ? widths.reduce((sum, width) => sum + width, 0) / widths.length
+                        : 120);
+                    container.scrollLeft = Math.max(0, idx * estimatedWidth - scrollPadding);
+                    return;
+                }
                 const cRect = container.getBoundingClientRect();
                 const tRect = target.getBoundingClientRect();
                 if (tRect.left < cRect.left) {
                     // Scrolling left: align target's right edge to container's right
-                    container.scrollLeft -= (cRect.right - tRect.right) - 20;
+                    container.scrollLeft -= (cRect.right - tRect.right) - scrollPadding;
                 } else if (tRect.right > cRect.right) {
                     // Scrolling right: align target's left edge to container's left
                     // so the maximum number of subsequent columns are already in view
-                    container.scrollLeft += (tRect.left - cRect.left) - 20;
+                    container.scrollLeft += (tRect.left - cRect.left) - scrollPadding;
                 }
-            }, { containerSel, headerSel, idx: colIndex });
+            }, { containerSel, headerSel, cellSel, idx: colIndex, columnWidth, scrollPadding });
 
             // Wait for a cell at this column index to mount in any row
             await root
@@ -115,12 +144,23 @@ const dataAttribute = (options?: DataAttributeViewportOptions): ViewportStrategy
 
         scrollToRow: async ({ root, config }, rowIndex) => {
             const rowSel = config.rowSelector;
-            await root.evaluate((el, { containerSel, rowSel, rowAttr, idx, rowOffset }) => {
+            await root.evaluate((el, { containerSel, rowSel, rowAttr, idx, rowOffset, rowHeight, scrollPadding }) => {
                 const container = el.closest(containerSel) as HTMLElement;
                 if (!container) return;
-                const row = el.querySelector(`${rowSel}[${rowAttr}="${idx + rowOffset}"]`);
-                if (row) row.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-            }, { containerSel, rowSel, rowAttr, idx: rowIndex, rowOffset });
+                const row = container.querySelector(`${rowSel}[${rowAttr}="${idx + rowOffset}"]`);
+                if (row) {
+                    row.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+                    return;
+                }
+                const visibleRows = [...container.querySelectorAll(rowSel)] as HTMLElement[];
+                const heights = visibleRows
+                    .map(visibleRow => visibleRow.getBoundingClientRect().height)
+                    .filter(height => height > 0);
+                const estimatedHeight = rowHeight ?? (heights.length
+                    ? heights.reduce((sum, height) => sum + height, 0) / heights.length
+                    : 40);
+                container.scrollTop = Math.max(0, idx * estimatedHeight - scrollPadding);
+            }, { containerSel, rowSel, rowAttr, idx: rowIndex, rowOffset, rowHeight, scrollPadding });
 
             await root
                 .locator(`${rowSel}[${rowAttr}="${rowIndex + rowOffset}"]`)
