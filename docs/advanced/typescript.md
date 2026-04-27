@@ -43,9 +43,9 @@ const ids = await table.map<number>(async ({ row }) => parseInt(await row.getCel
 If you are writing custom strategies, you can use the `TableContext` type to understand what arguments are available.
 
 ```typescript
-import type { TableContext } from 'playwright-smart-table';
+import type { TableContext } from '@rickcedwhat/playwright-smart-table';
 
-const myStrategy = async ({ page, rootLocator }: TableContext) => {
+const myStrategy = async ({ page, root }: TableContext) => {
     // ...
 };
 ```
@@ -60,7 +60,7 @@ All major types are exported for your use:
 - `TableResult`
 
 ```typescript
-import type { SmartRow } from 'playwright-smart-table';
+import type { SmartRow } from '@rickcedwhat/playwright-smart-table';
 
 // Helper function
 async function activateUser(row: SmartRow) {

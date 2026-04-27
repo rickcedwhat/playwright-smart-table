@@ -11,7 +11,7 @@ export const MINIMAL_CONFIG_CONTEXT = `
  * rowSelector: 'tbody tr'
  * 
  * // Function selector
- * rowSelector: (root) => root.locator('[role="row"]')
+ * headerSelector: (root) => root.locator('[role="columnheader"]')
  */
 export type Selector = string | ((root: Locator | Page) => Locator);
 

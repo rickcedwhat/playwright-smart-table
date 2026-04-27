@@ -23,7 +23,7 @@
       - `iterateThroughTable` (use `forEach`/`map`/`filter` instead).
       - `getColumnValues` (use `map` instead).
  - [x] **Document `forEach`/`map`/`filter` in README**
- - [x] **JSDoc `@note` on `map`'s `parallel` default**
+ - [x] **JSDoc `@note` on `map`'s `concurrency: 'parallel'` default**
  - [x] **Add mutation testing (Stryker)**
     - **Purpose**: Measure test effectiveness beyond coverage by introducing mutation testing using Stryker for Vitest.
     - **Goal**: Run locally and optionally as a scheduled CI job; aim for a high mutation score (>=80–90%).

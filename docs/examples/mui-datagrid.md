@@ -13,26 +13,11 @@ MUI DataGrid uses specific roles and classes. You'll need to configure selectors
 ### Basic Setup
 
 ```typescript
-import { useTable, Strategies } from 'playwright-smart-table';
+import { useTable, presets } from '@rickcedwhat/playwright-smart-table';
 
 const table = useTable(page.locator('.MuiDataGrid-root'), {
-  // MUI uses ARIA roles efficiently
-  rowSelector: 'div[role="row"]',
-  cellSelector: 'div[role="gridcell"]',
-  headerSelector: 'div[role="columnheader"]',
-  
-  // Header text often includes sort icons/menus, so we clean it up
-  headerTransformer: ({ text }) => text.trim(),
-  
-  strategies: {
-    // MUI uses standard ARIA sort attributes
-    sorting: Strategies.Sorting.AriaSort(),
-    
-    // Pagination (if using paginated view)
-    pagination: Strategies.Pagination.click({ next: 
-      'button[title="Go to next page"]'
-    })
-  }
+  ...presets.muiDataGrid,
+  maxPages: 5
 });
 
 await table.init();
@@ -42,33 +27,35 @@ await table.init();
 
 MUI DataGrid is virtualized, meaning only visible rows exist in the DOM.
 
-### Scrolling
+### Viewport Recovery
 
-The library's `findRow` naturally handles searching across pages, but for virtual scrolling (infinite scroll style), you should use the `InfiniteScroll` pagination strategy.
+The MUI DataGrid preset includes a viewport strategy that reports visible row/column ranges and scrolls directly to target rows or columns. This lets `row.getCell()` recover when horizontal column scrolling knocks the target row out of the DOM.
 
 ```typescript
-strategies: {
-  pagination: Strategies.Pagination.infiniteScroll({
-    scrollContainer: page.locator('.MuiDataGrid-virtualScroller'),
-    waitForNewRows: 500 // Wait for virtualization to render
-  })
-}
+const row = await table.findRow({ 'Last name': 'Lannister' });
+await expect(row.getCell('First name')).toHaveText('Cersei');
 ```
 
 ## Cell Editing
 
-MUI DataGrid often requires a double-click to edit.
+For custom editors, use `columnOverrides.write` to describe exactly how to open and commit the widget.
 
 ```typescript
-strategies: {
-  fill: Strategies.Fill.DoubleClickAndType({
-    clearFirst: true,
-    pressEnter: true
-  })
-}
+const table = useTable(page.locator('.MuiDataGrid-root'), {
+  ...presets.muiDataGrid,
+  columnOverrides: {
+    'First name': {
+      write: async ({ cell, targetValue }) => {
+        await cell.dblclick();
+        await cell.locator('input').fill(String(targetValue));
+        await cell.page().keyboard.press('Enter');
+      }
+    }
+  }
+});
 
 // Usage
-await row.smartFill({ 'First Name': 'Jane' });
+await row.smartFill({ 'First name': 'Jane' });
 ```
 
 ## Complete Test Example
@@ -78,9 +65,8 @@ test('MUI DataGrid interaction', async ({ page }) => {
   await page.goto('https://mui.com/x/react-data-grid/');
   
   const table = useTable(page.locator('.MuiDataGrid-root').first(), {
-    rowSelector: 'div[role="row"]',
-    cellSelector: 'div[role="gridcell"]',
-    headerSelector: 'div[role="columnheader"]',
+    ...presets.muiDataGrid,
+    maxPages: 5
   });
   
   // Find a row

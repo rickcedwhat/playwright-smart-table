@@ -12,6 +12,7 @@ Strategies define how the library interacts with different table implementations
 | **Fill** | `row.smartFill()` | Entering data into cells |
 | **Header** | `init()`, `revalidate()` | Finding and parsing column headers |
 | **Cell Locator** | `getCell()`, `toJSON()` | Custom cell resolution within a row |
+| **Viewport** | `getCell()`, `bringIntoView()` | Recovering rows/columns in 2D virtualized grids |
 
 ## Overview
 
@@ -228,14 +229,70 @@ When the DOM doesn't use predictable nth-child ordering (e.g. horizontally virtu
 
 ```typescript
 strategies: {
-  getCellLocator: ({ row, columnName, columnIndex }) => {
+  getCellLocator: ({ row, columnName, columnIndex, root, page, config }) => {
     // e.g. react-data-grid with aria-colindex attributes
     return row.locator(`[aria-colindex="${columnIndex}"]`);
   }
 }
 ```
 
-The function receives `{ row, columnName, columnIndex, rowIndex?, page }` and returns a `Locator`.
+The function receives `{ row, root, columnName, columnIndex, rowIndex?, page, config }` and returns a `Locator`.
+
+---
+
+## Viewport Strategy
+
+Viewport strategies help with 2D virtualized grids where rows and columns are both mounted only when visible. They let the cell-reading engine detect what is currently in the DOM and jump directly to the target row or column when scrolling one axis causes the other axis to unmount.
+
+### `Strategies.Viewport.dataAttribute(options?)`
+
+Use this when row and cell elements expose their indexes through DOM attributes.
+
+```typescript
+strategies: {
+  viewport: Strategies.Viewport.dataAttribute({
+    scrollContainer: '.grid-scroll-container',
+    rowAttribute: 'data-index',
+    columnAttribute: 'data-index'
+  })
+}
+```
+
+For ARIA grids, account for 1-based indexes:
+
+```typescript
+strategies: {
+  viewport: Strategies.Viewport.dataAttribute({
+    rowAttribute: 'aria-rowindex',
+    columnAttribute: 'aria-colindex',
+    rowOffset: 1,
+    columnOffset: 1
+  })
+}
+```
+
+### Custom Viewport Strategy
+
+Provide any combination of range oracles and scroll primitives:
+
+```typescript
+strategies: {
+  viewport: {
+    getVisibleRowRange: async ({ root }) => ({ first: 0, last: 20 }),
+    getVisibleColumnRange: async ({ root }) => ({ first: 0, last: 8 }),
+    scrollToRow: async ({ root }, rowIndex) => {
+      await root.evaluate((el, index) => {
+        el.querySelector(`[data-row-index="${index}"]`)?.scrollIntoView();
+      }, rowIndex);
+    },
+    scrollToColumn: async ({ root }, columnIndex) => {
+      await root.evaluate((el, index) => {
+        el.querySelector(`[data-column-index="${index}"]`)?.scrollIntoView();
+      }, columnIndex);
+    }
+  }
+}
+```
 
 ---
 

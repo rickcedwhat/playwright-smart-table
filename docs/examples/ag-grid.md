@@ -13,7 +13,7 @@ AG Grid is effectively tested by targeting its specific class names.
 ### Basic Setup
 
 ```typescript
-import { useTable, Strategies } from 'playwright-smart-table';
+import { useTable, Strategies } from '@rickcedwhat/playwright-smart-table';
 
 const table = useTable(page.locator('.ag-root-wrapper'), {
   // AG Grid standard classes
@@ -90,7 +90,7 @@ graph TD
 ```typescript
 strategies: {
   pagination: Strategies.Pagination.infiniteScroll({
-    scrollContainer: page.locator('.ag-body-viewport'),
+    scrollTarget: '.ag-body-viewport',
   })
 }
 ```

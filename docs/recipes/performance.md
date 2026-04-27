@@ -37,10 +37,10 @@ const data = await row.toJSON({
 If you know the row is on the first page, use `getRow()` (sync-like) instead of `findRow()` (async search).
 
 ```typescript
-// ❌ Searches all pages (overhead)
+// Slower: async search path, and may scan multiple pages when maxPages is raised
 await table.findRow({ ID: '123' });
 
-// ✅ Checks current page immediately
+// Faster: checks the current page immediately
 table.getRow({ ID: '123' }); 
 ```
 

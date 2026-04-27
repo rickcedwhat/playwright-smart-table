@@ -4,7 +4,7 @@ Learn how to efficiently extract data from tables, whether they are small, pagin
 
 ## Extracting All Data
 
-The most efficient way to scrape an entire table is using `table.map()`. This handles pagination automatically and processes rows in chunks.
+The most efficient way to scrape a table is using `table.map()`. It processes rows in chunks and follows pagination up to the configured `maxPages` limit.
 
 ```typescript
 // Define the data shape you want to extract
@@ -50,11 +50,13 @@ stream.end();
 
 ## Scraping Specific Columns
 
-If you only need values from a single column across all pages, use `table.map()`.
+If you only need values from a single column, use `table.map()`. Increase `maxPages` when you want to scan beyond the first page.
 
 ```typescript
-// Get all email addresses from the entire table
-const emails = await table.map(({ row }) => row.getCell('Email').innerText());
+const emails = await table.map(
+  ({ row }) => row.getCell('Email').innerText(),
+  { maxPages: 5 }
+);
 
 // Get and transform values (e.g., parse currency)
 const salaries = await table.map(async ({ row }) => {

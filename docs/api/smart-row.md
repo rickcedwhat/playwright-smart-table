@@ -1,4 +1,3 @@
-<!-- NEEDS REVIEW -->
 # SmartRow
 
 A SmartRow is a Playwright Locator enhanced with column-aware methods. It extends the native Locator, so all Playwright methods work.
@@ -169,9 +168,9 @@ await row.getCell('Edit').click();
 
 #### Notes
 
-- Useful for tables with many rows
-- Ensures row is visible before interactions
-- Uses Playwright's `scrollIntoViewIfNeeded()`
+- Useful for rows returned by `findRow()`, `findRows()`, `filter()`, or `getRowByIndex()`
+- Navigates back to the row's page when pagination metadata is available
+- Ensures the row is visible before interactions
 
 ---
 
@@ -215,25 +214,49 @@ await row.smartFill({
   Department: 'Engineering'
 });
 
-// With custom options
+// With custom input mappers
 await row.smartFill(
   { Salary: '100000' },
-  { 
-    strategy: 'clickAndType',
-    clearFirst: true 
+  {
+    inputMappers: {
+      Salary: (cell) => cell.locator('input[name="salary"]')
+    }
   }
 );
 ```
 
 #### Fill Strategies
 
-The fill behavior is determined by the configured fill strategy:
+The default fill behavior detects common inputs automatically: text inputs, selects, checkboxes, radios, textareas, and `contenteditable` elements.
 
-- **ClickAndType** (default) - Click cell, clear, type
-- **DoubleClickAndType** - Double-click, clear, type
-- **Custom** - Define your own fill logic
+For app-specific widgets, use `columnOverrides.write` in `TableConfig`, or pass `inputMappers` for a one-off call.
 
 See [Fill Strategies](/api/strategies#fill) for more details.
+
+---
+
+### wasFound()
+
+Returns whether the row exists in the DOM. Rows returned from failed searches are sentinel rows, so they can still be used with Playwright negative assertions like `await expect(row).not.toBeVisible()`.
+
+<!-- api-signature: wasFound -->
+
+### Signature
+
+```typescript
+wasFound(): boolean
+```
+
+<!-- /api-signature: wasFound -->
+
+#### Example
+
+```typescript
+const row = table.getRow({ Name: 'Ghost User' });
+
+await expect(row).not.toBeVisible();
+expect(row.wasFound()).toBe(false);
+```
 
 ---
 

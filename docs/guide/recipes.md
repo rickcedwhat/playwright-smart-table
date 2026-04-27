@@ -1,10 +1,14 @@
-<!-- NEEDS REVIEW -->
 # Recipes
 
-🚧 **Under Construction**
+Recipes are task-focused guides for common table-testing patterns. They are separate from the API reference because they start with what you are trying to accomplish.
 
-This page is being built. Check back soon!
+## Available Recipes
 
-For now, see:
-- [Examples](/examples/) - Real-world usage patterns
-- [API Reference](/api/) - Complete method documentation
+- [Data Scraping](/recipes/data-scraping): extract rows, columns, JSON, or CSV-style output.
+- [Custom Strategies](/recipes/custom-strategies): adapt Smart Table to custom pagination, filling, or cell lookup behavior.
+- [Performance Tips](/recipes/performance): keep large-table tests fast and reliable.
+
+## Related Pages
+
+- [Examples](/examples/): short examples by table type or workflow.
+- [Troubleshooting](/troubleshooting): fixes for common setup and runtime issues.

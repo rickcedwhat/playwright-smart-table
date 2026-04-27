@@ -1,48 +1,48 @@
-<!-- NEEDS REVIEW -->
 # API Reference
 
-Welcome to the Playwright Smart Table API documentation. This library provides a powerful, type-safe way to interact with HTML tables in Playwright tests.
+Use the API reference when you already know the method, config option, or strategy you need. If you are still learning the library, start with [Getting Started](/guide/getting-started) or [Examples](/examples/).
 
-## Quick Navigation
+## Main References
 
-### Configuration
-- [**TableConfig**](/api/table-config) - Configure table selectors, strategies, and behavior
+- [TableConfig](/api/table-config): selectors, strategies, debug, pagination limits, and column overrides.
+- [Table Methods](/api/table-methods): `getRow`, `findRow`, `findRows`, `map`, `forEach`, sorting, reset, and more.
+- [SmartRow](/api/smart-row): row-level helpers like `getCell`, `toJSON`, `smartFill`, and `bringIntoView`.
+- [SmartRowArray](/api/smart-row-array): array returned by `findRows()` and `filter()`.
+- [Strategies](/api/strategies): built-in and custom pagination, sorting, header, cell, fill, and viewport behavior.
 
-### Core Methods
-- [**Table Methods**](/api/table-methods) - Methods for finding and interacting with rows
-- [**SmartRow**](/api/smart-row) - Methods available on row objects
-- [**Strategies**](/api/strategies) - Built-in and custom strategies
+## Quick Method Map
 
-## Basic Usage
+| Need | API |
+|---|---|
+| Configure selectors or behavior | [TableConfig](/api/table-config) |
+| Find rows and iterate pages | [Table Methods](/api/table-methods) |
+| Read or interact with a row | [SmartRow](/api/smart-row) |
+| Convert many rows to JSON | [SmartRowArray](/api/smart-row-array) |
+| Adapt custom table behavior | [Strategies](/api/strategies) |
+
+## Minimal Usage
 
 ```typescript
 import { useTable } from '@rickcedwhat/playwright-smart-table';
 
-const table = useTable(page.locator('#my-table'), {
-  headerSelector: 'thead th',
-  rowSelector: 'tbody tr',
-  cellSelector: 'td'
-});
-
-await table.init();
-
-// Get a row by content (current page)
+const table = await useTable(page.locator('#my-table')).init();
 const row = table.getRow({ Name: 'John Doe' });
 
-// Get a cell value
-const email = await row.getCell('Email').textContent();
+await expect(row.getCell('Email')).toHaveText('john@example.com');
 ```
 
 ## Type Safety
 
-The library is fully typed. When you initialize a table, TypeScript will infer the column names:
+Pass a row type to `useTable<T>()` when you want TypeScript to check filter keys and `toJSON()` output.
 
 ```typescript
-type MyTableRow = {
+type UserRow = {
   Name: string;
   Email: string;
   Status: string;
 };
 
-const table = useTable<MyTableRow>(page.locator('#table'), config);
+const table = useTable<UserRow>(page.locator('#table'));
+const user = await table.findRow({ Status: 'Active' });
+const data = await user.toJSON(); // UserRow
 ```

@@ -37,10 +37,9 @@ const table = useTable(page.locator('.grid-container'), {
 ```
 
 > [!TIP]
-> You can pass functions if you need complex logic like filtering:
+> You can pass functions for `headerSelector` and `cellSelector` when you need complex locator logic:
 > ```typescript
-> // Only select rows that contain actual data cells (excluding headers/separators)
-> rowSelector: (root) => root.locator('div.row').filter({ has: root.locator('.cell') })
+> cellSelector: (row) => row.locator('div.cell').filter({ hasNotText: 'Loading...' })
 > ```
 
 ## Header Transformation
@@ -68,7 +67,8 @@ const table = useTable(loc, {
 });
 
 // Now you can use the clean name:
-table.getCell('First Name');
+const row = table.getRow({ 'First Name': 'Ada' });
+row.getCell('First Name');
 ```
 
 ## Strategies
@@ -76,7 +76,7 @@ table.getCell('First Name');
 Configuration is also where you attach behavior strategies.
 
 ```typescript
-import { Strategies } from 'playwright-smart-table';
+import { Strategies } from '@rickcedwhat/playwright-smart-table';
 
 const table = useTable(loc, {
   strategies: {

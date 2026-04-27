@@ -11,12 +11,12 @@ A Strategy is simply a function that implements specific behavior. You can overr
 Handle complex pagination logic like "Load More" buttons or infinite scroll triggers.
 
 ```typescript
-import { useTable, Strategies } from 'playwright-smart-table';
+import { useTable, Strategies } from '@rickcedwhat/playwright-smart-table';
 
 const table = useTable(page.locator('table'), {
   strategies: {
     pagination: {
-      goNext: async ({ page, rootLocator }) => {
+      goNext: async ({ page, root }) => {
           // 1. Detect if there's a next page
           const loadMore = page.locator('button:has-text("Load More")');
           

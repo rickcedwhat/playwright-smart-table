@@ -1,5 +1,8 @@
-<!-- NEEDS REVIEW -->
-# Pagination Examples of handling paginated tables.
+# Pagination Examples
+
+Use pagination strategies when Smart Table needs to move through pages while searching or iterating.
+
+By default, Smart Table only scans one page (`maxPages: 1`). To search or iterate beyond the current page, configure `maxPages` on the table or pass it to the method call.
 
 ## Basic Pagination
 
@@ -8,8 +11,11 @@ import { useTable, Strategies } from '@rickcedwhat/playwright-smart-table';
 
 const table = useTable(page.locator('#table'), {
   strategies: {
-    pagination: Strategies.Pagination.click({ next: '.pagination .next' })
-  }
+    pagination: Strategies.Pagination.click({
+      next: () => page.locator('.pagination .next')
+    })
+  },
+  maxPages: 5
 });
 
 await table.init();
@@ -18,11 +24,11 @@ await table.init();
 ## Finding Across Pages
 
 ```typescript
-// Automatically searches all pages
+// Uses the table-level maxPages value
 const row = await table.findRow({ Name: 'Cedric Kelly' });
 
-// Limit search to 5 pages
-const row = await table.findRow(
+// Or override the page limit for one search
+const rowWithinFivePages = await table.findRow(
   { Department: 'Engineering' },
   { maxPages: 5 }
 );
@@ -31,37 +37,38 @@ const row = await table.findRow(
 ## Getting All Matching Rows
 
 ```typescript
-// Find all engineers across all pages
 const engineers = await table.findRows({
   Department: 'Engineering'
 });
 
 console.log(`Found ${engineers.length} engineers`);
 
-// Limit pages
-const engineers = await table.findRows(
+const engineersWithinTenPages = await table.findRows(
   { Department: 'Engineering' },
   { maxPages: 10 }
 );
 ```
 
-## Iterating Through All Pages
+## Iterating Through Multiple Pages
 
 ```typescript
-await table.forEach(async ({ row, rowIndex }) => {
-  const name = await row.getCell('Name').textContent();
-  console.log(`${rowIndex}: ${name}`);
-});
+await table.forEach(
+  async ({ row, rowIndex }) => {
+    const name = await row.getCell('Name').textContent();
+    console.log(`${rowIndex}: ${name}`);
+  },
+  { maxPages: 5 }
+);
 ```
 
 ## Scanning Column Values
 
 ```typescript
-// Get all email addresses across all pages
+// Get email addresses from the default scan range
 const emails = await table.map(({ row }) => row.getCell('Email').innerText());
 
-// With page limit
-const emails = await table.map(({ row }) => row.getCell('Email').innerText(), {
+// Or override the page limit for one scan
+const limitedEmails = await table.map(({ row }) => row.getCell('Email').innerText(), {
   maxPages: 5
 });
 ```
@@ -72,7 +79,7 @@ const emails = await table.map(({ row }) => row.getCell('Email').innerText(), {
 const table = useTable(page.locator('#table'), {
   strategies: {
     pagination: {
-      goNext: async ({ page, rootLocator }) => {
+      goNext: async ({ page }) => {
         const nextBtn = page.locator('.custom-next-button');
         
         // Check if there are more pages
@@ -97,10 +104,20 @@ const table = useTable(page.locator('#table'), {
 ```typescript
 const table = useTable(page.locator('#table'), {
   strategies: {
-    pagination: Strategies.Pagination.ClickPageNumber({
-      pageNumberSelector: (pageNum) => 
-        page.locator(`.pagination button:has-text("${pageNum}")`)
-    })
+    pagination: {
+      goNext: async ({ page }) => {
+        const next = page.getByRole('button', { name: 'Next' });
+        if (await next.isDisabled()) return false;
+        await next.click();
+        return true;
+      },
+      goToPage: async (pageIndex, { page }) => {
+        const button = page.getByRole('button', { name: String(pageIndex + 1) });
+        if (await button.count() === 0) return false;
+        await button.click();
+        return true;
+      }
+    }
   }
 });
 ```
@@ -117,18 +134,20 @@ test('paginated table search', async ({ page }) => {
   const table = useTable(page.locator('#example'), {
     headerSelector: 'thead th',
     strategies: {
-      pagination: Strategies.Pagination.click({ next: '#example_next' })
+      pagination: Strategies.Pagination.click({
+        next: () => page.locator('#example_next')
+      })
     },
     maxPages: 10
   });
   
   await table.init();
   
-  // Find row that might be on any page
+  // Find a row within the configured page limit
   const row = await table.findRow({ Name: 'Cedric Kelly' });
   await expect(row.getCell('Position')).toHaveText('Senior JavaScript Developer');
   
-  // Get all San Francisco employees (across all pages)
+  // Get San Francisco employees within the configured page limit
   const sfEmployees = await table.findRows({
     Office: 'San Francisco'
   });

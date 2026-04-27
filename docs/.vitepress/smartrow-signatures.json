@@ -27,7 +27,7 @@
   {
     "name": "bringIntoView",
     "signature": "bringIntoView(): Promise<void>",
-    "comment": "/**\n* Scrolls/paginates to bring this row into view.\n* Only works if rowIndex is known (e.g., from getRowByIndex).\n* @throws Error if rowIndex is unknown\n*/"
+    "comment": "/**\n* Scrolls/paginates to bring this row into view.\n* Works when row position metadata is known (e.g., from getRowByIndex, findRow,\n* findRows, filter, or async iteration).\n* @throws Error if row position metadata is unknown\n*/"
   },
   {
     "name": "smartFill",
