@@ -324,9 +324,9 @@ export const muiDataGrid: Partial<TableConfig> = {
                     const cRect = scroller.getBoundingClientRect();
                     const tRect = target.getBoundingClientRect();
                     if (tRect.left < cRect.left) {
-                        scroller.scrollLeft -= (cRect.right - tRect.right) - 20;
+                        scroller.scrollLeft -= (cRect.left - tRect.left) + 20;
                     } else if (tRect.right > cRect.right) {
-                        scroller.scrollLeft += (tRect.left - cRect.left) - 20;
+                        scroller.scrollLeft += (tRect.right - cRect.right) + 20;
                     }
                 }, { headerSel, idx: colIndex });
                 await root.locator(`${config.rowSelector} [aria-colindex="${colIndex + 1}"]`)

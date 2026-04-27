@@ -126,12 +126,11 @@ const dataAttribute = (options?: DataAttributeViewportOptions): ViewportStrategy
                 const cRect = container.getBoundingClientRect();
                 const tRect = target.getBoundingClientRect();
                 if (tRect.left < cRect.left) {
-                    // Scrolling left: align target's right edge to container's right
-                    container.scrollLeft -= (cRect.right - tRect.right) - scrollPadding;
+                    // Scrolling left: reveal the target's left edge with padding.
+                    container.scrollLeft -= (cRect.left - tRect.left) + scrollPadding;
                 } else if (tRect.right > cRect.right) {
-                    // Scrolling right: align target's left edge to container's left
-                    // so the maximum number of subsequent columns are already in view
-                    container.scrollLeft += (tRect.left - cRect.left) - scrollPadding;
+                    // Scrolling right: reveal the target's right edge with padding.
+                    container.scrollLeft += (tRect.right - cRect.right) + scrollPadding;
                 }
             }, { containerSel, headerSel, cellSel, idx: colIndex, columnWidth, scrollPadding });
 
