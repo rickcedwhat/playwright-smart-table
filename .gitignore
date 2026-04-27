@@ -19,6 +19,7 @@ html/
 /.playground.pid
 /coverage/
 /.cache/
+/.local/
 /.idea/
 *.log
 .nyc_output/
