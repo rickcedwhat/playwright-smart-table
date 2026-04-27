@@ -218,6 +218,7 @@
   // ✅ Safe for popover interactions
   await table.map(async ({ row }) => { ... }, { parallel: false });
   ```
+  > Superseded in v6.8.0 by `concurrency: 'parallel' | 'sequential' | 'synchronized'`; `parallel` was removed in v6.9.0.
 
 ---
 
@@ -250,7 +251,7 @@
 ## [6.4.0] - 2026-02-18
 
 ### ⚠️ Breaking Changes
-- **Removed `getRows`**: The deprecated `getRows` method has been removed. Use `findRows` or `iterateThroughTable` instead.
+- **Removed `getRows`**: The deprecated `getRows` method has been removed. At the time, migration targeted `findRows` or `iterateThroughTable`; in current versions use `findRows`, `map`, `forEach`, or `filter`.
 - **Removed `cellNavigation`**: The deprecated `cellNavigation` strategy type has been removed in favor of `navigation` primitives.
 
 ### Added

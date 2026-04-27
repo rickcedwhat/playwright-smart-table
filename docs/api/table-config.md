@@ -55,7 +55,7 @@ headerSelector: (root) => root.locator('thead').locator('th')
 
 ### rowSelector
 
-**Type:** `string | ((root: Locator) => Locator)`  
+**Type:** `string`  
 **Required:** No  
 **Default:** `'tbody tr'`
 
@@ -113,7 +113,9 @@ Custom strategies for pagination, sorting, filling, etc. See [Strategies](/api/s
 strategies: {
   pagination: Strategies.Pagination.click({ next: '.next-button' }),
   sorting: Strategies.Sorting.AriaSort(),
-  fill: Strategies.Fill.ClickAndType()
+  fill: async ({ row, columnName, value }) => {
+    await row.getCell(columnName).locator('input').fill(String(value));
+  }
 }
 ```
 
@@ -121,17 +123,13 @@ strategies: {
 
 ### debug
 
-**Type:** `boolean | DebugConfig`  
+**Type:** `DebugConfig`  
 **Required:** No  
-**Default:** `false`
+**Default:** `undefined`
 
-Enable debug mode for slow motion, logging, and strict validation.
+Enable verbose logging or slow down table operations while troubleshooting.
 
 ```typescript
-// Simple
-debug: true
-
-// Advanced
 debug: {
   slow: 500,
   logLevel: 'verbose'
@@ -148,7 +146,7 @@ See the debug configuration options above for more details.
 **Required:** No  
 **Default:** `1`
 
-Maximum number of pages to traverse when using pagination methods like `findRows()`.
+Maximum number of pages to traverse when using pagination methods like `findRow()`, `findRows()`, `map()`, `forEach()`, and `filter()`. Keep the default for current-page scans; increase it when you want Smart Table to move through pagination.
 
 ```typescript
 maxPages: 10 // Stop after 10 pages
@@ -173,7 +171,7 @@ Default concurrency for `forEach`, `map`, and `filter`. Per-call options overrid
 
 **Type:** `boolean`  
 **Required:** No  
-**Default:** `false`
+**Default:** `true`
 
 When `true`, scrolls the table root into view during initialization.
 
@@ -184,7 +182,7 @@ When `true`, scrolls the table root into view during initialization.
 **Type:** `(context: TableContext) => Promise<void>`  
 **Required:** No
 
-Hook invoked when `table.reset()` runs, after pagination `goToFirst` (if configured) and before internal caches are cleared. Use for app-specific cleanup.
+Hook invoked when `table.reset()` runs, before pagination `goToFirst` (if configured) and before internal caches are cleared. Use for app-specific cleanup.
 
 ---
 
@@ -213,7 +211,9 @@ const table = useTable<Employee>(page.locator('#employees'), {
     sorting: Strategies.Sorting.AriaSort()
   },
   
-  debug: process.env.DEBUG === 'true',
+  debug: process.env.DEBUG === 'true'
+    ? { logLevel: 'verbose' }
+    : undefined,
   maxPages: 20
 });
 

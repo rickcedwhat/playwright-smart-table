@@ -138,7 +138,7 @@ getRowByIndex(index: number): SmartRow
 
 ## findRow()
 
-Find the first row matching the filter, searching across multiple pages.
+Find the first row matching the filter. By default this scans one page (`maxPages: 1`); increase `maxPages` to search through pagination.
 
 
 <!-- api-signature: findRow -->
@@ -162,11 +162,11 @@ findRow(
 ### Example
 
 ```typescript
-// Find first row matching criteria (searches all pages)
+// Find first row matching criteria on the default scan range
 const row = await table.findRow({ Name: 'John Doe' });
 
-// Limit search to first 5 pages
-const row = await table.findRow(
+// Search up to the first 5 pages
+const rowWithinFivePages = await table.findRow(
   { Name: 'John Doe' },
   { maxPages: 5 }
 );
@@ -184,7 +184,7 @@ const exactRow = await table.findRow(
 
 ## findRows()
 
-Find all rows matching the filter across multiple pages.
+Find rows matching the filter. By default this scans one page (`maxPages: 1`); increase `maxPages` to collect rows across pagination.
 
 
 <!-- api-signature: findRows -->
@@ -216,11 +216,11 @@ const data = await rows.toJSON();
 ### Example
 
 ```typescript
-// Find all rows matching criteria (searches all pages)
+// Find rows matching criteria on the default scan range
 const rows = await table.findRows({ Status: 'Active' });
 
-// Limit search to first 10 pages
-const rows = await table.findRows(
+// Search up to the first 10 pages
+const rowsWithinTenPages = await table.findRows(
   { Status: 'Active' },
   { maxPages: 10 }
 );
@@ -239,7 +239,7 @@ const exactRows = await table.findRows(
 
 ## forEach()
 
-Iterate every row across all pages, calling the callback for side effects. Execution is sequential by default (safe for interactions like clicking/filling). Call `stop()` in the callback to end iteration early.
+Iterate rows in the configured scan range, calling the callback for side effects. Execution is sequential by default (safe for interactions like clicking/filling). Increase `maxPages` to iterate beyond the first page. Call `stop()` in the callback to end iteration early.
 
 <!-- api-signature: forEach -->
 
@@ -275,7 +275,7 @@ await table.forEach(async ({ row, rowIndex, stop }) => {
 
 ## map()
 
-Transform every row across all pages into a value. Returns a flat array. Execution is parallel within each page by default (safe for reads). Call `stop()` to halt after the current page finishes.
+Transform rows in the configured scan range into values. Returns a flat array. Execution is parallel within each page by default (safe for reads). Increase `maxPages` to map beyond the first page. Call `stop()` to halt after the current page finishes.
 
 > [!WARNING]
 > `map` defaults to `concurrency: 'parallel'`. If your callback opens popovers, fills inputs, or mutates UI state, pass `{ concurrency: 'sequential' }` or `{ concurrency: 'synchronized' }` as appropriate.
@@ -313,7 +313,7 @@ const assignees = await table.map(async ({ row }) => {
 
 ## filter()
 
-Filter rows across all pages by an async predicate. Returns a [SmartRowArray](/api/smart-row-array). Execution is sequential by default. Call `bringIntoView()` on each row if you need to interact after pagination.
+Filter rows in the configured scan range by an async predicate. Returns a [SmartRowArray](/api/smart-row-array). Execution is sequential by default. Increase `maxPages` to filter beyond the first page. Call `bringIntoView()` on each row if you need to interact after pagination.
 
 <!-- api-signature: filter -->
 
@@ -525,4 +525,18 @@ Generates an AI-friendly configuration prompt for debugging. Outputs table HTML 
 
 ```typescript
 generateConfig(): Promise<void>
+```
+
+[Back to Top](#table-methods)
+
+---
+
+## generateConfigPrompt()
+
+Deprecated alias for `generateConfig()`. Use `generateConfig()` in new code; `generateConfigPrompt()` will be removed in v7.0.0.
+
+### Signature
+
+```typescript
+generateConfigPrompt(): Promise<void>
 ```

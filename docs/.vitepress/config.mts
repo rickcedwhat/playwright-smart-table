@@ -105,7 +105,8 @@ export default defineConfig({
                                 { text: 'reset()', link: '/api/table-methods#reset' },
                                 { text: 'revalidate()', link: '/api/table-methods#revalidate' },
                                 { text: 'sorting', link: '/api/table-methods#sorting' },
-                                { text: 'generateConfig()', link: '/api/table-methods#generateconfig' }
+                                { text: 'generateConfig()', link: '/api/table-methods#generateconfig' },
+                                { text: 'generateConfigPrompt()', link: '/api/table-methods#generateconfigprompt' }
                             ]
                         },
                         {
@@ -116,7 +117,8 @@ export default defineConfig({
                                 { text: 'getCell()', link: '/api/smart-row#getcell' },
                                 { text: 'toJSON()', link: '/api/smart-row#tojson' },
                                 { text: 'bringIntoView()', link: '/api/smart-row#bringintoview' },
-                                { text: 'smartFill()', link: '/api/smart-row#smartfill' }
+                                { text: 'smartFill()', link: '/api/smart-row#smartfill' },
+                                { text: 'wasFound()', link: '/api/smart-row#wasfound' }
                             ]
                         },
                         {
@@ -132,7 +134,8 @@ export default defineConfig({
                                 { text: 'Sorting', link: '/api/strategies#sorting-strategies' },
                                 { text: 'Fill', link: '/api/strategies#fill-strategy' },
                                 { text: 'Header', link: '/api/strategies#header-strategy' },
-                                { text: 'Cell locator', link: '/api/strategies#cell-locator-strategy' }
+                                { text: 'Cell locator', link: '/api/strategies#cell-locator-strategy' },
+                                { text: 'Viewport', link: '/api/strategies#viewport-strategy' }
                             ]
                         }
                     ]

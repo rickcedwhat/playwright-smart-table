@@ -1,66 +1,80 @@
 <!-- Last Reviewed: 02/06/2026 -->
 # Core Concepts
 
-Understanding the key concepts of Playwright Smart Table.
+There are three ideas to understand: a table helper, smart rows, and strategies.
 
-## SmartRow
+## 1. The Table Helper
 
-A SmartRow is a Playwright Locator enhanced with column-aware methods.
+`useTable(root)` creates a helper around one table-like element. It reads headers, caches the column map, and uses that map whenever you ask for a row or cell.
 
 ```typescript
-const row = await table.findRow({ Name: 'John Doe' });
+const table = await useTable(page.locator('#employees')).init();
+const headers = await table.getHeaders();
+```
+
+Call `reset()` when your app returns the table to its starting state. Call `revalidate()` when the visible columns changed and you want to refresh the header map without resetting pagination.
+
+## 2. SmartRow
+
+A `SmartRow` is a Playwright `Locator` with table-aware methods added.
+
+```typescript
+const row = table.getRow({ Name: 'Airi Satou' });
 
 // Column-aware access
-const email = row.getCell('Email');
+await expect(row.getCell('Office')).toHaveText('Tokyo');
 
-// Still a Locator - all Playwright methods work
+// It is still a Locator
 await expect(row).toBeVisible();
 await row.click();
 ```
 
-Learn more: [SmartRow API](/api/smart-row)
+Use `row.toJSON()` to read row data, `row.smartFill()` to fill editable cells, and `row.bringIntoView()` before interacting with a row returned from a paginated scan.
 
-## Strategies
+Learn more in the [SmartRow API](/api/smart-row).
 
-Strategies define how the library interacts with different table implementations. Use built-in strategies or provide your own.
+## 3. Strategies
+
+Strategies tell Smart Table how your table behaves when normal HTML-table assumptions are not enough.
 
 ```typescript
 import { Strategies, useTable } from '@rickcedwhat/playwright-smart-table';
 
-// Built-in strategies
 const table = useTable(page.locator('#table'), {
   strategies: {
     pagination: Strategies.Pagination.click({ next: '.next-btn' }),
-    sorting: Strategies.Sorting.AriaSort(),
-    // Custom fill: click cell, then type (e.g. for inline editors)
-    fill: async ({ row, columnName, value, page }) => {
-      const cell = row.getCell(columnName);
-      await cell.click();
-      await page.keyboard.type(String(value));
-    }
+    sorting: Strategies.Sorting.AriaSort()
   }
 });
 ```
 
-Learn more: [Strategies API](/api/strategies)
+Common strategies:
+
+| Strategy | Use it when... |
+|---|---|
+| `pagination` | Smart Table needs to move to the next page or scroll batch. |
+| `sorting` | You want `table.sorting.apply()` and `table.sorting.getState()`. |
+| `viewport` | Rows and columns are virtualized and may unmount while scrolling. |
+| `getCellLocator` | Cells cannot be resolved by simple column index. |
+| `fill` / `columnOverrides.write` | Editable cells need app-specific interaction logic. |
+
+Learn more in the [Strategies API](/api/strategies).
 
 ## Auto-Initialization
 
-Most methods auto-initialize the table:
+Async search and iteration methods initialize automatically. Current-page sync methods need `init()` first.
 
 ```typescript
-// No need to call init() for async methods
-const row = await table.findRow({ Name: 'John' }); // Auto-initializes
-const rows = await table.findRows({}, { maxPages: 1 }); // Auto-initializes
+const asyncTable = useTable(page.locator('#table'));
+const row = await asyncTable.findRow({ Name: 'John' }); // auto-initializes
 
-// Only needed for sync methods
-await table.init();
-const row = table.getRowByIndex(0); // Requires init()
+const table = await useTable(page.locator('#table')).init();
+const firstRow = table.getRowByIndex(0); // current-page sync access
 ```
 
 ## Type Safety
 
-Define your table structure for full TypeScript support:
+Define your row shape when you want TypeScript to check column names and JSON output.
 
 ```typescript
 type Employee = {
@@ -72,25 +86,14 @@ type Employee = {
 
 const table = useTable<Employee>(page.locator('#table'));
 
-// TypeScript knows the columns
 const row = await table.findRow({ 
   Name: 'John',
-  InvalidColumn: 'x' // ❌ TypeScript error
+  InvalidColumn: 'x' // TypeScript error
 });
 ```
 
-## Parallel Execution
-
-Playwright Smart Table is fully compatible with Playwright's parallel execution.
-
-- **Stateless**: `SmartRow` and `TableResult` objects are stateless wrappers around Playwright Locators.
-- **Safe**: No global state is shared between tests or workers.
-- **Independent**: Each `useTable` call creates a fresh instance scoped to the specific `page` object.
-
-You can safely run tests in parallel using `fullyParallel: true` in your Playwright config.
-
 ## Next Steps
 
-- [Configuration](/guide/configuration) - Customize table behavior
-- [API Reference](/api/) - Complete method documentation
-- [Examples](/examples/) - Real-world usage patterns
+- [Configuration](/guide/configuration): customize selectors and behavior.
+- [Examples](/examples/): choose a task-based example.
+- [API Reference](/api/): look up exact method details.

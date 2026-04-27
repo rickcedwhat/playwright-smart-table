@@ -1,132 +1,53 @@
-# Introduction
+# Playwright Smart Table
 
-## Why Playwright Smart Table?
+Playwright Smart Table helps you test tables by column name instead of DOM position. It maps the headers once, returns normal Playwright Locators, and adds table-aware helpers for rows and cells.
 
-Testing HTML tables in Playwright is painful. Traditional approaches are fragile and hard to maintain.
-
-### The Problem
-
-**Traditional approach:**
+## 30-Second Example
 
 ```typescript
-// ❌ Fragile - breaks if columns reorder
-const email = await page.locator('tbody tr').nth(2).locator('td').nth(3).textContent();
+import { test, expect } from '@playwright/test';
+import { useTable } from '@rickcedwhat/playwright-smart-table';
 
-// ❌ Brittle XPath
-const row = page.locator('//tr[td[contains(text(), "John")]]');
+test('verify an employee row', async ({ page }) => {
+  await page.goto('https://datatables.net/examples/data_sources/dom');
 
-// ❌ Manual column mapping
-const headers = await page.locator('thead th').allTextContents();
-const emailIndex = headers.indexOf('Email');
-const email = await row.locator('td').nth(emailIndex).textContent();
-```
+  const table = await useTable(page.locator('#example')).init();
+  const row = table.getRow({ Name: 'Airi Satou' });
 
-**Problems:**
-- Column indices break when columns reorder
-- XPath is hard to read and maintain
-- Manual header mapping is tedious
-- No type safety
-- Pagination requires custom logic
-
-### The Solution
-
-**Playwright Smart Table:**
-
-```typescript
-// ✅ Column-aware - survives column reordering
-const row = table.getRow({ Name: 'John Doe' });
-const email = await row.getCell('Email').textContent();
-
-// ✅ Auto-pagination across all pages
-const allEngineers = await table.findRows({ Department: 'Engineering' });
-
-// ✅ Type-safe
-type Employee = { Name: string; Email: string; Department: string };
-const table = useTable<Employee>(page.locator('#table'));
-```
-
-## Key Features
-
-### 🎯 Smart Locators
-
-Find rows by content, not position:
-
-```typescript
-const row = table.getRow({ Name: 'Airi Satou', Office: 'Tokyo' });
-```
-
-### 📄 Auto-Pagination
-
-Search across all pages automatically:
-
-```typescript
-const row = await table.findRow({ ID: '12345' }); // Searches across ALL pages
-```
-
-### 🔍 Column-Aware Access
-
-Access cells by column name:
-
-```typescript
-const email = row.getCell('Email'); // No manual mapping needed
-```
-
-### 🛠️ Debug Mode
-
-Visual debugging with slow motion and logging:
-
-```typescript
-const table = useTable(page.locator('#table'), {
-  debug: { slow: 500, logLevel: 'verbose' }
+  await expect(row.getCell('Position')).toHaveText('Accountant');
+  await expect(row.getCell('Office')).toHaveText('Tokyo');
 });
 ```
 
-### 🔌 Extensible Strategies
+The important part is the mental model:
 
-Support any table implementation:
+- `useTable(root)` creates a table helper scoped to one table.
+- `table.init()` reads the headers and builds the column map.
+- `table.getRow({ Name: 'Airi Satou' })` finds a row by cell text.
+- `row.getCell('Office')` returns a regular Playwright `Locator`.
 
-```typescript
-import { Strategies } from '@rickcedwhat/playwright-smart-table';
+## Most Users Need Four Methods
 
-const table = useTable(page.locator('#table'), {
-  strategies: {
-    pagination: Strategies.Pagination.click({ next: '.next-btn' }),
-    sorting: Strategies.Sorting.AriaSort()
-  }
-});
-```
+| Need | Use |
+|---|---|
+| Get a row already visible on the current page | `table.getRow(filters)` |
+| Search more than the current page | `await table.findRow(filters, { maxPages: 5 })` |
+| Collect matching rows across pages | `await table.findRows(filters, { maxPages: 5 })` |
+| Read or validate every row | `await table.map(...)` or `await table.forEach(...)` |
 
-## When to Use This Library
+## When It Helps
 
-**Use this library when you need to:**
+Use this library when your tests need to:
 
-- ✅ **Find rows by column values** - "Get the row where Name is 'John' and Status is 'Active'"
-- ✅ **Access cells by column name** - "Get the Email cell from this row"
-- ✅ **Search across paginated tables** - "Find all rows with Department 'Engineering' across all pages"
-- ✅ **Handle column reordering** - Your tests survive when columns move
-- ✅ **Extract structured data** - Convert table rows to JSON objects
-- ✅ **Fill/edit table cells** - Smart filling with custom strategies
-- ✅ **Work with dynamic tables** - MUI DataGrid, AG Grid, custom implementations
+- Find rows by meaningful cell values, not `nth()` indexes.
+- Read, assert, or click cells by column name.
+- Search across paginated or infinitely scrolling tables by configuring pagination and increasing `maxPages`.
+- Extract row data with `toJSON()`.
+- Adapt to grids like MUI DataGrid, AG Grid, React Data Grid, or custom table-like DOM.
 
-**You might not need this library if:**
+## Where To Go Next
 
-- ❌ You don't deal with tables
-- ❌ You don't need to handle pagination or virtualization
-- ❌ You enjoy writing complex CSS selectors manually
-- ❌ You like doing things the hard way
-
-## Quick Comparison
-
-| Task | Traditional | Smart Table |
-|------|------------|-------------|
-| Find row | `page.locator('//tr[td[contains(text(), "John")]]')` | `table.getRow({ Name: 'John' })` |
-| Get cell | `row.locator('td').nth(3)` | `row.getCell('Email')` |
-| Pagination | Manual loop + click logic | `table.findRows({ ... })` |
-| Type safety | None | Full TypeScript support |
-| Column reorder | Breaks | Survives |
-
-## Get Started
-
-Ready to simplify your table tests?
-
-[Get Started →](/guide/getting-started)
+- [Getting Started](/guide/getting-started): install the package and write the first test.
+- [Core Concepts](/guide/core-concepts): understand `TableResult`, `SmartRow`, and strategies.
+- [Examples](/examples/): choose a task-based example.
+- [API Reference](/api/): look up exact method and config details.

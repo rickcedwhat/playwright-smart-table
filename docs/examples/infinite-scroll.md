@@ -8,7 +8,7 @@ Infinite scroll is common in modern feeds and dashboards. The library handles th
 Use the included `InfiniteScroll` strategy. It scrolls the container to the bottom and waits for new rows to appear.
 
 ```typescript
-import { useTable, Strategies } from 'playwright-smart-table';
+import { useTable, Strategies } from '@rickcedwhat/playwright-smart-table';
 
 const table = useTable(page.locator('.feed-container'), {
   rowSelector: '.feed-item',
@@ -16,10 +16,10 @@ const table = useTable(page.locator('.feed-container'), {
   strategies: {
     pagination: Strategies.Pagination.infiniteScroll({
       // The element that has the overflow-y: scroll style
-      scrollContainer: page.locator('.feed-scroll-view'),
+      scrollTarget: '.feed-scroll-view',
       
-      // How long to wait for new items after scrolling (default: 1000ms)
-      waitForNewRows: 2000
+      // How long to wait for new items after scrolling
+      timeout: 2000
     })
   }
 });
@@ -44,16 +44,18 @@ Some implementations use a manual button instead of automatic scrolling. Use a c
 
 ```typescript
 strategies: {
-  pagination: async ({ page }) => {
-    const loadMore = page.locator('button:has-text("Load More")');
-    
-    if (await loadMore.isVisible()) {
-      await loadMore.click();
-      await page.waitForTimeout(500); // Wait for render
-      return true; // We "turned the page"
+  pagination: {
+    goNext: async ({ page }) => {
+      const loadMore = page.locator('button:has-text("Load More")');
+
+      if (await loadMore.isVisible() && await loadMore.isEnabled()) {
+        await loadMore.click();
+        await page.waitForTimeout(500); // Wait for render
+        return true; // We "turned the page"
+      }
+
+      return false; // Reached the end
     }
-    
-    return false; // Reached the end
   }
 }
 ```
@@ -69,6 +71,6 @@ const allItems = await table.map(async ({ row }) => {
 }, {
   // dedupe is important for infinite scroll!
   // Rows often stay in the DOM, so we might see them again.
-  dedupeStrategy: (row) => row.getCell('ID').innerText()
+  dedupe: (row) => row.getCell('ID').innerText()
 });
 ```

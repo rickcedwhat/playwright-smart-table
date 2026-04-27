@@ -8,7 +8,7 @@ import type { SmartRowArray } from './utils/smartRowArray';
  * rowSelector: 'tbody tr'
  * 
  * // Function selector
- * rowSelector: (root) => root.locator('[role="row"]')
+ * headerSelector: (root) => root.locator('[role="columnheader"]')
  */
 export type Selector = string | ((root: Locator | Page) => Locator) | ((root: Locator) => Locator);
 
@@ -208,8 +208,9 @@ export type SmartRow<T = any> = Locator & {
 
   /**
    * Scrolls/paginates to bring this row into view.
-   * Only works if rowIndex is known (e.g., from getRowByIndex).
-   * @throws Error if rowIndex is unknown
+   * Works when row position metadata is known (e.g., from getRowByIndex, findRow,
+   * findRows, filter, or async iteration).
+   * @throws Error if row position metadata is unknown
    */
   bringIntoView(): Promise<void>;
 

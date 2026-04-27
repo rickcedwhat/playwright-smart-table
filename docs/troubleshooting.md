@@ -97,7 +97,8 @@ import { Strategies } from '@rickcedwhat/playwright-smart-table';
 const table = useTable(page.locator('#table'), {
   strategies: {
     pagination: Strategies.Pagination.click({ next: '.next-button' })
-  }
+  },
+  maxPages: 10
 });
 ```
 
@@ -113,7 +114,7 @@ await page.locator('.next-button').click(); // Should navigate
 ```typescript
 const rows = await table.findRows(
   { Office: 'Tokyo' },
-  { maxPages: 10 } // Limit search
+  { maxPages: 10 } // Default is 1; raise it to scan more pages
 );
 ```
 

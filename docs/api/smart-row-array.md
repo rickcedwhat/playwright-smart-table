@@ -1,4 +1,3 @@
-<!-- NEEDS REVIEW -->
 # SmartRowArray
 
 `SmartRowArray` is a specialized array of [SmartRow](/api/smart-row) objects returned by methods like [findRows()](/api/table-methods#findrows) and `table.filter()`.

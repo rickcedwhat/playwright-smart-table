@@ -43,8 +43,11 @@ const email = await row.locator('td').nth(emailIndex).textContent();
 const row = table.getRow({ Name: 'John Doe' });
 const email = await row.getCell('Email').textContent();
 
-// ✅ Auto-pagination across all pages
-const allEngineers = await table.findRows({ Department: 'Engineering' });
+// ✅ Pagination-aware when you raise maxPages
+const allEngineers = await table.findRows(
+  { Department: 'Engineering' },
+  { maxPages: 5 }
+);
 
 // ✅ Type-safe
 type Employee = { Name: string; Email: string; Department: string };
@@ -72,8 +75,8 @@ const row = table.getRow({ Name: 'John Doe' });
 // Access cells by column name
 const email = await row.getCell('Email').innerText();
 
-// Search across paginated tables
-const allActive = await table.findRows({ Status: 'Active' });
+// Search more than the current page by raising maxPages
+const allActive = await table.findRows({ Status: 'Active' }, { maxPages: 5 });
 ```
 
 ### Iterating Across Pages
@@ -163,9 +166,9 @@ const table = useTable(page.locator('#table'), {
 - 🎯 **Smart Locators** - Find rows by content, not position
 - 🧠 **Fuzzy Matching** - Smart suggestions for typos in column names
 - ⚡ **Smart Initialization** - Handles loading states and dynamic headers automatically
-- 📄 **Auto-Pagination** - Search across all pages automatically
+- 📄 **Pagination-aware search** - Scan beyond the current page when `maxPages` is increased
 - 🔍 **Column-Aware Access** - Access cells by column name
-- 🔁 **Iteration Methods** - `forEach`, `map`, `filter`, and `for await...of` across all pages
+- 🔁 **Iteration Methods** - `forEach`, `map`, `filter`, and `for await...of` across the configured page range
 - 🛠️ **Debug Mode** - Visual debugging with slow motion and logging
 - 🔌 **[Extensible Strategies](docs/concepts/strategies.md)** - Support any table implementation
 - 💪 **Type-Safe** - Full TypeScript support
