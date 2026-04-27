@@ -8,6 +8,7 @@ import { DedupeStrategies } from './dedupe';
 import { LoadingStrategies } from './loading';
 import { StabilizationStrategies } from './stabilization';
 import { FilterStrategies } from './filter';
+import { ViewportStrategies } from './viewport';
 
 export * from './pagination';
 export * from './sorting';
@@ -19,6 +20,7 @@ export * from './dedupe';
 export * from './loading';
 export * from './stabilization';
 export * from './filter';
+export * from './viewport';
 
 export const Strategies = {
     Pagination: PaginationStrategies,
@@ -31,4 +33,5 @@ export const Strategies = {
     Loading: LoadingStrategies,
     Stabilization: StabilizationStrategies,
     Filter: FilterStrategies,
+    Viewport: ViewportStrategies,
 };

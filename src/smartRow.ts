@@ -35,7 +35,7 @@ const _navigateToCell = async (params: {
     logDebug(
         config,
         'verbose',
-        `_navigateToCell: navigating to column "${column}" (colIndex ${index}), ${rowLabel}`,
+        `_navigateToCell: resolving column "${column}" (colIndex ${index}), ${rowLabel}`,
     );
 
     // Get active cell if strategy is available
@@ -56,6 +56,102 @@ const _navigateToCell = async (params: {
     }
 
     const context: StrategyContext = { config, root: rootLocator, page, resolve };
+
+    // Shared helper: is the target cell currently in the DOM?
+    const targetReached = async () => {
+        if (config.strategies.getActiveCell) {
+            const ac = await config.strategies.getActiveCell({ config, root: rootLocator, page, resolve });
+            if (ac && ac.rowIndex === rowIndex && ac.columnIndex === index) return true;
+        }
+        // Locator presence: virtualized grids (e.g. Glide) often attach the target `td` after scroll
+        // while focus id lags; do not require getActiveCell to match for this to count as reached.
+        const cell = config.strategies.getCellLocator
+            ? config.strategies.getCellLocator({ row: rowLocator, root: rootLocator, columnName: column, columnIndex: index, rowIndex, page, config })
+            : resolve(config.cellSelector, rowLocator).nth(index);
+        return (await cell.count() > 0);
+    };
+
+    const getCellLocator = () => config.strategies.getCellLocator
+        ? config.strategies.getCellLocator({ row: rowLocator, root: rootLocator, columnName: column, columnIndex: index, rowIndex, page, config })
+        : resolve(config.cellSelector, rowLocator).nth(index);
+
+    // Viewport-oracle phase: direct positioning for 2D virtualized tables.
+    // Runs before navigation primitives; falls through to them if cell still not accessible.
+    const viewport = config.strategies.viewport;
+    if (viewport && typeof rowIndex === 'number') {
+        // Fast path via range oracle: if the user provides getVisibleColumnRange (and memoizes it),
+        // this check is a near-instant JS lookup — no DOM count() round-trip needed.
+        // Rows do NOT sync at the barrier here — only scroll boundaries need coordination.
+        if (viewport.getVisibleColumnRange) {
+            const colRange = await viewport.getVisibleColumnRange(context);
+            if (colRange && index >= colRange.first && index <= colRange.last) {
+                const rowRange = viewport.getVisibleRowRange
+                    ? await viewport.getVisibleRowRange(context)
+                    : null;
+                const rowVisible = !rowRange || (rowIndex >= rowRange.first && rowIndex <= rowRange.last);
+                if (rowVisible && await targetReached()) {
+                    logDebug(config, 'verbose', `_navigateToCell: col ${index} in visible range [${colRange.first}-${colRange.last}], reading directly`);
+                    return getCellLocator();
+                }
+            }
+        } else if (await targetReached()) {
+            // No range oracle — fall back to DOM count() check.
+            if (barrier) await barrier.sync(index);
+            return getCellLocator();
+        }
+
+        // Column is out of view. Scroll to bring it in.
+        // In synchronized mode, the last row to arrive triggers the scroll once for all rows.
+        const scrollIntoViewport = async () => {
+            const colRange = viewport.getVisibleColumnRange
+                ? await viewport.getVisibleColumnRange(context)
+                : null;
+            const colOutOfView = !colRange || index < colRange.first || index > colRange.last;
+
+            if (colOutOfView) {
+                logDebug(config, 'verbose', `_navigateToCell: col ${index} out of view, scrolling`);
+                if (viewport.scrollToColumn) {
+                    await viewport.scrollToColumn(context, index);
+                }
+            }
+
+            // Some row locators (notably rows returned by findRow()) have a logical
+            // rowIndex that is not the grid's viewport coordinate. If the target cell
+            // is already mounted after any column scroll, avoid a misleading row jump.
+            if (await targetReached()) {
+                return;
+            }
+
+            // 2D scroll hazard guard: scrolling horizontally may have unmounted the target row.
+            const rowRange = viewport.getVisibleRowRange
+                ? await viewport.getVisibleRowRange(context)
+                : null;
+            const rowOutOfView = rowRange && (rowIndex < rowRange.first || rowIndex > rowRange.last);
+
+            if (rowOutOfView) {
+                logDebug(config, 'verbose', `_navigateToCell: row ${rowIndex} out of view after col scroll, recovering`);
+                if (viewport.scrollToRow) {
+                    await viewport.scrollToRow(context, rowIndex);
+                }
+            }
+        };
+
+        if (barrier) {
+            await barrier.sync(index, scrollIntoViewport);
+        } else {
+            await scrollIntoViewport();
+        }
+
+        if (await targetReached()) {
+            return getCellLocator();
+        }
+
+        // Cell still not accessible — fall through to navigation primitives if configured.
+        if (!config.strategies.navigation) {
+            logDebug(config, 'verbose', '_navigateToCell: viewport phase could not reach cell, no navigation fallback configured');
+            return null;
+        }
+    }
 
     // Use navigation primitives if available
     if (config.strategies.navigation) {
@@ -99,27 +195,10 @@ const _navigateToCell = async (params: {
             }
         };
 
-        const targetReached = async () => {
-            if (config.strategies.getActiveCell) {
-                const ac = await config.strategies.getActiveCell({ config, root: rootLocator, page, resolve });
-                if (ac && ac.rowIndex === rowIndex && ac.columnIndex === index) return true;
-            }
-            // Locator presence: virtualized grids (e.g. Glide) often attach the target `td` after scroll
-            // while focus id lags; do not require getActiveCell to match for this to count as reached.
-            const cell = config.strategies.getCellLocator
-                ? config.strategies.getCellLocator({ row: rowLocator, columnName: column, columnIndex: index, page })
-                : resolve(config.cellSelector, rowLocator).nth(index);
-
-            return (await cell.count() > 0);
-        };
-
         if (await targetReached()) {
             // Already there. If we have a barrier, check-in to stay in lock-step.
             if (barrier) await barrier.sync(index);
-            const cell = config.strategies.getCellLocator
-                ? config.strategies.getCellLocator({ row: rowLocator, columnName: column, columnIndex: index, page })
-                : resolve(config.cellSelector, rowLocator).nth(index);
-            return cell;
+            return getCellLocator();
         }
 
         // If getActiveCell is present but returns null (no focus), and cell is in DOM,
@@ -256,10 +335,7 @@ const _navigateToCell = async (params: {
         }
 
         // Return final locator if reached
-        const finalCell = config.strategies.getCellLocator
-            ? config.strategies.getCellLocator({ row: rowLocator, columnName: column, columnIndex: index, page })
-            : resolve(config.cellSelector, rowLocator).nth(index);
-            
+        const finalCell = getCellLocator();
         if (await finalCell.count() > 0) return finalCell;
         return null;
     }
@@ -303,10 +379,12 @@ const createSmartRow = <T = any>(
         if (config.strategies.getCellLocator) {
             return config.strategies.getCellLocator({
                 row: rowLocator,
+                root: rootLocator,
                 columnName: colName,
                 columnIndex: idx,
                 rowIndex: rowIndex,
-                page: rootLocator.page()
+                page: rootLocator.page(),
+                config
             });
         }
 
@@ -344,10 +422,12 @@ const createSmartRow = <T = any>(
             const cell = config.strategies.getCellLocator
                 ? config.strategies.getCellLocator({
                     row: rowLocator,
+                    root: rootLocator,
                     columnName: col,
                     columnIndex: idx,
                     rowIndex: rowIndex,
-                    page: page
+                    page: page,
+                    config
                 })
                 : resolve(config.cellSelector, rowLocator).nth(idx);
 

@@ -35,3 +35,6 @@ playground/pst-unpack/
 /mapper_failures.txt
 /mapper_report.txt
 /test_results.txt
+
+# External (non-library) e2e tests — not part of CI, contain auth state
+/tests-external/

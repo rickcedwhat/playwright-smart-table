@@ -53,5 +53,10 @@
     "name": "loading?",
     "signature": "loading?: LoadingStrategy",
     "comment": "/**\n* Strategy for detecting loading states. Use this for table-, row-, and header-level readiness.\n* E.g. after sort/pagination, the engine uses loading.isTableLoading when present.\n*/"
+  },
+  {
+    "name": "viewport?",
+    "signature": "viewport?: ViewportStrategy",
+    "comment": "/**\n* Viewport oracle strategies for 2D virtualized tables (e.g. MUI DataGrid, AG Grid,\n* Braintrust-style grids where both rows and columns are virtualized simultaneously).\n*\n* When present, the cell-reading engine uses these to jump directly to the target\n* row/column and to detect the 2D scroll hazard (scrolling to reveal a column can\n* knock rows out of the vertical viewport, and vice versa).\n*\n* Completely optional and additive — existing `navigation` primitives remain the fallback.\n*/"
   }
 ]

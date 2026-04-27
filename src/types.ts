@@ -31,10 +31,13 @@ export type FilterValue = string | RegExp | number | ((cell: Locator) => Locator
  */
 export type GetCellLocatorFn = (args: {
   row: Locator;
+  /** The root locator passed to useTable(). Useful for re-querying stale row locators. */
+  root: Locator;
   columnName: string;
   columnIndex: number;
   rowIndex?: number;
   page: Page;
+  config: FinalTableConfig<any>;
 }) => Locator;
 
 /**
@@ -73,6 +76,88 @@ export type GetActiveCellFn = (args: TableContext) => Promise<{
   columnName?: string;
   locator: Locator;
 } | null>;
+
+/**
+ * Viewport oracle strategies for virtualized tables.
+ *
+ * These tell the library *what is currently in the DOM* rather than *how to move*.
+ * When present, the cell-reading engine uses them to jump directly to a target
+ * row/column instead of stepping blindly with navigation primitives.
+ *
+ * This is the primary fix for the 2D scroll hazard: scrolling right to bring a
+ * column into view can knock rows out of the vertical viewport (and vice versa).
+ * With `getVisibleRowRange` the engine detects this and calls `scrollToRow` to
+ * restore the row before reading — eliminating the hazard without polling loops.
+ *
+ * All members are optional. Supply whichever the underlying grid exposes:
+ * - Range oracles alone enable hazard detection with graceful fallback to navigation primitives.
+ * - Scroll primitives alone enable direct jumps without range awareness.
+ * - Both together give the most reliable, fastest path.
+ *
+ * @example
+ * // MUI DataGrid via apiRef
+ * strategies: {
+ *   viewport: {
+ *     getVisibleRowRange: async ({ root }) =>
+ *       root.evaluate(el => {
+ *         const api = (el as any).__muiDataGrid__;
+ *         return { first: api.getFirstVisibleRow(), last: api.getLastVisibleRow() };
+ *       }),
+ *     scrollToRow: async ({ root }, rowIndex) =>
+ *       root.evaluate((el, idx) =>
+ *         (el as any).__muiDataGrid__.scrollToIndexes({ rowIndex: idx }), rowIndex),
+ *     scrollToColumn: async ({ root }, colIndex) =>
+ *       root.evaluate((el, idx) =>
+ *         (el as any).__muiDataGrid__.scrollToIndexes({ colIndex: idx }), colIndex),
+ *   }
+ * }
+ *
+ * @example
+ * // aria-rowindex / aria-colindex DOM fallback (works without internal API access)
+ * strategies: {
+ *   viewport: {
+ *     getVisibleRowRange: async ({ root }) =>
+ *       root.evaluate(el => {
+ *         const rows = [...el.querySelectorAll('[role="row"][aria-rowindex]')];
+ *         const idxs = rows.map(r => Number(r.getAttribute('aria-rowindex')) - 1);
+ *         return { first: Math.min(...idxs), last: Math.max(...idxs) };
+ *       }),
+ *   }
+ * }
+ */
+export interface ViewportStrategy {
+  /**
+   * Returns the 0-based index range of rows currently rendered in the DOM.
+   * Used to detect when a target row has been scrolled out of view and needs recovery.
+   */
+  getVisibleRowRange?: (context: TableContext) => Promise<{ first: number; last: number }>;
+
+  /**
+   * Returns the 0-based index range of columns currently rendered in the DOM.
+   * Used to detect when a target column is not yet mounted before reading.
+   */
+  getVisibleColumnRange?: (context: TableContext) => Promise<{ first: number; last: number }>;
+
+  /**
+   * Scrolls or jumps directly to make a row visible by 0-based index.
+   * Replaces blind goDown()/goUp() step loops for grids that expose a scroll API.
+   */
+  scrollToRow?: (context: TableContext, rowIndex: number) => Promise<void>;
+
+  /**
+   * Scrolls or jumps directly to make a column visible by 0-based index.
+   * Replaces blind goRight()/goLeft() step loops for grids that expose a scroll API.
+   */
+  scrollToColumn?: (context: TableContext, colIndex: number) => Promise<void>;
+
+  /**
+   * When true, disables the automatic memoization of getVisibleColumnRange and
+   * getVisibleRowRange results. By default the library caches each range value and
+   * invalidates it after the corresponding scroll call, eliminating redundant DOM
+   * evaluate() round-trips between scrolls.
+   */
+  disableCache?: boolean;
+}
 
 
 /**
@@ -355,6 +440,18 @@ export interface TableStrategies {
    * E.g. after sort/pagination, the engine uses loading.isTableLoading when present.
    */
   loading?: LoadingStrategy;
+
+  /**
+   * Viewport oracle strategies for 2D virtualized tables (e.g. MUI DataGrid, AG Grid,
+   * Braintrust-style grids where both rows and columns are virtualized simultaneously).
+   *
+   * When present, the cell-reading engine uses these to jump directly to the target
+   * row/column and to detect the 2D scroll hazard (scrolling to reveal a column can
+   * knock rows out of the vertical viewport, and vice versa).
+   *
+   * Completely optional and additive — existing `navigation` primitives remain the fallback.
+   */
+  viewport?: ViewportStrategy;
 }
 
 
