@@ -115,6 +115,13 @@ const _navigateToCell = async (params: {
                 }
             }
 
+            // Some row locators (notably rows returned by findRow()) have a logical
+            // rowIndex that is not the grid's viewport coordinate. If the target cell
+            // is already mounted after any column scroll, avoid a misleading row jump.
+            if (await targetReached()) {
+                return;
+            }
+
             // 2D scroll hazard guard: scrolling horizontally may have unmounted the target row.
             const rowRange = viewport.getVisibleRowRange
                 ? await viewport.getVisibleRowRange(context)
