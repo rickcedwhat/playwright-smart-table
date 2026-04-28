@@ -438,7 +438,7 @@ await row.getCell('Email').click();
 Reset table state and invoke the `onReset` strategy.
 
 > [!WARNING]
-> `reset()` calls `pagination.goToFirst()` (if configured), which scrolls or paginates back to page 1 and exits any active filter or sort state applied outside the library. Do **not** call `reset()` around filtered/sorted reads unless you re-apply your filters afterward — the read will silently return unfiltered data.
+> `reset()` clears internal row cache and flags (`tableMapper.clear()`), calls `pagination.goToFirst()` (if configured) to scroll or paginate back to page 1, and exits any active filter or sort state applied outside the library. Calling `reset()` around filtered/sorted reads may silently return unfiltered data — re-apply filters and sorts after calling it.
 
 Use this between independent test operations to return the table to a clean baseline.
 
