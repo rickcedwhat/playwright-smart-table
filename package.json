@@ -7,7 +7,7 @@
   "homepage": "https://rickcedwhat.github.io/playwright-smart-table/",
   "repository": {
     "type": "git",
-    "url": "https://github.com/rickcedwhat/playwright-smart-table.git"
+    "url": "git+https://github.com/rickcedwhat/playwright-smart-table.git"
   },
   "bugs": {
     "url": "https://github.com/rickcedwhat/playwright-smart-table/issues"
