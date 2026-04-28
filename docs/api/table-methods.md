@@ -138,8 +138,12 @@ getRowByIndex(index: number): SmartRow
 
 ## findRow()
 
-Find the first row matching the filter. By default this scans one page (`maxPages: 1`); increase `maxPages` to search through pagination.
+Find **exactly one** row matching the filter. Throws an `"Ambiguous Row"` error if more than one match is found on a page — use this when your filters should uniquely identify a row. Use [`findRows()`](#findrows) if you expect multiple matches.
 
+By default this scans one page (`maxPages: 1`); increase `maxPages` to search through pagination.
+
+> [!NOTE]
+> **Not-found behaviour:** when no row matches, `findRow` returns a sentinel `SmartRow` rather than throwing immediately. Any subsequent interaction on it (`.click()`, `.innerText()`, etc.) will fail with a Playwright locator error at that point. Use [`findRows()`](#findrows) and check `.length` if you need an explicit "not found" assertion.
 
 <!-- api-signature: findRow -->
 
@@ -162,7 +166,7 @@ findRow(
 ### Example
 
 ```typescript
-// Find first row matching criteria on the default scan range
+// Expects exactly one match — throws if two rows both have Name: 'John Doe'
 const row = await table.findRow({ Name: 'John Doe' });
 
 // Search up to the first 5 pages
@@ -431,9 +435,12 @@ await row.getCell('Email').click();
 
 ## reset()
 
-Reset table state and invoke onReset strategy. 
+Reset table state and invoke the `onReset` strategy.
 
-Use this when the table state matches what is in the DOM but appropriate cleanup (like clearing filters) needs to happen before a new test.
+> [!WARNING]
+> `reset()` calls `pagination.goToFirst()` (if configured), which scrolls or paginates back to page 1 and exits any active filter or sort state applied outside the library. Do **not** call `reset()` around filtered/sorted reads unless you re-apply your filters afterward — the read will silently return unfiltered data.
+
+Use this between independent test operations to return the table to a clean baseline.
 
 
 <!-- api-signature: reset -->
