@@ -1,5 +1,8 @@
 import { defineConfig } from 'vitepress'
 
+/** Draft Lab (docs/lab): included in `docs:dev`; omitted from `docs:build` via scripts/docs-build-prod.mjs (sets LAB_PAGES=0). */
+const includeLabPages = process.env.LAB_PAGES !== '0'
+
 const presetSidebar = [
     {
         text: 'Presets (maintainers)',
@@ -18,7 +21,8 @@ export default defineConfig({
     themeConfig: {
         nav: [
             { text: 'Guide', link: '/guide/getting-started' },
-            { text: 'Concepts', link: '/concepts/strategies' },
+            ...(includeLabPages ? ([{ text: 'Lab', link: '/lab/' }] as const) : []),
+            { text: 'Concepts', link: '/concepts/table-anatomy' },
             { text: 'API', link: '/api/' },
             { text: 'Examples', link: '/examples/' },
             { text: 'Recipes', link: '/recipes/' },
@@ -42,9 +46,24 @@ export default defineConfig({
             '/concepts/': [
                 {
                     text: 'Concepts',
-                    items: [{ text: 'Strategies', link: '/concepts/strategies' }]
+                    items: [
+                        { text: 'Table Anatomy', link: '/concepts/table-anatomy' },
+                        { text: 'Header Mapping', link: '/concepts/header-mapping' },
+                        { text: 'Pagination Strategies', link: '/concepts/pagination-strategies' },
+                        { text: 'Strategies', link: '/concepts/strategies' }
+                    ]
                 }
             ],
+            ...(includeLabPages
+                ? {
+                      '/lab/': [
+                          {
+                              text: 'Lab (draft)',
+                              items: [{ text: 'Rough drafts', link: '/lab/' }]
+                          }
+                      ]
+                  }
+                : {}),
             '/examples/': [
                 {
                     text: 'Examples',
