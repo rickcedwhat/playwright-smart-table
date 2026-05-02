@@ -19,10 +19,12 @@ type PType = 'page-buttons' | 'load-more' | 'infinite-scroll'
 const ptype = ref<PType>('page-buttons')
 
 // ── Selector toggles (page-buttons only) ─────────────────────────────────
-const togFirst    = ref(true)
-const togNextBulk = ref(true)
-const togPrevBulk = ref(true)
-const togPageNums = ref(true)
+const togFirst         = ref(true)
+const togLast          = ref(true)
+const togNextBulk      = ref(true)
+const togPrevBulk      = ref(true)
+const togPageNums      = ref(true)
+const togNumberOfPages = ref(true)
 
 function onToggle() { clearPlan() }
 
@@ -43,7 +45,7 @@ const tableRows = computed(() => {
 })
 
 // ── Plan ──────────────────────────────────────────────────────────────────
-type StepType = 'goFirst' | 'goNext' | 'goPrev' | 'goNextBulk' | 'goPrevBulk' | 'goPage'
+type StepType = 'goFirst' | 'goLast' | 'goNext' | 'goPrev' | 'goNextBulk' | 'goPrevBulk' | 'goPage'
 interface PlanStep { type: StepType; targetPage: number; done: boolean }
 
 const plan      = ref<PlanStep[]>([])
@@ -57,9 +59,10 @@ const isExec    = ref(false)
 const execTimer = ref<ReturnType<typeof setTimeout> | null>(null)
 
 const STEP_META: Record<StepType, { label: string; btn: string; color: string }> = {
-  goFirst:    { label: 'Jump to first',          btn: '|< First', color: '#818cf8' },
-  goNext:     { label: 'Next page',              btn: 'Next →',   color: '#60a5fa' },
-  goPrev:     { label: 'Previous page',          btn: '← Prev',   color: '#60a5fa' },
+  goFirst:    { label: 'Jump to first',          btn: '|<',       color: '#818cf8' },
+  goLast:     { label: 'Jump to last',           btn: '>|',       color: '#f472b6' },
+  goNext:     { label: 'Next page',              btn: '>',        color: '#60a5fa' },
+  goPrev:     { label: 'Previous page',          btn: '<',        color: '#60a5fa' },
   goNextBulk: { label: `Skip +${BULK_N} pages`,  btn: '>>',       color: '#a78bfa' },
   goPrevBulk: { label: `Skip −${BULK_N} pages`,  btn: '<<',       color: '#a78bfa' },
   goPage:     { label: 'Click page number',      btn: '#',        color: '#34d399' },
@@ -141,64 +144,82 @@ function computePlan() {
 
   let steps: PlanStep[] | null = null
 
+  // Helper: build backward path from a page to a target (used for wrap-around)
+  function buildBackward(fromPage: number, toPage: number): PlanStep[] | null {
+    const s: PlanStep[] = []
+    let cur = fromPage
+    while (cur > toPage) {
+      if (togPrevBulk.value && cur - BULK_N >= toPage) {
+        cur -= BULK_N; s.push({ type: 'goPrevBulk', targetPage: cur, done: false })
+      } else {
+        cur--; s.push({ type: 'goPrev', targetPage: cur, done: false })
+      }
+    }
+    return cur === toPage ? s : null
+  }
+
+  // Helper: wrap-around via goLast — only valid when togLast && togNumberOfPages
+  function wrapPath(goPageStep?: PlanStep): PlanStep[] | null {
+    if (!togLast.value || !togNumberOfPages.value) return null
+    const goLastStep: PlanStep = { type: 'goLast', targetPage: TOTAL_PAGES, done: false }
+    const target = goPageStep ? windowOf(to) : to
+    if (goPageStep) {
+      // page-numbers mode: land in target window via goLast (which is in last window), then goPrevBulk back
+      const lastWin = windowOf(TOTAL_PAGES)
+      if (lastWin < target) return null // goLast undershoots (shouldn't happen with TOTAL_PAGES=100)
+      const backSteps: PlanStep[] = []
+      let cur = TOTAL_PAGES
+      while (windowOf(cur) > target) {
+        if (togPrevBulk.value) { cur = Math.max(cur - BULK_N, 1); backSteps.push({ type: 'goPrevBulk', targetPage: cur, done: false }) }
+        else { cur--; backSteps.push({ type: 'goPrev', targetPage: cur, done: false }) }
+      }
+      return [goLastStep, ...backSteps, goPageStep]
+    } else {
+      const back = buildBackward(TOTAL_PAGES, target)
+      return back !== null ? [goLastStep, ...back] : null
+    }
+  }
+
+  function shorter(a: PlanStep[] | null, b: PlanStep[] | null): PlanStep[] | null {
+    if (!a) return b; if (!b) return a
+    return a.length <= b.length ? a : b
+  }
+
   if (togPageNums.value) {
-    // With page numbers: navigate to the target window, then click the page number directly
     const fromWin   = windowOf(from)
     const toWin     = windowOf(to)
     const goPageStep: PlanStep = { type: 'goPage', targetPage: to, done: false }
 
     if (fromWin === toWin) {
-      // Already in the right window — one click
       steps = [goPageStep]
     } else if (toWin > fromWin) {
-      // Forward: bulk-advance into target window, then click
-      steps = [...buildForwardToWindow(from, toWin), goPageStep]
+      const fwd = [...buildForwardToWindow(from, toWin), goPageStep]
+      steps = shorter(fwd, wrapPath(goPageStep))
     } else {
-      // Backward — Option A: goFirst + forward to window
+      // Backward — Option A: goFirst + forward; Option B: prevBulk/prev
       let optA: PlanStep[] | null = null
-      if (togFirst.value) {
-        optA = [{ type: 'goFirst', targetPage: 1, done: false }, ...buildForwardToWindow(1, toWin), goPageStep]
-      }
-      // Option B: goPrevBulk (or goPrev) until in target window
+      if (togFirst.value) optA = [{ type: 'goFirst', targetPage: 1, done: false }, ...buildForwardToWindow(1, toWin), goPageStep]
       let optB: PlanStep[] | null = []
       let cur = from
       while (windowOf(cur) > toWin) {
-        if (togPrevBulk.value) {
-          cur = Math.max(cur - BULK_N, 1)
-          optB.push({ type: 'goPrevBulk', targetPage: cur, done: false })
-        } else {
-          cur--
-          optB.push({ type: 'goPrev', targetPage: cur, done: false })
-        }
+        if (togPrevBulk.value) { cur = Math.max(cur - BULK_N, 1); optB.push({ type: 'goPrevBulk', targetPage: cur, done: false }) }
+        else { cur--; optB.push({ type: 'goPrev', targetPage: cur, done: false }) }
         if (cur < 1) { optB = null; break }
       }
       if (optB) optB.push(goPageStep)
-
-      if (!optA && !optB) { planError.value = "Enable 'first' or 'previous' to navigate backward"; return }
-      steps = optA && optB ? (optA.length <= optB.length ? optA : optB) : (optA ?? optB)
+      steps = shorter(optA, optB)
+      if (!steps) { planError.value = "Enable 'first' or 'previous' to navigate backward"; return }
     }
   } else {
-    // Without page numbers: step-by-step navigation
     if (to > from) {
-      steps = buildForward(from, to)
+      const fwd = buildForward(from, to)
+      steps = shorter(fwd, wrapPath())
     } else {
       let optA: PlanStep[] | null = null
-      if (togFirst.value) {
-        optA = [{ type: 'goFirst', targetPage: 1, done: false }, ...buildForward(1, to)]
-      }
-      let optB: PlanStep[] | null = []
-      let cur = from
-      while (cur > to) {
-        if (togPrevBulk.value && cur - BULK_N >= to) {
-          cur -= BULK_N; optB.push({ type: 'goPrevBulk', targetPage: cur, done: false })
-        } else {
-          cur--; optB.push({ type: 'goPrev', targetPage: cur, done: false })
-        }
-      }
-      if (cur !== to) optB = null
-
-      if (!optA && !optB) { planError.value = "Enable 'previous' or 'first' to navigate backward"; return }
-      steps = optA && optB ? (optA.length <= optB.length ? optA : optB) : (optA ?? optB)
+      if (togFirst.value) optA = [{ type: 'goFirst', targetPage: 1, done: false }, ...buildForward(1, to)]
+      const optB = buildBackward(from, to)
+      steps = shorter(optA, optB)
+      if (!steps) { planError.value = "Enable 'previous' or 'first' to navigate backward"; return }
     }
   }
 
@@ -316,15 +337,6 @@ function onScroll(e: Event) {
               <span class="ps-gutter ps-gutter--lock" title="required">⌁</span>
               <span class="t-ind">  </span><span class="t-key">previous</span><span class="t-dim">:      </span><span class="t-str">page.locator('[data-pg="prev"]')</span><span class="t-dim">,</span>
             </div>
-            <!-- Optional: pageNumbers -->
-            <div class="ps-el" :class="{ 'ps-el--off': !togPageNums }">
-              <label class="ps-gutter ps-gutter--cb" title="toggle page number buttons">
-                <input type="checkbox" v-model="togPageNums" @change="onToggle" />
-              </label>
-              <span class="t-ind">  </span>
-              <span v-if="!togPageNums" class="t-comment">// </span>
-              <span class="t-key">pageNumbers</span><span class="t-dim">:  </span><span class="t-str">page.locator('[data-pg-num]')</span><span class="t-dim">,</span>
-            </div>
             <!-- Optional: first -->
             <div class="ps-el" :class="{ 'ps-el--off': !togFirst }">
               <label class="ps-gutter ps-gutter--cb" title="toggle first selector">
@@ -333,6 +345,15 @@ function onScroll(e: Event) {
               <span class="t-ind">  </span>
               <span v-if="!togFirst" class="t-comment">// </span>
               <span class="t-key">first</span><span class="t-dim">:         </span><span class="t-str">page.locator('[data-pg="first"]')</span><span class="t-dim">,</span>
+            </div>
+            <!-- Optional: last -->
+            <div class="ps-el" :class="{ 'ps-el--off': !togLast }">
+              <label class="ps-gutter ps-gutter--cb" title="toggle last selector">
+                <input type="checkbox" v-model="togLast" @change="onToggle" />
+              </label>
+              <span class="t-ind">  </span>
+              <span v-if="!togLast" class="t-comment">// </span>
+              <span class="t-key">last</span><span class="t-dim">:          </span><span class="t-str">page.locator('[data-pg="last"]')</span><span class="t-dim">,</span>
             </div>
             <!-- Optional: nextBulk -->
             <div class="ps-el" :class="{ 'ps-el--off': !togNextBulk }">
@@ -343,12 +364,6 @@ function onScroll(e: Event) {
               <span v-if="!togNextBulk" class="t-comment">// </span>
               <span class="t-key">nextBulk</span><span class="t-dim">:      </span><span class="t-str">page.locator('[data-pg="next-bulk"]')</span><span class="t-dim">,</span>
             </div>
-            <transition name="ps-fade">
-              <div v-if="togNextBulk" class="ps-el ps-el--extra">
-                <span class="ps-gutter"/><span class="t-ind">  </span>
-                <span class="t-key">nextBulkPages</span><span class="t-dim">: </span><span class="t-num">{{ BULK_N }}</span><span class="t-dim">,</span>
-              </div>
-            </transition>
             <!-- Optional: previousBulk -->
             <div class="ps-el" :class="{ 'ps-el--off': !togPrevBulk }">
               <label class="ps-gutter ps-gutter--cb" title="toggle previousBulk selector">
@@ -358,13 +373,39 @@ function onScroll(e: Event) {
               <span v-if="!togPrevBulk" class="t-comment">// </span>
               <span class="t-key">previousBulk</span><span class="t-dim">:  </span><span class="t-str">page.locator('[data-pg="prev-bulk"]')</span><span class="t-dim">,</span>
             </div>
-            <transition name="ps-fade">
-              <div v-if="togPrevBulk" class="ps-el ps-el--extra">
-                <span class="ps-gutter"/><span class="t-ind">  </span>
-                <span class="t-key">previousBulkPages</span><span class="t-dim">: </span><span class="t-num">{{ BULK_N }}</span><span class="t-dim">,</span>
+            <!-- Close selectors arg; open options arg if any options active -->
+            <div class="ps-el">
+              <span class="ps-gutter"/>
+              <span class="t-br">}</span><span v-if="togNextBulk || togPrevBulk || togNumberOfPages" class="t-dim">,</span>
+            </div>
+            <template v-if="togNextBulk || togPrevBulk || togNumberOfPages">
+              <div class="ps-el"><span class="ps-gutter"/><span class="t-br">{</span></div>
+              <!-- nextBulkPages -->
+              <transition name="ps-fade">
+                <div v-if="togNextBulk" class="ps-el">
+                  <span class="ps-gutter"/><span class="t-ind">  </span>
+                  <span class="t-key">nextBulkPages</span><span class="t-dim">:    </span><span class="t-num">{{ BULK_N }}</span><span class="t-dim">,</span>
+                </div>
+              </transition>
+              <!-- previousBulkPages -->
+              <transition name="ps-fade">
+                <div v-if="togPrevBulk" class="ps-el">
+                  <span class="ps-gutter"/><span class="t-ind">  </span>
+                  <span class="t-key">previousBulkPages</span><span class="t-dim">: </span><span class="t-num">{{ BULK_N }}</span><span class="t-dim">,</span>
+                </div>
+              </transition>
+              <!-- Optional: numberOfPages -->
+              <div class="ps-el" :class="{ 'ps-el--off': !togNumberOfPages }">
+                <label class="ps-gutter ps-gutter--cb" title="toggle numberOfPages option">
+                  <input type="checkbox" v-model="togNumberOfPages" @change="onToggle" />
+                </label>
+                <span class="t-ind">  </span>
+                <span v-if="!togNumberOfPages" class="t-comment">// </span>
+                <span class="t-key">numberOfPages</span><span class="t-dim">:    </span><span class="t-num">{{ TOTAL_PAGES }}</span><span class="t-dim">,</span>
               </div>
-            </transition>
-            <div class="ps-el"><span class="t-br">}</span><span class="t-br">)</span></div>
+              <div class="ps-el"><span class="ps-gutter"/><span class="t-br">}</span></div>
+            </template>
+            <div class="ps-el"><span class="t-br">)</span></div>
           </template>
         </div>
 
@@ -466,7 +507,8 @@ function onScroll(e: Event) {
             @click="manualNav(() => page < TOTAL_PAGES && page++)">&gt;</button>
           <button class="ps-pb" :class="{ 'ps-pb--dim': !canNext, 'ps-pb--flash': flash('goNextBulk') }"
             v-if="togNextBulk" @click="manualNav(() => page=Math.min(TOTAL_PAGES,page+BULK_N))">&gt;&gt;</button>
-          <button class="ps-pb" :class="{ 'ps-pb--dim': page===TOTAL_PAGES }"
+          <button v-if="togLast" class="ps-pb"
+            :class="{ 'ps-pb--dim': page===TOTAL_PAGES, 'ps-pb--flash': flash('goLast') }"
             @click="manualNav(() => page=TOTAL_PAGES)">&gt;|</button>
         </div>
 
