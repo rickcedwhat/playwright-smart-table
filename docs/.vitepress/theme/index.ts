@@ -13,6 +13,9 @@ import LabFeedbackMark from './components/lab/LabFeedbackMark.vue'
 import LabMethodWalkthrough from './components/lab/LabMethodWalkthrough.vue'
 import LabStrategyPicker from './components/lab/LabStrategyPicker.vue'
 import LabTableTypeGallery from './components/lab/LabTableTypeGallery.vue'
+import LabGetRowTrace from './components/lab/LabGetRowTrace.vue'
+import LabForEachTrace from './components/lab/LabForEachTrace.vue'
+import LabPaginationSandbox from './components/lab/LabPaginationSandbox.vue'
 import HeaderMapping from './components/HeaderMapping.vue'
 import PaginationStrategies from './components/PaginationStrategies.vue'
 import TableAnatomy from './components/TableAnatomy.vue'
@@ -32,6 +35,9 @@ export default {
     app.component('LabMethodWalkthrough', LabMethodWalkthrough)
     app.component('LabStrategyPicker', LabStrategyPicker)
     app.component('LabTableTypeGallery', LabTableTypeGallery)
+    app.component('LabGetRowTrace', LabGetRowTrace)
+    app.component('LabForEachTrace', LabForEachTrace)
+    app.component('LabPaginationSandbox', LabPaginationSandbox)
     app.component('HeaderMapping', HeaderMapping)
     app.component('PaginationStrategies', PaginationStrategies)
     app.component('TableAnatomy', TableAnatomy)

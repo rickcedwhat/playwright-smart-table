@@ -37,6 +37,20 @@ flowchart LR
 
 <LabDebugPlayback />
 
+## Pagination sandbox <LabFeedbackMark slug="pagination-sandbox" label="Pagination sandbox" />
+
+Switch between pagination types. Toggle selectors on/off — disabled buttons go dark in the mock UI and drop out of the generated config. The library page counter updates as you navigate.
+
+<LabPaginationSandbox />
+
+## findRow trace (step-through) <LabFeedbackMark slug="findrow-trace" label="findRow trace step-through" />
+
+<LabGetRowTrace />
+
+## forEach trace (animated) <LabFeedbackMark slug="foreach-trace" label="forEach trace animation" />
+
+<LabForEachTrace />
+
 ## Live query builder <LabFeedbackMark slug="query-builder" label="Live query builder" />
 
 Edit the `getRow` call directly — add and remove key/value pairs, watch the table respond in real time. Misspell a column name to see the guided error with fuzzy suggestions, right inline.

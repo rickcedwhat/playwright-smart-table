@@ -248,6 +248,35 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       return resolve(config.headerSelector as Selector, rootLocator).nth(idx);
     },
 
+    countRows: async (options?: { exact?: boolean }): Promise<number> => {
+      await _autoInit();
+      // Right now we ignore options.exact because we don't have filters here. 
+      // This is a simple count on current page.
+      const allRows = resolve(config.rowSelector, rootLocator);
+      return allRows.count();
+    },
+
+    mapColumn: async <R = unknown>(columnName: string, options: import('./types').RowIterationOptions = {}): Promise<R[]> => {
+      await _autoInit();
+      return result.map(async ({ row }) => {
+        const cell = row.getCell(columnName);
+        await cell.bringIntoView();
+        
+        const columnOverride = config.columnOverrides?.[columnName as keyof T];
+        if (columnOverride?.read) {
+            return await columnOverride.read(cell) as R;
+        }
+        
+        const text = await cell.innerText();
+        return (text || '').trim() as unknown as R;
+      }, options);
+    },
+
+    getColumnValues: async (columnName: string, options: import('./types').RowIterationOptions = {}): Promise<string[]> => {
+      const values = await result.mapColumn<unknown>(columnName, options);
+      return values.map(v => String(v));
+    },
+
     reset: async () => {
       log("Resetting table...");
       await config.onReset(createStrategyContext());

@@ -45,6 +45,11 @@
     "comment": "/**\n* ASYNC: Searches for all matching rows across pages using pagination.\n* Auto-initializes the table if not already initialized.\n* @param filters - The filter criteria to match (omit or pass {} for all rows)\n* @param options - Search options including exact match and max pages\n*/"
   },
   {
+    "name": "countRows",
+    "signature": "countRows: (options?: { maxPages?: number }) => Promise<number>",
+    "comment": "/**\n* ASYNC: Counts the number of rows across pages using pagination or current page only.\n* Auto-initializes the table if not already initialized.\n* @param options - Options including maxPages (default is 1 for current page only in v1)\n*/"
+  },
+  {
     "name": "scrollToColumn",
     "signature": "scrollToColumn: (columnName: string) => Promise<void>",
     "comment": "/**\n* Navigates to a specific column using the configured CellNavigationStrategy.\n*/"

@@ -1,0 +1,23 @@
+{
+  "name": "@rickcedwhat/pst-mcp-server",
+  "version": "0.1.0",
+  "description": "MCP server — analyze HTML tables and data grids, get back PST config hints",
+  "author": "Cedrick Catalan",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "pst-mcp": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "playwright": "^1.50.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0"
+  }
+}

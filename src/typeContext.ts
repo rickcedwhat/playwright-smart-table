@@ -164,6 +164,21 @@ export interface ViewportStrategy {
 
 
 /**
+ * SmartCell - A Playwright Locator with table-aware methods for single-cell operations.
+ * 
+ * Extends all standard Locator methods (click, isVisible, etc.).
+ */
+export type SmartCell = Locator & {
+  /**
+   * Scrolls/paginates to bring this specific cell into view using the configured strategies.
+   * Useful when the grid is horizontally virtualized and the column must be scrolled
+   * into view before it can be interacted with or read.
+   */
+  bringIntoView(): Promise<void>;
+};
+
+
+/**
  * SmartRow - A Playwright Locator with table-aware methods.
  * 
  * Extends all standard Locator methods (click, isVisible, etc.) with table-specific functionality.
@@ -188,12 +203,13 @@ export type SmartRow<T = any> = Locator & {
   /**
    * Get a cell locator by column name.
    * @param column - Column name (case-sensitive)
-   * @returns Locator for the cell
+   * @returns SmartCell (Locator + bringIntoView)
    * @example
    * const emailCell = row.getCell('Email');
+   * await emailCell.bringIntoView();
    * await expect(emailCell).toHaveText('john@example.com');
    */
-  getCell(column: string): Locator;
+  getCell(column: string): SmartCell;
 
   /**
    * Extract all cell data as a key-value object.
@@ -615,6 +631,27 @@ export interface TableResult<T = any> extends AsyncIterable<{ row: SmartRow<T>; 
    */
   scrollToColumn: (columnName: string) => Promise<void>;
 
+  /**
+   * Counts the number of rows currently on the page.
+   * Does not paginate.
+   * @param options - Optional filtering. (Currently only exact match supported)
+   */
+  countRows: (options?: { exact?: boolean }) => Promise<number>;
+
+  /**
+   * Iterates over rows and extracts the value of a single column.
+   * More efficient than map + toJSON for single-column extraction.
+   * @param columnName - The name of the column to extract
+   * @param options - Iteration options
+   */
+  mapColumn<R = unknown>(columnName: string, options?: RowIterationOptions): Promise<R[]>;
+
+  /**
+   * Iterates over rows and extracts the value of a single column as strings.
+   * @param columnName - The name of the column to extract
+   * @param options - Iteration options
+   */
+  getColumnValues(columnName: string, options?: RowIterationOptions): Promise<string[]>;
 
 
   /**

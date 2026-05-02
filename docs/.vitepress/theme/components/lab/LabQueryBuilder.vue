@@ -65,6 +65,14 @@ const resultState = computed((): ResultState => {
   if (matchCount.value === 0) return 'none'
   return 'many'
 })
+
+// Second line: getCell
+const cellCol = ref('')
+const cellValue = computed(() => {
+  if (resultState.value !== 'ok' || !cellCol.value) return null
+  const field = colMap[cellCol.value]
+  return field ? matches.value[0]?.[field] ?? null : null
+})
 </script>
 
 <template>
@@ -109,6 +117,21 @@ const resultState = computed((): ResultState => {
         <div class="qb-ln qb-ln--static">
           <span class="t-brace">}</span><span class="t-brace">)</span>
         </div>
+
+        <div class="qb-ln qb-ln--cell">
+          <span class="t-kw">await</span><span class="t-dim">&nbsp;</span><span class="t-var">row</span><span class="t-dim">.</span><span class="t-fn">getCell</span><span class="t-brace">(</span><span class="t-quote">'</span><input
+            v-model="cellCol"
+            class="qb-input qb-input--cellcol"
+            :style="{ width: `${(cellCol.length || 'Column'.length) + 1}ch` }"
+            placeholder="Column"
+            spellcheck="false"
+          /><span class="t-quote">'</span><span class="t-brace">)</span><span class="t-dim">.</span><span class="t-fn">textContent</span><span class="t-brace">(</span><span class="t-brace">)</span>
+        </div>
+        <transition name="qb-fade">
+          <div v-if="cellValue !== null" class="qb-ln">
+            <span class="t-cell-result">//&nbsp;→&nbsp;'{{ cellValue }}'</span>
+          </div>
+        </transition>
       </div>
 
       <!-- Result -->
@@ -229,6 +252,7 @@ const resultState = computed((): ResultState => {
   line-height: inherit;
   padding: 0;
   min-width: 1ch;
+  flex-shrink: 0;
   transition: border-color 0.12s;
 }
 .qb-input:focus { border-bottom-color: rgba(255,255,255,0.35); }
@@ -240,6 +264,11 @@ const resultState = computed((): ResultState => {
 
 .qb-input--val { color: #ce9178; }
 .qb-input--val::placeholder { color: #6b4a38; }
+
+.qb-input--cellcol { color: #ce9178; }
+.qb-input--cellcol::placeholder { color: #6b4a38; }
+
+.t-cell-result { color: #6a9955; white-space: nowrap; }
 
 /* Delete button */
 .qb-del {
@@ -311,8 +340,9 @@ const resultState = computed((): ResultState => {
 .qb-table-shell {
   border: 1px solid color-mix(in srgb, var(--vp-c-divider) 85%, transparent);
   border-radius: 10px; overflow: hidden; background: var(--vp-c-bg);
+  display: flex; justify-content: center;
 }
-.qb-table { width: 100%; border-collapse: collapse; font-size: 0.76rem; }
+.qb-table { width: auto; min-width: 260px; border-collapse: collapse; font-size: 0.76rem; }
 .qb-table th, .qb-table td {
   padding: 7px 9px;
   border-bottom: 1px solid color-mix(in srgb, var(--vp-c-divider) 70%, transparent);
