@@ -164,10 +164,10 @@ function clearScanVisuals() {
   cellClassMap.value = {}
 }
 
-async function pulseNextButton() {
+async function pulseNextButton(runId: number) {
   pagerPulseTarget.value = 'Next'
   await sleep(280)
-  pagerPulseTarget.value = null
+  if (runId === scanRunId) pagerPulseTarget.value = null
 }
 
 async function animateFindRowScan(step: number) {
@@ -247,7 +247,7 @@ async function animateFindRowScan(step: number) {
 
     if (pageIdx < pages.length - 1) {
       traceLines.value = [...traceLines.value, 'Clicking Next...']
-      await pulseNextButton()
+      await pulseNextButton(runId)
       if (runId !== scanRunId) return
       traceLines.value = [
         pagerTraceHeader,

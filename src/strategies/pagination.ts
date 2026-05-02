@@ -77,10 +77,13 @@ export const PaginationStrategies = {  /**
           }
         : undefined,
       getTotalPages: options.numberOfPages ? async (context) => {
-        if (typeof options.numberOfPages === 'function') {
-          return await options.numberOfPages(context.root);
+        const result = typeof options.numberOfPages === 'function'
+          ? await options.numberOfPages(context.root)
+          : options.numberOfPages;
+        if (typeof result !== 'number' || !Number.isFinite(result) || !Number.isInteger(result) || result < 1) {
+          throw new Error(`[SmartTable] numberOfPages must return a finite integer >= 1 (received: ${result})`);
         }
-        return options.numberOfPages as number;
+        return result;
       } : undefined,
       nextBulkPages: nextBulk,
       previousBulkPages: prevBulk,

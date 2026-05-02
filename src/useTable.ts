@@ -224,13 +224,18 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       logDebug(config, 'info', `Table initialized with ${map.size} columns`, Array.from(map.keys()));
 
       if (config.strategies.pagination?.detectCurrentPage) {
-        const detected = await config.strategies.pagination.detectCurrentPage(rootLocator);
-        if (Number.isInteger(detected) && detected >= 0) {
-          tableState.currentPageIndex = detected;
-          logDebug(config, 'info', `init: detected starting page index ${detected}`);
-        } else {
+        try {
+          const detected = await config.strategies.pagination.detectCurrentPage(rootLocator);
+          if (Number.isInteger(detected) && detected >= 0) {
+            tableState.currentPageIndex = detected;
+            logDebug(config, 'info', `init: detected starting page index ${detected}`);
+          } else {
+            tableState.currentPageIndex = 0;
+            logDebug(config, 'error', `init: detectCurrentPage returned invalid index (${detected}); defaulting to 0`);
+          }
+        } catch (e) {
           tableState.currentPageIndex = 0;
-          logDebug(config, 'error', `init: detectCurrentPage returned invalid index (${detected}); defaulting to 0`);
+          logDebug(config, 'error', `init: detectCurrentPage failed`, e);
         }
       }
 
