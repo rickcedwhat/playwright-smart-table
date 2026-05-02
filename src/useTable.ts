@@ -225,8 +225,13 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
 
       if (config.strategies.pagination?.detectCurrentPage) {
         const detected = await config.strategies.pagination.detectCurrentPage(rootLocator);
-        tableState.currentPageIndex = detected;
-        logDebug(config, 'info', `init: detected starting page index ${detected}`);
+        if (Number.isInteger(detected) && detected >= 0) {
+          tableState.currentPageIndex = detected;
+          logDebug(config, 'info', `init: detected starting page index ${detected}`);
+        } else {
+          tableState.currentPageIndex = 0;
+          logDebug(config, 'error', `init: detectCurrentPage returned invalid index (${detected}); defaulting to 0`);
+        }
       }
 
       await debugDelay(config, 'default');

@@ -58,6 +58,7 @@ function setActive(key: StrategyKey) {
         type="button"
         class="strategy-card"
         :class="{ active: active === strategy.key }"
+        :aria-pressed="active === strategy.key"
         @focus="setActive(strategy.key)"
         @mouseenter="setActive(strategy.key)"
         @click="setActive(strategy.key)"
@@ -109,24 +110,24 @@ function setActive(key: StrategyKey) {
 
         <div class="footer">
           <template v-if="active === 'next'">
-            <button type="button" class="pill highlight">Previous</button>
+            <span class="pill highlight">Previous</span>
             <span>Page 1 of 5</span>
-            <button type="button" class="pill highlight">Next</button>
+            <span class="pill highlight">Next</span>
           </template>
 
           <template v-else-if="active === 'first'">
-            <button type="button" class="pill highlight">First</button>
-            <button type="button" class="pill">Previous</button>
+            <span class="pill highlight">First</span>
+            <span class="pill">Previous</span>
             <span>Page 3 of 5</span>
-            <button type="button" class="pill">Next</button>
+            <span class="pill">Next</span>
           </template>
 
           <template v-else-if="active === 'page'">
-            <button type="button" class="page-number">1</button>
-            <button type="button" class="page-number highlight">2</button>
-            <button type="button" class="page-number">3</button>
-            <button type="button" class="page-number">4</button>
-            <button type="button" class="page-number">5</button>
+            <span class="page-number">1</span>
+            <span class="page-number highlight">2</span>
+            <span class="page-number">3</span>
+            <span class="page-number">4</span>
+            <span class="page-number">5</span>
           </template>
 
           <template v-else>
@@ -136,7 +137,7 @@ function setActive(key: StrategyKey) {
               </span>
               <span>Scroll reached bottom</span>
             </span>
-            <button type="button" class="pill highlight">Rows appended</button>
+            <span class="pill highlight">Rows appended</span>
           </template>
         </div>
       </div>

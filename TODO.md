@@ -4,9 +4,9 @@ Local sequencing and scratch work — **not** a public roadmap. Prefer GitHub is
 
 ## Virtual grids / Braintrust-style coverage
 
-- [x] `braintrust` like coverage (impl in playground) -> solve scroll hazard with beforeRowRead or X-only column reveal for 2D virtual grids (see issue 47 + issue 46) + wrap getCell() with SmartCell (Locator + bringIntoView) #43 ([#43](https://github.com/rickcedwhat/playwright-smart-table/issues/43), [#46](https://github.com/rickcedwhat/playwright-smart-table/issues/46), [#47](https://github.com/rickcedwhat/playwright-smart-table/issues/47))
+- [x] `braintrust`-like coverage (impl in playground) -> solve scroll hazard with beforeRowRead or X-only column reveal for 2D virtual grids (see issue 47 + issue 46) + wrap getCell() with SmartCell (Locator + bringIntoView) #43 ([#43](https://github.com/rickcedwhat/playwright-smart-table/issues/43), [#46](https://github.com/rickcedwhat/playwright-smart-table/issues/46), [#47](https://github.com/rickcedwhat/playwright-smart-table/issues/47))
 - [ ] `npm run apply` -> `npx @rickcedwhat/antigravity apply`? (review this)
-- [ ] add `/new-table` workflow -> interactive wizard to setup a new table configuration in a project (like a CLI)s
+- [ ] add `/new-table` workflow -> interactive wizard to setup a new table configuration in a project (like a CLI)
 
 **GitHub:** [#46](https://github.com/rickcedwhat/playwright-smart-table/issues/46) (docs hazard), [#47](https://github.com/rickcedwhat/playwright-smart-table/issues/47) (optional API). Split notes: [docs/internal/issue-45-split.md](docs/internal/issue-45-split.md).
 

@@ -65,8 +65,9 @@ export const PaginationStrategies = {  /**
       goToPage: selectors.pageNumbers
         ? async (pageIndex: number, context: TableContext) => {
             const { root, resolve } = context;
+            const pageLabel = String(pageIndex + 1);
             const btn = resolve(selectors.pageNumbers!, root)
-              .filter({ hasText: String(pageIndex + 1) })
+              .filter({ hasText: new RegExp(`^\\s*${pageLabel}\\s*$`) })
               .first();
             if (!await btn.isVisible().catch(() => false)) return false;
             if (!await btn.isEnabled().catch(() => false)) return false;

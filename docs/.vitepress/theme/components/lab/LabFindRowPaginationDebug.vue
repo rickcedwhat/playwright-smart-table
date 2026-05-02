@@ -34,7 +34,17 @@ const pages: Array<Array<Record<string, string>>> = [
   ]
 ]
 
-const MATCH_PAGE_INDEX = 3
+const TARGET_NAME = 'Mina Patel'
+const target = (() => {
+  for (let p = 0; p < pages.length; p++) {
+    const r = pages[p].findIndex(row => row.Name === TARGET_NAME)
+    if (r !== -1) return { pageIndex: p, rowIndex: r }
+  }
+  return { pageIndex: 3, rowIndex: 0 } // Fallback
+})()
+
+const MATCH_PAGE_INDEX = target.pageIndex
+const MATCH_ROW_INDEX = target.rowIndex
 
 const currentPage = ref(0)
 const cellClassMap = ref<Record<string, string>>({})
@@ -120,7 +130,7 @@ const stepNotes = [
 
 const rows = computed(() => {
   return pages[currentPage.value].map((row, idx) => {
-    if (activeStep.value !== null && activeStep.value >= 3 && currentPage.value === MATCH_PAGE_INDEX && idx === 0) {
+    if (activeStep.value !== null && activeStep.value >= 3 && currentPage.value === MATCH_PAGE_INDEX && idx === MATCH_ROW_INDEX) {
       return { ...row, '': '☑' }
     }
     return row
@@ -179,16 +189,17 @@ async function animateFindRowScan(step: number) {
   if (step > 2) {
     currentPage.value = MATCH_PAGE_INDEX
     cellClassMap.value = {
-      '0:Name': 'dbg-cell--match',
-      '1:Name': 'dbg-cell--miss',
-      '2:Name': 'dbg-cell--miss'
+      [`${MATCH_ROW_INDEX}:Name`]: 'dbg-cell--match',
     }
+    // Set misses for other rows on that page if any
+    pages[MATCH_PAGE_INDEX].forEach((_, i) => {
+        if (i !== MATCH_ROW_INDEX) cellClassMap.value[`${i}:Name`] = 'dbg-cell--miss'
+    })
+
     traceLines.value = [
       pagerTraceHeader,
-      'Page 1 scanned -> no match',
-      'Page 2 scanned -> no match',
-      'Page 3 scanned -> no match',
-      `Page ${MATCH_PAGE_INDEX + 1} scanned -> Mina Patel matched`,
+      ...Array.from({ length: MATCH_PAGE_INDEX }, (_, i) => `Page ${i + 1} scanned -> no match`),
+      `Page ${MATCH_PAGE_INDEX + 1} scanned -> ${TARGET_NAME} matched`,
       `table.currentPageIndex === ${MATCH_PAGE_INDEX}`
     ]
     return
@@ -204,22 +215,25 @@ async function animateFindRowScan(step: number) {
       `Scanning page ${pageIdx + 1}...`
     ]
     await sleep(320)
+    if (runId !== scanRunId) return
 
     const pageMap: Record<string, string> = {}
     let foundOnPage = false
     for (let rowIdx = 0; rowIdx < pages[pageIdx].length; rowIdx += 1) {
       const key = `${rowIdx}:Name`
-      const isMatch = pages[pageIdx][rowIdx]?.Name === 'Mina Patel'
+      const isMatch = pages[pageIdx][rowIdx]?.Name === TARGET_NAME
       pageMap[key] = isMatch ? 'dbg-cell--match' : 'dbg-cell--miss'
       if (isMatch) foundOnPage = true
     }
     cellClassMap.value = pageMap
     await sleep(foundOnPage ? 520 : 360)
+    if (runId !== scanRunId) return
+
     if (foundOnPage) {
       traceLines.value = [
         pagerTraceHeader,
         ...Array.from({ length: pageIdx }, (_, i) => `Page ${i + 1} scanned -> no match`),
-        `Page ${pageIdx + 1} scanned -> Mina Patel matched`,
+        `Page ${pageIdx + 1} scanned -> ${TARGET_NAME} matched`,
         `table.currentPageIndex === ${pageIdx}`
       ]
       findRowTraceSettled.value = true
@@ -241,6 +255,7 @@ async function animateFindRowScan(step: number) {
         `Moved to page ${pageIdx + 2}`
       ]
       await sleep(180)
+      if (runId !== scanRunId) return
     }
   }
 }

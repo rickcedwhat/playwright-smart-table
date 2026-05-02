@@ -51,7 +51,9 @@ export function planNavigationPath(
     } else {
       const bulkCountA = Math.floor(stepsForward / nextBulkSize);
       const remA = stepsForward % nextBulkSize;
-      const totalA = bulkCountA + remA;
+      const totalA = (remA === 0 || primitives.goNext)
+        ? bulkCountA + remA
+        : Infinity;
 
       let totalB = Infinity;
       let bulkCountB = 0;
@@ -69,12 +71,12 @@ export function planNavigationPath(
             if (overB > 0) path.push({ type: 'goPrevious', count: overB });
             return path;
           })()
-        : (() => {
+        : Number.isFinite(totalA) ? (() => {
             const path: NavigationStep[] = [];
             if (bulkCountA > 0) path.push({ type: 'goNextBulk', count: bulkCountA });
             if (remA > 0) path.push({ type: 'goNext', count: remA });
             return path;
-          })();
+          })() : [];
     }
 
     if (totalPages !== undefined && primitives.goToLast) {

@@ -55,7 +55,7 @@
     "comment": "/**\n* Counts the number of rows currently on the page.\n* Does not paginate.\n*/"
   },
   {
-    "name": "mapColumn<R = string>",
+    "name": "mapColumn",
     "signature": "mapColumn<R = string>(columnName: string, options?: RowIterationOptions): Promise<R[]>",
     "comment": "/**\n* Iterates over rows and extracts the value of a single column.\n* More efficient than map + toJSON for single-column extraction.\n* @param columnName - The name of the column to extract\n* @param options - Iteration options\n*/"
   },
