@@ -655,9 +655,8 @@ export interface TableResult<T = any> extends AsyncIterable<{ row: SmartRow<T>; 
   /**
    * Counts the number of rows currently on the page.
    * Does not paginate.
-   * @param options - Optional filtering. (Currently only exact match supported)
    */
-  countRows: (options?: { exact?: boolean }) => Promise<number>;
+  countRows: () => Promise<number>;
 
   /**
    * Iterates over rows and extracts the value of a single column.
@@ -665,7 +664,7 @@ export interface TableResult<T = any> extends AsyncIterable<{ row: SmartRow<T>; 
    * @param columnName - The name of the column to extract
    * @param options - Iteration options
    */
-  mapColumn<R = unknown>(columnName: string, options?: RowIterationOptions): Promise<R[]>;
+  mapColumn<R = string>(columnName: string, options?: RowIterationOptions): Promise<R[]>;
 
   /**
    * Iterates over rows and extracts the value of a single column as strings.

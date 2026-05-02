@@ -463,8 +463,9 @@ test.describe('new API additions', () => {
         const row = table.getRowByIndex(0);
         const cell = row.getCell('Status');
         
-        await expect(cell.bringIntoView()).rejects.toThrowError(/SmartTable: could not reach cell for column "Status" \(colIndex 2\) at row 0/);
-        await expect(cell.bringIntoView()).rejects.toThrowError(/Visible column range: \[0–1\]/);
-        await expect(cell.bringIntoView()).rejects.toThrowError(/Column is out of view and no navigation fallback is configured/);
+        const err = await cell.bringIntoView().catch(e => e);
+        expect(err.message).toMatch(/SmartTable: could not reach cell for column "Status" \(colIndex 2\) at row 0/);
+        expect(err.message).toMatch(/Visible column range: \[0–1\]/);
+        expect(err.message).toMatch(/Column is out of view and no navigation fallback is configured/);
     });
 });

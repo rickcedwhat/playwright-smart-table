@@ -1,5 +1,3 @@
-#!/usr/bin/env sh
-. "$(dirname -- "$0")/_/husky.sh"
 
 echo "🚧 Running build and docs generation..."
 # Check for changelog updates if version bumped

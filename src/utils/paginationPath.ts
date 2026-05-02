@@ -56,7 +56,7 @@ export function planNavigationPath(
       let totalB = Infinity;
       let bulkCountB = 0;
       let overB = 0;
-      if (hasPrev && primitives.goPreviousBulk && prevBulkSize > 0) {
+      if (hasPrev) {
         bulkCountB = Math.ceil(stepsForward / nextBulkSize);
         overB = bulkCountB * nextBulkSize - stepsForward;
         totalB = bulkCountB + overB;

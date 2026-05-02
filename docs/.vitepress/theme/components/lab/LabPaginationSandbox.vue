@@ -120,7 +120,10 @@ function computePlan() {
   clearPlan()
   const from = libPage.value
   const to   = targetPg.value
-  if (to < 1 || to > TOTAL_PAGES) { planError.value = `Page must be 1–${TOTAL_PAGES}`; return }
+  if (!Number.isInteger(to) || to < 1 || to > TOTAL_PAGES) {
+    planError.value = `Page must be an integer between 1–${TOTAL_PAGES}`
+    return
+  }
   if (from === to) { planError.value = 'Already on that page'; return }
 
   // ── Load-more / infinite-scroll: forward-only append ────────────────────
@@ -272,7 +275,11 @@ function stepClass(i: number) {
 function flash(t: StepType) { return flashBtn.value === t }
 
 // Manual page-change helpers (clears plan)
-function manualNav(fn: () => void) { if (!isExec.value) clearPlan(); fn() }
+function manualNav(guard: boolean, fn: () => void) {
+  if (!guard) return
+  if (!isExec.value) clearPlan()
+  fn()
+}
 
 function loadMore() {
   if (hasMore.value) manualNav(() => loadedPgs.value++)
@@ -280,7 +287,10 @@ function loadMore() {
 
 function onScroll(e: Event) {
   const el = e.target as HTMLElement
-  if (el.scrollHeight - el.scrollTop - el.clientHeight < 40 && hasMore.value) loadedPgs.value++
+  if (el.scrollHeight - el.scrollTop - el.clientHeight < 40 && hasMore.value) {
+    if (!isExec.value) clearPlan()
+    loadedPgs.value++
+  }
 }
 </script>
 
@@ -489,27 +499,27 @@ function onScroll(e: Event) {
         <!-- Pager: page-buttons -->
         <div v-if="ptype === 'page-buttons'" class="ps-pager">
           <button class="ps-pb" :class="{ 'ps-pb--dim': page===1, 'ps-pb--flash': flash('goFirst') }"
-            v-if="togFirst" @click="manualNav(() => page=1)">|&lt;</button>
+            v-if="togFirst" @click="manualNav(page > 1, () => page=1)">|&lt;</button>
           <button class="ps-pb" :class="{ 'ps-pb--dim': !canPrev, 'ps-pb--flash': flash('goPrevBulk') }"
-            v-if="togPrevBulk" @click="manualNav(() => page=Math.max(1,page-BULK_N))">&lt;&lt;</button>
+            v-if="togPrevBulk" @click="manualNav(canPrev, () => page=Math.max(1,page-BULK_N))">&lt;&lt;</button>
           <button class="ps-pb" :class="{ 'ps-pb--dim': !canPrev, 'ps-pb--flash': flash('goPrev') }"
-            @click="manualNav(() => page > 1 && page--)">&lt;</button>
+            @click="manualNav(canPrev, () => page--)">&lt;</button>
           <template v-if="togPageNums">
             <button
               v-for="n in pageWindow" :key="n"
               class="ps-pb ps-pb--num"
               :class="{ 'ps-pb--current': n === page, 'ps-pb--flash': flash('goPage') && flashTargetPage === n }"
-              @click="manualNav(() => page = n)"
+              @click="manualNav(n !== page, () => page = n)"
             >{{ n }}</button>
           </template>
           <span v-else class="ps-pager-info">{{ page }} of {{ TOTAL_PAGES }}</span>
           <button class="ps-pb" :class="{ 'ps-pb--dim': !canNext, 'ps-pb--flash': flash('goNext') }"
-            @click="manualNav(() => page < TOTAL_PAGES && page++)">&gt;</button>
+            @click="manualNav(canNext, () => page++)">&gt;</button>
           <button class="ps-pb" :class="{ 'ps-pb--dim': !canNext, 'ps-pb--flash': flash('goNextBulk') }"
-            v-if="togNextBulk" @click="manualNav(() => page=Math.min(TOTAL_PAGES,page+BULK_N))">&gt;&gt;</button>
+            v-if="togNextBulk" @click="manualNav(canNext, () => page=Math.min(TOTAL_PAGES,page+BULK_N))">&gt;&gt;</button>
           <button v-if="togLast" class="ps-pb"
             :class="{ 'ps-pb--dim': page===TOTAL_PAGES, 'ps-pb--flash': flash('goLast') }"
-            @click="manualNav(() => page=TOTAL_PAGES)">&gt;|</button>
+            @click="manualNav(page < TOTAL_PAGES, () => page=TOTAL_PAGES)">&gt;|</button>
         </div>
 
         <!-- Pager: load-more -->

@@ -1,5 +1,21 @@
 # Changelog
 
+## [6.10.1] - 2026-05-02
+
+### Added
+- **Optimal Path Planning for Pagination** — New `goToLast` and `numberOfPages` primitives enable "wrap-around" navigation. If a table has 500 pages and you are on page 1, jumping to page 500 can now happen in a single click if `goToLast` is defined, rather than 500 `goNext` calls.
+- **Explicit Column Validation** — `mapColumn` and `getColumnValues` now throw a descriptive error if a column is not found, including fuzzy-match suggestions to help debug typos.
+
+### Changed
+- **`mapColumn<T = string>`** — Changed default generic to `string` for better developer ergonomics (common case of extracting text).
+- **`SmartCell.bringIntoView()`** — Now captures the fresh DOM node after navigation, preventing "stale locator" errors on subsequent interactions.
+- **`countRows()` API** — Removed unused/deprecated `exact` option to simplify the signature.
+- **Lab & Sandbox stabilization** — Updated interactive documentation components with better input validation, stable `v-for` keys, and plan invalidation on scroll.
+
+### Fixed
+- **Pagination Overshoot Logic** — Fixed a bug where `goPreviousBulk` was incorrectly guarded in the path planner when resolving an overshoot.
+- **Husky pre-commit** — Removed deprecated shell initialization lines to comply with v10 patterns.
+
 ## [6.10.0] - 2026-04-26
 
 ### Added

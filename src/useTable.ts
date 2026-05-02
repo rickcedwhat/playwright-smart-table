@@ -255,16 +255,17 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       return resolve(config.headerSelector as Selector, rootLocator).nth(idx);
     },
 
-    countRows: async (options?: { exact?: boolean }): Promise<number> => {
+    countRows: async (): Promise<number> => {
       await _autoInit();
-      // Right now we ignore options.exact because we don't have filters here. 
-      // This is a simple count on current page.
       const allRows = resolve(config.rowSelector, rootLocator);
       return allRows.count();
     },
 
-    mapColumn: async <R = unknown>(columnName: string, options: import('./types').RowIterationOptions = {}): Promise<R[]> => {
+    mapColumn: async <R = string>(columnName: string, options: import('./types').RowIterationOptions = {}): Promise<R[]> => {
       await _autoInit();
+      const map = await tableMapper.getMap();
+      if (!map.has(columnName)) throw _createColumnError(columnName, map, 'mapColumn iteration');
+
       return result.map(async ({ row }) => {
         const cell = row.getCell(columnName);
         await cell.bringIntoView();

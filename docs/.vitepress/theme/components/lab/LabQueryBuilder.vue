@@ -23,11 +23,12 @@ const colMap: Record<string, keyof typeof rows[0]> = {
 }
 const validCols = Object.keys(colMap)
 
-type Pair = { key: string; value: string }
-const pairs = ref<Pair[]>([{ key: '', value: '' }])
+type Pair = { id: number; key: string; value: string }
+let pairId = 0
+const pairs = ref<Pair[]>([{ id: pairId++, key: '', value: '' }])
 
 function addPair() {
-  if (pairs.value.length < validCols.length) pairs.value.push({ key: '', value: '' })
+  if (pairs.value.length < validCols.length) pairs.value.push({ id: pairId++, key: '', value: '' })
 }
 function removePair(i: number) { pairs.value.splice(i, 1) }
 
@@ -85,7 +86,7 @@ const cellValue = computed(() => {
           <span class="t-kw">const</span><span class="t-dim">&nbsp;</span><span class="t-var">row</span><span class="t-dim"> = </span><span class="t-root">table</span><span class="t-dim">.</span><span class="t-fn">getRow</span><span class="t-brace">(</span><span class="t-brace">{</span>
         </div>
 
-        <div v-for="(pair, i) in pairs" :key="i" class="qb-ln qb-ln--pair">
+        <div v-for="(pair, i) in pairs" :key="pair.id" class="qb-ln qb-ln--pair">
           <span class="t-indent">&nbsp;&nbsp;</span>
           <input
             v-model="pair.key"

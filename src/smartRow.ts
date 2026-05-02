@@ -411,7 +411,7 @@ const createSmartRow = <T = any>(
 
         const smartCell = baseLocator as SmartCell;
         smartCell.bringIntoView = async () => {
-            await _navigateToCell({
+            const navigatedCell = await _navigateToCell({
                 config,
                 rootLocator,
                 page: rootLocator.page(),
@@ -422,6 +422,9 @@ const createSmartRow = <T = any>(
                 rowIndex,
                 barrier: (smart as any)._barrier
             });
+            if (navigatedCell && (navigatedCell as any)._locator) {
+                (smartCell as any)._locator = (navigatedCell as any)._locator;
+            }
         };
 
         return smartCell;

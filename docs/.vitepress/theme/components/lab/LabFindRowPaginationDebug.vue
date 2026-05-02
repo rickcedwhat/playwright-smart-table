@@ -39,7 +39,8 @@ const MATCH_PAGE_INDEX = 3
 const currentPage = ref(0)
 const cellClassMap = ref<Record<string, string>>({})
 const pagerPulseTarget = ref<string | null>(null)
-const traceLines = ref<string[]>(['Pager controls: Prev 1 2 3 4 5 Next', 'Ready to scan pages'])
+const pagerTraceHeader = `Pager controls: Prev ${pages.map((_, i) => i + 1).join(' ')} Next`
+const traceLines = ref<string[]>([pagerTraceHeader, 'Ready to scan pages'])
 /** When true, step-3 context shows only Playwright row locator (trace stays in commentary / animation only). */
 const findRowTraceSettled = ref(false)
 let scanRunId = 0
@@ -119,7 +120,7 @@ const stepNotes = [
 
 const rows = computed(() => {
   return pages[currentPage.value].map((row, idx) => {
-    if (activeStep.value !== null && activeStep.value >= 3 && currentPage.value === 3 && idx === 0) {
+    if (activeStep.value !== null && activeStep.value >= 3 && currentPage.value === MATCH_PAGE_INDEX && idx === 0) {
       return { ...row, '': '☑' }
     }
     return row
@@ -164,7 +165,7 @@ async function animateFindRowScan(step: number) {
   clearScanVisuals()
   currentPage.value = 0
   pagerPulseTarget.value = null
-  traceLines.value = ['Pager controls: Prev 1 2 3 4 5 Next', 'Ready to scan pages']
+  traceLines.value = [pagerTraceHeader, 'Ready to scan pages']
 
   findRowTraceSettled.value = step > 2
   if (step < 2) {
@@ -183,7 +184,7 @@ async function animateFindRowScan(step: number) {
       '2:Name': 'dbg-cell--miss'
     }
     traceLines.value = [
-      'Pager controls: Prev 1 2 3 4 5 Next',
+      pagerTraceHeader,
       'Page 1 scanned -> no match',
       'Page 2 scanned -> no match',
       'Page 3 scanned -> no match',
@@ -198,7 +199,7 @@ async function animateFindRowScan(step: number) {
     currentPage.value = pageIdx
     clearScanVisuals()
     traceLines.value = [
-      'Pager controls: Prev 1 2 3 4 5 Next',
+      pagerTraceHeader,
       ...Array.from({ length: pageIdx }, (_, i) => `Page ${i + 1} scanned -> no match`),
       `Scanning page ${pageIdx + 1}...`
     ]
@@ -216,7 +217,7 @@ async function animateFindRowScan(step: number) {
     await sleep(foundOnPage ? 520 : 360)
     if (foundOnPage) {
       traceLines.value = [
-        'Pager controls: Prev 1 2 3 4 5 Next',
+        pagerTraceHeader,
         ...Array.from({ length: pageIdx }, (_, i) => `Page ${i + 1} scanned -> no match`),
         `Page ${pageIdx + 1} scanned -> Mina Patel matched`,
         `table.currentPageIndex === ${pageIdx}`
@@ -226,7 +227,7 @@ async function animateFindRowScan(step: number) {
     }
 
     traceLines.value = [
-      'Pager controls: Prev 1 2 3 4 5 Next',
+      pagerTraceHeader,
       ...Array.from({ length: pageIdx + 1 }, (_, i) => `Page ${i + 1} scanned -> no match`)
     ]
 
@@ -235,7 +236,7 @@ async function animateFindRowScan(step: number) {
       await pulseNextButton()
       if (runId !== scanRunId) return
       traceLines.value = [
-        'Pager controls: Prev 1 2 3 4 5 Next',
+        pagerTraceHeader,
         ...Array.from({ length: pageIdx + 1 }, (_, i) => `Page ${i + 1} scanned -> no match`),
         `Moved to page ${pageIdx + 2}`
       ]

@@ -101,7 +101,7 @@ function setActive(key: StrategyKey) {
             </tr>
             <tr v-if="active === 'infinite'" class="loaded-row delay-two">
               <td>Doris Wilder</td>
-              <td>Sidney</td>
+              <td>Sydney</td>
               <td>Active</td>
             </tr>
           </tbody>
