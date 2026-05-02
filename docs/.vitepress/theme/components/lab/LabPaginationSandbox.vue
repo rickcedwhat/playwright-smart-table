@@ -76,7 +76,7 @@ function clearPlan() {
 // Window index: pages 1-10 → 0, 11-20 → 1, etc.
 function windowOf(p: number) { return Math.floor((p - 1) / BULK_N) }
 
-// Page-number window shown in the pager (10 buttons, decade-aligned)
+// Page-number window shown in the pagination component (10 buttons, decade-aligned)
 const pageWindow = computed(() => {
   const start = windowOf(page.value) * BULK_N + 1
   const end   = Math.min(start + BULK_N - 1, TOTAL_PAGES)
@@ -471,7 +471,7 @@ function onScroll(e: Event) {
         </div>
       </div>
 
-      <!-- ── Right: live table + pager ── -->
+      <!-- ── Right: live table + pagination ── -->
       <div class="ps-right">
 
         <div class="ps-page-badge">
@@ -496,8 +496,8 @@ function onScroll(e: Event) {
           </div>
         </div>
 
-        <!-- Pager: page-buttons -->
-        <div v-if="ptype === 'page-buttons'" class="ps-pager">
+        <!-- Pagination: page-buttons -->
+        <div v-if="ptype === 'page-buttons'" class="ps-pagination">
           <button class="ps-pb" :class="{ 'ps-pb--dim': page===1, 'ps-pb--flash': flash('goFirst') }"
             v-if="togFirst" @click="manualNav(page > 1, () => page=1)">|&lt;</button>
           <button class="ps-pb" :class="{ 'ps-pb--dim': !canPrev, 'ps-pb--flash': flash('goPrevBulk') }"
@@ -512,7 +512,7 @@ function onScroll(e: Event) {
               @click="manualNav(n !== page, () => page = n)"
             >{{ n }}</button>
           </template>
-          <span v-else class="ps-pager-info">{{ page }} of {{ TOTAL_PAGES }}</span>
+          <span v-else class="ps-pagination-info">{{ page }} of {{ TOTAL_PAGES }}</span>
           <button class="ps-pb" :class="{ 'ps-pb--dim': !canNext, 'ps-pb--flash': flash('goNext') }"
             @click="manualNav(canNext, () => page++)">&gt;</button>
           <button class="ps-pb" :class="{ 'ps-pb--dim': !canNext, 'ps-pb--flash': flash('goNextBulk') }"
@@ -522,14 +522,14 @@ function onScroll(e: Event) {
             @click="manualNav(page < TOTAL_PAGES, () => page=TOTAL_PAGES)">&gt;|</button>
         </div>
 
-        <!-- Pager: load-more -->
-        <div v-else-if="ptype === 'load-more'" class="ps-pager">
+        <!-- Pagination: load-more -->
+        <div v-else-if="ptype === 'load-more'" class="ps-pagination">
           <button class="ps-pb ps-pb--load-more"
             :class="{ 'ps-pb--dim': !hasMore, 'ps-pb--flash': flash('goNext') }"
             @click="loadMore()">
             {{ hasMore ? 'Load More' : 'All loaded' }}
           </button>
-          <span class="ps-pager-info">{{ loadedPgs * PAGE_SIZE }} of {{ TOTAL_PAGES * PAGE_SIZE }} rows</span>
+          <span class="ps-pagination-info">{{ loadedPgs * PAGE_SIZE }} of {{ TOTAL_PAGES * PAGE_SIZE }} rows</span>
         </div>
 
       </div>
@@ -755,9 +755,9 @@ function onScroll(e: Event) {
 }
 .ps-scroll-hint { text-align: center; padding: 8px; font-size: 0.7rem; color: var(--vp-c-text-3); }
 
-/* Pager */
-.ps-pager { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
-.ps-pager-info { font-size: 0.73rem; color: var(--vp-c-text-2); padding: 0 5px; }
+/* Pagination */
+.ps-pagination { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.ps-pagination-info { font-size: 0.73rem; color: var(--vp-c-text-2); padding: 0 5px; }
 .ps-pb {
   font-size: 0.72rem; font-weight: 600; padding: 4px 9px;
   border-radius: 6px; border: 1px solid var(--vp-c-divider);

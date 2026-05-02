@@ -83,4 +83,4 @@ Pick a question. Shuffle the columns. Brittle index-based code reads from the wr
 
 - [Table Anatomy](/concepts/table-anatomy) — selector scoping.
 - [Header Mapping](/concepts/header-mapping) — `__col_*` + `headerTransformer`.
-- [Pagination Strategies](/concepts/pagination-strategies) — pager shapes.
+- [Pagination Strategies](/concepts/pagination-strategies) — pagination shapes.

@@ -22,8 +22,8 @@ export const PaginationStrategies = {  /**
     last?: Selector,
     /**
      * Selector matching all visible page-number buttons/links.
-     * Used to implement direct page jumps (goToPage). Works with both full-range pagers
-     * (all pages always visible) and windowed pagers (e.g. only pages 6–14 visible) —
+     * Used to implement direct page jumps (goToPage). Works with both full-range pagination
+     * (all pages always visible) and windowed pagination (e.g. only pages 6–14 visible) —
      * returns false when the target page is outside the current window, triggering the
      * library's step-and-retry loop until the button scrolls into view.
      */

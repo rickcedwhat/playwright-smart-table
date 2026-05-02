@@ -78,7 +78,7 @@ const line = computed(() => steps.find((s) => s.key === active.value) ?? steps[0
           Brielle · NYC · Active
         </div>
         <div class="r" :class="{ h3: active === 'iterate' }">Cedric · Edinburgh · Review</div>
-        <div v-if="active === 'findRow'" class="pager">page 2 ▸</div>
+        <div v-if="active === 'findRow'" class="pagination-indicator">page 2 ▸</div>
       </div>
     </div>
   </div>
@@ -170,7 +170,7 @@ button:hover {
   background: color-mix(in srgb, var(--vp-c-brand-1) 14%, var(--vp-c-bg-soft));
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--vp-c-brand-1) 35%, transparent);
 }
-.pager {
+.pagination-indicator {
   padding: 6px 12px;
   font-size: 0.75rem;
   text-align: right;

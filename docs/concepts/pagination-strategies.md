@@ -20,6 +20,6 @@ This page shows common pagination shapes and the strategy primitive that usually
 - `goToLast` enables optimal path planning (wrap-around) when navigating to distant pages.
 - `goToPage` fits numbered pagination or page inputs.
 - `numberOfPages` allows Smart Table to calculate the most efficient path between distant pages (e.g., jumping to the last page first).
-- Infinite scroll and load-more UIs still use the pagination strategy slot; the strategy just scrolls or loads instead of clicking a numbered pager.
+- Infinite scroll and load-more UIs still use the pagination strategy slot; the strategy just scrolls or loads instead of clicking a numbered pagination component.
 
 Each primitive should return `true` when movement happened and `false` when there is nowhere else to go. For exact signatures, see [Pagination Strategies](/api/strategies#pagination-strategies).

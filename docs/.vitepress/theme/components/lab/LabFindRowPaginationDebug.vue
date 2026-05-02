@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import LabDebuggerWidget from './LabDebuggerWidget.vue'
-import type { DebugPagerButton, DebugVariablePane } from './LabDebuggerWidget.vue'
+import type { DebugPaginationButton, DebugVariablePane } from './LabDebuggerWidget.vue'
 
 const activeStep = ref<number | null>(null)
 
@@ -48,9 +48,9 @@ const MATCH_ROW_INDEX = target.rowIndex
 
 const currentPage = ref(0)
 const cellClassMap = ref<Record<string, string>>({})
-const pagerPulseTarget = ref<string | null>(null)
-const pagerTraceHeader = `Pager controls: Prev ${pages.map((_, i) => i + 1).join(' ')} Next`
-const traceLines = ref<string[]>([pagerTraceHeader, 'Ready to scan pages'])
+const paginationPulseTarget = ref<string | null>(null)
+const paginationTraceHeader = `Pagination controls: Prev ${pages.map((_, i) => i + 1).join(' ')} Next`
+const traceLines = ref<string[]>([paginationTraceHeader, 'Ready to scan pages'])
 /** When true, step-3 context shows only Playwright row locator (trace stays in commentary / animation only). */
 const findRowTraceSettled = ref(false)
 let scanRunId = 0
@@ -84,8 +84,8 @@ const configSnippet = [
   "  cellSelector: 'td',",
   '  strategies: {',
   '    pagination: Strategies.Pagination.click({',
-  "      prev: '.pager [aria-label=\"Prev\"]',",
-  "      next: '.pager [aria-label=\"Next\"]'",
+  "      prev: '.pagination [aria-label=\"Prev\"]',",
+  "      next: '.pagination [aria-label=\"Next\"]'",
   '    })',
   '  },',
   '  headerTransformer: ({ text }) => {',
@@ -124,7 +124,7 @@ const variables = computed<DebugVariablePane[]>(() => [
 const stepNotes = [
   'Wire useTable with click pagination + headerTransformer (see config pane on line 1).',
   'Note: __col_0 was converted to Select using headerTransformer.',
-  `findRow paginates until a row matches Name. Trace lines stay visible; once the match settles, Playwright translation for the row locator is appended. TableResult.currentPageIndex stays in sync (${MATCH_PAGE_INDEX} here = 0-based page for this row → pager highlights "4").`,
+  `findRow paginates until a row matches Name. Trace lines stay visible; once the match settles, Playwright translation for the row locator is appended. TableResult.currentPageIndex stays in sync (${MATCH_PAGE_INDEX} here = 0-based page for this row → pagination highlights "${MATCH_PAGE_INDEX + 1}").`,
   'getCell resolves to locators scoped under the matched row.'
 ]
 
@@ -137,12 +137,12 @@ const rows = computed(() => {
   })
 })
 
-const pagerButtons = computed<DebugPagerButton[]>(() => {
-  const buttons: DebugPagerButton[] = [
+const paginationButtons = computed<DebugPaginationButton[]>(() => {
+  const buttons: DebugPaginationButton[] = [
     {
       label: 'Prev',
       disabled: currentPage.value === 0,
-      pulse: pagerPulseTarget.value === 'Prev'
+      pulse: paginationPulseTarget.value === 'Prev'
     }
   ]
   for (let i = 0; i < pages.length; i += 1) {
@@ -151,7 +151,7 @@ const pagerButtons = computed<DebugPagerButton[]>(() => {
   buttons.push({
     label: 'Next',
     disabled: currentPage.value === pages.length - 1,
-    pulse: pagerPulseTarget.value === 'Next'
+    pulse: paginationPulseTarget.value === 'Next'
   })
   return buttons
 })
@@ -165,17 +165,17 @@ function clearScanVisuals() {
 }
 
 async function pulseNextButton(runId: number) {
-  pagerPulseTarget.value = 'Next'
+  paginationPulseTarget.value = 'Next'
   await sleep(280)
-  if (runId === scanRunId) pagerPulseTarget.value = null
+  if (runId === scanRunId) paginationPulseTarget.value = null
 }
 
 async function animateFindRowScan(step: number) {
   const runId = ++scanRunId
   clearScanVisuals()
   currentPage.value = 0
-  pagerPulseTarget.value = null
-  traceLines.value = [pagerTraceHeader, 'Ready to scan pages']
+  paginationPulseTarget.value = null
+  traceLines.value = [paginationTraceHeader, 'Ready to scan pages']
 
   findRowTraceSettled.value = step > 2
   if (step < 2) {
@@ -197,7 +197,7 @@ async function animateFindRowScan(step: number) {
     })
 
     traceLines.value = [
-      pagerTraceHeader,
+      paginationTraceHeader,
       ...Array.from({ length: MATCH_PAGE_INDEX }, (_, i) => `Page ${i + 1} scanned -> no match`),
       `Page ${MATCH_PAGE_INDEX + 1} scanned -> ${TARGET_NAME} matched`,
       `table.currentPageIndex === ${MATCH_PAGE_INDEX}`
@@ -210,7 +210,7 @@ async function animateFindRowScan(step: number) {
     currentPage.value = pageIdx
     clearScanVisuals()
     traceLines.value = [
-      pagerTraceHeader,
+      paginationTraceHeader,
       ...Array.from({ length: pageIdx }, (_, i) => `Page ${i + 1} scanned -> no match`),
       `Scanning page ${pageIdx + 1}...`
     ]
@@ -231,7 +231,7 @@ async function animateFindRowScan(step: number) {
 
     if (foundOnPage) {
       traceLines.value = [
-        pagerTraceHeader,
+        paginationTraceHeader,
         ...Array.from({ length: pageIdx }, (_, i) => `Page ${i + 1} scanned -> no match`),
         `Page ${pageIdx + 1} scanned -> ${TARGET_NAME} matched`,
         `table.currentPageIndex === ${pageIdx}`
@@ -241,7 +241,7 @@ async function animateFindRowScan(step: number) {
     }
 
     traceLines.value = [
-      pagerTraceHeader,
+      paginationTraceHeader,
       ...Array.from({ length: pageIdx + 1 }, (_, i) => `Page ${i + 1} scanned -> no match`)
     ]
 
@@ -250,7 +250,7 @@ async function animateFindRowScan(step: number) {
       await pulseNextButton(runId)
       if (runId !== scanRunId) return
       traceLines.value = [
-        pagerTraceHeader,
+        paginationTraceHeader,
         ...Array.from({ length: pageIdx + 1 }, (_, i) => `Page ${i + 1} scanned -> no match`),
         `Moved to page ${pageIdx + 2}`
       ]
@@ -275,7 +275,7 @@ watch(
       title="findRow + pagination + checkbox"
       :headers="headers"
       :rows="rows"
-      :pager-buttons="pagerButtons"
+      :pagination-buttons="paginationButtons"
       :cell-class-map="cellClassMap"
       :code-lines="codeLines"
       :variables="variables"

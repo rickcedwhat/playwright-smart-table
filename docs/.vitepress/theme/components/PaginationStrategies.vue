@@ -15,7 +15,7 @@ const strategies: Array<{
     key: 'next',
     title: 'Next / Previous buttons',
     code: "Strategies.Pagination.click({ next, previous })",
-    detail: 'Use this for classic pagers where Smart Table can click one page at a time.'
+    detail: 'Use this for classic pagination components where Smart Table can click one page at a time.'
   },
   {
     key: 'first',

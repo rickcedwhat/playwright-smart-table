@@ -12,7 +12,7 @@ export type DebugVariablePane = {
   idleValue?: string
 }
 
-export type DebugPagerButton = {
+export type DebugPaginationButton = {
   label: string
   active?: boolean
   disabled?: boolean
@@ -26,7 +26,7 @@ const props = defineProps<{
   variables: DebugVariablePane[]
   stepNotes?: string[]
   cellClassMap?: Record<string, string>
-  pagerButtons?: DebugPagerButton[]
+  paginationButtons?: DebugPaginationButton[]
   persistPreviousContext?: boolean
   title?: string
 }>()
@@ -229,9 +229,9 @@ function cellClass(rowIndex: number, header: string): string {
               </tr>
             </tbody>
           </table>
-          <div v-if="(pagerButtons?.length ?? 0) > 0" class="dbg-pager" aria-label="Pagination controls">
-            <button v-for="(btn, idx) in pagerButtons" :key="`${btn.label}-${idx}`" type="button" class="dbg-pager-btn"
-              :class="{ 'dbg-pager-btn--active': btn.active, 'dbg-pager-btn--pulse': btn.pulse }" :disabled="btn.disabled">
+          <div v-if="(paginationButtons?.length ?? 0) > 0" class="dbg-pagination" aria-label="Pagination controls">
+            <button v-for="(btn, idx) in paginationButtons" :key="`${btn.label}-${idx}`" type="button" class="dbg-pagination-btn"
+              :class="{ 'dbg-pagination-btn--active': btn.active, 'dbg-pagination-btn--pulse': btn.pulse }" :disabled="btn.disabled">
               {{ btn.label }}
             </button>
           </div>
@@ -278,11 +278,11 @@ function cellClass(rowIndex: number, header: string): string {
 .dbg-table td.dbg-cell--miss { background: color-mix(in srgb, #ef4444 18%, transparent); color: #fecaca; }
 .dbg-table td.dbg-cell--match { background: color-mix(in srgb, #22c55e 24%, transparent); color: #bbf7d0; font-weight: 600; }
 
-.dbg-pager { display: flex; gap: 6px; justify-content: center; padding: 8px 8px 10px; border-top: 1px solid color-mix(in srgb, var(--vp-c-divider) 72%, transparent); background: color-mix(in srgb, var(--vp-c-bg-soft) 60%, var(--vp-c-bg)); }
-.dbg-pager-btn { min-width: 24px; height: 22px; border-radius: 6px; border: 1px solid color-mix(in srgb, var(--vp-c-divider) 82%, transparent); background: color-mix(in srgb, var(--vp-c-bg) 84%, transparent); color: var(--vp-c-text-2); font-size: 0.66rem; line-height: 1; padding: 0 7px; }
-.dbg-pager-btn--active { border-color: color-mix(in srgb, var(--vp-c-brand-1) 65%, var(--vp-c-divider)); color: var(--vp-c-brand-1); }
-.dbg-pager-btn--pulse { animation: dbg-pager-click .28s ease; }
-@keyframes dbg-pager-click {
+.dbg-pagination { display: flex; gap: 6px; justify-content: center; padding: 8px 8px 10px; border-top: 1px solid color-mix(in srgb, var(--vp-c-divider) 72%, transparent); background: color-mix(in srgb, var(--vp-c-bg-soft) 60%, var(--vp-c-bg)); }
+.dbg-pagination-btn { min-width: 24px; height: 22px; border-radius: 6px; border: 1px solid color-mix(in srgb, var(--vp-c-divider) 82%, transparent); background: color-mix(in srgb, var(--vp-c-bg) 84%, transparent); color: var(--vp-c-text-2); font-size: 0.66rem; line-height: 1; padding: 0 7px; }
+.dbg-pagination-btn--active { border-color: color-mix(in srgb, var(--vp-c-brand-1) 65%, var(--vp-c-divider)); color: var(--vp-c-brand-1); }
+.dbg-pagination-btn--pulse { animation: dbg-pagination-click .28s ease; }
+@keyframes dbg-pagination-click {
   0% { transform: translateY(0); }
   35% { transform: translateY(1px) scale(0.97); background: color-mix(in srgb, var(--vp-c-brand-1) 28%, var(--vp-c-bg)); }
   100% { transform: translateY(0) scale(1); }
