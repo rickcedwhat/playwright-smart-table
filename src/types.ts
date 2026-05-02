@@ -336,6 +336,15 @@ export interface PaginationPrimitives {
   /** Jump to first page / scroll to top */
   goToFirst?: (context: TableContext) => Promise<boolean>;
 
+  /** Jump to last page / scroll to bottom */
+  goToLast?: (context: TableContext) => Promise<boolean>;
+
+  /**
+   * Fetch the total number of pages currently available.
+   * Can be used to optimize pagination paths (e.g. jumping to last page and going backwards).
+   */
+  getTotalPages?: (context: TableContext) => Promise<number | null>;
+
   /**
    * Jump to specific page index (0-indexed).
    * Can be full-range (e.g. page number input: any page works) or windowed (e.g. only visible links 6–14).

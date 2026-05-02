@@ -19,9 +19,11 @@ export const PaginationStrategies = {  /**
     nextBulk?: Selector,
     previousBulk?: Selector,
     first?: Selector,
+    last?: Selector,
   }, options: {
     nextBulkPages?: number,
     previousBulkPages?: number,
+    numberOfPages?: number | ((root: import('@playwright/test').Locator) => number | Promise<number>),
     stabilization?: StabilizationStrategy,
     timeout?: number
   } = {}): PaginationStrategy => {
@@ -51,6 +53,13 @@ export const PaginationStrategies = {  /**
       goNextBulk: createClicker(selectors.nextBulk, nextBulk),
       goPreviousBulk: createClicker(selectors.previousBulk, prevBulk),
       goToFirst: createClicker(selectors.first),
+      goToLast: createClicker(selectors.last),
+      getTotalPages: options.numberOfPages ? async (context) => {
+        if (typeof options.numberOfPages === 'function') {
+          return await options.numberOfPages(context.root);
+        }
+        return options.numberOfPages as number;
+      } : undefined,
       nextBulkPages: nextBulk,
       previousBulkPages: prevBulk,
     };

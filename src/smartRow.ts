@@ -595,7 +595,12 @@ const createSmartRow = <T = any>(
                 logDebug(config, 'info', `bringIntoView: Navigating to page ${tablePageIndex} (goToPage retry loop)`);
                 await executeNavigationWithGoToPageRetry(tablePageIndex, primitives, context, getCurrent, setCurrent);
             } else {
-                const path = planNavigationPath(getCurrent(), tablePageIndex, primitives);
+                let totalPages: number | undefined;
+                if (primitives.getTotalPages) {
+                    const tp = await primitives.getTotalPages(context);
+                    if (tp !== null) totalPages = tp;
+                }
+                const path = planNavigationPath(getCurrent(), tablePageIndex, primitives, totalPages);
                 if (path.length > 0) {
                     logDebug(config, 'info', `bringIntoView: Executing navigation path to page ${tablePageIndex} (${path.length} step(s))`);
                     await executeNavigationPath(path, primitives, context, getCurrent, setCurrent);
