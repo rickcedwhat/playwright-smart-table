@@ -43,7 +43,7 @@
     "test:playground": "npx playwright test --config tests-external/playground/playwright.config.ts 2>&1 | tee \"tests-external/playground/logs/run-$(date +%Y%m%d-%H%M%S).log\"",
     "dev:playground": "cd playground && npm run dev",
     "dev:mui": "cd tests/apps/mui-datagrid && npm run dev",
-    "prepare": "husky install"
+    "prepare": "husky"
   },
   "exports": {
     ".": {
