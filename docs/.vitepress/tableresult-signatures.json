@@ -50,6 +50,21 @@
     "comment": "/**\n* Navigates to a specific column using the configured CellNavigationStrategy.\n*/"
   },
   {
+    "name": "countRows",
+    "signature": "countRows: () => Promise<number>",
+    "comment": "/**\n* Counts the number of rows currently on the page.\n* Does not paginate.\n*/"
+  },
+  {
+    "name": "mapColumn",
+    "signature": "mapColumn<R = string>(columnName: string, options?: RowIterationOptions): Promise<R[]>",
+    "comment": "/**\n* Iterates over rows and extracts the value of a single column.\n* More efficient than map + toJSON for single-column extraction.\n* @param columnName - The name of the column to extract\n* @param options - Iteration options\n*/"
+  },
+  {
+    "name": "getColumnValues",
+    "signature": "getColumnValues(columnName: string, options?: RowIterationOptions): Promise<string[]>",
+    "comment": "/**\n* Iterates over rows and extracts the value of a single column as strings.\n* @param columnName - The name of the column to extract\n* @param options - Iteration options\n*/"
+  },
+  {
     "name": "reset",
     "signature": "reset: () => Promise<void>",
     "comment": "/**\n* Resets the table state (clears cache, flags) and invokes the onReset strategy.\n*/"

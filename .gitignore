@@ -8,6 +8,7 @@ playwright-report/
 # VitePress
 docs/.vitepress/dist
 docs/.vitepress/cache
+.lab-draft-stash/
 
 # Vitest
 html/

@@ -85,6 +85,34 @@ describe('planNavigationPath', () => {
     });
   });
 
+  describe('forward with goToLast optimization', () => {
+    const withGoToLast: PaginationPrimitives = {
+      goNext: async () => true,
+      goPrevious: async () => true,
+      goToLast: async () => true,
+    };
+
+    it('uses wrap-around path when it is shorter (e.g. 0 -> 99 with 100 total pages)', () => {
+      const path = planNavigationPath(0, 99, withGoToLast, 100);
+      expect(path).toEqual([{ type: 'goToLast', targetIndex: 99 }]);
+    });
+
+    it('uses wrap-around path when backward steps are cheaper (e.g. 0 -> 98 with 100 total pages)', () => {
+      const path = planNavigationPath(0, 98, withGoToLast, 100);
+      expect(path).toEqual([
+        { type: 'goToLast', targetIndex: 99 },
+        { type: 'goPrevious', count: 1 }
+      ]);
+    });
+
+    it('uses normal forward path when it is cheaper (e.g. 0 -> 1 with 100 total pages)', () => {
+      const path = planNavigationPath(0, 1, withGoToLast, 100);
+      expect(path).toEqual([
+        { type: 'goNext', count: 1 }
+      ]);
+    });
+  });
+
   describe('backward (target < current)', () => {
     it('uses only goPrevious when no bulk', () => {
       expect(planNavigationPath(5, 0, prevOnly)).toEqual([

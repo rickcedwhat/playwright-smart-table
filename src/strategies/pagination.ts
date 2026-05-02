@@ -19,9 +19,19 @@ export const PaginationStrategies = {  /**
     nextBulk?: Selector,
     previousBulk?: Selector,
     first?: Selector,
+    last?: Selector,
+    /**
+     * Selector matching all visible page-number buttons/links.
+     * Used to implement direct page jumps (goToPage). Works with both full-range pagination
+     * (all pages always visible) and windowed pagination (e.g. only pages 6–14 visible) —
+     * returns false when the target page is outside the current window, triggering the
+     * library's step-and-retry loop until the button scrolls into view.
+     */
+    pageNumbers?: Selector,
   }, options: {
     nextBulkPages?: number,
     previousBulkPages?: number,
+    numberOfPages?: number | ((root: import('@playwright/test').Locator) => number | Promise<number>),
     stabilization?: StabilizationStrategy,
     timeout?: number
   } = {}): PaginationStrategy => {
@@ -38,7 +48,7 @@ export const PaginationStrategies = {  /**
         }
 
         return await defaultStabilize(context, async () => {
-          await btn.click({ timeout: 2000 }).catch(() => { });
+          await btn.click({ timeout: options.timeout ?? 2000 });
         }).then(stabilized => stabilized ? returnVal : false);
       };
     };
@@ -51,6 +61,30 @@ export const PaginationStrategies = {  /**
       goNextBulk: createClicker(selectors.nextBulk, nextBulk),
       goPreviousBulk: createClicker(selectors.previousBulk, prevBulk),
       goToFirst: createClicker(selectors.first),
+      goToLast: createClicker(selectors.last),
+      goToPage: selectors.pageNumbers
+        ? async (pageIndex: number, context: TableContext) => {
+            const { root, resolve } = context;
+            const pageLabel = String(pageIndex + 1);
+            const btn = resolve(selectors.pageNumbers!, root)
+              .filter({ hasText: new RegExp(`^\\s*${pageLabel}\\s*$`) })
+              .first();
+            if (!await btn.isVisible().catch(() => false)) return false;
+            if (!await btn.isEnabled().catch(() => false)) return false;
+            return await defaultStabilize(context, async () => {
+              await btn.click({ timeout: options.timeout ?? 2000 });
+            }).then(s => !!s);
+          }
+        : undefined,
+      getTotalPages: options.numberOfPages !== undefined ? async (context) => {
+        const result = typeof options.numberOfPages === 'function'
+          ? await options.numberOfPages(context.root)
+          : options.numberOfPages;
+        if (typeof result !== 'number' || !Number.isFinite(result) || !Number.isInteger(result) || result < 1) {
+          throw new Error(`[SmartTable] numberOfPages must return a finite integer >= 1 (received: ${result})`);
+        }
+        return result;
+      } : undefined,
       nextBulkPages: nextBulk,
       previousBulkPages: prevBulk,
     };

@@ -80,6 +80,10 @@ function main() {
 
     for (const link of links) {
         const [pathPart, fragment] = link.split('#');
+
+        // Ignore paths that only exist in development
+        if (pathPart.startsWith('/lab')) continue;
+
         const htmlPath = resolveHtmlFile(pathPart);
 
         if (!htmlPath) {

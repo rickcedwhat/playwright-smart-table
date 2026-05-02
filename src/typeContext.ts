@@ -164,6 +164,21 @@ export interface ViewportStrategy {
 
 
 /**
+ * SmartCell - A Playwright Locator with table-aware methods for single-cell operations.
+ * 
+ * Extends all standard Locator methods (click, isVisible, etc.).
+ */
+export type SmartCell = Locator & {
+  /**
+   * Scrolls/paginates to bring this specific cell into view using the configured strategies.
+   * Useful when the grid is horizontally virtualized and the column must be scrolled
+   * into view before it can be interacted with or read.
+   */
+  bringIntoView(): Promise<void>;
+};
+
+
+/**
  * SmartRow - A Playwright Locator with table-aware methods.
  * 
  * Extends all standard Locator methods (click, isVisible, etc.) with table-specific functionality.
@@ -188,12 +203,13 @@ export type SmartRow<T = any> = Locator & {
   /**
    * Get a cell locator by column name.
    * @param column - Column name (case-sensitive)
-   * @returns Locator for the cell
+   * @returns SmartCell (Locator + bringIntoView)
    * @example
    * const emailCell = row.getCell('Email');
+   * await emailCell.bringIntoView();
    * await expect(emailCell).toHaveText('john@example.com');
    */
-  getCell(column: string): Locator;
+  getCell(column: string): SmartCell;
 
   /**
    * Extract all cell data as a key-value object.
@@ -323,6 +339,15 @@ export interface PaginationPrimitives {
   /** Jump to first page / scroll to top */
   goToFirst?: (context: TableContext) => Promise<boolean>;
 
+  /** Jump to last page / scroll to bottom */
+  goToLast?: (context: TableContext) => Promise<boolean>;
+
+  /**
+   * Fetch the total number of pages currently available.
+   * Can be used to optimize pagination paths (e.g. jumping to last page and going backwards).
+   */
+  getTotalPages?: (context: TableContext) => Promise<number | null>;
+
   /**
    * Jump to specific page index (0-indexed).
    * Can be full-range (e.g. page number input: any page works) or windowed (e.g. only visible links 6–14).
@@ -335,6 +360,18 @@ export interface PaginationPrimitives {
 
   /** How many pages one goPreviousBulk() goes back. Used by navigation path planner for optimal bringIntoView. */
   previousBulkPages?: number;
+
+  /**
+   * Called once during init() to sync the library's page counter with the actual DOM state.
+   * Use when a table may open on a page other than the first (e.g. a deep-linked URL that
+   * lands on page 5). Returns a 0-indexed page number.
+   * @example
+   * detectCurrentPage: async (root) => {
+   *   const text = await root.locator('[aria-current="page"]').textContent();
+   *   return parseInt(text ?? '1') - 1;
+   * }
+   */
+  detectCurrentPage?: (root: import('@playwright/test').Locator) => number | Promise<number>;
 }
 
 export type PaginationStrategy = PaginationPrimitives;
@@ -615,6 +652,26 @@ export interface TableResult<T = any> extends AsyncIterable<{ row: SmartRow<T>; 
    */
   scrollToColumn: (columnName: string) => Promise<void>;
 
+  /**
+   * Counts the number of rows currently on the page.
+   * Does not paginate.
+   */
+  countRows: () => Promise<number>;
+
+  /**
+   * Iterates over rows and extracts the value of a single column.
+   * More efficient than map + toJSON for single-column extraction.
+   * @param columnName - The name of the column to extract
+   * @param options - Iteration options
+   */
+  mapColumn<R = string>(columnName: string, options?: RowIterationOptions): Promise<R[]>;
+
+  /**
+   * Iterates over rows and extracts the value of a single column as strings.
+   * @param columnName - The name of the column to extract
+   * @param options - Iteration options
+   */
+  getColumnValues(columnName: string, options?: RowIterationOptions): Promise<string[]>;
 
 
   /**

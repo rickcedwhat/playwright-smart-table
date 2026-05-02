@@ -1,5 +1,5 @@
 import type { Locator, Page } from '@playwright/test';
-import { SmartRow as SmartRowType, FillOptions, FinalTableConfig, TableResult } from './types';
+import { SmartRow as SmartRowType, FillOptions, FinalTableConfig, TableResult, SmartCell } from './types';
 import { FillStrategies } from './strategies/fill';
 import { buildColumnNotFoundError } from './utils/stringUtils';
 import { debugDelay, logDebug } from './utils/debugUtils';
@@ -29,7 +29,7 @@ const _navigateToCell = async (params: {
     rowLocator: Locator;
     rowIndex?: number;
     barrier?: NavigationBarrier;
-}): Promise<Locator | null> => {
+}): Promise<Locator> => {
     const { config, rootLocator, page, resolve, column, index, rowLocator, rowIndex, barrier } = params;
     const rowLabel = typeof rowIndex === 'number' ? `row ${rowIndex}` : 'row ?';
     logDebug(
@@ -148,8 +148,22 @@ const _navigateToCell = async (params: {
 
         // Cell still not accessible — fall through to navigation primitives if configured.
         if (!config.strategies.navigation) {
-            logDebug(config, 'verbose', '_navigateToCell: viewport phase could not reach cell, no navigation fallback configured');
-            return null;
+            const colRange = viewport.getVisibleColumnRange ? await viewport.getVisibleColumnRange(context) : null;
+            const rowRange = viewport.getVisibleRowRange ? await viewport.getVisibleRowRange(context) : null;
+            
+            let errMsg = `SmartTable: could not reach cell for column "${column}" (colIndex ${index}) at row ${rowIndex}.\n`;
+            if (colRange) {
+                errMsg += `  Visible column range: [${colRange.first}–${colRange.last}]. Column is out of view and no navigation fallback is configured.\n`;
+            } else {
+                errMsg += `  Column is out of view and no navigation fallback is configured.\n`;
+            }
+            if (rowRange && rowIndex !== undefined) {
+                const inView = rowIndex >= rowRange.first && rowIndex <= rowRange.last;
+                errMsg += `  Visible row range: [${rowRange.first}–${rowRange.last}]. ${inView ? 'Row is in view.' : 'Row is out of view.'}\n`;
+            }
+            errMsg += `  → Add a \`strategies.navigation\` or \`strategies.viewport.scrollToColumn\` to handle off-screen columns.`;
+            
+            throw new Error(errMsg);
         }
     }
 
@@ -337,9 +351,13 @@ const _navigateToCell = async (params: {
         // Return final locator if reached
         const finalCell = getCellLocator();
         if (await finalCell.count() > 0) return finalCell;
-        return null;
+        
+        throw new Error(`SmartTable: could not reach cell for column "${column}" (colIndex ${index}) at row ${rowIndex} after exhausting navigation strategies. Ensure navigation primitives are correctly implemented.`);
     }
-    return null;
+    
+    // No horizontal strategies configured; assume table is 1D or fully rendered,
+    // and let standard Playwright auto-waiting handle any lazy-loading delays.
+    return getCellLocator();
 };
 
 /**
@@ -370,14 +388,15 @@ const createSmartRow = <T = any>(
     smart._barrier = barrier;
 
     // Attach Methods
-    smart.getCell = (colName: string): Locator => {
+    smart.getCell = (colName: string): SmartCell => {
         const idx = map.get(colName);
         if (idx === undefined) {
             throw new Error(buildColumnNotFoundError(colName, Array.from(map.keys())));
         }
 
+        let baseLocator: Locator;
         if (config.strategies.getCellLocator) {
-            return config.strategies.getCellLocator({
+            baseLocator = config.strategies.getCellLocator({
                 row: rowLocator,
                 root: rootLocator,
                 columnName: colName,
@@ -386,9 +405,29 @@ const createSmartRow = <T = any>(
                 page: rootLocator.page(),
                 config
             });
+        } else {
+            baseLocator = resolve(config.cellSelector, rowLocator).nth(idx);
         }
 
-        return resolve(config.cellSelector, rowLocator).nth(idx);
+        const smartCell = baseLocator as SmartCell;
+        smartCell.bringIntoView = async () => {
+            const navigatedCell = await _navigateToCell({
+                config,
+                rootLocator,
+                page: rootLocator.page(),
+                resolve,
+                column: colName,
+                index: idx,
+                rowLocator,
+                rowIndex,
+                barrier: (smart as any)._barrier
+            });
+            if (navigatedCell && (navigatedCell as any)._locator) {
+                (smartCell as any)._locator = (navigatedCell as any)._locator;
+            }
+        };
+
+        return smartCell;
     };
 
     smart.wasFound = (): boolean => {
@@ -559,7 +598,12 @@ const createSmartRow = <T = any>(
                 logDebug(config, 'info', `bringIntoView: Navigating to page ${tablePageIndex} (goToPage retry loop)`);
                 await executeNavigationWithGoToPageRetry(tablePageIndex, primitives, context, getCurrent, setCurrent);
             } else {
-                const path = planNavigationPath(getCurrent(), tablePageIndex, primitives);
+                let totalPages: number | undefined;
+                if (primitives.getTotalPages) {
+                    const tp = await primitives.getTotalPages(context);
+                    if (tp !== null) totalPages = tp;
+                }
+                const path = planNavigationPath(getCurrent(), tablePageIndex, primitives, totalPages);
                 if (path.length > 0) {
                     logDebug(config, 'info', `bringIntoView: Executing navigation path to page ${tablePageIndex} (${path.length} step(s))`);
                     await executeNavigationPath(path, primitives, context, getCurrent, setCurrent);

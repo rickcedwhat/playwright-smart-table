@@ -414,3 +414,58 @@ test.describe('numeric pagination result in useTable iteration', () => {
         expect(advanceCount).toBe(1);
     });
 });
+
+// ─── new API additions (#89, #84, #43, #82) ───────────────────────────────────
+test.describe('new API additions', () => {
+    test('countRows counts the rows on current page', async ({ page }) => {
+        await page.setContent(TABLE_HTML);
+        const table = makeTable(page);
+        
+        expect(await table.countRows()).toBe(2);
+    });
+
+    test('mapColumn collects values for a single column', async ({ page }) => {
+        await page.setContent(TABLE_HTML);
+        const table = makeTable(page);
+        
+        const statuses = await table.mapColumn('Status');
+        expect(statuses).toEqual(['Active', 'Inactive', 'Active', 'Inactive', 'Active', 'Inactive']);
+    });
+
+    test('getColumnValues collects values as strings', async ({ page }) => {
+        await page.setContent(TABLE_HTML);
+        const table = makeTable(page);
+        
+        const ids = await table.getColumnValues('ID');
+        expect(ids).toEqual(['1', '2', '3', '4', '5', '6']);
+    });
+
+    test('SmartCell.bringIntoView throws targeted error on failure', async ({ page }) => {
+        await page.setContent(TABLE_HTML);
+        const table = useTable(page.locator('#tbl'), {
+            strategies: {
+                viewport: {
+                    getVisibleColumnRange: async () => ({ first: 0, last: 1 }), // limits to cols 0 and 1
+                },
+                getCellLocator: ({ row, columnIndex }) => {
+                    // Mock: If column > 1, pretend it's completely unmounted from the DOM
+                    if (columnIndex > 1) {
+                        return page.locator('.this-does-not-exist-in-dom');
+                    }
+                    return row.locator('td').nth(columnIndex);
+                }
+            }
+        });
+        await table.init();
+        
+        // 'Status' is column 2 (0-indexed). So index 2 is > 1.
+        // It's out of view, and we didn't configure a navigation strategy or scrollToColumn.
+        const row = table.getRowByIndex(0);
+        const cell = row.getCell('Status');
+        
+        const err = await cell.bringIntoView().catch(e => e);
+        expect(err.message).toMatch(/SmartTable: could not reach cell for column "Status" \(colIndex 2\) at row 0/);
+        expect(err.message).toMatch(/Visible column range: \[0–1\]/);
+        expect(err.message).toMatch(/Column is out of view and no navigation fallback is configured/);
+    });
+});

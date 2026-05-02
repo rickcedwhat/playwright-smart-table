@@ -3,10 +3,18 @@ import type { PaginationPrimitives, TableContext } from '../types';
 /** A single step in a navigation plan (e.g. "goNextBulk 3 times"). */
 export type NavigationStep =
   | { type: 'goToPage'; pageIndex: number }
+  | { type: 'goToLast'; targetIndex: number }
   | { type: 'goNextBulk'; count: number }
   | { type: 'goNext'; count: number }
   | { type: 'goPreviousBulk'; count: number }
   | { type: 'goPrevious'; count: number };
+
+function computeCost(path: NavigationStep[]): number {
+  return path.reduce((sum, step) => {
+    if ('count' in step) return sum + step.count;
+    return sum + 1; // goToPage and goToLast count as 1
+  }, 0);
+}
 
 /**
  * Plans an optimal path from currentPageIndex to targetPageIndex using available primitives.
@@ -17,7 +25,8 @@ export type NavigationStep =
 export function planNavigationPath(
   currentPageIndex: number,
   targetPageIndex: number,
-  primitives: PaginationPrimitives
+  primitives: PaginationPrimitives,
+  totalPages?: number
 ): NavigationStep[] {
   if (currentPageIndex === targetPageIndex) return [];
 
@@ -34,37 +43,57 @@ export function planNavigationPath(
     const hasBulk = !!(primitives.goNextBulk && nextBulkSize > 0);
     const hasPrev = !!primitives.goPrevious;
 
+    let forwardPath: NavigationStep[] = [];
     if (!hasBulk || nextBulkSize <= 0) {
       if (primitives.goNext) {
-        return [{ type: 'goNext', count: stepsForward }];
+        forwardPath = [{ type: 'goNext', count: stepsForward }];
       }
-      return [];
+    } else {
+      const bulkCountA = Math.floor(stepsForward / nextBulkSize);
+      const remA = stepsForward % nextBulkSize;
+      const totalA = (remA === 0 || primitives.goNext)
+        ? bulkCountA + remA
+        : Infinity;
+
+      let totalB = Infinity;
+      let bulkCountB = 0;
+      let overB = 0;
+      if (hasPrev) {
+        bulkCountB = Math.ceil(stepsForward / nextBulkSize);
+        overB = bulkCountB * nextBulkSize - stepsForward;
+        totalB = bulkCountB + overB;
+      }
+
+      forwardPath = (totalB < totalA)
+        ? (() => {
+            const path: NavigationStep[] = [];
+            if (bulkCountB > 0) path.push({ type: 'goNextBulk', count: bulkCountB });
+            if (overB > 0) path.push({ type: 'goPrevious', count: overB });
+            return path;
+          })()
+        : Number.isFinite(totalA) ? (() => {
+            const path: NavigationStep[] = [];
+            if (bulkCountA > 0) path.push({ type: 'goNextBulk', count: bulkCountA });
+            if (remA > 0) path.push({ type: 'goNext', count: remA });
+            return path;
+          })() : [];
     }
 
-    const bulkCountA = Math.floor(stepsForward / nextBulkSize);
-    const remA = stepsForward % nextBulkSize;
-    const totalA = bulkCountA + remA;
-
-    let totalB = Infinity;
-    let bulkCountB = 0;
-    let overB = 0;
-    if (hasPrev && primitives.goPreviousBulk && prevBulkSize > 0) {
-      bulkCountB = Math.ceil(stepsForward / nextBulkSize);
-      overB = bulkCountB * nextBulkSize - stepsForward;
-      totalB = bulkCountB + overB;
+    if (totalPages !== undefined && primitives.goToLast) {
+      const lastPageIndex = totalPages - 1;
+      if (targetPageIndex <= lastPageIndex) {
+        // Evaluate wrap-around path
+        const backwardPath = planNavigationPath(lastPageIndex, targetPageIndex, primitives);
+        if (backwardPath.length > 0 || targetPageIndex === lastPageIndex) {
+          const wrapPath: NavigationStep[] = [{ type: 'goToLast', targetIndex: lastPageIndex }, ...backwardPath];
+          if (forwardPath.length === 0 || computeCost(wrapPath) < computeCost(forwardPath)) {
+            return wrapPath;
+          }
+        }
+      }
     }
 
-    if (totalB < totalA) {
-      const path: NavigationStep[] = [];
-      if (bulkCountB > 0) path.push({ type: 'goNextBulk', count: bulkCountB });
-      if (overB > 0) path.push({ type: 'goPrevious', count: overB });
-      return path;
-    }
-
-    const path: NavigationStep[] = [];
-    if (bulkCountA > 0) path.push({ type: 'goNextBulk', count: bulkCountA });
-    if (remA > 0) path.push({ type: 'goNext', count: remA });
-    return path;
+    return forwardPath;
   }
 
   // Backward: current → target
@@ -197,6 +226,13 @@ export async function executeNavigationPath(
           const ok = await primitives.goToPage(step.pageIndex, context);
           if (!ok) throw new Error(`goToPage(${step.pageIndex}) failed`);
           setCurrentPage(step.pageIndex);
+        }
+        break;
+      case 'goToLast':
+        if (primitives.goToLast) {
+          const ok = await primitives.goToLast(context);
+          if (!ok) throw new Error(`goToLast failed`);
+          setCurrentPage(step.targetIndex);
         }
         break;
       case 'goNextBulk':

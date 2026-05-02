@@ -222,6 +222,23 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       const map = await tableMapper.getMap(options?.timeout);
 
       logDebug(config, 'info', `Table initialized with ${map.size} columns`, Array.from(map.keys()));
+
+      if (config.strategies.pagination?.detectCurrentPage) {
+        try {
+          const detected = await config.strategies.pagination.detectCurrentPage(rootLocator);
+          if (Number.isInteger(detected) && detected >= 0) {
+            tableState.currentPageIndex = detected;
+            logDebug(config, 'info', `init: detected starting page index ${detected}`);
+          } else {
+            tableState.currentPageIndex = 0;
+            logDebug(config, 'error', `init: detectCurrentPage returned invalid index (${detected}); defaulting to 0`);
+          }
+        } catch (e) {
+          tableState.currentPageIndex = 0;
+          logDebug(config, 'error', `init: detectCurrentPage failed`, e);
+        }
+      }
+
       await debugDelay(config, 'default');
       return result;
     },
@@ -246,6 +263,36 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       const idx = map.get(columnName);
       if (idx === undefined) throw _createColumnError(columnName, map, 'header cell');
       return resolve(config.headerSelector as Selector, rootLocator).nth(idx);
+    },
+
+    countRows: async (): Promise<number> => {
+      await _autoInit();
+      const allRows = resolve(config.rowSelector, rootLocator);
+      return allRows.count();
+    },
+
+    mapColumn: async <R = string>(columnName: string, options: import('./types').RowIterationOptions = {}): Promise<R[]> => {
+      await _autoInit();
+      const map = await tableMapper.getMap();
+      if (!map.has(columnName)) throw _createColumnError(columnName, map, 'mapColumn iteration');
+
+      return result.map(async ({ row }) => {
+        const cell = row.getCell(columnName);
+        await cell.bringIntoView();
+        
+        const columnOverride = config.columnOverrides?.[columnName as keyof T];
+        if (columnOverride?.read) {
+            return await columnOverride.read(cell) as R;
+        }
+        
+        const text = await cell.innerText();
+        return (text || '').trim() as unknown as R;
+      }, options);
+    },
+
+    getColumnValues: async (columnName: string, options: import('./types').RowIterationOptions = {}): Promise<string[]> => {
+      const values = await result.mapColumn<unknown>(columnName, options);
+      return values.map(v => String(v));
     },
 
     reset: async () => {
