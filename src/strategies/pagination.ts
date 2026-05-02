@@ -48,7 +48,7 @@ export const PaginationStrategies = {  /**
         }
 
         return await defaultStabilize(context, async () => {
-          await btn.click({ timeout: 2000 }).catch(() => { });
+          await btn.click({ timeout: options.timeout ?? 2000 });
         }).then(stabilized => stabilized ? returnVal : false);
       };
     };
@@ -72,7 +72,7 @@ export const PaginationStrategies = {  /**
             if (!await btn.isVisible().catch(() => false)) return false;
             if (!await btn.isEnabled().catch(() => false)) return false;
             return await defaultStabilize(context, async () => {
-              await btn.click({ timeout: 2000 }).catch(() => {});
+              await btn.click({ timeout: options.timeout ?? 2000 });
             }).then(s => !!s);
           }
         : undefined,
