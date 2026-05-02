@@ -222,6 +222,13 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       const map = await tableMapper.getMap(options?.timeout);
 
       logDebug(config, 'info', `Table initialized with ${map.size} columns`, Array.from(map.keys()));
+
+      if (config.strategies.pagination?.detectCurrentPage) {
+        const detected = await config.strategies.pagination.detectCurrentPage(rootLocator);
+        tableState.currentPageIndex = detected;
+        logDebug(config, 'info', `init: detected starting page index ${detected}`);
+      }
+
       await debugDelay(config, 'default');
       return result;
     },

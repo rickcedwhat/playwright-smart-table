@@ -20,6 +20,14 @@ export const PaginationStrategies = {  /**
     previousBulk?: Selector,
     first?: Selector,
     last?: Selector,
+    /**
+     * Selector matching all visible page-number buttons/links.
+     * Used to implement direct page jumps (goToPage). Works with both full-range pagers
+     * (all pages always visible) and windowed pagers (e.g. only pages 6–14 visible) —
+     * returns false when the target page is outside the current window, triggering the
+     * library's step-and-retry loop until the button scrolls into view.
+     */
+    pageNumbers?: Selector,
   }, options: {
     nextBulkPages?: number,
     previousBulkPages?: number,
@@ -54,6 +62,19 @@ export const PaginationStrategies = {  /**
       goPreviousBulk: createClicker(selectors.previousBulk, prevBulk),
       goToFirst: createClicker(selectors.first),
       goToLast: createClicker(selectors.last),
+      goToPage: selectors.pageNumbers
+        ? async (pageIndex: number, context: TableContext) => {
+            const { root, resolve } = context;
+            const btn = resolve(selectors.pageNumbers!, root)
+              .filter({ hasText: String(pageIndex + 1) })
+              .first();
+            if (!await btn.isVisible().catch(() => false)) return false;
+            if (!await btn.isEnabled().catch(() => false)) return false;
+            return await defaultStabilize(context, async () => {
+              await btn.click({ timeout: 2000 }).catch(() => {});
+            }).then(s => !!s);
+          }
+        : undefined,
       getTotalPages: options.numberOfPages ? async (context) => {
         if (typeof options.numberOfPages === 'function') {
           return await options.numberOfPages(context.root);

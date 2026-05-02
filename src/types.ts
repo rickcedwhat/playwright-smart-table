@@ -357,6 +357,18 @@ export interface PaginationPrimitives {
 
   /** How many pages one goPreviousBulk() goes back. Used by navigation path planner for optimal bringIntoView. */
   previousBulkPages?: number;
+
+  /**
+   * Called once during init() to sync the library's page counter with the actual DOM state.
+   * Use when a table may open on a page other than the first (e.g. a deep-linked URL that
+   * lands on page 5). Returns a 0-indexed page number.
+   * @example
+   * detectCurrentPage: async (root) => {
+   *   const text = await root.locator('[aria-current="page"]').textContent();
+   *   return parseInt(text ?? '1') - 1;
+   * }
+   */
+  detectCurrentPage?: (root: import('@playwright/test').Locator) => number | Promise<number>;
 }
 
 export type PaginationStrategy = PaginationPrimitives;
