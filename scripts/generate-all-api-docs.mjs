@@ -126,7 +126,7 @@ function extractMethods(content, interfaceName) {
 Object.entries(allSignatures).forEach(([interfaceName, methods]) => {
     const outputPath = path.join(rootDir, `docs/.vitepress/${interfaceName.toLowerCase()}-signatures.json`);
     const formatted = methods.map(m => ({
-        name: m.name.replace(/\(.*$/, '').trim(),
+        name: m.name.replace(/[<(].*$/, '').trim(),
         signature: m.signature.replace(/;$/, '').trim(),
         comment: m.comment
     }));
