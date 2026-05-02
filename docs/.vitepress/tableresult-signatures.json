@@ -51,12 +51,12 @@
   },
   {
     "name": "countRows",
-    "signature": "countRows: (options?: { exact?: boolean }) => Promise<number>",
-    "comment": "/**\n* Counts the number of rows currently on the page.\n* Does not paginate.\n* @param options - Optional filtering. (Currently only exact match supported)\n*/"
+    "signature": "countRows: () => Promise<number>",
+    "comment": "/**\n* Counts the number of rows currently on the page.\n* Does not paginate.\n*/"
   },
   {
-    "name": "mapColumn<R = unknown>",
-    "signature": "mapColumn<R = unknown>(columnName: string, options?: RowIterationOptions): Promise<R[]>",
+    "name": "mapColumn<R = string>",
+    "signature": "mapColumn<R = string>(columnName: string, options?: RowIterationOptions): Promise<R[]>",
     "comment": "/**\n* Iterates over rows and extracts the value of a single column.\n* More efficient than map + toJSON for single-column extraction.\n* @param columnName - The name of the column to extract\n* @param options - Iteration options\n*/"
   },
   {
