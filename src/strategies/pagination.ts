@@ -76,7 +76,7 @@ export const PaginationStrategies = {  /**
             }).then(s => !!s);
           }
         : undefined,
-      getTotalPages: options.numberOfPages ? async (context) => {
+      getTotalPages: options.numberOfPages !== undefined ? async (context) => {
         const result = typeof options.numberOfPages === 'function'
           ? await options.numberOfPages(context.root)
           : options.numberOfPages;
