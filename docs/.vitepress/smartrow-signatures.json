@@ -16,8 +16,8 @@
   },
   {
     "name": "getCell",
-    "signature": "getCell(column: string): Locator",
-    "comment": "/**\n* Get a cell locator by column name.\n* @param column - Column name (case-sensitive)\n* @returns Locator for the cell\n* @example\n* const emailCell = row.getCell('Email');\n* await expect(emailCell).toHaveText('john@example.com');\n*/"
+    "signature": "getCell(column: string): SmartCell",
+    "comment": "/**\n* Get a cell locator by column name.\n* @param column - Column name (case-sensitive)\n* @returns SmartCell (Locator + bringIntoView)\n* @example\n* const emailCell = row.getCell('Email');\n* await emailCell.bringIntoView();\n* await expect(emailCell).toHaveText('john@example.com');\n*/"
   },
   {
     "name": "toJSON",
