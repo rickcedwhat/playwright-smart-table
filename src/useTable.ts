@@ -22,6 +22,20 @@ import { createSmartRowArray, SmartRowArray } from './utils/smartRowArray';
 import { ElementTracker } from './utils/elementTracker';
 import { NavigationBarrier } from './utils/navigationBarrier';
 
+// Helper to safely serialize objects containing functions for logging
+const safeStringify = (obj: any) => {
+  try {
+    return JSON.stringify(obj, (key: string, value: any) => {
+      if (typeof value === 'function') {
+        return '[Function]';
+      }
+      return value;
+    });
+  } catch (e) {
+    return '[unserializable]';
+  }
+};
+
 /**
  * Main hook to interact with a table.
  */
@@ -276,7 +290,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     },
 
     mapColumn: async <R = string>(columnName: string, options: import('./types').RowIterationOptions = {}): Promise<R[]> => {
-      log(`mapColumn: column="${columnName}" options=${JSON.stringify(options)}`);
+      log(`mapColumn: column="${columnName}" options=${safeStringify(options)}`);
       await _autoInit();
       const map = await tableMapper.getMap();
       if (!map.has(columnName)) throw _createColumnError(columnName, map, 'mapColumn iteration');
@@ -296,7 +310,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     },
 
     getColumnValues: async (columnName: string, options: import('./types').RowIterationOptions = {}): Promise<string[]> => {
-      log(`getColumnValues: column="${columnName}" options=${JSON.stringify(options)}`);
+      log(`getColumnValues: column="${columnName}" options=${safeStringify(options)}`);
       const values = await result.mapColumn<unknown>(columnName, options);
       return values.map(v => String(v));
     },
@@ -328,7 +342,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
 
 
     getRow: (filters: Partial<T> | Record<string, FilterValue>, options: { exact?: boolean } = { exact: false }): SmartRowType<T> => {
-      log(`getRow: filters=${JSON.stringify(filters)} exact=${options.exact}`);
+      log(`getRow: filters=${safeStringify(filters)} exact=${options.exact}`);
       const map = tableMapper.getMapSync();
       if (!map) throw new Error('Initialization Error: You attempted to access a row before the table structure was mapped. Please call "await table.init()" once before using synchronous row access.');
 
@@ -355,14 +369,14 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     },
 
     findRow: async (filters: Record<string, FilterValue>, options?: { exact?: boolean, maxPages?: number }): Promise<SmartRowType<T>> => {
-      log(`findRow: filters=${JSON.stringify(filters)} options=${JSON.stringify(options)}`);
+      log(`findRow: filters=${safeStringify(filters)} options=${safeStringify(options)}`);
       return rowFinder.findRow(filters, options);
     },
 
 
 
     findRows: async (filters?: Record<string, FilterValue>, options?: { exact?: boolean, maxPages?: number }): Promise<SmartRowArray<T>> => {
-      log(`findRows: filters=${JSON.stringify(filters ?? {})} options=${JSON.stringify(options)}`);
+      log(`findRows: filters=${safeStringify(filters ?? {})} options=${safeStringify(options)}`);
       return rowFinder.findRows(filters ?? {}, options);
     },
 
@@ -448,7 +462,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     // ─── Row iteration (delegated to engine/tableIteration) ──────────────────
 
     forEach: async (callback, options = {}) => {
-      log(`forEach: options=${JSON.stringify(options)}`);
+      log(`forEach: options=${safeStringify(options)}`);
       await _autoInit();
       await runForEach(
         {
@@ -466,7 +480,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     },
 
     map: async <R>(callback: (ctx: import('./types').RowIterationContext<T>) => R | Promise<R>, options: import('./types').RowIterationOptions = {}): Promise<R[]> => {
-      log(`map: options=${JSON.stringify(options)}`);
+      log(`map: options=${safeStringify(options)}`);
       await _autoInit();
       return runMap(
         {
@@ -484,7 +498,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     },
 
     filter: async (predicate, options = {}) => {
-      log(`filter: options=${JSON.stringify(options)}`);
+      log(`filter: options=${safeStringify(options)}`);
       await _autoInit();
       return runFilter(
         {

@@ -39,13 +39,11 @@ describe('Issue 82: Targeted navigation errors', () => {
             null
         );
 
-        await expect(smartRow.getCell('Score').bringIntoView()).rejects.toThrowError(
-            /SmartTable: could not reach cell for column "Score" \(colIndex 10\) at row 20/
-        );
-
         try {
             await smartRow.getCell('Score').bringIntoView();
+            expect.fail('Should have thrown an error');
         } catch (e: any) {
+            expect(e.message).toMatch(/SmartTable: could not reach cell for column "Score" \(colIndex 10\) at row 20/);
             expect(e.message).toContain('Visible column range: [0–5]');
             expect(e.message).toContain('Visible row range: [0–10]');
             expect(e.message).toContain('Row is out of view');
