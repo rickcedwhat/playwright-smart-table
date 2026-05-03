@@ -96,24 +96,24 @@ jobs:
             const repo = context.repo.repo;
             const pull_number = context.payload.pull_request.number;
 
-            console.log('🔍 Checking CodeRabbit review status...');
+            console.log('🔍 Starting CodeRabbit review gate polling...');
 
-            // 1. Check for "Changes Requested" review from CodeRabbit
-            const { data: reviews } = await github.rest.pulls.listReviews({
-              owner,
-              repo,
-              pull_number,
-            });
-            
-            const coderabbitReview = reviews.reverse().find(r => r.user.login === botName);
-            if (coderabbitReview && coderabbitReview.state === 'CHANGES_REQUESTED') {
-              core.setFailed('❌ CodeRabbit has requested changes. Please resolve them before merging.');
-              return;
-            }
-
-            // 2. Wait for the CodeRabbit check to finish
             const maxAttempts = 15; // ~7.5 minutes
             for (let i = 0; i < maxAttempts; i++) {
+              // 1. Check for "Changes Requested" review from CodeRabbit (fetched each loop to catch late reviews)
+              const { data: reviews } = await github.rest.pulls.listReviews({
+                owner,
+                repo,
+                pull_number,
+              });
+              
+              const coderabbitReview = reviews.reverse().find(r => r.user.login === botName);
+              if (coderabbitReview && coderabbitReview.state === 'CHANGES_REQUESTED') {
+                core.setFailed('❌ CodeRabbit has requested changes. Please resolve them before merging.');
+                return;
+              }
+
+              // 2. Check for the CodeRabbit check-run status
               const { data: checks } = await github.rest.checks.listForRef({
                 owner,
                 repo,
@@ -130,10 +130,12 @@ jobs:
                   }
                   return;
                 }
-                console.log(`⏳ CodeRabbit check is still ${crCheck.status}... waiting 30s`);
+                console.log(`⏳ CodeRabbit check is still ${crCheck.status}... waiting 30s (Attempt ${i + 1}/${maxAttempts})`);
               } else {
-                console.log('⏳ CodeRabbit check not found yet... waiting 30s');
+                console.log(`⏳ CodeRabbit check not found yet... waiting 30s (Attempt ${i + 1}/${maxAttempts})`);
               }
+              
               await new Promise(r => setTimeout(r, 30000));
             }
-            console.log('⚠️ Timed out waiting for CodeRabbit check, but no blocking reviews found. Proceeding.');
+            
+            core.setFailed('❌ Timed out waiting for CodeRabbit check. Please ensure the bot is running and try again.');
