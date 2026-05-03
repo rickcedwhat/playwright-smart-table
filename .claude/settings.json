@@ -1,0 +1,18 @@
+{
+  "worktree": {
+    "symlinkDirectories": []
+  },
+  "hooks": {
+    "WorktreeCreate": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '.worktreePath' | { read -r p; cd \"$p\" && source ~/.zshrc && pnpm install --frozen-lockfile; }",
+            "statusMessage": "Installing pnpm dependencies in new worktree..."
+          }
+        ]
+      }
+    ]
+  }
+}

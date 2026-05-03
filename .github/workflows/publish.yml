@@ -16,6 +16,9 @@ jobs:
       - name: Checkout Source
         uses: actions/checkout@v6
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
@@ -40,11 +43,11 @@ jobs:
 
       - name: Install Dependencies
         if: steps.check_version.outputs.changed == 'true'
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Build Project
         if: steps.check_version.outputs.changed == 'true'
-        run: npm run build
+        run: pnpm run build
 
       - name: Test Packaging
         if: steps.check_version.outputs.changed == 'true'

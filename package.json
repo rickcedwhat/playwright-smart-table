@@ -28,19 +28,19 @@
     "docs:build:all": "vitepress build docs",
     "docs:verify-links": "node scripts/verify-vitepress-links.mjs",
     "embed-version": "node scripts/embed-version.mjs",
-    "build": "npm run embed-version && npm run generate-types && npm run generate-config-types && npm run generate-docs && npm run generate-all-api-docs && npm run update-all-api-signatures && tsc",
-    "prepublishOnly": "npm run build",
+    "build": "pnpm run embed-version && pnpm run generate-types && pnpm run generate-config-types && pnpm run generate-docs && pnpm run generate-all-api-docs && pnpm run update-all-api-signatures && tsc",
+    "prepublishOnly": "pnpm run build",
     "clean-port": "lsof -ti:3000 | xargs kill -9 || true",
-    "pretest": "npm run clean-port",
-    "posttest": "npm run clean-port",
-    "test": "npm run test:unit && npx playwright test",
+    "pretest": "pnpm run clean-port",
+    "posttest": "pnpm run clean-port",
+    "test": "pnpm run test:unit && pnpm exec playwright test",
     "test:unit": "vitest run --coverage --reporter=verbose --reporter=html",
     "test:unit:ui": "vitest --ui",
-    "test:mutate": "npx stryker run",
-    "pretest:e2e": "npm run clean-port",
-    "posttest:e2e": "npm run clean-port",
-    "test:e2e": "npx playwright test",
-    "test:playground": "npx playwright test --config tests-external/playground/playwright.config.ts 2>&1 | tee \"tests-external/playground/logs/run-$(date +%Y%m%d-%H%M%S).log\"",
+    "test:mutate": "pnpm exec stryker run",
+    "pretest:e2e": "pnpm run clean-port",
+    "posttest:e2e": "pnpm run clean-port",
+    "test:e2e": "pnpm exec playwright test",
+    "test:playground": "pnpm exec playwright test --config tests-external/playground/playwright.config.ts 2>&1 | tee \"tests-external/playground/logs/run-$(date +%Y%m%d-%H%M%S).log\"",
     "dev:playground": "cd playground && npm run dev",
     "dev:mui": "cd tests/apps/mui-datagrid && npm run dev",
     "prepare": "husky"
@@ -87,17 +87,18 @@
     "@stryker-mutator/core": "^9.6.0",
     "@stryker-mutator/vitest-runner": "^9.6.0",
     "@types/node": "^25.5.2",
-    "@vitest/coverage-v8": "^4.1.0",
-    "@vitest/ui": "^4.1.0",
+    "@vitest/coverage-v8": "^3.2.4",
+    "@vitest/ui": "^3.2.4",
     "happy-dom": "^20.8.3",
     "@commitlint/cli": "^19.7.1",
     "@commitlint/config-conventional": "^19.7.1",
     "husky": "^9.1.7",
     "typescript": "^6.0.2",
     "vitepress": "^1.6.4",
-    "vitest": "^4.1.0"
+    "vitest": "^3.2.4"
   },
   "dependencies": {
     "@scarf/scarf": "^1.4.0"
-  }
+  },
+  "packageManager": "pnpm@10.33.2"
 }
