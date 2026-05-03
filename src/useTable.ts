@@ -22,6 +22,20 @@ import { createSmartRowArray, SmartRowArray } from './utils/smartRowArray';
 import { ElementTracker } from './utils/elementTracker';
 import { NavigationBarrier } from './utils/navigationBarrier';
 
+// Helper to safely serialize objects containing functions for logging
+const safeStringify = (obj: any) => {
+  try {
+    return JSON.stringify(obj, (key: string, value: any) => {
+      if (typeof value === 'function') {
+        return '[Function]';
+      }
+      return value;
+    });
+  } catch (e) {
+    return '[unserializable]';
+  }
+};
+
 /**
  * Main hook to interact with a table.
  */
@@ -244,6 +258,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     },
 
     scrollToColumn: async (columnName: string) => {
+      log(`scrollToColumn: column="${columnName}"`);
       const map = await tableMapper.getMap();
       const idx = map.get(columnName);
       if (idx === undefined) throw _createColumnError(columnName, map);
@@ -254,11 +269,13 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     },
 
     getHeaders: async () => {
+      log("getHeaders: fetching available columns");
       const map = await tableMapper.getMap();
       return Array.from(map.keys());
     },
 
     getHeaderCell: async (columnName: string) => {
+      log(`getHeaderCell: column="${columnName}"`);
       const map = await tableMapper.getMap();
       const idx = map.get(columnName);
       if (idx === undefined) throw _createColumnError(columnName, map, 'header cell');
@@ -266,12 +283,14 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     },
 
     countRows: async (): Promise<number> => {
+      log("countRows: counting rows in current viewport");
       await _autoInit();
       const allRows = resolve(config.rowSelector, rootLocator);
       return allRows.count();
     },
 
     mapColumn: async <R = string>(columnName: string, options: import('./types').RowIterationOptions = {}): Promise<R[]> => {
+      log(`mapColumn: column="${columnName}" options=${safeStringify(options)}`);
       await _autoInit();
       const map = await tableMapper.getMap();
       if (!map.has(columnName)) throw _createColumnError(columnName, map, 'mapColumn iteration');
@@ -291,6 +310,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     },
 
     getColumnValues: async (columnName: string, options: import('./types').RowIterationOptions = {}): Promise<string[]> => {
+      log(`getColumnValues: column="${columnName}" options=${safeStringify(options)}`);
       const values = await result.mapColumn<unknown>(columnName, options);
       return values.map(v => String(v));
     },
@@ -322,6 +342,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
 
 
     getRow: (filters: Partial<T> | Record<string, FilterValue>, options: { exact?: boolean } = { exact: false }): SmartRowType<T> => {
+      log(`getRow: filters=${safeStringify(filters)} exact=${options.exact}`);
       const map = tableMapper.getMapSync();
       if (!map) throw new Error('Initialization Error: You attempted to access a row before the table structure was mapped. Please call "await table.init()" once before using synchronous row access.');
 
@@ -339,6 +360,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     },
 
     getRowByIndex: (index: number): SmartRowType<T> => {
+      log(`getRowByIndex: index=${index}`);
       const map = tableMapper.getMapSync();
       if (!map) throw new Error('Initialization Error: You attempted to access a row before the table structure was mapped. Please call "await table.init()" once before using synchronous row access.');
 
@@ -347,17 +369,21 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     },
 
     findRow: async (filters: Record<string, FilterValue>, options?: { exact?: boolean, maxPages?: number }): Promise<SmartRowType<T>> => {
+      log(`findRow: filters=${safeStringify(filters)} options=${safeStringify(options)}`);
       return rowFinder.findRow(filters, options);
     },
 
 
 
     findRows: async (filters?: Record<string, FilterValue>, options?: { exact?: boolean, maxPages?: number }): Promise<SmartRowArray<T>> => {
+      log(`findRows: filters=${safeStringify(filters ?? {})} options=${safeStringify(options)}`);
       return rowFinder.findRows(filters ?? {}, options);
     },
 
     isInitialized: (): boolean => {
-      return tableMapper.isInitialized();
+      const initialized = tableMapper.isInitialized();
+      log(`isInitialized: ${initialized}`);
+      return initialized;
     },
 
     sorting: {
@@ -392,6 +418,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
         throw new Error(`Failed to sort column "${columnName}" to "${direction}" after ${maxRetries} attempts.`);
       },
       getState: async (columnName: string): Promise<'asc' | 'desc' | 'none'> => {
+        log(`sorting.getState: column="${columnName}"`);
         await _autoInit();
         if (!config.strategies.sorting) throw new Error('No sorting strategy has been configured.');
         const context: StrategyContext = { ...createStrategyContext(), getHeaderCell: result.getHeaderCell };
@@ -435,6 +462,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     // ─── Row iteration (delegated to engine/tableIteration) ──────────────────
 
     forEach: async (callback, options = {}) => {
+      log(`forEach: options=${safeStringify(options)}`);
       await _autoInit();
       await runForEach(
         {
@@ -452,6 +480,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     },
 
     map: async <R>(callback: (ctx: import('./types').RowIterationContext<T>) => R | Promise<R>, options: import('./types').RowIterationOptions = {}): Promise<R[]> => {
+      log(`map: options=${safeStringify(options)}`);
       await _autoInit();
       return runMap(
         {
@@ -469,6 +498,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     },
 
     filter: async (predicate, options = {}) => {
+      log(`filter: options=${safeStringify(options)}`);
       await _autoInit();
       return runFilter(
         {
@@ -488,6 +518,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
 
 
     generateConfig: async () => {
+      log("Generating table config prompt...");
       const html = await _getCleanHtml(rootLocator);
       const separator = "=".repeat(50);
       const content = `\n${separator} \n🤖 COPY INTO GEMINI / ChatGPT 🤖\n${separator} \nI am using 'playwright-smart-table'.\nTarget Table Locator: ${rootLocator.toString()} \nGenerate config for: \n\`\`\`html\n${html.substring(0, 10000)} ...\n\`\`\`\n${separator}\n`;

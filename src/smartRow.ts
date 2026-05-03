@@ -352,7 +352,18 @@ const _navigateToCell = async (params: {
         const finalCell = getCellLocator();
         if (await finalCell.count() > 0) return finalCell;
         
-        throw new Error(`SmartTable: could not reach cell for column "${column}" (colIndex ${index}) at row ${rowIndex} after exhausting navigation strategies. Ensure navigation primitives are correctly implemented.`);
+        const colRange = viewport && viewport.getVisibleColumnRange ? await viewport.getVisibleColumnRange(context) : null;
+        const rowRange = viewport && viewport.getVisibleRowRange ? await viewport.getVisibleRowRange(context) : null;
+        
+        let errMsg = `SmartTable: could not reach cell for column "${column}" (colIndex ${index}) at row ${rowIndex} after exhausting navigation strategies. Ensure navigation primitives are correctly implemented.\n`;
+        if (colRange) {
+            errMsg += `  Visible column range: [${colRange.first}–${colRange.last}].\n`;
+        }
+        if (rowRange && rowIndex !== undefined) {
+            errMsg += `  Visible row range: [${rowRange.first}–${rowRange.last}].\n`;
+        }
+        
+        throw new Error(errMsg);
     }
     
     // No horizontal strategies configured; assume table is 1D or fully rendered,
