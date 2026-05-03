@@ -552,7 +552,10 @@ export interface FillOptions {
 /** Callback context passed to forEach, map, and filter. */
 export type RowIterationContext<T = any> = {
   row: SmartRow<T>;
+  /** 0-based iteration counter — the order this row was visited, not its DOM position or grid identity. @deprecated Use \`index\` instead. \`rowIndex\` will be removed in v7.0.0. */
   rowIndex: number;
+  /** 0-based iteration counter — the order this row was visited, not its DOM position or grid identity. */
+  index: number;
   stop: () => void;
 };
 
