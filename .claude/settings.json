@@ -8,7 +8,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "jq -r '.worktreePath' | { read -r p; cd \"$p\" && source ~/.zshrc && pnpm install --frozen-lockfile; } 2>/dev/null || true",
+            "command": "jq -r '.worktreePath' | { read -r p; cd \"$p\" && source ~/.zshrc && pnpm install --frozen-lockfile; }",
             "statusMessage": "Installing pnpm dependencies in new worktree..."
           }
         ]
