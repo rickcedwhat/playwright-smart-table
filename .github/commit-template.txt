@@ -1,0 +1,7 @@
+# --- COMMIT MESSAGE TEMPLATE ---
+# Format: <type>(<scope>): <subject>
+# Types: feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert
+# ------------------------------
+# Example: feat(pagination): add dynamic pageCount support
+# ------------------------------
+

@@ -71,14 +71,13 @@ jobs:
           echo "$body" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Create GitHub Release (from changelog)
+      - name: Create GitHub Release
         if: steps.check_version.outputs.changed == 'true'
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: softprops/action-gh-release@v2
         with:
+          token: ${{ secrets.GITHUB_TOKEN }}
           tag_name: v${{ steps.check_version.outputs.version }}
-          release_name: v${{ steps.check_version.outputs.version }}
+          name: v${{ steps.check_version.outputs.version }}
           body: ${{ steps.get_changelog.outputs.body }}
           draft: false
           prerelease: false
