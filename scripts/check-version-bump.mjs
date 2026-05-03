@@ -59,8 +59,8 @@ try {
             const lockVersion = JSON.parse(lockRaw).version;
             if (lockVersion !== currentVersion) {
                 console.error(`\n❌ ERROR: package-lock.json version (${lockVersion}) does not match package.json (${currentVersion}).`);
-                console.error('👉 Run: npm version patch (or minor/major) instead of editing package.json directly.');
-                console.error('   Or run: npm install --package-lock-only  to sync the lockfile.\n');
+                console.error('👉 Run: npm version minor (or patch/major) instead of editing package.json directly.');
+                console.error('   Or run: npm install  to sync the lockfile (do NOT use --package-lock-only: it skips dependency resolution).\n');
                 process.exit(1);
             }
             console.log('✅ package-lock.json is in sync.');
