@@ -6,7 +6,36 @@ on:
       - main
 
 jobs:
+  changes:
+    name: Detect Changed Paths
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v6
+
+      - name: Check for code changes
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            code:
+              - 'src/**'
+              - 'tests/**'
+              - 'playground/**'
+              - 'package.json'
+              - 'package-lock.json'
+              - 'tsconfig*.json'
+              - 'playwright.config*.ts'
+              - 'scripts/**'
+              - 'vite.config*.ts'
+
   lint:
+    name: Static Analysis & Linting
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -41,6 +70,8 @@ jobs:
 
   test-a:
     name: Unit + Core Tests (playground)
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -85,6 +116,8 @@ jobs:
 
   test-b:
     name: Integration Tests (external + MUI DataGrid)
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
