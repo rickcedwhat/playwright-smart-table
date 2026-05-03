@@ -76,7 +76,8 @@ export const StabilizationStrategies = {
      * Useful for tables that have explicit loading states but might not change content immediately.
      */
     networkIdle: (options: { spinnerSelector?: string, timeout?: number } = {}): StabilizationStrategy => {
-        return async ({ root, page, resolve }) => {
+        return async ({ root, page, resolve }, action) => {
+            await action();
             const timeout = options.timeout ?? 5000;
             if (options.spinnerSelector) {
                 const spinner = resolve(options.spinnerSelector, root);
