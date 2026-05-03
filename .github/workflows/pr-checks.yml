@@ -123,10 +123,10 @@ jobs:
               const crCheck = checks.check_runs.find(c => c.name.toLowerCase().includes('coderabbit'));
               if (crCheck) {
                 if (crCheck.status === 'completed') {
-                  if (crCheck.conclusion === 'failure' || crCheck.conclusion === 'action_required') {
-                    core.setFailed('❌ CodeRabbit check failed or requires action.');
-                  } else {
+                  if (crCheck.conclusion === 'success') {
                     console.log('✅ CodeRabbit check completed successfully.');
+                  } else {
+                    core.setFailed(`❌ CodeRabbit check ended with conclusion: ${crCheck.conclusion}. Please resolve any issues.`);
                   }
                   return;
                 }
