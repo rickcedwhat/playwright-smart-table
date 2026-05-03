@@ -586,7 +586,7 @@ export type RowIterationOptions = {
   useBulkPagination?: boolean;
 };
 
-export interface TableResult<T = any> extends AsyncIterable<{ row: SmartRow<T>; rowIndex: number }> {
+export interface TableResult<T = any> extends AsyncIterable<{ row: SmartRow<T>; rowIndex: number; index: number }> {
   /**
    * Represents the current page index of the table's DOM.
    * Starts at 0. Automatically maintained by the library during pagination and bringIntoView.
