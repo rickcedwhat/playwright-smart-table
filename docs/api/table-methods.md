@@ -290,7 +290,7 @@ forEach(
 
 ### Parameters
 
-- `callback` - Function receiving `{ row, index, stop }` (`rowIndex` is a deprecated alias for `index`)
+- `callback` - Function receiving { row, rowIndex, stop }
 - `options` - maxPages, concurrency, dedupe, useBulkPagination
 
 <!-- /api-signature: forEach -->
