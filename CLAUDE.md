@@ -1,4 +1,6 @@
-# Claude Code — Project Context
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 See `AGENTS.md` for shared conventions (package manager, branch strategy, release flow, CI, design constraints).
 
@@ -12,16 +14,60 @@ See `AGENTS.md` for shared conventions (package manager, branch strategy, releas
 
 ---
 
+## Commands
+
+```bash
+# Build
+pnpm run build                          # compile + regenerate all auto-generated files
+
+# Type-check only (fast)
+npx tsc --noEmit
+
+# Unit tests (Vitest, happy-dom environment)
+pnpm run test:unit                      # all unit tests
+npx vitest run tests/unit/foo.test.ts   # single unit test file
+
+# E2E tests (Playwright)
+npx playwright test                                           # all tests
+npx playwright test tests/bug-regression.spec.ts             # single spec file
+npx playwright test --grep "Bug #103"                        # single test by name
+npx playwright test --config playwright.config.ci-a.ts       # core tests (CI group A)
+npx playwright test --config playwright.config.ci-b.ts       # integration tests (CI group B)
+```
+
+---
+
 ## Key Files
 
 | File | Purpose |
 |---|---|
 | `src/useTable.ts` | Core table factory — do not change signature |
-| `src/strategies/` | All pagination / loading / sorting / fill strategies |
+| `src/engine/rowFinder.ts` | `findRow` / `findRows` — pagination loop lives here |
+| `src/strategies/` | All pagination / loading / sorting / fill / stabilization strategies |
 | `src/types.ts` | All public TypeScript types |
+| `src/smartRow.ts` | `SmartRow` construction and cell navigation |
+| `src/filterEngine.ts` | Column-value filter logic used by `getRow` / `findRow` |
 | `src/utils/debugUtils.ts` | `logDebug()` — use instead of `console.log` |
 | `scripts/check-version-bump.mjs` | Pre-commit hook: enforces pnpm-lock.yaml staged on version bump |
 | `CHANGELOG.md` | Must be updated whenever version is bumped |
+
+---
+
+## Architecture
+
+`useTable(locator, config)` is the single entry point. Calling `.init()` runs `TableMapper` to resolve headers → column→index map. After that, all row operations use that frozen map.
+
+**Row access flow:**
+- `getRow(filters)` — **synchronous**. Applies `FilterEngine` to the row locator set and returns `.first()` wrapped in a `SmartRow`. Cannot compute `rowIndex` without async evaluation.
+- `findRow(filters)` — **async**. Delegates to `RowFinder.findRowLocator()`, paginates if needed, returns a `SmartRow` with the real `rowIndex`.
+- `findRows(filters)` — **async**. `RowFinder` runs a pagination loop collecting matches page-by-page.
+
+**Pagination:**
+`_advancePage(useBulk)` in `useTable.ts` is the canonical single-page-advance primitive — it respects the `useBulk` flag and delegates to `goNext` vs `goNextBulk`. `RowFinder` has its own pagination loop that **must** stay consistent with `_advancePage`.
+
+**Stabilization strategies** wrap an `action()` call: they capture state before calling `action()`, then poll until stable. The signature is `(context, action) => Promise<boolean>`.
+
+**SmartRow:** constructed via `createSmartRow(locator, columnMap, rowIndex, config, ...)`. `rowIndex` is used for virtual-scroll viewport calculation and logging. Passing `undefined` is valid; passing the wrong index causes `bringIntoView` to navigate to the wrong row.
 
 ---
 
@@ -36,6 +82,15 @@ See `AGENTS.md` for shared conventions (package manager, branch strategy, releas
 | `docs/api/*.md` | `pnpm run generate-all-api-docs` + `update-all-api-signatures` |
 
 Running `pnpm run build` executes all generators then compiles TypeScript.
+
+---
+
+## Tests
+
+- **Unit tests** (`tests/unit/`) use Vitest with `happy-dom`. No browser. Fast.
+- **E2E / integration tests** (`tests/*.spec.ts`, `tests/integration/`) use Playwright. The playground dev server (port 3000) and MUI DataGrid app (port 3050) are started automatically via `webServer` in `playwright.config.ts`.
+- `playwright.config.ci-a.ts` — core unit + E2E tests (excludes `tests/integration/`)
+- `playwright.config.ci-b.ts` — integration tests only (`tests/integration/**`)
 
 ---
 
