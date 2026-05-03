@@ -240,6 +240,38 @@ const exactRows = await table.findRows(
 
 ---
 
+## countRows()
+
+Count the rows visible on the current page. Auto-initializes the table if needed.
+
+> [!TIP]
+> `countRows()` counts rows on the **current page only**. To count across all pages, use `findRows({}, { maxPages: N })` and check `.length`.
+
+<!-- api-signature: countRows -->
+
+### Signature
+
+```typescript
+countRows: () => Promise<number>
+```
+
+<!-- /api-signature: countRows -->
+
+### Example
+
+```typescript
+const count = await table.countRows();
+expect(count).toBe(10);
+
+// Current page only — navigate first if needed
+await table.reset();
+const firstPageCount = await table.countRows();
+```
+
+[Back to Top](#table-methods)
+
+---
+
 
 ## forEach()
 
@@ -258,15 +290,18 @@ forEach(
 
 ### Parameters
 
-- `callback` - Function receiving { row, rowIndex, stop }
+- `callback` - Function receiving `{ row, index, stop }` (`rowIndex` is a deprecated alias for `index`)
 - `options` - maxPages, concurrency, dedupe, useBulkPagination
 
 <!-- /api-signature: forEach -->
 
+> [!NOTE]
+> `index` is a **visit counter** (0, 1, 2…) — the order this row was encountered during iteration. It is not a DOM position, `data-index`, or grid-internal row identity. With infinite-scroll and deduplication it can diverge from any of those. Use the `row` locator for element-scoped lookups.
+
 ### Example
 
 ```typescript
-await table.forEach(async ({ row, rowIndex, stop }) => {
+await table.forEach(async ({ row, index, stop }) => {
   if (await row.getCell('Status').innerText() === 'Done') stop();
   await row.getCell('Checkbox').click();
 });
@@ -353,8 +388,8 @@ for (const row of active) {
 The table is async iterable. Use `for await...of` for low-level page-by-page iteration.
 
 ```typescript
-for await (const { row, rowIndex } of table) {
-  console.log(rowIndex, await row.getCell('Name').innerText());
+for await (const { row, index } of table) {
+  console.log(index, await row.getCell('Name').innerText());
 }
 ```
 

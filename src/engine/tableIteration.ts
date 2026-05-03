@@ -112,7 +112,7 @@ export async function runMap<T, R>(
             const runCallback = async () => {
               if (stopped && row.rowIndex! > stoppedIndex) return SKIP;
               log(env.config, `${label}: processing row ${row.rowIndex}`);
-              return await callback({ row, rowIndex: row.rowIndex!, stop: () => stop(row.rowIndex!) });
+              return await callback({ row, index: row.rowIndex!, rowIndex: row.rowIndex!, stop: () => stop(row.rowIndex!) });
             };
 
             if (actionMutex) {
