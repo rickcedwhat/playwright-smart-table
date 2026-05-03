@@ -1,4 +1,7 @@
 
+# Ensure pnpm is available (it installs outside the default PATH)
+export PATH="$HOME/Library/pnpm:$HOME/.local/share/pnpm:$PATH"
+
 echo "🚧 Running build and docs generation..."
 # Check for changelog updates if version bumped
 node scripts/check-version-bump.mjs
@@ -7,12 +10,12 @@ if [ $? -ne 0 ]; then
 fi
 
 # Run build (docs/types are generated)
-npm run build
+pnpm run build
 
 # Add generated/modified files to the commit (dist is intentionally ignored)
 git add README.md src/typeContext.ts
 
-# Check if npm run build was successful before committing
+# Check if pnpm run build was successful before committing
 if [ $? -ne 0 ]; then
   echo "Build failed, commit aborted."
   exit 1
