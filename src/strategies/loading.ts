@@ -109,22 +109,23 @@ export const LoadingStrategies = {
 
                 // Polling path
                 const deadline = timeoutMs !== undefined ? Date.now() + timeoutMs : Infinity;
-                let stableStart: number | null = null;
                 let lastSig = await getSignature();
+                let stableStart: number | null = Date.now(); // baseline sample counts toward the stable window
 
                 while (true) {
-                    await context.page.waitForTimeout(pollMs);
-
+                    // Check deadline before sleeping so the loop cannot overshoot timeoutMs by one pollMs interval.
                     if (Date.now() > deadline) {
                         throw new Error(
                             `Headers.stable: headers did not stabilise within ${timeoutMs}ms`
                         );
                     }
 
+                    await context.page.waitForTimeout(pollMs);
+
                     const sig = await getSignature();
                     if (sig !== lastSig) {
                         lastSig = sig;
-                        stableStart = null;
+                        stableStart = null; // reset on change
                         continue;
                     }
 
