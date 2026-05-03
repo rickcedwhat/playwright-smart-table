@@ -215,6 +215,26 @@ strategies: {
 }
 ```
 
+### Bulk header read with `evaluateAll`
+
+When header names live in DOM attributes (not visible text), `evaluateAll` reads all of them in a **single browser round-trip** instead of one `getAttribute` call per header — useful when your table has many columns or initializes repeatedly in a test suite.
+
+```typescript
+strategies: {
+  header: async ({ root, resolve, config }) => {
+    // Single round-trip: extract all column keys from data attributes at once
+    return resolve(config.headerSelector, root).evaluateAll(
+      (els) => els.map(el => el.getAttribute('data-column-key') ?? el.textContent?.trim() ?? '')
+    );
+  }
+}
+```
+
+The callback runs inside the browser, so you can derive column names from any combination of attributes, computed styles, or text — without a waterfall of individual Playwright calls.
+
+> [!TIP]
+> Fall back to `textContent` (as shown above) to gracefully handle any header elements that don't carry the expected attribute.
+
 ---
 
 ## Cell Locator Strategy

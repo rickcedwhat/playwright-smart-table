@@ -401,7 +401,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
 
     // ─── Shared async row iterator ───────────────────────────────────────────
 
-    async *[Symbol.asyncIterator](): AsyncIterableIterator<{ row: SmartRowType<T>; rowIndex: number }> {
+    async *[Symbol.asyncIterator](): AsyncIterableIterator<{ row: SmartRowType<T>; index: number; rowIndex: number }> {
       await _autoInit();
       const map = tableMapper.getMapSync()!;
       const effectiveMaxPages = config.maxPages;
@@ -419,7 +419,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
           const barrier = new NavigationBarrier(newIndices.length);
 
           for (const idx of newIndices) {
-            yield { row: _makeSmart(pageRows[idx], map, rowIndex, pagesScanned - 1, barrier), rowIndex };
+            yield { row: _makeSmart(pageRows[idx], map, rowIndex, pagesScanned - 1, barrier), index: rowIndex, rowIndex };
             rowIndex++;
           }
 

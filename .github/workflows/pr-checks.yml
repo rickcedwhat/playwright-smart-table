@@ -35,16 +35,9 @@ jobs:
             exit 1
           fi
         continue-on-error: false
-      - name: Check Commit Messages
-        run: |
-          # Check if commits follow conventional commits (excluding PR merge commits)
-          git log origin/main..HEAD --no-merges --pretty=format:"%s" | while read msg; do
-            if ! echo "$msg" | grep -qE "^(feat|fix|docs|test|refactor|perf|chore|style|ci|build|revert)(\(.+\))?: .+"; then
-              echo "❌ Invalid commit message: $msg"
-              echo "Must follow: type(scope?): description"
-              exit 1
-            fi
-          done
+
+      - name: Check Commit Messages (commitlint)
+        run: npx commitlint --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }} --verbose
 
   test:
     runs-on: ubuntu-latest
@@ -84,3 +77,4 @@ jobs:
 
       - name: Build Project
         run: npm run build
+
