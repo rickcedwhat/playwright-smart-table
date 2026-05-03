@@ -100,11 +100,12 @@ jobs:
 
             const maxAttempts = 15; // ~7.5 minutes
             for (let i = 0; i < maxAttempts; i++) {
-              // 1. Check for "Changes Requested" review from CodeRabbit (fetched each loop to catch late reviews)
+              // 1. Check for "Changes Requested" review from CodeRabbit
               const { data: reviews } = await github.rest.pulls.listReviews({
                 owner,
                 repo,
                 pull_number,
+                per_page: 100
               });
               
               const coderabbitReview = reviews.reverse().find(r => r.user.login === botName);
@@ -118,9 +119,11 @@ jobs:
                 owner,
                 repo,
                 ref: context.payload.pull_request.head.sha,
+                per_page: 100
               });
               
-              const crCheck = checks.check_runs.find(c => c.name.toLowerCase().includes('coderabbit'));
+              // Use app.slug to uniquely identify CodeRabbit and avoid matching this job
+              const crCheck = checks.check_runs.find(c => c.app && c.app.slug === 'coderabbit');
               if (crCheck) {
                 if (crCheck.status === 'completed') {
                   if (crCheck.conclusion === 'success') {
