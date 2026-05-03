@@ -16,7 +16,7 @@ html/
 .agent/
 .continue/
 .cursorrules
-.agents/
+.agents/reports/
 /.playground.pid
 /coverage/
 /.cache/
