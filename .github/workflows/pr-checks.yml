@@ -7,7 +7,6 @@ on:
 
 jobs:
   lint:
-    name: Static Analysis & Linting
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -48,7 +47,6 @@ jobs:
           done
 
   test:
-    name: Integration Tests
     runs-on: ubuntu-latest
     permissions:
       contents: read
