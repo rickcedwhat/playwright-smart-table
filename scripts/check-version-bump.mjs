@@ -38,10 +38,7 @@ try {
 
         // 6. Verify the new version is actually in the changelog content
         try {
-            // Read the file from the filesystem (which includes the staged changes for adding lines)
             const changelogContent = fs.readFileSync('CHANGELOG.md', 'utf8');
-
-            // Look for "[6.2.0]" or similar
             if (!changelogContent.includes(`[${currentVersion}]`)) {
                 console.error(`\n❌ ERROR: CHANGELOG.md is staged but missing entry for version [${currentVersion}].`);
                 console.error(`👉 Please add a "## [${currentVersion}]" section to CHANGELOG.md.\n`);
@@ -53,20 +50,60 @@ try {
 
         console.log('✅ CHANGELOG.md update confirmed.');
 
-        // 7. Verify package-lock.json is in sync
+        // 7. Verify package-lock.json is staged at all
+        const isLockStaged = stagedFiles.includes('package-lock.json');
+        if (!isLockStaged) {
+            console.error('\n❌ ERROR: package.json version was changed but package-lock.json was not staged.');
+            console.error('👉 Always use: npm version minor (or patch/major) — never edit package.json directly.');
+            console.error('   npm version updates both files with full dependency resolution.\n');
+            process.exit(1);
+        }
+
+        // 8. Verify package-lock.json version matches
         try {
             const lockRaw = fs.readFileSync('package-lock.json', 'utf8');
             const lockVersion = JSON.parse(lockRaw).version;
             if (lockVersion !== currentVersion) {
                 console.error(`\n❌ ERROR: package-lock.json version (${lockVersion}) does not match package.json (${currentVersion}).`);
-                console.error('👉 Run: npm version patch (or minor/major) instead of editing package.json directly.');
-                console.error('   Or run: npm install --package-lock-only  to sync the lockfile.\n');
+                console.error('👉 Always use: npm version minor (or patch/major) — never edit package.json directly.');
+                console.error('   npm version updates both files with full dependency resolution.\n');
                 process.exit(1);
             }
-            console.log('✅ package-lock.json is in sync.');
         } catch (e) {
-            console.warn('⚠️ Could not verify package-lock.json:', e.message);
+            console.warn('⚠️ Could not verify package-lock.json version:', e.message);
         }
+
+        // 9. Detect shallow lockfile update (direct edit or --package-lock-only).
+        //    npm version runs a full install, which changes integrity hashes and resolved URLs
+        //    throughout the lockfile — not just the top-level version strings.
+        //    Strip version fields from both snapshots; if they're identical the lockfile
+        //    was not fully regenerated.
+        try {
+            const stripVersions = (raw) => {
+                const obj = JSON.parse(raw);
+                delete obj.version;
+                if (obj.packages?.['']) delete obj.packages[''].version;
+                return JSON.stringify(obj);
+            };
+
+            const stagedLockRaw = execSync('git show :package-lock.json', { encoding: 'utf8' });
+            const headLockRaw = execSync('git show HEAD:package-lock.json', { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] });
+
+            const stagedNorm = stripVersions(stagedLockRaw);
+            const headNorm   = stripVersions(headLockRaw);
+
+            if (stagedNorm === headNorm) {
+                console.error('\n❌ ERROR: package-lock.json only has its version field changed — dependency tree was not resolved.');
+                console.error('   This happens with --package-lock-only or a direct package.json edit.');
+                console.error('👉 Always use: npm version minor (or patch/major)');
+                console.error('   It runs a full npm install so the lockfile is properly regenerated.\n');
+                process.exit(1);
+            }
+        } catch (e) {
+            console.warn('⚠️ Could not verify lockfile depth:', e.message);
+        }
+
+        console.log('✅ package-lock.json is in sync.');
     }
 
 } catch (error) {
