@@ -5,6 +5,15 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+    paths:
+      - 'src/**'
+      - 'tests/**'
+      - 'playground/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig*.json'
+      - 'scripts/**'
+      - 'vite.config*.ts'
   schedule:
     - cron: '0 3 * * 1' # weekly on Monday at 03:00 UTC
 
