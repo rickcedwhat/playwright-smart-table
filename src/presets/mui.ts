@@ -95,9 +95,8 @@ export const muiTable: Partial<TableConfig> = {
                 const prevBtn = root.locator('button[aria-label="Go to previous page"]');
                 const displayedRows = root.locator('.MuiTablePagination-displayedRows');
 
-                let maxRetries = 50;
                 let clicked = false;
-                while (maxRetries-- > 0 && await prevBtn.count() > 0 && !(await prevBtn.isDisabled())) {
+                while (await prevBtn.count() > 0 && !(await prevBtn.isDisabled())) {
                     const oldText = await displayedRows.innerText().catch(() => '');
                     await prevBtn.click();
                     await waitForMuiPaginationStabilization(context, displayedRows, oldText);

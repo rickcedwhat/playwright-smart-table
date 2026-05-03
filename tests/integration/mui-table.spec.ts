@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import path from 'path';
 import { useTable, presets } from '../../src/index';
 
 test.describe('MUI Table Preset Integration', () => {
@@ -73,5 +74,35 @@ test.describe('MUI Table Preset Integration', () => {
         // Calling findRows() with no filters should scrape all pages and return every row.
         const allRows = await table.findRows();
         expect(allRows.length).toBeGreaterThan(5);
+    });
+});
+
+// ─── Bug #105: muiTable.goToFirst() silently fails if table has more than 50 pages
+
+test.describe('Bug #105: goToFirst() 50-retry cap', () => {
+    // Uses a synthetic page that starts on page 55 of 55.
+    // Returning to page 1 requires 54 previous-page clicks — exceeds the hardcoded cap of 50.
+    const fixtureUrl = `file://${path.resolve(__dirname, '../test-assets/mui-pagination-55pages.html')}`;
+
+    test('goToFirst() reaches page 1 when the table has more than 50 pages', async ({ page }) => {
+        await page.goto(fixtureUrl);
+
+        // Confirm we start on the last page (rows 271–275 of 275)
+        await expect(page.locator('.MuiTablePagination-displayedRows')).toContainText('271');
+
+        const context: any = {
+            root: page.locator('#table-wrapper'),
+            page,
+            config: { strategies: {} },
+            resolve: (selector: string, root: any) => root.locator(selector),
+        };
+
+        const goToFirst = (presets.muiTable as any).strategies.pagination.goToFirst;
+        const result = await goToFirst(context);
+
+        expect(result).toBe(true);
+        // After a successful goToFirst, the display must show rows starting at exactly 1
+        // (e.g. "1–5 of 275"). A loose contains('1–') would also match "21–25", so use a regex.
+        await expect(page.locator('.MuiTablePagination-displayedRows')).toHaveText(/^1[–\-]/);
     });
 });
