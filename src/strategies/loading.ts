@@ -78,27 +78,67 @@ export const LoadingStrategies = {
      */
     Headers: {
         /**
-         * Checks if the headers are stable (count and text) for a specified duration.
-         * @param duration Duration in ms for headers to remain unchanged to be considered stable (default: 200).
+         * Waits until the header signature (count + text) remains unchanged for `duration` ms.
+         *
+         * The default single-shot check (read → wait → read) is fine for most grids.
+         * For slow or virtualized grids that churn headers for several seconds, supply
+         * `pollMs` and optionally `timeoutMs` to poll in a loop until stable.
+         *
+         * @param duration  Stable window in ms — headers must not change for this long (default: 200).
+         * @param options.pollMs     How often to re-check while waiting (default: same as `duration`, i.e. single-shot).
+         * @param options.timeoutMs  Hard deadline in ms; throws if stability is never reached (default: no hard timeout).
          */
-        stable: (duration: number = 200) => async (context: TableContext): Promise<boolean> => {
-            const { config, resolve, root } = context;
-            const getHeaderTexts = async () => {
-                const headers = await resolve(config.headerSelector as Selector, root).all();
-                return Promise.all(headers.map(h => h.innerText()));
-            };
+        stable: (duration: number = 200, options: { pollMs?: number; timeoutMs?: number } = {}) =>
+            async (context: TableContext): Promise<boolean> => {
+                const { config, resolve, root } = context;
+                const { pollMs, timeoutMs } = options;
 
-            const initial = await getHeaderTexts();
-            // Wait for duration
-            await context.page.waitForTimeout(duration);
-            const current = await getHeaderTexts();
+                const getSignature = async (): Promise<string> => {
+                    const headers = await resolve(config.headerSelector as Selector, root).all();
+                    const texts = await Promise.all(headers.map(h => h.innerText()));
+                    return texts.join('\x00');
+                };
 
-            if (initial.length !== current.length) return true; // Count changed, still loading
-            for (let i = 0; i < initial.length; i++) {
-                if (initial[i] !== current[i]) return true; // Content changed, still loading
-            }
-            return false; // Stable
-        },
+                // Single-shot path (original behaviour): no polling requested
+                if (pollMs === undefined) {
+                    const initial = await getSignature();
+                    await context.page.waitForTimeout(duration);
+                    const current = await getSignature();
+                    return initial !== current; // true = still loading
+                }
+
+                // Polling path
+                const deadline = timeoutMs !== undefined ? Date.now() + timeoutMs : Infinity;
+                let lastSig = await getSignature();
+                let stableStart: number | null = Date.now(); // baseline sample counts toward the stable window
+
+                while (true) {
+                    // Check deadline before sleeping so the loop cannot overshoot timeoutMs by one pollMs interval.
+                    if (Date.now() > deadline) {
+                        throw new Error(
+                            `Headers.stable: headers did not stabilise within ${timeoutMs}ms`
+                        );
+                    }
+
+                    await context.page.waitForTimeout(pollMs);
+
+                    const sig = await getSignature();
+                    if (sig !== lastSig) {
+                        lastSig = sig;
+                        stableStart = null; // reset on change
+                        continue;
+                    }
+
+                    if (stableStart === null) {
+                        stableStart = Date.now();
+                        continue;
+                    }
+
+                    if (Date.now() - stableStart >= duration) {
+                        return false; // Stable — not loading
+                    }
+                }
+            },
 
         /**
          * Assume headers are never loading (immediate snapshot).

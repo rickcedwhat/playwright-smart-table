@@ -1,5 +1,14 @@
 # Changelog
 
+## [6.11.0] - 2026-05-03
+
+### Added
+- **`Headers.stable` polling options** — `Strategies.Loading.Headers.stable(duration, { pollMs, timeoutMs })` now supports a polling loop for slow or virtualized grids that churn headers for several seconds. `pollMs` sets the re-check interval; `timeoutMs` sets a hard deadline that throws if stability is never reached. The default single-shot behaviour (read → wait `duration` → read) is unchanged. Closes #81.
+- **PR template** — Slimmed down to what's actually checked on every PR.
+
+### Changed
+- **CI** — `test` job split into parallel `test-a` (unit + core/playground) and `test-b` (integration/external + MUI DataGrid), cutting total wall-clock CI time roughly in half.
+
 ## [6.10.1] - 2026-05-02
 
 ### Added
