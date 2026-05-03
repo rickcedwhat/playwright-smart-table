@@ -34,7 +34,7 @@ Phase 1 already tries common row patterns (`tr`, `[role="row"]`, `[data-rowindex
 
 #### DOM stripping (before sending to LLM)
 
-Strip aggressively to keep the snapshot under ~4KB:
+Strip aggressively to keep the total snapshot under **8 KB (UTF-8 bytes)**. This budget covers the table root, sample rows, headers, and trimmed typings combined — not per-element. The stripping rules below exist to stay within it:
 - SVG `<path>` elements → replace with `<path … />`
 - Tailwind / utility class lists → strip `class` entirely if preset is already identified; otherwise keep only non-utility-looking class names
 - Inline `style` → strip unless it contains `transform` or `display` (virtualization signals)
@@ -46,7 +46,7 @@ Strip aggressively to keep the snapshot under ~4KB:
 
 ## Architecture
 
-```
+```text
 packages/mcp/
   src/
     index.ts                  ← MCP server entry, registers tools
@@ -73,7 +73,17 @@ packages/mcp/
 
 ## MCP tools
 
-### `inspect_table(url, tableSelector?, authMode?)`
+### `inspect_table(url, tableSelector?, options?)`
+
+```ts
+interface InspectTableOptions {
+  authMode?: 'storageState' | 'interactive';
+  storageStatePath?: string;  // required when authMode === 'storageState'
+  llm?: boolean;              // default: true; set false to skip GitHub Models call
+}
+```
+
+Input validation: if `authMode === 'storageState'` and `storageStatePath` is absent or the path does not exist on disk, the tool must throw a descriptive error before launching the browser.
 
 Returns:
 ```ts
@@ -117,7 +127,9 @@ Returns:
 }
 ```
 
-### `generate_config(url, tableSelector?, hints?, authMode?)`
+### `generate_config(url, tableSelector?, hints?, options?)`
+
+Accepts the same `InspectTableOptions` as `inspect_table` (see above).
 
 `hints` lets the developer correct findings before config generation:
 ```ts
@@ -151,8 +163,8 @@ npx playwright open --save-storage=session.json https://your-app.com
 ```
 
 Then passes the file path when calling the tool:
-```
-inspect_table("https://your-app.com/table", { authMode: "storageState", storageStatePath: "./session.json" })
+```ts
+inspect_table("https://your-app.com/table", undefined, { authMode: "storageState", storageStatePath: "./session.json" })
 ```
 
 Playwright loads the session and the page renders as authenticated. No re-login needed.
@@ -202,8 +214,8 @@ All signals must match for a confident preset ID. Partial matches returned with 
 
 Uses the `GITHUB_TOKEN` already available in the developer's environment — no extra API key needed.
 
-The DOM snapshot sent to the model is:
-- The table root element (outer HTML, max ~8KB)
+The DOM snapshot sent to the model is assembled within the total **8 KB (UTF-8 bytes)** budget (same budget enforced by the DOM stripping rules above):
+- The table root element (outer HTML, after stripping)
 - 3–5 representative rows (deduplicated)
 - All visible header elements
 - The `useTable()` TypeScript types (trimmed to the config shape)
@@ -211,6 +223,18 @@ The DOM snapshot sent to the model is:
 The prompt asks the model to return ranked selector candidates for `rowSelector`, `cellSelector`, and `headerSelector`, and to confirm or correct the heuristic preset guess.
 
 This is optional but on by default. Disable with `{ llm: false }` if offline or rate-limited.
+
+### Secret redaction (GITHUB_TOKEN)
+
+The `GITHUB_TOKEN` value is used only as an `Authorization` header in the HTTP call to the GitHub Models endpoint. It must **never** appear in:
+- The prompt or payload sent to the model
+- Any log output or debug traces
+- Telemetry or error reports
+
+Implementation requirements:
+- A central `redactSecrets(str: string): string` utility must mask any string matching the `GITHUB_TOKEN` env var value before it is logged or included in an error message
+- The payload assembled in `selectorPrompt.ts` must not include env vars or the token value
+- A runtime assertion before every `llm: true` call must verify the serialized prompt does not contain the literal token value; if it does, throw rather than send
 
 ---
 
@@ -246,7 +270,7 @@ expect(generateConfig({ preset: { value: 'rdg', confidence: 0.95 }, ... }))
 
 Static HTML fixtures in `packages/mcp/tests/fixtures/` representing each detectable case — no framework, just hand-crafted HTML with the right signals. A simple `http.createServer` serves them during the test run.
 
-```
+```text
 packages/mcp/
   tests/
     fixtures/
