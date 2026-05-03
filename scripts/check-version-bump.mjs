@@ -50,60 +50,17 @@ try {
 
         console.log('✅ CHANGELOG.md update confirmed.');
 
-        // 7. Verify package-lock.json is staged at all
-        const isLockStaged = stagedFiles.includes('package-lock.json');
+        // 7. Verify pnpm-lock.yaml is staged
+        //    pnpm version runs a full install, updating the lockfile alongside package.json.
+        const isLockStaged = stagedFiles.includes('pnpm-lock.yaml');
         if (!isLockStaged) {
-            console.error('\n❌ ERROR: package.json version was changed but package-lock.json was not staged.');
-            console.error('👉 Always use: npm version minor (or patch/major) — never edit package.json directly.');
-            console.error('   npm version updates both files with full dependency resolution.\n');
+            console.error('\n❌ ERROR: package.json version was changed but pnpm-lock.yaml was not staged.');
+            console.error('👉 Always use: pnpm version minor (or patch/major) — never edit package.json directly.');
+            console.error('   pnpm version updates both files with full dependency resolution.\n');
             process.exit(1);
         }
 
-        // 8. Verify package-lock.json version matches
-        try {
-            const lockRaw = fs.readFileSync('package-lock.json', 'utf8');
-            const lockVersion = JSON.parse(lockRaw).version;
-            if (lockVersion !== currentVersion) {
-                console.error(`\n❌ ERROR: package-lock.json version (${lockVersion}) does not match package.json (${currentVersion}).`);
-                console.error('👉 Always use: npm version minor (or patch/major) — never edit package.json directly.');
-                console.error('   npm version updates both files with full dependency resolution.\n');
-                process.exit(1);
-            }
-        } catch (e) {
-            console.warn('⚠️ Could not verify package-lock.json version:', e.message);
-        }
-
-        // 9. Detect shallow lockfile update (direct edit or --package-lock-only).
-        //    npm version runs a full install, which changes integrity hashes and resolved URLs
-        //    throughout the lockfile — not just the top-level version strings.
-        //    Strip version fields from both snapshots; if they're identical the lockfile
-        //    was not fully regenerated.
-        try {
-            const stripVersions = (raw) => {
-                const obj = JSON.parse(raw);
-                delete obj.version;
-                if (obj.packages?.['']) delete obj.packages[''].version;
-                return JSON.stringify(obj);
-            };
-
-            const stagedLockRaw = execSync('git show :package-lock.json', { encoding: 'utf8' });
-            const headLockRaw = execSync('git show HEAD:package-lock.json', { encoding: 'utf8', stdio: ['pipe', 'pipe', 'ignore'] });
-
-            const stagedNorm = stripVersions(stagedLockRaw);
-            const headNorm   = stripVersions(headLockRaw);
-
-            if (stagedNorm === headNorm) {
-                console.error('\n❌ ERROR: package-lock.json only has its version field changed — dependency tree was not resolved.');
-                console.error('   This happens with --package-lock-only or a direct package.json edit.');
-                console.error('👉 Always use: npm version minor (or patch/major)');
-                console.error('   It runs a full npm install so the lockfile is properly regenerated.\n');
-                process.exit(1);
-            }
-        } catch (e) {
-            console.warn('⚠️ Could not verify lockfile depth:', e.message);
-        }
-
-        console.log('✅ package-lock.json is in sync.');
+        console.log('✅ pnpm-lock.yaml is staged.');
     }
 
 } catch (error) {
