@@ -40,7 +40,9 @@ export class RowFinder<T = any> {
         if (rowLocator) {
             logDebug(this.config, 'info', 'Row found');
             await debugDelay(this.config, 'findRow');
-            return this.makeSmartRow(rowLocator, await this.tableMapper.getMap(), 0);
+            const map = await this.tableMapper.getMap();
+            const rowIndex = await this.resolveRowIndex(rowLocator);
+            return this.makeSmartRow(rowLocator, map, rowIndex);
         }
 
         logDebug(this.config, 'error', 'Row not found', filters);
@@ -55,7 +57,7 @@ export class RowFinder<T = any> {
 
     public async findRows(
         filters: Record<string, FilterValue> = {},
-        options?: { exact?: boolean, maxPages?: number }
+        options?: { exact?: boolean, maxPages?: number, useBulkPagination?: boolean }
     ): Promise<SmartRowArray<T>> {
         const filtersRecord = filters;
         const map = await this.tableMapper.getMap();
@@ -113,8 +115,9 @@ export class RowFinder<T = any> {
                 };
 
                 let paginationResult: boolean | number | PaginationPrimitives | undefined;
-                if (this.config.strategies.pagination?.goNextBulk) {
-                    paginationResult = await this.config.strategies.pagination.goNextBulk(context);
+                const useBulk = options?.useBulkPagination !== false && !!this.config.strategies.pagination?.goNextBulk;
+                if (useBulk) {
+                    paginationResult = await this.config.strategies.pagination.goNextBulk!(context);
                 } else if (this.config.strategies.pagination?.goNext) {
                     paginationResult = await this.config.strategies.pagination.goNext(context);
                 } else {
@@ -212,10 +215,12 @@ export class RowFinder<T = any> {
                 };
 
                 let paginationResult: boolean | number | PaginationPrimitives | undefined;
-                if (this.config.strategies.pagination?.goNextBulk) {
-                    paginationResult = await this.config.strategies.pagination.goNextBulk(context);
-                } else if (this.config.strategies.pagination?.goNext) {
-                    paginationResult = await this.config.strategies.pagination.goNext(context);
+                const pagination = this.config.strategies.pagination;
+                const useBulk = !!pagination?.goNextBulk;
+                if (useBulk && pagination?.goNextBulk) {
+                    paginationResult = await pagination.goNextBulk(context);
+                } else if (pagination?.goNext) {
+                    paginationResult = await pagination.goNext(context);
                 } else {
                     this.log(`Page ${this.tableState.currentPageIndex}: Pagination failed (no goNext or goNextBulk primitive).`);
                     return null;
@@ -234,5 +239,18 @@ export class RowFinder<T = any> {
             }
             return null;
         }
+    }
+
+    private async resolveRowIndex(rowLocator: Locator): Promise<number> {
+        const allRows = await this.resolve(this.config.rowSelector, this.rootLocator).all();
+        const targetHandle = await rowLocator.elementHandle();
+        if (!targetHandle) return 0;
+        for (let i = 0; i < allRows.length; i++) {
+            const handle = await allRows[i].elementHandle();
+            if (handle && await handle.evaluate((el, t) => el === t, targetHandle)) {
+                return i;
+            }
+        }
+        return 0;
     }
 }

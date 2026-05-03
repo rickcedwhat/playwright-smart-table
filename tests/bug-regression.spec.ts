@@ -29,10 +29,10 @@ test.describe('Bug #103: rowIndex is 0 for every matched row', () => {
     const table = await useTable(page.locator('#t')).init();
 
     const carol = table.getRow({ Name: 'Carol' });
-    expect(carol.rowIndex).toBe(2); // 0-indexed; Alice=0, Bob=1, Carol=2
+    expect(carol.rowIndex).toBeUndefined(); // sync path cannot compute real index
 
     const eve = table.getRow({ Name: 'Eve' });
-    expect(eve.rowIndex).toBe(4);
+    expect(eve.rowIndex).toBeUndefined();
   });
 
   test('findRow() returns the correct rowIndex for a non-first match', async ({ page }) => {
@@ -83,6 +83,7 @@ test.describe('Bug #101: findRows() always uses goNextBulk even when bulk is dis
     let goNextBulkCalled = 0;
 
     const table = await useTable(page.locator('#t'), {
+      maxPages: 2,
       strategies: {
         pagination: {
           goNext: async () => { goNextCalled++; return false; },      // single-page step

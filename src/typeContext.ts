@@ -647,7 +647,7 @@ export interface TableResult<T = any> extends AsyncIterable<{ row: SmartRow<T>; 
    */
   findRows: (
     filters?: Record<string, FilterValue>,
-    options?: { exact?: boolean, maxPages?: number }
+    options?: { exact?: boolean, maxPages?: number, useBulkPagination?: boolean }
   ) => Promise<SmartRowArray<T>>;
 
   /**

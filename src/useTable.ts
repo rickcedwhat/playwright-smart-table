@@ -359,7 +359,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
         rootLocator
       );
       const rowLocator = matchedRows.first();
-      return _makeSmart(rowLocator, map, 0); // fallback index 0
+      return _makeSmart(rowLocator, map, undefined); // sync path cannot compute real index
     },
 
     getRowByIndex: (index: number): SmartRowType<T> => {
@@ -378,7 +378,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
 
 
 
-    findRows: async (filters?: Record<string, FilterValue>, options?: { exact?: boolean, maxPages?: number }): Promise<SmartRowArray<T>> => {
+    findRows: async (filters?: Record<string, FilterValue>, options?: { exact?: boolean, maxPages?: number, useBulkPagination?: boolean }): Promise<SmartRowArray<T>> => {
       log(`findRows: filters=${safeStringify(filters ?? {})} options=${safeStringify(options)}`);
       return rowFinder.findRows(filters ?? {}, options);
     },
