@@ -290,7 +290,7 @@ forEach(
 
 ### Parameters
 
-- `callback` - Function receiving { row, rowIndex, stop }
+- `callback` - Function receiving `{ row, index, stop }` (`rowIndex` is a deprecated alias for `index`)
 - `options` - maxPages, concurrency, dedupe, useBulkPagination
 
 <!-- /api-signature: forEach -->
@@ -334,7 +334,7 @@ map<R>(
 
 ```typescript
 // Data extraction — parallel is safe
-const emails = await table.map(({ row }) => row.getCell('Email').innerText());
+const emails = await table.map(({ row, index }) => row.getCell('Email').innerText());
 
 // UI interactions — use sequential (or synchronized) concurrency
 const assignees = await table.map(async ({ row }) => {
