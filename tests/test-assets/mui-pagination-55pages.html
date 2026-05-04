@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Synthetic MUI Pagination – 55 pages</title>
+  <style>
+    body { font-family: sans-serif; padding: 16px; }
+    table { border-collapse: collapse; }
+    th, td { border: 1px solid #ccc; padding: 6px 12px; }
+    .MuiTablePagination-root { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+    button:disabled { opacity: 0.4; cursor: default; }
+  </style>
+</head>
+<body>
+  <div id="table-wrapper" class="MuiPaper-root">
+    <table id="main-table">
+      <thead><tr><th>Name</th></tr></thead>
+      <tbody><tr><td>Row A</td></tr></tbody>
+    </table>
+    <div class="MuiTablePagination-root">
+      <span class="MuiTablePagination-displayedRows" id="page-display"></span>
+      <button aria-label="Go to previous page" id="prev-btn">‹ Prev</button>
+    </div>
+  </div>
+
+  <script>
+    // 55 pages of 5 rows each = 275 rows total. Start on the last page (index 54).
+    const TOTAL_PAGES = 55;
+    const ROWS_PER_PAGE = 5;
+    const TOTAL_ROWS = TOTAL_PAGES * ROWS_PER_PAGE;
+
+    let currentPage = TOTAL_PAGES - 1; // 0-indexed
+
+    function render() {
+      const start = currentPage * ROWS_PER_PAGE + 1;
+      const end = Math.min((currentPage + 1) * ROWS_PER_PAGE, TOTAL_ROWS);
+      document.getElementById('page-display').textContent =
+        start + '–' + end + ' of ' + TOTAL_ROWS;
+      document.getElementById('prev-btn').disabled = currentPage === 0;
+    }
+
+    document.getElementById('prev-btn').addEventListener('click', function () {
+      if (currentPage > 0) {
+        currentPage--;
+        render();
+      }
+    });
+
+    render();
+  </script>
+</body>
+</html>

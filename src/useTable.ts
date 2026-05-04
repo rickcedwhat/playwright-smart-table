@@ -4,7 +4,7 @@ import { TYPE_CONTEXT } from './typeContext';
 import { MINIMAL_CONFIG_CONTEXT } from './minimalConfigContext';
 import { SortingStrategies as ImportedSortingStrategies } from './strategies/sorting';
 import { PaginationStrategies as ImportedPaginationStrategies } from './strategies/pagination';
-import { validatePaginationResult } from './strategies/validation';
+import { validatePaginationResult, validateSortingStrategy, validateFillStrategy } from './strategies/validation';
 
 import { DedupeStrategies as ImportedDedupeStrategies } from './strategies/dedupe';
 import { LoadingStrategies as ImportedLoadingStrategies } from './strategies/loading';
@@ -230,6 +230,9 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     init: async (options?: { timeout?: number }): Promise<TableResult<T>> => {
       if (tableMapper.isInitialized()) return result;
 
+      if (config.strategies.sorting) validateSortingStrategy(config.strategies.sorting);
+      if (config.strategies.fill) validateFillStrategy(config.strategies.fill);
+
       warnIfDebugInCI(config);
       logDebug(config, 'info', 'Initializing table');
 
@@ -356,7 +359,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
         rootLocator
       );
       const rowLocator = matchedRows.first();
-      return _makeSmart(rowLocator, map, 0); // fallback index 0
+      return _makeSmart(rowLocator, map, undefined); // sync path cannot compute real index
     },
 
     getRowByIndex: (index: number): SmartRowType<T> => {
@@ -375,7 +378,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
 
 
 
-    findRows: async (filters?: Record<string, FilterValue>, options?: { exact?: boolean, maxPages?: number }): Promise<SmartRowArray<T>> => {
+    findRows: async (filters?: Record<string, FilterValue>, options?: { exact?: boolean, maxPages?: number, useBulkPagination?: boolean }): Promise<SmartRowArray<T>> => {
       log(`findRows: filters=${safeStringify(filters ?? {})} options=${safeStringify(options)}`);
       return rowFinder.findRows(filters ?? {}, options);
     },
@@ -403,7 +406,10 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
           await config.strategies.sorting.doSort({ columnName, direction, context });
 
           if (config.strategies.loading?.isTableLoading) {
-            await config.strategies.loading.isTableLoading(context);
+            const deadline = Date.now() + 10000;
+            while (Date.now() < deadline && await config.strategies.loading.isTableLoading(context)) {
+              await rootLocator.page().waitForTimeout(100);
+            }
           } else {
             await rootLocator.page().waitForTimeout(200);
           }
