@@ -593,7 +593,9 @@ const createSmartRow = <T = any>(
 
     smart.bringIntoView = async (): Promise<void> => {
         if (rowIndex === undefined) {
-            throw new Error('Cannot bring row into view - row index is unknown. Use getRowByIndex() instead of getRow().');
+            logDebug(config, 'info', 'bringIntoView called on a row with unknown rowIndex (e.g. from getRow()). ' +
+                'Page navigation and scrolling will proceed, but virtual-scroll keyboard navigation will be skipped. ' +
+                'Use findRow() if you need accurate rowIndex.');
         }
 
         const parentTable = smart.table as TableResult<T>;
