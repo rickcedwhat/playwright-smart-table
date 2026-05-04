@@ -147,7 +147,7 @@ export class RowFinder<T = any> {
 
     private async findRowLocator(
         filters: Record<string, FilterValue>,
-        options: { exact?: boolean, maxPages?: number } = {}
+        options: { exact?: boolean, maxPages?: number, useBulkPagination?: boolean } = {}
     ): Promise<Locator | null> {
         const map = await this.tableMapper.getMap();
         const effectiveMaxPages = options.maxPages ?? this.config.maxPages;
@@ -216,7 +216,7 @@ export class RowFinder<T = any> {
 
                 let paginationResult: boolean | number | PaginationPrimitives | undefined;
                 const pagination = this.config.strategies.pagination;
-                const useBulk = !!pagination?.goNextBulk;
+                const useBulk = options.useBulkPagination !== false && !!pagination?.goNextBulk;
                 if (useBulk && pagination?.goNextBulk) {
                     paginationResult = await pagination.goNextBulk(context);
                 } else if (pagination?.goNext) {

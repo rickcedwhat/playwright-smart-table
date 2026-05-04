@@ -111,7 +111,7 @@ export const muiTable: Partial<TableConfig> = {
                         noProgressCount++;
                         if (noProgressCount >= NO_PROGRESS_LIMIT) {
                             logDebug(context.config, 'error', `goToFirst: no pagination progress after ${NO_PROGRESS_LIMIT} consecutive clicks — aborting to avoid infinite loop`);
-                            break;
+                            return false;
                         }
                     } else {
                         noProgressCount = 0;
