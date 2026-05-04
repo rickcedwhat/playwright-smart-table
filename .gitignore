@@ -16,6 +16,8 @@ docs/.vitepress/cache
 
 # Vitest
 html/
+# vitest JSON reporter output (temporary, used by collect-metrics.mjs)
+test-results.json
 
 .agent/
 .continue/
