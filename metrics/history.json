@@ -1,0 +1,16 @@
+[
+  {
+    "version": "6.11.0",
+    "date": "2026-05-04",
+    "distSizeKB": 512,
+    "publicApiCount": 52,
+    "publicApiBreakdown": {
+      "tableresult": 21,
+      "tableconfig": 11,
+      "smartrow": 8,
+      "tablestrategies": 12
+    },
+    "unitTestCount": 113,
+    "unitTestPass": 113
+  }
+]
