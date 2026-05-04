@@ -42,7 +42,7 @@ export class RowFinder<T = any> {
             await debugDelay(this.config, 'findRow');
             const map = await this.tableMapper.getMap();
             const rowIndex = await this.resolveRowIndex(rowLocator);
-            return this.makeSmartRow(rowLocator, map, rowIndex);
+            return this.makeSmartRow(rowLocator, map, rowIndex, this.tableState.currentPageIndex);
         }
 
         logDebug(this.config, 'error', 'Row not found', filters);
