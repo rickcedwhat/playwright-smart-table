@@ -59,14 +59,29 @@ for (const name of signatureFiles) {
 let unitTestCount = null;
 let unitTestPass = null;
 const jsonReportPath = path.join(rootDir, 'test-results.json');
+const isCI = Boolean(process.env.CI);
 try {
-    if (fs.existsSync(jsonReportPath)) {
+    if (!fs.existsSync(jsonReportPath)) {
+        const msg = `test-results.json not found at ${jsonReportPath}. Run vitest with --reporter=json --outputFile.json=test-results.json before collecting metrics.`;
+        if (isCI) {
+            console.error(`\n❌ ${msg}`);
+            process.exit(1);
+        } else {
+            console.warn(`\n⚠️  ${msg}`);
+        }
+    } else {
         const report = JSON.parse(fs.readFileSync(jsonReportPath, 'utf-8'));
         unitTestCount = report.numTotalTests ?? null;
         unitTestPass = report.numPassedTests ?? null;
     }
-} catch {
-    // report may be malformed; skip gracefully
+} catch (err) {
+    const msg = `Failed to parse test-results.json at ${jsonReportPath}: ${err.message}`;
+    if (isCI) {
+        console.error(`\n❌ ${msg}`);
+        process.exit(1);
+    } else {
+        console.warn(`\n⚠️  ${msg}`);
+    }
 }
 
 // ── 5. Mutation score (optional) ─────────────────────────────────────────────
