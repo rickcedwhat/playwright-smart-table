@@ -53,19 +53,6 @@ jobs:
         if: steps.check_version.outputs.changed == 'true'
         run: pnpm run test:unit -- --reporter=json --outputFile.json=test-results.json
 
-      - name: Collect Library Metrics
-        if: steps.check_version.outputs.changed == 'true'
-        run: node scripts/collect-metrics.mjs
-
-      - name: Commit Metrics
-        if: steps.check_version.outputs.changed == 'true'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add metrics/history.json
-          git diff --cached --quiet || git commit -m "chore: record metrics for v${{ steps.check_version.outputs.version }} [skip ci]"
-          git push
-
       - name: Test Packaging
         if: steps.check_version.outputs.changed == 'true'
         run: |
@@ -101,3 +88,16 @@ jobs:
           body: ${{ steps.get_changelog.outputs.body }}
           draft: false
           prerelease: false
+
+      - name: Collect Library Metrics
+        if: steps.check_version.outputs.changed == 'true' && success()
+        run: node scripts/collect-metrics.mjs
+
+      - name: Commit Metrics
+        if: steps.check_version.outputs.changed == 'true' && success()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add metrics/history.json
+          git diff --cached --quiet || git commit -m "chore: record metrics for v${{ steps.check_version.outputs.version }} [skip ci]"
+          git push
