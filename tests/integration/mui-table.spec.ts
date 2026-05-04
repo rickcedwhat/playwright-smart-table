@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
+import { Locator } from '@playwright/test';
 import path from 'path';
-import { useTable, presets } from '../../src/index';
+import { useTable, presets, TableContext } from '../../src/index';
 
 test.describe('MUI Table Preset Integration', () => {
 
@@ -90,14 +91,14 @@ test.describe('Bug #105: goToFirst() 50-retry cap', () => {
         // Confirm we start on the last page (rows 271–275 of 275)
         await expect(page.locator('.MuiTablePagination-displayedRows')).toContainText('271');
 
-        const context: any = {
+        const context: TableContext = {
             root: page.locator('#table-wrapper'),
             page,
-            config: { strategies: {} },
-            resolve: (selector: string, root: any) => root.locator(selector),
+            config: { strategies: {} } as TableContext['config'],
+            resolve: (selector, root) => (root as Locator).locator(selector as string),
         };
 
-        const goToFirst = (presets.muiTable as any).strategies.pagination.goToFirst;
+        const goToFirst = presets.muiTable.strategies!.pagination!.goToFirst!;
         const result = await goToFirst(context);
 
         expect(result).toBe(true);

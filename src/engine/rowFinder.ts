@@ -17,7 +17,7 @@ export class RowFinder<T = any> {
         resolve: (item: Selector, parent: Locator | Page) => Locator,
         private filterEngine: FilterEngine,
         private tableMapper: TableMapper,
-        private makeSmartRow: (loc: Locator, map: Map<string, number>, index: number, tablePageIndex?: number) => SmartRow<T>,
+        private makeSmartRow: (loc: Locator, map: Map<string, number>, index: number | undefined, tablePageIndex?: number) => SmartRow<T>,
         private tableState: { currentPageIndex: number } = { currentPageIndex: 0 }
     ) {
         this.resolve = resolve;
@@ -241,16 +241,16 @@ export class RowFinder<T = any> {
         }
     }
 
-    private async resolveRowIndex(rowLocator: Locator): Promise<number> {
+    private async resolveRowIndex(rowLocator: Locator): Promise<number | undefined> {
         const allRows = await this.resolve(this.config.rowSelector, this.rootLocator).all();
         const targetHandle = await rowLocator.elementHandle();
-        if (!targetHandle) return 0;
+        if (!targetHandle) return undefined;
         for (let i = 0; i < allRows.length; i++) {
             const handle = await allRows[i].elementHandle();
             if (handle && await handle.evaluate((el, t) => el === t, targetHandle)) {
                 return i;
             }
         }
-        return 0;
+        return undefined;
     }
 }

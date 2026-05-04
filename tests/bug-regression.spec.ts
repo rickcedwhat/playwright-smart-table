@@ -93,7 +93,7 @@ test.describe('Bug #101: findRows() always uses goNextBulk even when bulk is dis
     }).init();
 
     // Pass useBulkPagination: false — findRows should prefer goNext
-    await table.findRows({}, { useBulkPagination: false } as any);
+    await table.findRows({}, { useBulkPagination: false });
 
     expect(goNextBulkCalled).toBe(0);
     expect(goNextCalled).toBe(1);

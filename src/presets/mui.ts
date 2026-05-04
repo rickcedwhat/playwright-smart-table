@@ -1,6 +1,7 @@
 import { Locator } from '@playwright/test';
 import { TableConfig, TableContext } from '../types';
 import { PaginationStrategies } from '../strategies';
+import { logDebug } from '../utils/debugUtils';
 
 /** 
  * Safely wait for MUI pagination to stabilize.
@@ -96,11 +97,25 @@ export const muiTable: Partial<TableConfig> = {
                 const displayedRows = root.locator('.MuiTablePagination-displayedRows');
 
                 let clicked = false;
+                let noProgressCount = 0;
+                const NO_PROGRESS_LIMIT = 3;
+
                 while (await prevBtn.count() > 0 && !(await prevBtn.isDisabled())) {
                     const oldText = await displayedRows.innerText().catch(() => '');
                     await prevBtn.click();
                     await waitForMuiPaginationStabilization(context, displayedRows, oldText);
                     clicked = true;
+
+                    const newText = await displayedRows.innerText().catch(() => '');
+                    if (newText === oldText) {
+                        noProgressCount++;
+                        if (noProgressCount >= NO_PROGRESS_LIMIT) {
+                            logDebug(context.config, 'error', `goToFirst: no pagination progress after ${NO_PROGRESS_LIMIT} consecutive clicks — aborting to avoid infinite loop`);
+                            break;
+                        }
+                    } else {
+                        noProgressCount = 0;
+                    }
                 }
                 return clicked;
             }

@@ -77,10 +77,23 @@ export const StabilizationStrategies = {
      */
     networkIdle: (options: { spinnerSelector?: string, timeout?: number } = {}): StabilizationStrategy => {
         return async ({ root, page, resolve }, action) => {
-            await action();
             const timeout = options.timeout ?? 5000;
             if (options.spinnerSelector) {
                 const spinner = resolve(options.spinnerSelector, root);
+                const existedBefore = await spinner.count() > 0;
+
+                await action();
+
+                if (!existedBefore) {
+                    // Spinner wasn't present before action — wait briefly for it to appear
+                    // so we don't declare success before the loading cycle even starts
+                    const appearDeadline = Date.now() + 500;
+                    while (Date.now() < appearDeadline && await spinner.count() === 0) {
+                        await page.waitForTimeout(50);
+                    }
+                    if (await spinner.count() === 0) return true; // spinner never appeared
+                }
+
                 try {
                     await spinner.waitFor({ state: 'detached', timeout });
                     return true;
@@ -89,6 +102,7 @@ export const StabilizationStrategies = {
                 }
             }
             // Fallback to simple wait if no selector
+            await action();
             await page.waitForTimeout(500);
             return true;
         }

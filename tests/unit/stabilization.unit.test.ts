@@ -30,7 +30,11 @@ describe('StabilizationStrategies.networkIdle', () => {
 
   it('calls action() when spinnerSelector is provided', async () => {
     const action = vi.fn().mockResolvedValue(undefined);
-    const mockSpinner = { waitFor: vi.fn().mockResolvedValue(undefined) };
+    const mockSpinner = {
+      // First call: absent before action; subsequent calls: present after action appears
+      count: vi.fn().mockResolvedValueOnce(0).mockResolvedValue(1),
+      waitFor: vi.fn().mockResolvedValue(undefined),
+    };
     const ctx = makeMockContext({
       resolve: vi.fn().mockReturnValue(mockSpinner) as any,
     });
