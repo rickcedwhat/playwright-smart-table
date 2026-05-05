@@ -43,11 +43,13 @@ Limit to top 3 candidates for each.
   `.trim();
 
   try {
+    const model = process.env.LLM_MODEL || (process.env.GITHUB_TOKEN ? 'gpt-4o' : 'gpt-4o-mini');
     const response = await client.chat.completions.create({
-      model: process.env.GITHUB_TOKEN ? 'gpt-4o' : 'gpt-4o-mini',
+      model,
       messages: [{ role: 'user', content: prompt }],
       response_format: { type: 'json_object' },
     });
+
 
     const content = response.choices[0].message.content;
     if (!content) throw new Error('Empty response from LLM');
