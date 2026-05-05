@@ -32,7 +32,9 @@ export const InspectTableInputSchema = z.object({
       authMode: z.enum(['storageState', 'interactive']).optional(),
       storageStatePath: z.string().optional(),
       llm: z.boolean().optional().default(true),
+      model: z.enum(['gpt-4o', 'gpt-4o-mini', 'o1-preview', 'o1-mini', 'meta-llama-3.1-405b-instruct']).optional().default('gpt-4o'),
       generateSnapshot: z.boolean().optional().default(true),
+
 
       verbosity: z.enum(['mini', 'full']).optional().default('full'),
     })
@@ -330,9 +332,11 @@ export async function inspectTable(
     if (rawSignals.snapshot && (input.options?.llm !== false)) {
       selectorCandidates = await discoverSelectors(
         { preset, virtualization, pagination, loading: stubFindings().loading },
-        rawSignals.snapshot
+        rawSignals.snapshot,
+        input.options?.model
       );
     }
+
 
     const findings: InspectTableFindings = {
 
