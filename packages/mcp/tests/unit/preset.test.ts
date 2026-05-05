@@ -10,6 +10,7 @@ function makeSignals(overrides: Partial<{
   dataAttributes: string[];
   hasGlideCanvas: boolean;
   hasGlideInput: boolean;
+  hasGlideClass: boolean;
 }>): DomSignals {
   return {
     classes: new Set(overrides.classes ?? []),
@@ -17,7 +18,9 @@ function makeSignals(overrides: Partial<{
     dataAttributes: new Set(overrides.dataAttributes ?? []),
     hasGlideCanvas: overrides.hasGlideCanvas ?? false,
     hasGlideInput: overrides.hasGlideInput ?? false,
+    hasGlideClass: overrides.hasGlideClass ?? false,
     visibleRowCount: 0,
+
     ariaRowCount: null,
     ariaColCount: null,
   };
@@ -114,7 +117,7 @@ describe('detectPreset — RDG', () => {
 describe('detectPreset — Glide', () => {
   it('returns full confidence when all signals match', () => {
     const result = detectPreset(
-      makeSignals({ hasGlideCanvas: true, hasGlideInput: true }),
+      makeSignals({ hasGlideCanvas: true, hasGlideInput: true, hasGlideClass: true }),
     );
     expect(result.value).toBe('glide');
     expect(result.confidence).toBe(1.0);
@@ -123,9 +126,10 @@ describe('detectPreset — Glide', () => {
   it('returns partial confidence with only canvas signal', () => {
     const result = detectPreset(makeSignals({ hasGlideCanvas: true }));
     expect(result.value).toBe('glide');
-    expect(result.confidence).toBeCloseTo(0.5);
+    expect(result.confidence).toBeCloseTo(0.333, 3);
   });
 });
+
 
 // ── Unknown / no match ────────────────────────────────────────────────────────
 
