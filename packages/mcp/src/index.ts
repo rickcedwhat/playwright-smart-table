@@ -28,9 +28,11 @@ server.tool(
     'pagination type, and selector candidates.',
   {
     url: InspectTableInputSchema.shape.url,
+    testUrl: InspectTableInputSchema.shape.testUrl,
     tableSelector: InspectTableInputSchema.shape.tableSelector,
     options: InspectTableInputSchema.shape.options,
   },
+
   async (input) => {
     try {
       const findings = await inspectTable(input);
