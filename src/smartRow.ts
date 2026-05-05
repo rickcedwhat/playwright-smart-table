@@ -79,18 +79,18 @@ const _navigateToCell = async (params: {
     // Runs before navigation primitives; falls through to them if cell still not accessible.
     const viewport = config.strategies.viewport;
     if (viewport && typeof rowIndex === 'number') {
-        // Fast path via range oracle: if the user provides getVisibleColumnRange (and memoizes it),
-        // this check is a near-instant JS lookup — no DOM count() round-trip needed.
+        // Fast path via range oracle: re-used below to avoid a second DOM round-trip.
         // Rows do NOT sync at the barrier here — only scroll boundaries need coordination.
+        let knownColRange: { first: number; last: number } | null = null;
         if (viewport.getVisibleColumnRange) {
-            const colRange = await viewport.getVisibleColumnRange(context);
-            if (colRange && index >= colRange.first && index <= colRange.last) {
+            knownColRange = await viewport.getVisibleColumnRange(context);
+            if (knownColRange && index >= knownColRange.first && index <= knownColRange.last) {
                 const rowRange = viewport.getVisibleRowRange
                     ? await viewport.getVisibleRowRange(context)
                     : null;
                 const rowVisible = !rowRange || (rowIndex >= rowRange.first && rowIndex <= rowRange.last);
                 if (rowVisible && await targetReached()) {
-                    logDebug(config, 'verbose', `_navigateToCell: col ${index} in visible range [${colRange.first}-${colRange.last}], reading directly`);
+                    logDebug(config, 'verbose', `_navigateToCell: col ${index} in visible range [${knownColRange.first}-${knownColRange.last}], reading directly`);
                     return getCellLocator();
                 }
             }
@@ -103,9 +103,10 @@ const _navigateToCell = async (params: {
         // Column is out of view. Scroll to bring it in.
         // In synchronized mode, the last row to arrive triggers the scroll once for all rows.
         const scrollIntoViewport = async () => {
-            const colRange = viewport.getVisibleColumnRange
+            // Reuse the range fetched during the fast-path check; re-query only if unknown.
+            const colRange = knownColRange ?? (viewport.getVisibleColumnRange
                 ? await viewport.getVisibleColumnRange(context)
-                : null;
+                : null);
             const colOutOfView = !colRange || index < colRange.first || index > colRange.last;
 
             if (colOutOfView) {
@@ -122,15 +123,14 @@ const _navigateToCell = async (params: {
                 return;
             }
 
-            // 2D scroll hazard guard: scrolling horizontally may have unmounted the target row.
-            const rowRange = viewport.getVisibleRowRange
-                ? await viewport.getVisibleRowRange(context)
-                : null;
-            const rowOutOfView = rowRange && (rowIndex < rowRange.first || rowIndex > rowRange.last);
-
-            if (rowOutOfView) {
-                logDebug(config, 'verbose', `_navigateToCell: row ${rowIndex} out of view after col scroll, recovering`);
-                if (viewport.scrollToRow) {
+            // 2D scroll hazard: horizontal scroll may evict the target row from the DOM.
+            // scrollToRow moves the viewport to one specific row, which would evict every
+            // other row in the same barrier batch — only safe in sequential (no-barrier) mode.
+            if (!barrier && viewport.scrollToRow && viewport.getVisibleRowRange) {
+                const rowRange = await viewport.getVisibleRowRange(context);
+                const rowOutOfView = rowRange && (rowIndex < rowRange.first || rowIndex > rowRange.last);
+                if (rowOutOfView) {
+                    logDebug(config, 'verbose', `_navigateToCell: row ${rowIndex} out of view after col scroll, recovering`);
                     await viewport.scrollToRow(context, rowIndex);
                 }
             }
