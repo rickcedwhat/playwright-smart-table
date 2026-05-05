@@ -51,7 +51,7 @@ jobs:
 
       - name: Run Unit Tests
         if: steps.check_version.outputs.changed == 'true'
-        run: pnpm run test:unit -- --reporter=json --outputFile.json=test-results.json
+        run: pnpm exec vitest run --reporter=verbose --reporter=json --outputFile=test-results.json
 
       - name: Test Packaging
         if: steps.check_version.outputs.changed == 'true'
