@@ -4,7 +4,9 @@ import { launchBrowser, closeBrowser } from '../browser/launcher.js';
 import { detectPreset } from '../detectors/preset.js';
 import { detectVirtualization } from '../detectors/virtualization.js';
 import { detectPagination } from '../detectors/pagination.js';
+import { discoverSelectors } from '../detectors/selectors.js';
 import type {
+
   DomSignals,
 
   SerializableDomSignals,
@@ -30,8 +32,10 @@ export const InspectTableInputSchema = z.object({
       authMode: z.enum(['storageState', 'interactive']).optional(),
       storageStatePath: z.string().optional(),
       llm: z.boolean().optional(),
+      generateSnapshot: z.boolean().optional().default(true),
     })
     .optional(),
+
 });
 
 export type InspectTableInput = z.infer<typeof InspectTableInputSchema>;
@@ -46,9 +50,12 @@ export type InspectTableInput = z.infer<typeof InspectTableInputSchema>;
 async function collectDomSignals(
   page: Page,
   tableSelector: string | undefined,
+  generateSnapshot: boolean = false,
 ): Promise<SerializableDomSignals> {
-  return page.evaluate<SerializableDomSignals, string | undefined>((selector) => {
-    const root = selector
+  return page.evaluate<SerializableDomSignals, [string | undefined, boolean]>(
+    ([selector, wantSnapshot]) => {
+      const root = selector
+
       ? (document.querySelector(selector) ?? document.body)
       : document.body;
 
@@ -144,9 +151,64 @@ async function collectDomSignals(
       },
       paginationTexts,
       paginationButtons,
+      snapshot: wantSnapshot ? generateDomSnapshot(root) : undefined,
     };
-  }, tableSelector);
+
+    function generateDomSnapshot(el: Element): string {
+      const MAX_LENGTH = 20000;
+      let output = '';
+
+      function walk(node: Node, depth: number) {
+        if (output.length > MAX_LENGTH) return;
+        if (node.nodeType === Node.TEXT_NODE) {
+          const text = node.textContent?.trim();
+          if (text) output += text + ' ';
+          return;
+        }
+
+        if (node.nodeType !== Node.ELEMENT_NODE) return;
+
+        const element = node as Element;
+        const tag = element.tagName.toLowerCase();
+
+        // Skip noise
+        if (['script', 'style', 'svg', 'path', 'noscript', 'link'].includes(tag)) return;
+        
+        // Skip hidden
+        const style = window.getComputedStyle(element);
+        if (style.display === 'none' || style.visibility === 'hidden') return;
+
+        output += `<${tag}`;
+        
+        // Keep key attributes
+        for (const attr of element.getAttributeNames()) {
+          if (['class', 'role', 'id'].includes(attr) || attr.startsWith('data-') || attr.startsWith('aria-')) {
+            output += ` ${attr}="${element.getAttribute(attr)}"`;
+          }
+        }
+        
+        // Keep transform style for virtualization
+        const htmlElement = element as HTMLElement;
+        if (htmlElement.style?.transform) {
+          output += ` style="transform: ${htmlElement.style.transform}"`;
+        }
+
+
+        output += '>';
+        
+        for (const child of Array.from(element.childNodes)) {
+          walk(child, depth + 1);
+        }
+        
+        output += `</${tag}>`;
+      }
+
+      walk(el, 0);
+      return output.slice(0, MAX_LENGTH);
+    }
+  }, [tableSelector, generateSnapshot]);
 }
+
 
 // ── Stub helpers ──────────────────────────────────────────────────────────────
 
@@ -230,7 +292,12 @@ export async function inspectTable(
     const page = await launched.context.newPage();
     await page.goto(url, { waitUntil: 'networkidle' });
 
-    const rawSignals = await collectDomSignals(page, input.tableSelector);
+    const rawSignals = await collectDomSignals(
+      page,
+      input.tableSelector,
+      input.options?.generateSnapshot ?? true,
+    );
+
 
 
     // Re-hydrate arrays into Sets for the pure detector function
@@ -253,13 +320,25 @@ export async function inspectTable(
     const virtualization = detectVirtualization(signals);
     const pagination = detectPagination(signals);
 
+    // Step 3: LLM Selector Discovery (if snapshot was requested and llm enabled)
+    let selectorCandidates = stubFindings().selectorCandidates;
+    if (rawSignals.snapshot && (input.options?.llm !== false)) {
+      selectorCandidates = await discoverSelectors(
+        { preset, virtualization, pagination, loading: stubFindings().loading },
+        rawSignals.snapshot
+      );
+    }
+
     return {
       preset,
       virtualization,
       pagination,
       loading: stubFindings().loading,
-      selectorCandidates: stubFindings().selectorCandidates,
+      selectorCandidates,
+      snapshot: rawSignals.snapshot,
     };
+
+
 
   } finally {
     await closeBrowser(launched);

@@ -79,7 +79,10 @@ export interface InspectTableFindings {
   pagination: PaginationFindings;
   loading: LoadingFindings;
   selectorCandidates: SelectorCandidates;
+  /** Cleaned DOM fragment for LLM analysis */
+  snapshot?: string;
 }
+
 
 /** Options accepted by both MCP tools */
 export interface InspectTableOptions {
@@ -136,4 +139,6 @@ export interface SerializableDomSignals {
   styles: Record<string, string[]>;
   paginationTexts: string[];
   paginationButtons: Array<{ label: string | null; icon: string | null; classes: string[] }>;
+  snapshot?: string;
 }
+
