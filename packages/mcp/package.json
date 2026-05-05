@@ -1,0 +1,42 @@
+{
+  "name": "@rickcedwhat/playwright-smart-table-mcp",
+  "version": "0.1.0",
+  "description": "MCP server that inspects table DOM and generates playwright-smart-table configs",
+  "type": "module",
+  "main": "./dist/index.js",
+  "bin": {
+    "playwright-smart-table-mcp": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "test:unit": "vitest run",
+    "test:unit:watch": "vitest"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.11.0",
+    "zod": "^3.25.20"
+  },
+  "peerDependencies": {
+    "@playwright/test": ">=1.40.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.2",
+    "typescript": "^6.0.2",
+    "vitest": "^3.2.4"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "playwright",
+    "table",
+    "testing",
+    "mcp",
+    "model-context-protocol"
+  ],
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  }
+}
