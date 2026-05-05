@@ -40,18 +40,20 @@ export async function fetchGitHubModels(): Promise<string[]> {
   }
 }
 
-export function getLastModel(): string {
+export function getLastState(): any {
   try {
     if (fs.existsSync(STATE_FILE)) {
-      const state = JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
-      return state.lastModel || 'gpt-4o';
+      return JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
     }
   } catch {}
-  return 'gpt-4o';
+  return {};
 }
 
-export function saveLastModel(model: string) {
+export function saveLastState(state: any) {
   try {
-    fs.writeFileSync(STATE_FILE, JSON.stringify({ lastModel: model }, null, 2));
+    // Only save serializable fields
+    const toSave = { ...state };
+    fs.writeFileSync(STATE_FILE, JSON.stringify(toSave, null, 2));
   } catch {}
 }
+

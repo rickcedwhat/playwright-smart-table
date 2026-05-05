@@ -17,27 +17,28 @@ import type {
 
 // ── Input schema ─────────────────────────────────────────────────────────────
 
-export const getInspectTableInputSchema = (models: string[], defaultModel: string) => z.object({
-  url: z.string().url('url must be a valid URL').optional(),
+export const getInspectTableInputSchema = (models: string[], lastState: any) => z.object({
+  url: z.string().url('url must be a valid URL').optional().default(lastState.url),
   testUrl: z.enum([
     'https://mui.com/x/react-data-grid/',
     'https://grid.glideapps.com/',
     'https://adazzle.github.io/react-data-grid/',
     'local-fixture'
-  ]).optional(),
-  tableSelector: z.string().optional(),
+  ]).optional().default(lastState.testUrl),
+  tableSelector: z.string().optional().default(lastState.tableSelector),
 
   options: z
     .object({
-      authMode: z.enum(['storageState', 'interactive']).optional(),
-      storageStatePath: z.string().optional(),
-      llm: z.boolean().optional().default(true),
-      model: z.enum(models as [string, ...string[]]).optional().default(defaultModel as any),
-      generateSnapshot: z.boolean().optional().default(true),
-      verbosity: z.enum(['mini', 'full']).optional().default('full'),
+      authMode: z.enum(['storageState', 'interactive']).optional().default(lastState.options?.authMode),
+      storageStatePath: z.string().optional().default(lastState.options?.storageStatePath),
+      llm: z.boolean().optional().default(lastState.options?.llm ?? true),
+      model: z.enum(models as [string, ...string[]]).optional().default(lastState.options?.model || 'gpt-4o'),
+      generateSnapshot: z.boolean().optional().default(lastState.options?.generateSnapshot ?? true),
+      verbosity: z.enum(['mini', 'full']).optional().default(lastState.options?.verbosity || 'full'),
     })
-    .optional(),
+    .optional().default(lastState.options || {}),
 });
+
 
 export type InspectTableInput = z.infer<ReturnType<typeof getInspectTableInputSchema>>;
 
@@ -358,7 +359,9 @@ export async function inspectTable(
 
     findings.metadata = {
       generationTimeMs: Math.round(performance.now() - startTime),
+      model: input.options?.model || (process.env.GITHUB_TOKEN ? 'gpt-4o' : 'gpt-4o-mini'),
     };
+
 
     return findings;
 

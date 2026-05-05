@@ -84,8 +84,10 @@ export interface InspectTableFindings {
   /** Internal metrics and debug info */
   metadata?: {
     generationTimeMs: number;
+    model: string;
   };
 }
+
 
 
 
