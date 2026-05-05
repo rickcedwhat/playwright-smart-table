@@ -57,8 +57,9 @@ export async function generateConfig(input: GenerateConfigInput): Promise<string
   }
 
   const metadataComment = findings.metadata 
-    ? `/** Generated in ${findings.metadata.generationTimeMs}ms */\n` 
+    ? `/** Generated in ${findings.metadata.generationTimeMs}ms via ${findings.metadata.model} */\n` 
     : '';
+
 
   const virtualizationComment = `    // Virtualization detected: ${virtualization.rows.detected ? 'Rows (Yes)' : 'Rows (No)'}, ${virtualization.columns.detected ? 'Cols (Yes)' : 'Cols (No)'}`;
 

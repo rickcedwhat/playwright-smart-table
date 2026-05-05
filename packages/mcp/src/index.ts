@@ -2,10 +2,20 @@
 
 // Redirect all console.log/info to stderr to avoid polluting stdout (MCP JSON stream)
 // MUST BE AT THE VERY TOP before any other imports that might log
-const originalLog = console.log;
-const originalInfo = console.info;
-console.log = (...args) => console.error(...args);
-console.info = (...args) => console.error(...args);
+console.log = console.error;
+console.info = console.error;
+console.warn = console.error;
+
+// Deep redirect: capture process.stdout.write
+const originalStdoutWrite = process.stdout.write.bind(process.stdout);
+process.stdout.write = (chunk: any, encoding?: any, callback?: any): boolean => {
+  const str = chunk.toString();
+  // Only allow valid JSON (MCP messages) to pass through to stdout
+  if (str.startsWith('{') || str.startsWith('[')) {
+    return originalStdoutWrite(chunk, encoding, callback);
+  }
+  return process.stderr.write(chunk, encoding, callback);
+};
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -13,21 +23,22 @@ import * as dotenv from 'dotenv';
 import { inspectTable, getInspectTableInputSchema } from './tools/inspectTable.js';
 import { generateConfig, GenerateConfigInputSchema } from './tools/generateConfig.js';
 import { inspectAndGenerate } from './tools/inspectAndGenerate.js';
-import { fetchGitHubModels, getLastModel, saveLastModel } from './utils/githubModels.js';
+import { compareModels, getCompareModelsInputSchema } from './tools/compareModels.js';
+import { fetchGitHubModels, getLastState, saveLastState } from './utils/githubModels.js';
+
 
 dotenv.config();
 
 async function main() {
-
   const models = await fetchGitHubModels();
-  const defaultModel = getLastModel();
+  const lastState = getLastState();
   
   const server = new McpServer({
     name: 'playwright-smart-table-inspector',
     version: '0.1.0',
   });
 
-  const inputSchema = getInspectTableInputSchema(models, defaultModel);
+  const inputSchema = getInspectTableInputSchema(models, lastState);
 
   // ── Tool: inspect_table ─────────────────────────────────────────────────────
   server.tool(
@@ -36,7 +47,7 @@ async function main() {
     inputSchema.shape,
     async (input) => {
       try {
-        if (input.options?.model) saveLastModel(input.options.model);
+        saveLastState(input);
         const findings = await inspectTable(input as any);
         return {
           content: [{ type: 'text', text: JSON.stringify(findings, null, 2) }],
@@ -75,9 +86,29 @@ async function main() {
     inputSchema.shape,
     async (input) => {
       try {
-        if (input.options?.model) saveLastModel(input.options.model);
+        saveLastState(input);
         const config = await inspectAndGenerate(input as any);
         return { content: [{ type: 'text', text: config }] };
+      } catch (err) {
+        return {
+          content: [{ type: 'text', text: `Error: ${err instanceof Error ? err.message : String(err)}` }],
+          isError: true,
+        };
+      }
+    },
+  );
+
+  // ── Tool: compare_models ───────────────────────────────────────────────────
+  const compareSchema = getCompareModelsInputSchema(models, lastState);
+  server.tool(
+    'compare_models',
+    'Compares selector discovery results across multiple models side-by-side.',
+    compareSchema.shape,
+    async (input) => {
+      try {
+        saveLastState(input);
+        const report = await compareModels(input as any);
+        return { content: [{ type: 'text', text: report }] };
       } catch (err) {
         return {
           content: [{ type: 'text', text: `Error: ${err instanceof Error ? err.message : String(err)}` }],
@@ -90,6 +121,8 @@ async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
 }
+
+
 
 main().catch(err => {
   console.error('Fatal error starting MCP server:', err);
