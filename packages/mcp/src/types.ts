@@ -81,7 +81,12 @@ export interface InspectTableFindings {
   selectorCandidates: SelectorCandidates;
   /** Cleaned DOM fragment for LLM analysis */
   snapshot?: string;
+  /** Internal metrics and debug info */
+  metadata?: {
+    generationTimeMs: number;
+  };
 }
+
 
 
 /** Options accepted by both MCP tools */

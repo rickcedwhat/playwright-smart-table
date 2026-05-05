@@ -33,7 +33,12 @@ export async function generateConfig(input: GenerateConfigInput): Promise<string
   const cellSelector = selectors.cell[0]?.selector || 'TD_OR_DIV_SELECTOR';
   const headerSelector = selectors.header[0]?.selector || 'TH_OR_DIV_SELECTOR';
 
+  const metadataComment = findings.metadata 
+    ? `/** Generated in ${findings.metadata.generationTimeMs}ms */\n` 
+    : '';
+
   let paginationSnippet = '';
+
   if (pagination.type.value === 'buttons') {
     paginationSnippet = `    pagination: {
       type: 'buttons',
@@ -42,7 +47,8 @@ export async function generateConfig(input: GenerateConfigInput): Promise<string
     },\n`;
   }
 
-  let code = `${strategyImport}import { useTable } from 'playwright-smart-table';
+  let code = `${metadataComment}${strategyImport}import { useTable } from 'playwright-smart-table';
+
 
 const table = useTable(page.locator('YOUR_TABLE_ROOT_SELECTOR'), {
 ${strategyConfig}    rowSelector: '${rowSelector}',

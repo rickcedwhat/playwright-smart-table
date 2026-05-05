@@ -263,7 +263,9 @@ export async function inspectTable(
   input: InspectTableInput,
   _options?: InspectTableOptions,
 ): Promise<InspectTableFindings> {
+  const startTime = performance.now();
   let url = input.url;
+
 
   if (input.testUrl) {
     if (input.testUrl === 'local-fixture') {
@@ -353,7 +355,12 @@ export async function inspectTable(
       (findings.pagination as any).signals = undefined;
     }
 
+    findings.metadata = {
+      generationTimeMs: Math.round(performance.now() - startTime),
+    };
+
     return findings;
+
 
 
 
