@@ -15,6 +15,8 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import * as dotenv from 'dotenv';
 import { inspectTable, InspectTableInputSchema } from './tools/inspectTable.js';
 import { generateConfig, GenerateConfigInputSchema } from './tools/generateConfig.js';
+import { inspectAndGenerate, InspectAndGenerateInputSchema } from './tools/inspectAndGenerate.js';
+
 
 
 dotenv.config();
@@ -91,7 +93,40 @@ server.tool(
 );
 
 
+// ── Tool: inspect_and_generate ───────────────────────────────────────────────
+
+server.tool(
+  'inspect_and_generate',
+  'All-in-one tool: Navigates to a URL, inspects the table, and returns a ready-to-use configuration snippet.',
+  {
+    url: InspectAndGenerateInputSchema.shape.url,
+    testUrl: InspectAndGenerateInputSchema.shape.testUrl,
+    tableSelector: InspectAndGenerateInputSchema.shape.tableSelector,
+    options: InspectAndGenerateInputSchema.shape.options,
+  },
+  async (input) => {
+    try {
+      const config = await inspectAndGenerate(input as any);
+      return {
+        content: [
+          {
+            type: 'text',
+            text: config,
+          },
+        ],
+      };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return {
+        content: [{ type: 'text', text: `Error: ${message}` }],
+        isError: true,
+      };
+    }
+  },
+);
+
 // ── Start ─────────────────────────────────────────────────────────────────────
+
 
 const transport = new StdioServerTransport();
 await server.connect(transport);
