@@ -8,12 +8,18 @@ vi.mock('../../src/utils/elementTracker', () => {
   return {
     ElementTracker: class {
       private _called = false;
-      async getUnseenIndices(locators: any) {
+      async peekUnseenIndices(locators: any) {
         if (this._called) return [];
-        this._called = true;
-        // Return indices 0..n-1 matching how many rows the env exposes via .all()
         const rows = await locators.all();
         return rows.map((_: any, i: number) => i);
+      }
+      async commitIndices(_locators: any, _indices: number[]) {
+        this._called = true;
+      }
+      async getUnseenIndices(locators: any) {
+        const indices = await this.peekUnseenIndices(locators);
+        await this.commitIndices(locators, indices);
+        return indices;
       }
       async cleanup() { }
     }
@@ -108,7 +114,7 @@ function makeEnv(
 
   return {
     getRowLocators: () => ({
-      all: async () => rowData.map((data, i) => ({ _data: data, _index: i })),
+      all: async () => rowData.map((data, i) => ({ _data: data, _index: i, count: async () => 1 })),
     }) as any,
     getMap: () => new Map([['Name', 0]]),
     advancePage: async () => {

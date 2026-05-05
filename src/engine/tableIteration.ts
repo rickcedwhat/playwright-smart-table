@@ -77,9 +77,20 @@ export async function runMap<T, R>(
 
     while (!stopped) {
       const rowLocators = env.getRowLocators();
-      const newIndices = await tracker.getUnseenIndices(rowLocators);
+      const allIndices = await tracker.peekUnseenIndices(rowLocators);
       const pageRows = await rowLocators.all();
-      
+
+      // In synchronized mode, overscan rows rendered beyond the visible viewport by virtual
+      // scrollers can be evicted when the horizontal barrier fires snapFirstColumnIntoView.
+      // Filter them out before committing so they stay unseen and are picked up on the next page.
+      const newIndices = concurrency === 'synchronized'
+        ? (await Promise.all(
+            allIndices.map(async idx => ({ idx, present: (await pageRows[idx].count()) > 0 }))
+          )).filter(r => r.present).map(r => r.idx)
+        : allIndices;
+
+      await tracker.commitIndices(rowLocators, newIndices);
+
       const batchSize = newIndices.length;
       if (batchSize === 0) {
         log(env.config, `${label}: page ${pagesScanned} — no new row(s) found`);
