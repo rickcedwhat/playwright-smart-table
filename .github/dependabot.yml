@@ -11,6 +11,16 @@ updates:
       - "dependencies"
       - "auto-approve"
     rebase-strategy: "auto"
+    # vitest 4.x requires vite >=6, but vitepress 1.x bundles vite 5 — incompatible under pnpm.
+    # Remove these ignores once vitepress 2.0 stable ships and is upgraded.
+    # Tracked in: https://github.com/rickcedwhat/playwright-smart-table/issues/118
+    ignore:
+      - dependency-name: "vitest"
+        versions: [">=4"]
+      - dependency-name: "@vitest/ui"
+        versions: [">=4"]
+      - dependency-name: "@vitest/coverage-v8"
+        versions: [">=4"]
     groups:
       weekly-npm-dependencies:
         applies-to: "version-updates"
