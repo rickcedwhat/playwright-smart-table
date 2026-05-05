@@ -48,10 +48,17 @@ async function main() {
     async (input) => {
       try {
         saveLastState(input);
-        const findings = await inspectTable(input as any);
-        return {
-          content: [{ type: 'text', text: JSON.stringify(findings, null, 2) }],
-        };
+        const models = [input.options?.model1 || 'gpt-4o'];
+        if (input.options?.model2) models.push(input.options.model2);
+
+        const results = await Promise.all(
+          models.map(async (m) => {
+            const findings = await inspectTable({ ...input, options: { ...input.options, model: m } } as any);
+            return { type: 'text' as const, text: `### Model: ${m}\n${JSON.stringify(findings, null, 2)}` };
+          })
+        );
+
+        return { content: results };
       } catch (err) {
         return {
           content: [{ type: 'text', text: `Error: ${err instanceof Error ? err.message : String(err)}` }],
@@ -87,8 +94,17 @@ async function main() {
     async (input) => {
       try {
         saveLastState(input);
-        const config = await inspectAndGenerate(input as any);
-        return { content: [{ type: 'text', text: config }] };
+        const models = [input.options?.model1 || 'gpt-4o'];
+        if (input.options?.model2) models.push(input.options.model2);
+
+        const results = await Promise.all(
+          models.map(async (m) => {
+            const config = await inspectAndGenerate({ ...input, options: { ...input.options, model: m } } as any);
+            return { type: 'text' as const, text: `### Model: ${m}\n${config}` };
+          })
+        );
+
+        return { content: results };
       } catch (err) {
         return {
           content: [{ type: 'text', text: `Error: ${err instanceof Error ? err.message : String(err)}` }],
@@ -97,6 +113,7 @@ async function main() {
       }
     },
   );
+
 
   const transport = new StdioServerTransport();
   await server.connect(transport);
