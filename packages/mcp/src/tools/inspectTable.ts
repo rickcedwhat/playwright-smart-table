@@ -17,7 +17,7 @@ import type {
 
 // ── Input schema ─────────────────────────────────────────────────────────────
 
-export const InspectTableInputSchema = z.object({
+export const getInspectTableInputSchema = (models: string[], defaultModel: string) => z.object({
   url: z.string().url('url must be a valid URL').optional(),
   testUrl: z.enum([
     'https://mui.com/x/react-data-grid/',
@@ -32,18 +32,15 @@ export const InspectTableInputSchema = z.object({
       authMode: z.enum(['storageState', 'interactive']).optional(),
       storageStatePath: z.string().optional(),
       llm: z.boolean().optional().default(true),
-      model: z.enum(['gpt-4o', 'gpt-4o-mini', 'o1-preview', 'o1-mini', 'meta-llama-3.1-405b-instruct']).optional().default('gpt-4o'),
+      model: z.enum(models as [string, ...string[]]).optional().default(defaultModel as any),
       generateSnapshot: z.boolean().optional().default(true),
-
-
       verbosity: z.enum(['mini', 'full']).optional().default('full'),
     })
     .optional(),
-
-
 });
 
-export type InspectTableInput = z.infer<typeof InspectTableInputSchema>;
+export type InspectTableInput = z.infer<ReturnType<typeof getInspectTableInputSchema>>;
+
 
 // ── DOM signal collection ─────────────────────────────────────────────────────
 
