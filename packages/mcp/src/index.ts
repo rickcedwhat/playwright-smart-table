@@ -23,8 +23,8 @@ import * as dotenv from 'dotenv';
 import { inspectTable, getInspectTableInputSchema } from './tools/inspectTable.js';
 import { generateConfig, GenerateConfigInputSchema } from './tools/generateConfig.js';
 import { inspectAndGenerate } from './tools/inspectAndGenerate.js';
-import { compareModels, getCompareModelsInputSchema } from './tools/compareModels.js';
 import { fetchGitHubModels, getLastState, saveLastState } from './utils/githubModels.js';
+
 
 
 dotenv.config();
@@ -98,29 +98,10 @@ async function main() {
     },
   );
 
-  // ── Tool: compare_models ───────────────────────────────────────────────────
-  const compareSchema = getCompareModelsInputSchema(models, lastState);
-  server.tool(
-    'compare_models',
-    'Compares selector discovery results across multiple models side-by-side.',
-    compareSchema.shape,
-    async (input) => {
-      try {
-        saveLastState(input);
-        const report = await compareModels(input as any);
-        return { content: [{ type: 'text', text: report }] };
-      } catch (err) {
-        return {
-          content: [{ type: 'text', text: `Error: ${err instanceof Error ? err.message : String(err)}` }],
-          isError: true,
-        };
-      }
-    },
-  );
-
   const transport = new StdioServerTransport();
   await server.connect(transport);
 }
+
 
 
 
