@@ -33,8 +33,10 @@ export const InspectTableInputSchema = z.object({
       storageStatePath: z.string().optional(),
       llm: z.boolean().optional(),
       generateSnapshot: z.boolean().optional().default(true),
+      verbosity: z.enum(['mini', 'full']).optional().default('full'),
     })
     .optional(),
+
 
 });
 
@@ -329,7 +331,8 @@ export async function inspectTable(
       );
     }
 
-    return {
+    const findings: InspectTableFindings = {
+
       preset,
       virtualization,
       pagination,
@@ -337,6 +340,20 @@ export async function inspectTable(
       selectorCandidates,
       snapshot: rawSignals.snapshot,
     };
+
+    if (input.options?.verbosity === 'mini') {
+      if (findings.snapshot) {
+        findings.snapshot = findings.snapshot.slice(0, 500) + '... [TRUNCATED]';
+      }
+      // Remove signals to keep it mini
+      (findings.preset as any).signals = undefined;
+      (findings.virtualization.rows as any).signals = undefined;
+      (findings.virtualization.columns as any).signals = undefined;
+      (findings.pagination as any).signals = undefined;
+    }
+
+    return findings;
+
 
 
 
