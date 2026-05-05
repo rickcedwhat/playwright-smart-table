@@ -16,8 +16,15 @@ import type {
 // ── Input schema ─────────────────────────────────────────────────────────────
 
 export const InspectTableInputSchema = z.object({
-  url: z.string().url('url must be a valid URL'),
+  url: z.string().url('url must be a valid URL').optional(),
+  testUrl: z.enum([
+    'https://mui.com/x/react-data-grid/',
+    'https://grid.glideapps.com/',
+    'https://adazzle.github.io/react-data-grid/',
+    'local-fixture'
+  ]).optional(),
   tableSelector: z.string().optional(),
+
   options: z
     .object({
       authMode: z.enum(['storageState', 'interactive']).optional(),
@@ -191,9 +198,27 @@ export async function inspectTable(
   input: InspectTableInput,
   _options?: InspectTableOptions,
 ): Promise<InspectTableFindings> {
-  const { url, tableSelector } = input;
+  let url = input.url;
+
+  if (input.testUrl) {
+    if (input.testUrl === 'local-fixture') {
+      const { fileURLToPath } = await import('url');
+      const { join, dirname } = await import('path');
+      const __filename = fileURLToPath(import.meta.url);
+      const __dirname = dirname(__filename);
+      // dist/tools/inspectTable.js -> ../../tests/fixtures/...
+      url = `file://${join(__dirname, '../../tests/fixtures/mui-datagrid-mock.html')}`;
+    } else {
+      url = input.testUrl;
+    }
+  }
+
+  if (!url) {
+    throw new Error('Either "url" or "testUrl" must be provided.');
+  }
 
   // Input validation: storageState mode requires a path
+
   if (input.options?.authMode === 'storageState' && !input.options.storageStatePath) {
     throw new Error(
       'authMode "storageState" requires storageStatePath to be provided.',
@@ -205,7 +230,8 @@ export async function inspectTable(
     const page = await launched.context.newPage();
     await page.goto(url, { waitUntil: 'networkidle' });
 
-    const rawSignals = await collectDomSignals(page, tableSelector);
+    const rawSignals = await collectDomSignals(page, input.tableSelector);
+
 
     // Re-hydrate arrays into Sets for the pure detector function
     const signals: DomSignals = {
