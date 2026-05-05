@@ -31,8 +31,9 @@ export const InspectTableInputSchema = z.object({
     .object({
       authMode: z.enum(['storageState', 'interactive']).optional(),
       storageStatePath: z.string().optional(),
-      llm: z.boolean().optional(),
+      llm: z.boolean().optional().default(true),
       generateSnapshot: z.boolean().optional().default(true),
+
       verbosity: z.enum(['mini', 'full']).optional().default('full'),
     })
     .optional(),
