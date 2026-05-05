@@ -43,8 +43,10 @@
     "test:playground": "pnpm exec playwright test --config tests-external/playground/playwright.config.ts 2>&1 | tee \"tests-external/playground/logs/run-$(date +%Y%m%d-%H%M%S).log\"",
     "dev:playground": "cd playground && npm run dev",
     "dev:mui": "cd tests/apps/mui-datagrid && npm run dev",
+    "inspector": "./scripts/start-inspector.sh",
     "prepare": "husky"
   },
+
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

@@ -11,11 +11,16 @@
     "build": "tsc",
     "build:watch": "tsc --watch",
     "test:unit": "vitest run",
-    "test:unit:watch": "vitest"
+    "test:unit:watch": "vitest",
+    "inspector:serve": "node dist/index.js --sse",
+    "inspector:ui": "cd ../inspector && pnpm vite"
   },
+
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.11.0",
+    "cors": "^2.8.6",
     "dotenv": "^17.4.2",
+    "express": "^5.2.1",
     "openai": "^6.36.0",
     "zod": "^3.25.20"
   },
@@ -23,6 +28,8 @@
     "@playwright/test": ">=1.40.0"
   },
   "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
     "@types/node": "^25.5.2",
     "typescript": "^6.0.2",
     "vitest": "^3.2.4"
