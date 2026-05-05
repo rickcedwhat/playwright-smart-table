@@ -10,51 +10,63 @@ export type GenerateConfigInput = z.infer<typeof GenerateConfigInputSchema>;
 export async function generateConfig(input: GenerateConfigInput): Promise<string> {
   const findings = input.findings as InspectTableFindings;
   
-  const preset = findings.preset.value;
+  const presetValue = findings.preset.value;
   const selectors = findings.selectorCandidates;
   const pagination = findings.pagination;
   const virtualization = findings.virtualization;
 
-  let strategyImport = '';
-  let strategyConfig = '';
+  let imports = ["useTable", "Strategies"];
+  let configLines: string[] = [];
+  let rootSelector = 'table';
 
-  if (preset === 'mui-datagrid') {
-    strategyImport = "import { MuiDataGridStrategy } from 'playwright-smart-table';\n";
-    strategyConfig = "    strategy: new MuiDataGridStrategy(),\n";
-  } else if (preset === 'rdg') {
-    strategyImport = "import { RdgStrategy } from 'playwright-smart-table';\n";
-    strategyConfig = "    strategy: new RdgStrategy(),\n";
-  } else if (preset === 'glide') {
-    strategyImport = "import { GlideStrategy } from 'playwright-smart-table';\n";
-    strategyConfig = "    strategy: new GlideStrategy(),\n";
+  // 1. Preset Handling
+  if (presetValue) {
+    imports.push("presets");
+    const presetVar = presetValue === 'mui-datagrid' ? 'muiDataGrid' : 
+                    presetValue === 'rdg' ? 'rdg' : 
+                    presetValue === 'glide' ? 'glide' : 'muiTable';
+    configLines.push(`    ...presets.${presetVar},`);
+    
+    // Attempt to find a better root selector from signals
+    const rootSignal = findings.preset.signals.find(s => s.includes('.MuiDataGrid-root') || s.includes('.rdg') || s.includes('.dvn-'));
+    if (rootSignal) {
+      rootSelector = rootSignal.split(' ')[0].replace(' ✓', '').replace(' ✗', '');
+    }
+  } else {
+    // 2. Manual Selectors (only if no preset)
+    const rowSelector = selectors.row[0]?.selector || 'tr';
+    const cellSelector = selectors.cell[0]?.selector || 'td';
+    const headerSelector = selectors.header[0]?.selector || 'th';
+    configLines.push(`    rowSelector: '${rowSelector}',`);
+    configLines.push(`    cellSelector: '${cellSelector}',`);
+    configLines.push(`    headerSelector: '${headerSelector}',`);
   }
 
-  const rowSelector = selectors.row[0]?.selector || 'TR_OR_DIV_SELECTOR';
-  const cellSelector = selectors.cell[0]?.selector || 'TD_OR_DIV_SELECTOR';
-  const headerSelector = selectors.header[0]?.selector || 'TH_OR_DIV_SELECTOR';
+  // 3. Pagination Strategy
+  if (pagination.type.value === 'buttons' && !presetValue) {
+    const next = pagination.primitives.goNext.selector;
+    const prev = pagination.primitives.goPrevious.selector;
+    if (next || prev) {
+      configLines.push(`    strategies: {`);
+      configLines.push(`        pagination: Strategies.pagination.click({`);
+      if (next) configLines.push(`            next: '${next}',`);
+      if (prev) configLines.push(`            previous: '${prev}',`);
+      configLines.push(`        }),`);
+      configLines.push(`    },`);
+    }
+  }
 
   const metadataComment = findings.metadata 
     ? `/** Generated in ${findings.metadata.generationTimeMs}ms */\n` 
     : '';
 
-  let paginationSnippet = '';
+  const virtualizationComment = `    // Virtualization detected: ${virtualization.rows.detected ? 'Rows (Yes)' : 'Rows (No)'}, ${virtualization.columns.detected ? 'Cols (Yes)' : 'Cols (No)'}`;
 
-  if (pagination.type.value === 'buttons') {
-    paginationSnippet = `    pagination: {
-      type: 'buttons',
-      nextSelector: '${pagination.primitives.goNext.selector}',
-      prevSelector: '${pagination.primitives.goPrevious.selector}',
-    },\n`;
-  }
+  const code = `${metadataComment}import { ${imports.join(', ')} } from 'playwright-smart-table';
 
-  let code = `${metadataComment}${strategyImport}import { useTable } from 'playwright-smart-table';
-
-
-const table = useTable(page.locator('YOUR_TABLE_ROOT_SELECTOR'), {
-${strategyConfig}    rowSelector: '${rowSelector}',
-    cellSelector: '${cellSelector}',
-    headerSelector: '${headerSelector}',
-${paginationSnippet}    // Virtualization detected: ${virtualization.rows.detected ? 'Rows (Yes)' : 'Rows (No)'}, ${virtualization.columns.detected ? 'Cols (Yes)' : 'Cols (No)'}
+const table = useTable(page.locator('${rootSelector}'), {
+${configLines.join('\n')}
+${virtualizationComment}
 });
 
 // Example usage:
@@ -63,3 +75,4 @@ ${paginationSnippet}    // Virtualization detected: ${virtualization.rows.detect
 
   return code;
 }
+
