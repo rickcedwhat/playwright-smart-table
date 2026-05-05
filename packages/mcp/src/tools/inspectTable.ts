@@ -161,7 +161,7 @@ export async function inspectTable(
   const launched = await launchBrowser({ headless: true });
   try {
     const page = await launched.context.newPage();
-    await page.goto(url, { waitUntil: 'domcontentloaded' });
+    await page.goto(url, { waitUntil: 'networkidle' });
 
     const rawSignals = await collectDomSignals(page, tableSelector);
 
