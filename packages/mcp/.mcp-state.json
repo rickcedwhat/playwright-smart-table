@@ -1,3 +1,12 @@
 {
-  "lastModel": "openai/gpt-5"
+  "testUrl": "https://grid.glideapps.com/",
+  "options": {
+    "llm": true,
+    "models": [
+      "openai/gpt-5",
+      "openai/o3-mini"
+    ],
+    "generateSnapshot": true,
+    "verbosity": "full"
+  }
 }
