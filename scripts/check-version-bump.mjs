@@ -50,17 +50,18 @@ try {
 
         console.log('✅ CHANGELOG.md update confirmed.');
 
-        // 7. Verify pnpm-lock.yaml is staged
-        //    pnpm version runs a full install, updating the lockfile alongside package.json.
+        // 7. Verify pnpm-lock.yaml is staged if it has changes.
+        //    A pure version bump (no dependency changes) leaves the lockfile clean — that's fine.
         const isLockStaged = stagedFiles.includes('pnpm-lock.yaml');
-        if (!isLockStaged) {
-            console.error('\n❌ ERROR: package.json version was changed but pnpm-lock.yaml was not staged.');
-            console.error('👉 Always use: pnpm version minor (or patch/major) — never edit package.json directly.');
-            console.error('   pnpm version updates both files with full dependency resolution.\n');
+        const lockDirty = execSync('git diff -- pnpm-lock.yaml', { encoding: 'utf8' }).trim();
+        if (lockDirty && !isLockStaged) {
+            console.error('\n❌ ERROR: pnpm-lock.yaml has unstaged changes alongside a version bump.');
+            console.error('👉 Stage pnpm-lock.yaml or run: corepack pnpm install\n');
             process.exit(1);
         }
 
-        console.log('✅ pnpm-lock.yaml is staged.');
+        if (isLockStaged) console.log('✅ pnpm-lock.yaml is staged.');
+        else console.log('✅ pnpm-lock.yaml unchanged — no staging required.');
     }
 
 } catch (error) {

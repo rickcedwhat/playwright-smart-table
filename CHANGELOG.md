@@ -1,5 +1,10 @@
 # Changelog
 
+## [6.12.0] - 2026-05-05
+
+### Fixed
+- **Overscan row eviction in `synchronized` map** — Virtual scroll grids (RDG, AG Grid) render overscan rows beyond the visible viewport edge. In `synchronized` mode these rows were committed to the batch before the horizontal navigation barrier fired, which could evict them from the DOM and cause `"could not reach cell"` errors. `ElementTracker` now exposes `peekUnseenIndices` / `commitIndices` so `runMap` can filter overscan rows out before committing — they are picked up naturally on the next page advance. Closes #120.
+
 ## [6.11.0] - 2026-05-03
 
 ### Added

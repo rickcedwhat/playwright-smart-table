@@ -6,11 +6,18 @@ import type { FinalTableConfig } from '../../src/types';
 vi.mock('../../src/utils/elementTracker', () => ({
   ElementTracker: class {
     private _called = false;
-    async getUnseenIndices(locators: any) {
+    async peekUnseenIndices(locators: any) {
       if (this._called) return [];
-      this._called = true;
       const rows = await locators.all();
       return rows.map((_: any, i: number) => i);
+    }
+    async commitIndices(_locators: any, _indices: number[]) {
+      this._called = true;
+    }
+    async getUnseenIndices(locators: any) {
+      const indices = await this.peekUnseenIndices(locators);
+      await this.commitIndices(locators, indices);
+      return indices;
     }
     async cleanup() {}
   },
@@ -36,7 +43,7 @@ function makeBarrierEnv(rowCount: number): TableIterationEnv<any> {
   return {
     getRowLocators: () =>
       ({
-        all: async () => Array.from({ length: rowCount }, (_, i) => ({ _index: i })),
+        all: async () => Array.from({ length: rowCount }, (_, i) => ({ _index: i, count: async () => 1 })),
       }) as any,
     getMap: () => new Map([['A', 0]]),
     advancePage: async () => false,
