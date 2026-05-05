@@ -31,7 +31,9 @@ export async function fetchGitHubModels(): Promise<string[]> {
 
     if (!response.ok) return ['gpt-4o', 'gpt-4o-mini', 'o1-preview', 'o1-mini'];
 
-    const data = await response.json() as GitHubModelItem[];
+    const raw = await response.json();
+    if (!Array.isArray(raw)) return ['gpt-4o', 'gpt-4o-mini', 'o1-preview', 'o1-mini'];
+    const data = raw as GitHubModelItem[];
     // Take reasoning, coding, and conversation models
     const models = data
       .filter(m =>
@@ -54,7 +56,9 @@ export function getLastState(): PersistedState {
     if (fs.existsSync(STATE_FILE)) {
       return JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')) as PersistedState;
     }
-  } catch {}
+  } catch (err) {
+    console.error('Failed to read MCP state file:', err);
+  }
   return {};
 }
 
@@ -63,5 +67,7 @@ export function saveLastState(state: PersistedState): void {
     // Only save serializable fields
     const toSave = { ...state };
     fs.writeFileSync(STATE_FILE, JSON.stringify(toSave, null, 2));
-  } catch {}
+  } catch (err) {
+    console.error('Failed to write MCP state file:', err);
+  }
 }

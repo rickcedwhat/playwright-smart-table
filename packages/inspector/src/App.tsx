@@ -21,6 +21,15 @@ function escapeHtml(text: string): string {
     .replace(/'/g, '&#39;');
 }
 
+// Module-level singleton so themes/langs are loaded once across all CodeBlock instances.
+let highlighterPromise: ReturnType<typeof createHighlighter> | null = null;
+function getHighlighter() {
+  if (!highlighterPromise) {
+    highlighterPromise = createHighlighter({ themes: ['github-dark'], langs: ['typescript'] });
+  }
+  return highlighterPromise;
+}
+
 // --- Components ---
 
 function CodeBlock({ code, label }: { code: string; label?: string }) {
@@ -28,22 +37,19 @@ function CodeBlock({ code, label }: { code: string; label?: string }) {
   const [html, setHtml] = useState<string | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
     async function highlight() {
       try {
-        const highlighter = await createHighlighter({
-          themes: ['github-dark'],
-          langs: ['typescript']
-        });
-        const h = highlighter.codeToHtml(code, {
-          lang: 'typescript',
-          theme: 'github-dark'
-        });
-        setHtml(h);
+        const highlighter = await getHighlighter();
+        if (cancelled) return;
+        const h = highlighter.codeToHtml(code, { lang: 'typescript', theme: 'github-dark' });
+        if (!cancelled) setHtml(h);
       } catch (err) {
-        setHtml(`<pre>${escapeHtml(code)}</pre>`);
+        if (!cancelled) setHtml(`<pre>${escapeHtml(code)}</pre>`);
       }
     }
     highlight();
+    return () => { cancelled = true; };
   }, [code]);
 
 
@@ -92,28 +98,39 @@ export default function App() {
 
   // Initialize MCP Client
   useEffect(() => {
+    let mounted = true;
+    let createdClient: Client | null = null;
+
     const initClient = async () => {
       try {
+        if (!mounted) return;
         setError(null);
-        console.log('Connecting to MCP server...');
         const transport = new SSEClientTransport(new URL('http://localhost:3001/sse'));
         const mcpClient = new Client(
           { name: 'Smart Table Inspector UI', version: '1.0.0' },
           { capabilities: {} }
         );
+        createdClient = mcpClient;
         await mcpClient.connect(transport);
+        if (!mounted) { await mcpClient.close().catch(() => undefined); return; }
         setClient(mcpClient);
         setConnected(true);
 
         const { tools: mcpTools } = await mcpClient.listTools();
+        if (!mounted) return;
         setTools(mcpTools);
         if (mcpTools.length > 0) setSelectedTool(mcpTools[0].name);
       } catch (err) {
-        console.error('Failed to connect to MCP server:', err);
-        setError(String(err));
+        if (mounted) setError(String(err));
       }
     };
     initClient();
+    return () => {
+      mounted = false;
+      createdClient?.close().catch(() => undefined);
+      setClient(null);
+      setConnected(false);
+    };
   }, []);
 
   const handleCopyBoth = () => {

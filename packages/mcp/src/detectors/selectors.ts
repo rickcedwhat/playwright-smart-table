@@ -61,9 +61,9 @@ Limit to top 3 candidates for each.
 
     const result = JSON.parse(content);
     return {
-      row: result.row || [],
-      cell: result.cell || [],
-      header: result.header || [],
+      row: Array.isArray(result.row) ? result.row : [],
+      cell: Array.isArray(result.cell) ? result.cell : [],
+      header: Array.isArray(result.header) ? result.header : [],
     };
   } catch (err) {
     console.error('LLM Selector Discovery failed:', err);
