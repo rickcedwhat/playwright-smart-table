@@ -19,7 +19,12 @@ process.stdout.write = (chunk: any, encoding?: any, callback?: any): boolean => 
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
+import express from 'express';
+import cors from 'cors';
 import * as dotenv from 'dotenv';
+
+
 import { inspectTable, getInspectTableInputSchema } from './tools/inspectTable.js';
 import { generateConfig, GenerateConfigInputSchema } from './tools/generateConfig.js';
 import { inspectAndGenerate } from './tools/inspectAndGenerate.js';
@@ -29,15 +34,7 @@ import { fetchGitHubModels, getLastState, saveLastState } from './utils/githubMo
 
 dotenv.config();
 
-async function main() {
-  const models = await fetchGitHubModels();
-  const lastState = getLastState();
-  
-  const server = new McpServer({
-    name: 'playwright-smart-table-inspector',
-    version: '0.1.0',
-  });
-
+function registerTools(server: McpServer, models: string[], lastState: any) {
   const inputSchema = getInspectTableInputSchema(models, lastState);
 
   // ── Tool: inspect_table ─────────────────────────────────────────────────────
@@ -113,11 +110,75 @@ async function main() {
       }
     },
   );
-
-
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
 }
+
+async function main() {
+  const models = await fetchGitHubModels();
+  const lastState = getLastState();
+  const isSse = process.argv.includes('--sse');
+
+  if (isSse) {
+    const app = express();
+    app.use(cors());
+    // app.use(express.json()); // Disabled: breaks SSEServerTransport stream
+    const port = parseInt(process.env.MCP_PORT || '3001');
+
+
+    const activeTransports: SSEServerTransport[] = [];
+
+    app.get('/sse', async (req, res) => {
+      console.error('New SSE connection request');
+      
+      // Create a fresh server instance for this session
+      const server = new McpServer({
+        name: 'playwright-smart-table-inspector',
+        version: '0.1.0',
+      });
+      registerTools(server, models, lastState);
+
+      const transport = new SSEServerTransport('/message', res);
+      activeTransports.push(transport);
+      await server.connect(transport);
+      
+      transport.onclose = () => {
+        console.error('SSE connection closed');
+        const index = activeTransports.indexOf(transport);
+        if (index > -1) activeTransports.splice(index, 1);
+      };
+    });
+
+    app.post('/message', async (req, res) => {
+      const sessionId = req.query.sessionId as string;
+      const transport = activeTransports.find(t => t.sessionId === sessionId);
+      
+      if (transport) {
+        await transport.handlePostMessage(req, res);
+      } else {
+        res.status(404).send('No active SSE transport found for this session');
+      }
+    });
+
+    app.get('/health', (req, res) => {
+      res.json({ status: 'ok', activeSessions: activeTransports.length });
+    });
+
+    app.listen(port, () => {
+      console.error(`MCP Server (SSE) running at http://localhost:${port}/sse`);
+    });
+  } else {
+    const server = new McpServer({
+      name: 'playwright-smart-table-inspector',
+      version: '0.1.0',
+    });
+    registerTools(server, models, lastState);
+    
+    const transport = new StdioServerTransport();
+    await server.connect(transport);
+    console.error('MCP Server (Stdio) running');
+  }
+}
+
+
 
 
 
