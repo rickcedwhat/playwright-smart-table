@@ -14,8 +14,8 @@ jobs:
       contents: write
       pull-requests: write
     steps:
-      - name: Get PR body
-        id: check-dependabot
+      - name: Check for major version bumps
+        id: check-major
         uses: actions/github-script@v9
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -25,15 +25,7 @@ jobs:
               repo: context.repo.repo,
               pull_number: context.payload.pull_request.number,
             });
-            core.setOutput('body', pr.data.body || '');
-
-      - name: Check for major version bumps
-        id: check-major
-        uses: actions/github-script@v9
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          script: |
-            const body = `${{ steps.check-dependabot.outputs.body }}`;
+            const body = pr.data.body || '';
             const regex = /from\s+([0-9]+)\.([0-9]+)\.([0-9]+)[^\n]*to\s+([0-9]+)\.([0-9]+)\.([0-9]+)/ig;
             let m;
             while ((m = regex.exec(body)) !== null) {
