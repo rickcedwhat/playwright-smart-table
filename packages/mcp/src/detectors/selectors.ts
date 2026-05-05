@@ -6,8 +6,10 @@ import type { DomSignals, InspectTableFindings, SelectorCandidates } from '../ty
  */
 export async function discoverSelectors(
   findings: Omit<InspectTableFindings, 'selectorCandidates'>,
-  snapshot: string
+  snapshot: string,
+  modelOverride?: string
 ): Promise<SelectorCandidates> {
+
   const apiKey = process.env.GITHUB_TOKEN || process.env.OPENAI_API_KEY;
   const baseURL = process.env.GITHUB_TOKEN 
     ? 'https://models.inference.ai.azure.com' 
@@ -43,7 +45,8 @@ Limit to top 3 candidates for each.
   `.trim();
 
   try {
-    const model = process.env.LLM_MODEL || (process.env.GITHUB_TOKEN ? 'gpt-4o' : 'gpt-4o-mini');
+    const model = modelOverride || process.env.LLM_MODEL || (process.env.GITHUB_TOKEN ? 'gpt-4o' : 'gpt-4o-mini');
+
     const response = await client.chat.completions.create({
       model,
       messages: [{ role: 'user', content: prompt }],
