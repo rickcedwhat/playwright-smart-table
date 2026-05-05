@@ -1,0 +1,37 @@
+{
+  "name": "inspector",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.33.2",
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.2.4",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "autoprefixer": "^10.5.0",
+    "postcss": "^8.5.14",
+    "tailwindcss": "^4.2.4",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.10"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.14.0",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
+    "shadcn-ui": "^0.9.5",
+    "shiki": "^4.0.2",
+    "tailwind-merge": "^3.5.0"
+  }
+}
