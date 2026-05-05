@@ -1,14 +1,11 @@
 #!/usr/bin/env node
-/**
- * playwright-smart-table MCP Inspector
- * Registers MCP tools and starts the stdio server.
- *
- * Usage:
- *   node packages/mcp/dist/index.js
- *
- * For interactive testing:
- *   npx @modelcontextprotocol/inspector node packages/mcp/dist/index.js
- */
+
+// Redirect all console.log/info to stderr to avoid polluting stdout (MCP JSON stream)
+// MUST BE AT THE VERY TOP before any other imports that might log
+const originalLog = console.log;
+const originalInfo = console.info;
+console.log = (...args) => console.error(...args);
+console.info = (...args) => console.error(...args);
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -20,13 +17,8 @@ import { fetchGitHubModels, getLastModel, saveLastModel } from './utils/githubMo
 
 dotenv.config();
 
-// Redirect all console.log/info to stderr to avoid polluting stdout (MCP JSON stream)
-const originalLog = console.log;
-const originalInfo = console.info;
-console.log = (...args) => console.error(...args);
-console.info = (...args) => console.error(...args);
-
 async function main() {
+
   const models = await fetchGitHubModels();
   const defaultModel = getLastModel();
   
