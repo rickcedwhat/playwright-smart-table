@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.11.0",
+    "openai": "^6.36.0",
     "zod": "^3.25.20"
   },
   "peerDependencies": {

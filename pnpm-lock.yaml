@@ -60,6 +60,9 @@ importers:
       '@playwright/test':
         specifier: '>=1.40.0'
         version: 1.59.1
+      openai:
+        specifier: ^6.36.0
+        version: 6.36.0(ws@8.20.0)(zod@3.25.76)
       zod:
         specifier: ^3.25.20
         version: 3.25.76
