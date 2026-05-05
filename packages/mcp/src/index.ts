@@ -14,6 +14,8 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import * as dotenv from 'dotenv';
 import { inspectTable, InspectTableInputSchema } from './tools/inspectTable.js';
+import { generateConfig, GenerateConfigInputSchema } from './tools/generateConfig.js';
+
 
 dotenv.config();
 
@@ -37,6 +39,7 @@ server.tool(
     options: InspectTableInputSchema.shape.options,
   },
 
+
   async (input) => {
     try {
       const findings = await inspectTable(input);
@@ -57,6 +60,36 @@ server.tool(
     }
   },
 );
+
+// ── Tool: generate_config ────────────────────────────────────────────────────
+
+server.tool(
+  'generate_config',
+  'Generates a playwright-smart-table configuration snippet from inspection findings.',
+  {
+    findings: GenerateConfigInputSchema.shape.findings,
+  },
+  async (input) => {
+    try {
+      const config = await generateConfig(input as any);
+      return {
+        content: [
+          {
+            type: 'text',
+            text: config,
+          },
+        ],
+      };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      return {
+        content: [{ type: 'text', text: `Error: ${message}` }],
+        isError: true,
+      };
+    }
+  },
+);
+
 
 // ── Start ─────────────────────────────────────────────────────────────────────
 
