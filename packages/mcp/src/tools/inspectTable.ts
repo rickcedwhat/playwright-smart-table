@@ -46,8 +46,10 @@ async function collectDomSignals(
     const roles = new Set<string>();
     const dataAttributes = new Set<string>();
 
-    // Walk all elements inside root, collect class names, roles, and data-* attrs
-    root.querySelectorAll('*').forEach((el) => {
+    // Walk root and all descendants
+    const elements = [root, ...Array.from(root.querySelectorAll('*'))];
+    elements.forEach((el) => {
+
       // Classes
       el.classList.forEach((cls) => classes.add(cls));
 
@@ -64,9 +66,10 @@ async function collectDomSignals(
     });
 
     // Glide-specific checks - more robust matching
-    const dvnElements = Array.from(root.querySelectorAll('*')).filter(el => 
+    const dvnElements = elements.filter(el => 
       Array.from(el.classList).some(cls => cls.startsWith('dvn-'))
     );
+
     const hasGlideCanvas = dvnElements.some(el => el.querySelector('canvas') !== null);
     
     const hasGlideInput = 
