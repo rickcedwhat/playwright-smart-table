@@ -102,7 +102,10 @@ export interface DomSignals {
   hasGlideCanvas: boolean;
   /** Whether a gdg-input textarea exists */
   hasGlideInput: boolean;
+  /** Whether any class starting with dvn- or gdg- exists */
+  hasGlideClass: boolean;
   /** Total visible row count (best guess from heuristics) */
+
   visibleRowCount: number;
   /** aria-rowcount value on the grid root, if present */
   ariaRowCount: number | null;
@@ -120,7 +123,9 @@ export interface SerializableDomSignals {
   dataAttributes: string[];
   hasGlideCanvas: boolean;
   hasGlideInput: boolean;
+  hasGlideClass: boolean;
   visibleRowCount: number;
+
   ariaRowCount: number | null;
   ariaColCount: number | null;
 }

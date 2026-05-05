@@ -58,15 +58,20 @@ const PRESET_SPECS: PresetSpec[] = [
     name: 'glide',
     signals: [
       {
-        label: 'canvas inside .dvn-scroll-container',
+        label: 'canvas inside dvn-* element',
         check: (s) => s.hasGlideCanvas,
       },
       {
-        label: 'gdg-input textarea',
+        label: 'gdg-* textarea',
         check: (s) => s.hasGlideInput,
+      },
+      {
+        label: 'dvn- or gdg- class prefix',
+        check: (s) => s.hasGlideClass,
       },
     ],
   },
+
 ];
 
 /**
