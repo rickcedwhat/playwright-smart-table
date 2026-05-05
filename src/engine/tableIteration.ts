@@ -85,7 +85,7 @@ export async function runMap<T, R>(
       // Filter them out before committing so they stay unseen and are picked up on the next page.
       const newIndices = concurrency === 'synchronized'
         ? (await Promise.all(
-            allIndices.map(async idx => ({ idx, present: (await pageRows[idx].count()) > 0 }))
+            allIndices.map(async idx => ({ idx, present: pageRows[idx] != null && (await pageRows[idx].count()) > 0 }))
           )).filter(r => r.present).map(r => r.idx)
         : allIndices;
 
