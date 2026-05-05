@@ -32,12 +32,15 @@ export const getInspectTableInputSchema = (models: string[], lastState: any) => 
       authMode: z.enum(['storageState', 'interactive']).optional().default(lastState.options?.authMode),
       storageStatePath: z.string().optional().default(lastState.options?.storageStatePath),
       llm: z.boolean().optional().default(lastState.options?.llm ?? true),
-      model: z.enum(models as [string, ...string[]]).optional().default(lastState.options?.model || 'gpt-4o'),
+      models: z.array(z.enum(models as [string, ...string[]]))
+        .optional()
+        .default(lastState.options?.models || [lastState.options?.model || 'gpt-4o']),
       generateSnapshot: z.boolean().optional().default(lastState.options?.generateSnapshot ?? true),
       verbosity: z.enum(['mini', 'full']).optional().default(lastState.options?.verbosity || 'full'),
     })
     .optional().default(lastState.options || {}),
 });
+
 
 
 export type InspectTableInput = z.infer<ReturnType<typeof getInspectTableInputSchema>>;
@@ -327,13 +330,41 @@ export async function inspectTable(
 
     // Step 3: LLM Selector Discovery (if snapshot was requested and llm enabled)
     let selectorCandidates = stubFindings().selectorCandidates;
+    const selectedModels = input.options?.models || [(process.env.GITHUB_TOKEN ? 'gpt-4o' : 'gpt-4o-mini')];
+
+
     if (rawSignals.snapshot && (input.options?.llm !== false)) {
+      // Run first model
       selectorCandidates = await discoverSelectors(
         { preset, virtualization, pagination, loading: stubFindings().loading },
         rawSignals.snapshot,
-        input.options?.model
+        selectedModels[0]
       );
+      
+      // Annotate reasons with model name
+      selectorCandidates.row.forEach(r => r.reason = `[${selectedModels[0]}] ${r.reason}`);
+      selectorCandidates.cell.forEach(c => c.reason = `[${selectedModels[0]}] ${c.reason}`);
+      selectorCandidates.header.forEach(h => h.reason = `[${selectedModels[0]}] ${h.reason}`);
+
+      // If multiple models, run the rest and aggregate
+      if (selectedModels.length > 1) {
+        for (let i = 1; i < selectedModels.length; i++) {
+          const extra = await discoverSelectors(
+            { preset, virtualization, pagination, loading: stubFindings().loading },
+            rawSignals.snapshot,
+            selectedModels[i]
+          );
+          extra.row.forEach(r => r.reason = `[${selectedModels[i]}] ${r.reason}`);
+          extra.cell.forEach(c => c.reason = `[${selectedModels[i]}] ${c.reason}`);
+          extra.header.forEach(h => h.reason = `[${selectedModels[i]}] ${h.reason}`);
+          
+          selectorCandidates.row.push(...extra.row);
+          selectorCandidates.cell.push(...extra.cell);
+          selectorCandidates.header.push(...extra.header);
+        }
+      }
     }
+
 
 
     const findings: InspectTableFindings = {
@@ -359,8 +390,9 @@ export async function inspectTable(
 
     findings.metadata = {
       generationTimeMs: Math.round(performance.now() - startTime),
-      model: input.options?.model || (process.env.GITHUB_TOKEN ? 'gpt-4o' : 'gpt-4o-mini'),
+      model: selectedModels.join(' + '),
     };
+
 
 
     return findings;
