@@ -63,14 +63,17 @@ async function collectDomSignals(
       }
     });
 
-    // Glide-specific checks
-    const dvnContainer = root.querySelector('.dvn-scroll-container');
-    const hasGlideCanvas = dvnContainer
-      ? dvnContainer.querySelector('canvas') !== null
-      : false;
-    const hasGlideInput =
-      root.querySelector('textarea.gdg-input') !== null ||
-      document.querySelector('textarea.gdg-input') !== null;
+    // Glide-specific checks - more robust matching
+    const dvnElements = Array.from(root.querySelectorAll('*')).filter(el => 
+      Array.from(el.classList).some(cls => cls.startsWith('dvn-'))
+    );
+    const hasGlideCanvas = dvnElements.some(el => el.querySelector('canvas') !== null);
+    
+    const hasGlideInput = 
+      root.querySelector('textarea[class*="gdg-"]') !== null ||
+      document.querySelector('textarea[class*="gdg-"]') !== null;
+      
+    const hasGlideClass = Array.from(classes).some(cls => cls.startsWith('gdg-') || cls.startsWith('dvn-'));
 
     // Best-effort visible row count — count [role="row"] or <tr> elements
     const rowCount =
@@ -92,6 +95,7 @@ async function collectDomSignals(
       dataAttributes: [...dataAttributes],
       hasGlideCanvas,
       hasGlideInput,
+      hasGlideClass,
       visibleRowCount: rowCount,
       ariaRowCount,
       ariaColCount,
@@ -172,7 +176,9 @@ export async function inspectTable(
       dataAttributes: new Set(rawSignals.dataAttributes),
       hasGlideCanvas: rawSignals.hasGlideCanvas,
       hasGlideInput: rawSignals.hasGlideInput,
+      hasGlideClass: rawSignals.hasGlideClass,
       visibleRowCount: rawSignals.visibleRowCount,
+
       ariaRowCount: rawSignals.ariaRowCount,
       ariaColCount: rawSignals.ariaColCount,
     };
