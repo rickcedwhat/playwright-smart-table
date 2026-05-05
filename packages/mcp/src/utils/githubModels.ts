@@ -20,16 +20,20 @@ export async function fetchGitHubModels(): Promise<string[]> {
       }
     });
 
-    if (!response.ok) return ['gpt-4o', 'gpt-4o-mini'];
+    if (!response.ok) return ['gpt-4o', 'gpt-4o-mini', 'o1-preview', 'o1-mini'];
 
     const data = await response.json() as any[];
-    // Filter for chat/completion models and take the first few
+    // Take reasoning, coding, and conversation models
     const models = data
-      .filter(m => m.task === 'chat' || m.task === 'completion')
-      .map(m => m.name)
-      .slice(0, 10);
+      .filter(m => 
+        m.tags?.some((t: string) => ['conversation', 'reasoning', 'coding', 'summarization', 'logic'].includes(t.toLowerCase())) ||
+        m.id.includes('gpt') || m.id.includes('llama') || m.id.includes('phi')
+      )
+      .map(m => m.id)
+      .slice(0, 30); // Grab a bigger chunk
 
-    return models.length > 0 ? models : ['gpt-4o', 'gpt-4o-mini'];
+    return models.length > 0 ? models : ['gpt-4o', 'gpt-4o-mini', 'o1-preview', 'o1-mini'];
+
   } catch (err) {
     console.error('Failed to fetch GitHub models:', err);
     return ['gpt-4o', 'gpt-4o-mini'];
