@@ -111,6 +111,12 @@ export interface DomSignals {
   ariaRowCount: number | null;
   /** aria-colcount value on the grid root, if present */
   ariaColCount: number | null;
+  /** Inline styles found on elements (key=style property, value=set of observed values) */
+  styles: Record<string, string[]>;
+  /** Text content of potential pagination indicators (e.g. "1-25 of 100") */
+  paginationTexts: string[];
+  /** Attributes of potential pagination buttons (aria-labels, etc.) */
+  paginationButtons: Array<{ label: string | null; icon: string | null; classes: string[] }>;
 }
 
 /**
@@ -125,8 +131,9 @@ export interface SerializableDomSignals {
   hasGlideInput: boolean;
   hasGlideClass: boolean;
   visibleRowCount: number;
-
   ariaRowCount: number | null;
   ariaColCount: number | null;
+  styles: Record<string, string[]>;
+  paginationTexts: string[];
+  paginationButtons: Array<{ label: string | null; icon: string | null; classes: string[] }>;
 }
-

@@ -2,8 +2,11 @@ import type { Page } from '@playwright/test';
 import { z } from 'zod';
 import { launchBrowser, closeBrowser } from '../browser/launcher.js';
 import { detectPreset } from '../detectors/preset.js';
+import { detectVirtualization } from '../detectors/virtualization.js';
+import { detectPagination } from '../detectors/pagination.js';
 import type {
   DomSignals,
+
   SerializableDomSignals,
   InspectTableFindings,
   InspectTableOptions,
@@ -45,22 +48,48 @@ async function collectDomSignals(
     const classes = new Set<string>();
     const roles = new Set<string>();
     const dataAttributes = new Set<string>();
+    const styles: Record<string, Set<string>> = { transform: new Set(), display: new Set() };
+    const paginationTexts: string[] = [];
+    const paginationButtons: Array<{ label: string | null; icon: string | null; classes: string[] }> = [];
 
     // Walk root and all descendants
     const elements = [root, ...Array.from(root.querySelectorAll('*'))];
     elements.forEach((el) => {
+      const element = el as HTMLElement;
 
       // Classes
-      el.classList.forEach((cls) => classes.add(cls));
+      element.classList.forEach((cls) => classes.add(cls));
 
       // Role
-      const role = el.getAttribute('role');
+      const role = element.getAttribute('role');
       if (role) roles.add(role);
 
-      // data-* attributes
-      for (const attr of el.getAttributeNames()) {
+      // data-* and aria-* attributes
+      for (const attr of element.getAttributeNames()) {
         if (attr.startsWith('data-') || attr.startsWith('aria-')) {
           dataAttributes.add(attr);
+        }
+      }
+
+      // Styles (virtualization signals)
+      const style = element.style;
+      if (style.transform) styles.transform.add(style.transform);
+      if (style.display) styles.display.add(style.display);
+
+      // Pagination indicators (e.g. "1-25 of 100")
+      if (element.children.length === 0 && element.innerText?.match(/\d+[-–]\d+\s+of\s+\d+/i)) {
+        paginationTexts.push(element.innerText.trim());
+      }
+
+      // Pagination buttons
+      if (element.tagName === 'BUTTON' || element.getAttribute('role') === 'button') {
+        const ariaLabel = element.getAttribute('aria-label');
+        if (ariaLabel?.match(/next|prev|first|last/i)) {
+          paginationButtons.push({
+            label: ariaLabel,
+            icon: element.querySelector('svg, i')?.tagName || null,
+            classes: Array.from(element.classList),
+          });
         }
       }
     });
@@ -84,7 +113,7 @@ async function collectDomSignals(
       root.querySelectorAll('tr').length;
 
     // aria-rowcount / aria-colcount on grid root
-    const gridEl = root.querySelector('[role="grid"]') ?? root.querySelector('[role="treegrid"]');
+    const gridEl = (root.querySelector('[role="grid"]') ?? root.querySelector('[role="treegrid"]')) as HTMLElement | null;
     const ariaRowCount = gridEl
       ? parseInt(gridEl.getAttribute('aria-rowcount') ?? '', 10) || null
       : null;
@@ -102,6 +131,12 @@ async function collectDomSignals(
       visibleRowCount: rowCount,
       ariaRowCount,
       ariaColCount,
+      styles: {
+        transform: [...styles.transform],
+        display: [...styles.display],
+      },
+      paginationTexts,
+      paginationButtons,
     };
   }, tableSelector);
 }
@@ -181,17 +216,25 @@ export async function inspectTable(
       hasGlideInput: rawSignals.hasGlideInput,
       hasGlideClass: rawSignals.hasGlideClass,
       visibleRowCount: rawSignals.visibleRowCount,
-
       ariaRowCount: rawSignals.ariaRowCount,
       ariaColCount: rawSignals.ariaColCount,
+      styles: rawSignals.styles,
+      paginationTexts: rawSignals.paginationTexts,
+      paginationButtons: rawSignals.paginationButtons,
     };
 
     const preset = detectPreset(signals);
+    const virtualization = detectVirtualization(signals);
+    const pagination = detectPagination(signals);
 
     return {
       preset,
-      ...stubFindings(),
+      virtualization,
+      pagination,
+      loading: stubFindings().loading,
+      selectorCandidates: stubFindings().selectorCandidates,
     };
+
   } finally {
     await closeBrowser(launched);
   }

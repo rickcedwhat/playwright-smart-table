@@ -18,6 +18,12 @@ export default defineConfig({
     title: "Playwright Smart Table",
     description: "Production-ready table testing for Playwright",
     base: '/playwright-smart-table/',
+    markdown: {
+        theme: {
+            light: 'material-theme-palenight',
+            dark: 'material-theme-palenight'
+        }
+    },
     themeConfig: {
         nav: [
             { text: 'Guide', link: '/guide/getting-started' },
