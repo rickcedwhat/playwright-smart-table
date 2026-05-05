@@ -1,10 +1,11 @@
-import { z } from 'zod';
-import { InspectTableInputSchema, inspectTable } from './inspectTable.js';
+import { getInspectTableInputSchema, inspectTable } from './inspectTable.js';
 import { generateConfig } from './generateConfig.js';
 
-export const InspectAndGenerateInputSchema = InspectTableInputSchema;
+export const getInspectAndGenerateInputSchema = getInspectTableInputSchema;
 
-export async function inspectAndGenerate(input: z.infer<typeof InspectAndGenerateInputSchema>): Promise<string> {
+
+export async function inspectAndGenerate(input: any): Promise<string> {
+
   // 1. Run the inspection
   const findings = await inspectTable(input);
   
