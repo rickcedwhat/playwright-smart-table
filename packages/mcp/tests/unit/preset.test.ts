@@ -20,9 +20,11 @@ function makeSignals(overrides: Partial<{
     hasGlideInput: overrides.hasGlideInput ?? false,
     hasGlideClass: overrides.hasGlideClass ?? false,
     visibleRowCount: 0,
-
     ariaRowCount: null,
     ariaColCount: null,
+    styles: { transform: [], display: [] },
+    paginationTexts: [],
+    paginationButtons: [],
   };
 }
 

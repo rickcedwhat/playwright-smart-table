@@ -1,6 +1,10 @@
 import { z } from 'zod';
 import type { InspectTableFindings } from '../types.js';
 
+function escapeSingleQuoted(s: string): string {
+  return s.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
 export const GenerateConfigInputSchema = z.object({
   findings: z.any(), // Type checked manually inside
 });
@@ -37,9 +41,9 @@ export async function generateConfig(input: GenerateConfigInput): Promise<string
     const rowSelector = selectors.row[0]?.selector || 'tr';
     const cellSelector = selectors.cell[0]?.selector || 'td';
     const headerSelector = selectors.header[0]?.selector || 'th';
-    configLines.push(`    rowSelector: '${rowSelector}',`);
-    configLines.push(`    cellSelector: '${cellSelector}',`);
-    configLines.push(`    headerSelector: '${headerSelector}',`);
+    configLines.push(`    rowSelector: '${escapeSingleQuoted(rowSelector)}',`);
+    configLines.push(`    cellSelector: '${escapeSingleQuoted(cellSelector)}',`);
+    configLines.push(`    headerSelector: '${escapeSingleQuoted(headerSelector)}',`);
   }
 
   // 3. Pagination Strategy
@@ -49,8 +53,8 @@ export async function generateConfig(input: GenerateConfigInput): Promise<string
     if (next || prev) {
       configLines.push(`    strategies: {`);
       configLines.push(`        pagination: Strategies.pagination.click({`);
-      if (next) configLines.push(`            next: '${next}',`);
-      if (prev) configLines.push(`            previous: '${prev}',`);
+      if (next) configLines.push(`            next: '${escapeSingleQuoted(next)}',`);
+      if (prev) configLines.push(`            previous: '${escapeSingleQuoted(prev)}',`);
       configLines.push(`        }),`);
       configLines.push(`    },`);
     }

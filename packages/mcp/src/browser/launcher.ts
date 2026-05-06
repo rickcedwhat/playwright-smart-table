@@ -9,11 +9,17 @@ export interface LaunchedBrowser {
  * Launches a Playwright Chromium browser and returns the browser + context.
  * Headless by default; pass { headless: false } for interactive auth mode.
  */
-export async function launchBrowser(options: { headless?: boolean } = {}): Promise<LaunchedBrowser> {
+export async function launchBrowser(options: { headless?: boolean; storageStatePath?: string } = {}): Promise<LaunchedBrowser> {
   const { chromium } = await import('@playwright/test');
   const browser = await chromium.launch({ headless: options.headless ?? true });
-  const context = await browser.newContext();
-  return { browser, context };
+  try {
+    const contextOptions = options.storageStatePath ? { storageState: options.storageStatePath } : {};
+    const context = await browser.newContext(contextOptions);
+    return { browser, context };
+  } catch (err) {
+    await browser.close().catch(() => undefined);
+    throw err;
+  }
 }
 
 /**

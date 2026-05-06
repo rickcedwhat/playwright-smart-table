@@ -114,7 +114,6 @@ function registerTools(server: McpServer, models: string[], lastState: any) {
 
 async function main() {
   const models = await fetchGitHubModels();
-  const lastState = getLastState();
   const isSse = process.argv.includes('--sse');
 
   if (isSse) {
@@ -128,13 +127,13 @@ async function main() {
 
     app.get('/sse', async (req, res) => {
       console.error('New SSE connection request');
-      
+
       // Create a fresh server instance for this session
       const server = new McpServer({
         name: 'playwright-smart-table-inspector',
         version: '0.1.0',
       });
-      registerTools(server, models, lastState);
+      registerTools(server, models, getLastState());
 
       const transport = new SSEServerTransport('/message', res);
       activeTransports.push(transport);
