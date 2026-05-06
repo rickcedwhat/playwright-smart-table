@@ -34,4 +34,7 @@ async function run() {
   await browser.close();
 }
 
-run();
+run().catch((err) => {
+  console.error('dump_glide failed:', err);
+  process.exit(1);
+});
