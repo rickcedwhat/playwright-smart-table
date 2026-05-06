@@ -1,0 +1,16 @@
+# CodeRabbit configuration
+# https://docs.coderabbit.ai/guides/configure-coderabbit
+
+reviews:
+  # Skip automatic review on Dependabot PRs — trigger manually with
+  # `@coderabbitai review` if you want a review before merging.
+  ignore_title_keywords:
+    - "chore(deps)"
+    - "chore(deps-dev)"
+  auto_review:
+    ignore_title_keywords:
+      - "chore(deps)"
+      - "chore(deps-dev)"
+    # Also match the standard Dependabot branch prefix
+    ignore_author:
+      - "dependabot[bot]"
