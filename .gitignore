@@ -46,3 +46,6 @@ playground/pst-unpack/
 
 # External (non-library) e2e tests — not part of CI, contain auth state
 /tests-external/
+
+# MCP runtime state (written by saveLastState; use .mcp-state.json.example for defaults)
+packages/mcp/.mcp-state.json

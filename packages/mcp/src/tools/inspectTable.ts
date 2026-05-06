@@ -301,7 +301,10 @@ export async function inspectTable(
     );
   }
 
-  const launched = await launchBrowser({ headless: true });
+  const launched = await launchBrowser({
+    headless: true,
+    storageStatePath: input.options?.authMode === 'storageState' ? input.options.storageStatePath : undefined,
+  });
   try {
     const page = await launched.context.newPage();
     await page.goto(url, { waitUntil: 'networkidle' });
@@ -363,11 +366,10 @@ export async function inspectTable(
       if (findings.snapshot) {
         findings.snapshot = findings.snapshot.slice(0, 500) + '... [TRUNCATED]';
       }
-      // Remove signals to keep it mini
-      (findings.preset as any).signals = undefined;
-      (findings.virtualization.rows as any).signals = undefined;
-      (findings.virtualization.columns as any).signals = undefined;
-      (findings.pagination as any).signals = undefined;
+      findings.preset.signals = [];
+      findings.virtualization.rows.signals = [];
+      findings.virtualization.columns.signals = [];
+      findings.pagination.signals = [];
     }
 
     findings.metadata = {

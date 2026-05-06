@@ -12,6 +12,15 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // --- Components ---
 
 function CodeBlock({ code, label }: { code: string; label?: string }) {
@@ -31,7 +40,7 @@ function CodeBlock({ code, label }: { code: string; label?: string }) {
         });
         setHtml(h);
       } catch (err) {
-        setHtml(`<pre>${code}</pre>`);
+        setHtml(`<pre>${escapeHtml(code)}</pre>`);
       }
     }
     highlight();
