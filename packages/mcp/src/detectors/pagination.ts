@@ -1,9 +1,13 @@
 import type { DomSignals, PaginationFindings, PaginationPrimitiveFindings } from '../types.js';
 
+function escapeAttrValue(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
 function findButton(signals: DomSignals, pattern: RegExp): PaginationPrimitiveFindings {
   const btn = signals.paginationButtons.find(b => b.label?.match(pattern));
-  if (btn) {
-    return { selector: `[aria-label="${btn.label}"]`, confidence: 0.9 };
+  if (btn && btn.label !== null) {
+    return { selector: `[aria-label="${escapeAttrValue(btn.label)}"]`, confidence: 0.9 };
   }
   return { selector: null, confidence: 0 };
 }

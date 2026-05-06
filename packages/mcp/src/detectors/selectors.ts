@@ -54,8 +54,10 @@ Limit to top 3 candidates for each.
     });
 
 
+    if (!response.choices?.length || !response.choices[0].message?.content) {
+      throw new Error(`LLM returned no choices (model=${model}, finish_reason=${response.choices?.[0]?.finish_reason ?? 'unknown'})`);
+    }
     const content = response.choices[0].message.content;
-    if (!content) throw new Error('Empty response from LLM');
 
     const result = JSON.parse(content);
     return {

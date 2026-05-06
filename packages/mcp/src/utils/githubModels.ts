@@ -5,6 +5,15 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const STATE_FILE = path.join(__dirname, '../../.mcp-state.json');
 
+interface GitHubModelItem {
+  id: string;
+  tags?: string[];
+}
+
+interface PersistedState {
+  [key: string]: unknown;
+}
+
 export async function fetchGitHubModels(): Promise<string[]> {
   const token = process.env.GITHUB_TOKEN;
   if (!token) {
@@ -22,10 +31,10 @@ export async function fetchGitHubModels(): Promise<string[]> {
 
     if (!response.ok) return ['gpt-4o', 'gpt-4o-mini', 'o1-preview', 'o1-mini'];
 
-    const data = await response.json() as any[];
+    const data = await response.json() as GitHubModelItem[];
     // Take reasoning, coding, and conversation models
     const models = data
-      .filter(m => 
+      .filter(m =>
         m.tags?.some((t: string) => ['conversation', 'reasoning', 'coding', 'summarization', 'logic'].includes(t.toLowerCase())) ||
         m.id.includes('gpt') || m.id.includes('llama') || m.id.includes('phi')
       )
@@ -40,20 +49,19 @@ export async function fetchGitHubModels(): Promise<string[]> {
   }
 }
 
-export function getLastState(): any {
+export function getLastState(): PersistedState {
   try {
     if (fs.existsSync(STATE_FILE)) {
-      return JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'));
+      return JSON.parse(fs.readFileSync(STATE_FILE, 'utf8')) as PersistedState;
     }
   } catch {}
   return {};
 }
 
-export function saveLastState(state: any) {
+export function saveLastState(state: PersistedState): void {
   try {
     // Only save serializable fields
     const toSave = { ...state };
     fs.writeFileSync(STATE_FILE, JSON.stringify(toSave, null, 2));
   } catch {}
 }
-
