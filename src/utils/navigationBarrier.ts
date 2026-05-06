@@ -12,6 +12,11 @@ export class NavigationBarrier {
     this.total = total;
   }
 
+  /** True when more than one row shares this barrier (scrollToRow would evict peers). */
+  isParallel(): boolean {
+    return this.total > 1;
+  }
+
   /**
    * Synchronize all active rows at a specific column index.
    * The last row to arrive will trigger the `moveAction`.

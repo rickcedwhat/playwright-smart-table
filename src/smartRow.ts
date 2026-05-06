@@ -125,8 +125,8 @@ const _navigateToCell = async (params: {
 
             // 2D scroll hazard: horizontal scroll may evict the target row from the DOM.
             // scrollToRow moves the viewport to one specific row, which would evict every
-            // other row in the same barrier batch — only safe in sequential (no-barrier) mode.
-            if (!barrier && viewport.scrollToRow && viewport.getVisibleRowRange) {
+            // other row in a parallel batch — safe only when there are no peers to evict.
+            if ((!barrier || !barrier.isParallel()) && viewport.scrollToRow && viewport.getVisibleRowRange) {
                 const rowRange = await viewport.getVisibleRowRange(context);
                 const rowOutOfView = rowRange && (rowIndex < rowRange.first || rowIndex > rowRange.last);
                 if (rowOutOfView) {
