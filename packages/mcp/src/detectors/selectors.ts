@@ -4,12 +4,11 @@ import type { DomSignals, InspectTableFindings, SelectorCandidates } from '../ty
 const MAX_SNAPSHOT_LENGTH = 15000;
 
 function sanitizeSnapshot(raw: string): string {
+  // generateDomSnapshot() already excludes script/style/svg/noscript/link elements,
+  // so no selective HTML stripping is needed here (and partial regex stripping is
+  // bypassable — CodeQL CWE-116). Enforce a hard length cap and collapse whitespace
+  // to bound token usage; the system message anchors the LLM instructions.
   return raw
-    // Remove HTML comments (common injection vector)
-    .replace(/<!--[\s\S]*?-->/g, '')
-    // Remove any residual <script> or <style> blocks
-    .replace(/<(script|style)[^>]*>[\s\S]*?<\/\1>/gi, '')
-    // Collapse runs of whitespace to a single space
     .replace(/\s{2,}/g, ' ')
     .trim()
     .slice(0, MAX_SNAPSHOT_LENGTH);
