@@ -11,9 +11,15 @@ export interface LaunchedBrowser {
  */
 export async function launchBrowser(options: { headless?: boolean; storageStatePath?: string } = {}): Promise<LaunchedBrowser> {
   const { chromium } = await import('@playwright/test');
-  const browser = await chromium.launch({ headless: options.headless ?? true });
+  const browser = await chromium.launch({ 
+    headless: options.headless ?? true,
+    args: options.headless ? [] : ['--start-maximized']
+  });
   try {
-    const contextOptions = options.storageStatePath ? { storageState: options.storageStatePath } : {};
+    const contextOptions = {
+      ...(options.storageStatePath ? { storageState: options.storageStatePath } : {}),
+      viewport: null, // Critical: Allows window to control viewport size
+    };
     const context = await browser.newContext(contextOptions);
     return { browser, context };
   } catch (err) {

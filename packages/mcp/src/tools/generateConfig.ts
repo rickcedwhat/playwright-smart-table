@@ -36,6 +36,15 @@ export async function generateConfig(input: GenerateConfigInput): Promise<string
     if (rootSignal) {
       rootSelector = rootSignal.split(' ')[0].replace(' ✓', '').replace(' ✗', '');
     }
+
+    // Add suggested selectors as comments for customisation
+    const rowSelector = selectors.row[0]?.selector;
+    const cellSelector = selectors.cell[0]?.selector;
+    if (rowSelector || cellSelector) {
+      configLines.push(`\n    // Custom overrides (detected):`);
+      if (rowSelector) configLines.push(`    // rowSelector: '${escapeSingleQuoted(rowSelector)}',`);
+      if (cellSelector) configLines.push(`    // cellSelector: '${escapeSingleQuoted(cellSelector)}',`);
+    }
   } else {
     // 2. Manual Selectors (only if no preset)
     const rowSelector = selectors.row[0]?.selector || 'tr';
@@ -46,32 +55,54 @@ export async function generateConfig(input: GenerateConfigInput): Promise<string
     configLines.push(`    headerSelector: '${escapeSingleQuoted(headerSelector)}',`);
   }
 
-  // 3. Pagination Strategy
-  if (pagination.type.value === 'buttons' && !presetValue) {
-    const next = pagination.primitives.goNext.selector;
-    const prev = pagination.primitives.goPrevious.selector;
-    if (next || prev) {
-      configLines.push(`    strategies: {`);
-      configLines.push(`        pagination: Strategies.pagination.click({`);
-      if (next) configLines.push(`            next: '${escapeSingleQuoted(next)}',`);
-      if (prev) configLines.push(`            previous: '${escapeSingleQuoted(prev)}',`);
-      configLines.push(`        }),`);
-      configLines.push(`    },`);
+  // 3. Virtualization Config
+  if (virtualization.rows.detected || virtualization.columns.detected) {
+    configLines.push(`\n    // Optimized for virtualization`);
+    configLines.push(`    rowVirtualization: ${virtualization.rows.detected},`);
+    if (virtualization.columns.detected) {
+      configLines.push(`    columnVirtualization: true,`);
     }
   }
+
+  // 4. Pagination Strategy
+  const manual = findings.manualOverrides || {};
+  if (manual.table) rootSelector = manual.table;
+
+  const next = manual.goNext || (pagination.type.value === 'buttons' ? pagination.primitives.goNext.selector : null);
+  const prev = manual.goPrevious || (pagination.type.value === 'buttons' ? pagination.primitives.goPrevious.selector : null);
+  const last = manual.goToLast || (pagination.type.value === 'buttons' ? pagination.primitives.goToLast.selector : null);
+  const first = manual.goToFirst || (pagination.type.value === 'buttons' ? pagination.primitives.goToFirst.selector : null);
+
+  if ((next || prev || last || first) && !presetValue) {
+    configLines.push(`\n    strategies: {`);
+    configLines.push(`        pagination: Strategies.pagination.click({`);
+    if (next) configLines.push(`            next: '${escapeSingleQuoted(next)}',`);
+    if (prev) configLines.push(`            previous: '${escapeSingleQuoted(prev)}',`);
+    if (last) configLines.push(`            last: '${escapeSingleQuoted(last)}',`);
+    if (first) configLines.push(`            first: '${escapeSingleQuoted(first)}',`);
+    configLines.push(`        }),`);
+    configLines.push(`    },`);
+  }
+
+  // 5. Build discovery insights comment
+  const insights: string[] = [];
+  if (findings.preset.value) insights.push(`- Identified as ${findings.preset.value} (${Math.round(findings.preset.confidence * 100)}% confidence)`);
+  if (findings.visibleRowCount) insights.push(`- Found ${findings.visibleRowCount} visible rows`);
+  if (findings.ariaRowCount) insights.push(`- aria-rowcount: ${findings.ariaRowCount}`);
+  if (virtualization.rows.detected) insights.push(`- Row virtualization detected`);
+  if (Object.keys(manual).length > 0) insights.push(`- Applied ${Object.keys(manual).length} manual selector overrides`);
+  
+  const insightBlock = insights.length > 0 
+    ? `\n  /**\n   * Discovery Insights:\n   * ${insights.join('\n   * ')}\n   */\n` 
+    : '';
 
   const metadataComment = findings.metadata 
     ? `/** Generated in ${findings.metadata.generationTimeMs}ms via ${findings.metadata.model} */\n` 
     : '';
 
-
-  const virtualizationComment = `    // Virtualization detected: ${virtualization.rows.detected ? 'Rows (Yes)' : 'Rows (No)'}, ${virtualization.columns.detected ? 'Cols (Yes)' : 'Cols (No)'}`;
-
   const code = `${metadataComment}import { ${imports.join(', ')} } from 'playwright-smart-table';
 
-const table = useTable(page.locator('${rootSelector}'), {
-${configLines.join('\n')}
-${virtualizationComment}
+const table = useTable(page.locator('${rootSelector}'), {${insightBlock}${configLines.join('\n')}
 });
 
 // Example usage:
