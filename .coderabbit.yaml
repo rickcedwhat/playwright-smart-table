@@ -1,0 +1,10 @@
+# CodeRabbit configuration
+# https://docs.coderabbit.ai/guides/configure-coderabbit
+
+reviews:
+  auto_review:
+    # Skip automatic review on draft PRs and Dependabot PRs.
+    # Trigger manually with `@coderabbitai review` when ready.
+    drafts: false
+    ignore_usernames:
+      - "dependabot[bot]"
