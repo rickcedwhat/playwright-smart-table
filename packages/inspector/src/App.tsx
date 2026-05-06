@@ -163,6 +163,8 @@ export default function App() {
       const response = await client.callTool({
         name: selectedTool,
         arguments: params
+      }, {
+        timeout: 300000 // 5 minutes for interactive discovery
       });
       setResults(response.content as any[] || []);
     } catch (err) {
@@ -224,8 +226,11 @@ export default function App() {
                       <option value="">Select a common target...</option>
                       <option value="https://mui.com/x/react-data-grid/">MUI Data Grid</option>
                       <option value="https://ant.design/components/table">Ant Design Table</option>
-                      <option value="https://www.ag-grid.com/example/">AG Grid</option>
+                      <option value="https://www.ag-grid.com/javascript-data-grid/grid-interface/">AG Grid</option>
                       <option value="https://glideapps.github.io/glide-data-grid/">Glide Data Grid</option>
+                      <option value="https://tanstack.com/table/v8/docs/framework/react/examples/basic">TanStack Table</option>
+                      <option value="https://mantine.dev/core/table/">Mantine Table</option>
+                      <option value="https://adazzle.github.io/react-data-grid/">React Data Grid</option>
                     </select>
                     <input 
                       type="text"
@@ -239,6 +244,33 @@ export default function App() {
 
                 {/* Dynamically render some common params for brevity in this MVP */}
                 <div className="space-y-3">
+                  <div className="flex items-center justify-between p-2 rounded-lg bg-slate-950/30 border border-slate-800/50">
+                    <label className="text-[11px] text-slate-400">Headless Mode</label>
+                    <input 
+                      type="checkbox" 
+                      checked={params.options?.headless !== false}
+                      onChange={(e) => handleParamChange('options', { ...params.options, headless: e.target.checked })}
+                      className="w-4 h-4 rounded border-slate-700 bg-slate-800 text-blue-600 focus:ring-blue-500/50"
+                    />
+                  </div>
+
+                  <div className={cn(
+                    "flex items-center justify-between p-2 rounded-lg border transition-all",
+                    params.options?.interactive ? "bg-blue-600/10 border-blue-500/30" : "bg-slate-950/30 border-slate-800/50"
+                  )}>
+                    <div className="flex flex-col">
+                      <label className="text-[11px] text-slate-400">Interactive Picker</label>
+                      <span className="text-[9px] text-slate-600">Click to select table</span>
+                    </div>
+                    <input 
+                      type="checkbox" 
+                      disabled={params.options?.headless !== false}
+                      checked={params.options?.interactive || false}
+                      onChange={(e) => handleParamChange('options', { ...params.options, interactive: e.target.checked })}
+                      className="w-4 h-4 rounded border-slate-700 bg-slate-800 text-blue-600 focus:ring-blue-500/50 disabled:opacity-30"
+                    />
+                  </div>
+
                   <div>
                     <label className="text-[11px] text-slate-400 mb-1.5 block">Primary Model</label>
                     <select 
@@ -263,7 +295,10 @@ export default function App() {
                     <div className="animate-in slide-in-from-top-2 duration-300">
                       <div className="flex items-center justify-between mb-1.5">
                         <label className="text-[11px] text-slate-400 block">Comparison Model</label>
-                        <button onClick={() => setShowModel2(false)} className="text-[10px] text-slate-600 hover:text-slate-400">Remove</button>
+                        <button onClick={() => {
+                          setShowModel2(false);
+                          handleParamChange('options', { ...params.options, model2: undefined });
+                        }} className="text-[10px] text-slate-600 hover:text-slate-400">Remove</button>
                       </div>
                       <select 
                         className="w-full bg-slate-950/50 border border-slate-800 rounded-md px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500/50 transition-all text-slate-200"

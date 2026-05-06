@@ -79,6 +79,18 @@ export interface InspectTableFindings {
   pagination: PaginationFindings;
   loading: LoadingFindings;
   selectorCandidates: SelectorCandidates;
+  /** Manually selected selectors from Guided Discovery */
+  manualOverrides?: {
+    table?: string;
+    goNext?: string;
+    goPrevious?: string;
+    goToLast?: string;
+    goToFirst?: string;
+  };
+  /** Total visible row count (best guess from heuristics) */
+  visibleRowCount?: number;
+  /** aria-rowcount value on the grid root, if present */
+  ariaRowCount?: number | null;
   /** Cleaned DOM fragment for LLM analysis */
   snapshot?: string;
   /** Internal metrics and debug info */
