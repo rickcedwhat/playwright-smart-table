@@ -5,7 +5,7 @@ Short answers for the problems new users tend to hit first.
 
 ## Do I need to call `init()` every time?
 
-No. Call `init()` before synchronous current-page methods such as `getRow()`, `getRowByIndex()`, and `getHeaders()`.
+No. Call `init()` before synchronous current-page methods such as `getRow()` and `getRowByIndex()`.
 
 ```typescript
 const table = useTable(page.locator('#orders'));
