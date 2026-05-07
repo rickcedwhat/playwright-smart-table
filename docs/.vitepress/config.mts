@@ -27,7 +27,7 @@ export default defineConfig({
             { text: 'Examples', link: '/examples/' },
             { text: 'Recipes', link: '/recipes/' },
             { text: 'Advanced', link: '/advanced/' },
-            { text: 'Help', link: '/troubleshooting' }
+            { text: 'Help', link: '/faq' }
         ],
 
         sidebar: {
@@ -186,10 +186,20 @@ export default defineConfig({
             ],
             '/PRESET_DEVELOPMENT': presetSidebar,
             '/PRESET_TEMPLATE': presetSidebar,
+            '/faq': [
+                {
+                    text: 'Help',
+                    items: [
+                        { text: 'FAQ', link: '/faq' },
+                        { text: 'Troubleshooting', link: '/troubleshooting' }
+                    ]
+                }
+            ],
             '/troubleshooting': [
                 {
                     text: 'Help',
                     items: [
+                        { text: 'FAQ', link: '/faq' },
                         { text: 'Troubleshooting', link: '/troubleshooting' }
                     ]
                 }
