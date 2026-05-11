@@ -49,7 +49,7 @@ export async function runMap<T, R>(
   const defaultMode = label === 'map' ? 'parallel' : 'sequential';
   const concurrency =
     options.concurrency ?? env.config.concurrency ?? defaultMode;
-  const useBarrier = concurrency !== 'sequential';
+  const useBarrier = concurrency === 'synchronized';
   // Mutex must not pair with the navigation barrier: synchronized mode needs every row
   // to enter barrier.sync concurrently; serializing callbacks here deadlocks (first row waits
   // for batchSize peers that never reach the barrier).
