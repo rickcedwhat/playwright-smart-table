@@ -10,33 +10,6 @@ pageClass: table-anatomy-doc
 
 Interactive rough drafts for docs and UX. Polished teaching pages live under [Concepts](/concepts/table-anatomy).
 
-## Method walkthrough <LabFeedbackMark slug="method-walkthrough" label="Method walkthrough widget" />
-
-<LabMethodWalkthrough />
-
-**Reference flow:** <LabFeedbackMark slug="method-mermaid" label="Mermaid reference diagram" />
-
-```mermaid
-flowchart LR
-  visible[Row on screen?]
-  getRow[getRow]
-  findRow[findRow + maxPages]
-  findRows[findRows]
-  iterate[map / forEach]
-  visible -->|yes| getRow
-  visible -->|no, one match| findRow
-  visible -->|no, many matches| findRows
-  visible -->|all rows| iterate
-```
-
-## Strategy picker <LabFeedbackMark slug="strategy-picker" label="Strategy picker" />
-
-<LabStrategyPicker />
-
-## Debug playback (sample logs) <LabFeedbackMark slug="debug-playback" label="Debug playback" />
-
-<LabDebugPlayback />
-
 ## Pagination sandbox <LabFeedbackMark slug="pagination-sandbox" label="Pagination sandbox" />
 
 Switch between pagination types. Toggle selectors on/off — disabled buttons go dark in the mock UI and drop out of the generated config. The library page counter updates as you navigate.
@@ -50,6 +23,8 @@ Switch between pagination types. Toggle selectors on/off — disabled buttons go
 ## forEach trace (animated) <LabFeedbackMark slug="foreach-trace" label="forEach trace animation" />
 
 <LabForEachTrace />
+
+> Want to see how parallel and synchronized modes change this pattern? See [Concurrency modes](#concurrency-modes) below.
 
 ## Live query builder <LabFeedbackMark slug="query-builder" label="Live query builder" />
 
@@ -71,13 +46,53 @@ Pick a question. Shuffle the columns. Brittle index-based code reads from the wr
 
 <LabFindRowPaginationDebug />
 
-## Failure states <LabFeedbackMark slug="failure-states" label="Failure states" />
+## Concurrency modes <LabFeedbackMark slug="concurrency-modes" label="Concurrency modes animator" />
 
-<LabFailureStates />
+Run the same 3-page `forEach` in each concurrency mode and watch how the row callbacks are scheduled. The elapsed time badge shows the relative cost of each approach. Use the speed picker to see the difference clearly or simulate realistic timing.
 
-## Table type gallery <LabFeedbackMark slug="table-gallery" label="Table type gallery" />
+<LabConcurrencyAnimator />
 
-<LabTableTypeGallery />
+## Inline components <LabFeedbackMark slug="inline-components" label="Inline components demo" />
+
+### MethodBadge
+
+Inline async/sync pill for use next to method names in API docs.
+
+`getRow()` <MethodBadge type="sync" /> returns the first matching row from the current page without paginating.
+
+`findRow()` <MethodBadge type="async" /> paginates until a match is found or `maxPages` is exhausted.
+
+`findRows()` <MethodBadge type="async" /> collects all matching rows across pages.
+
+`init()` <MethodBadge type="async" /> resolves headers and populates the column map.
+
+### ConfigSwatch
+
+Collapsible config block for embedding ready-to-use configs inline in example pages.
+
+<ConfigSwatch label="MUI DataGrid — viewport preset" :code="`const table = useTable(page.locator('.MuiDataGrid-root'), {
+  strategies: {
+    viewport: Strategies.Viewport.dataAttribute({ attribute: 'data-rowindex' })
+  }
+})`" />
+
+<ConfigSwatch label="AG Grid — custom selectors" :code="`const table = useTable(page.locator('.ag-root'), {
+  headerSelector: '.ag-header-cell-text',
+  rowSelector: '.ag-row',
+  cellSelector: '.ag-cell'
+})`" />
+
+<ConfigSwatch label="Click pagination with bulk nav" :code="`const table = useTable(locator, {
+  strategies: {
+    pagination: Strategies.Pagination.click({
+      next:  () => page.getByRole('button', { name: 'Next' }),
+      prev:  () => page.getByRole('button', { name: 'Prev' }),
+      first: () => page.getByRole('button', { name: 'First' }),
+      last:  () => page.getByRole('button', { name: 'Last' }),
+    })
+  },
+  maxPages: 20
+})`" />
 
 ## Existing interactives <LabFeedbackMark slug="links-concepts" label="Links to Concepts pages" />
 
