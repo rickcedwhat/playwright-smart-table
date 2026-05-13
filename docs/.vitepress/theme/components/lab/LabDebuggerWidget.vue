@@ -157,11 +157,11 @@ onUnmounted(() => {
 })
 
 // ---
-const advanceIcon = computed(() => !hasStarted.value ? '▶' : isDone.value ? '✓' : '⏭')
-const advanceLabel = computed(() => !hasStarted.value ? 'Play' : isDone.value ? 'Playback complete' : `Run line ${nextLine.value + 1}`)
+const advanceIcon = computed(() => !hasStarted.value ? '▶' : isDone.value ? '↺' : '⏭')
+const advanceLabel = computed(() => !hasStarted.value ? 'Play' : isDone.value ? 'Replay' : `Run line ${nextLine.value + 1}`)
 
 function stepLine() {
-  if (isDone.value) return
+  if (isDone.value) { resetDebugger(); return }
   if (!executedSet.value.has(nextLine.value)) executed.value = [...executed.value, nextLine.value]
   nextLine.value += 1
 }
@@ -179,11 +179,8 @@ function cellClass(rowIndex: number, header: string): string {
     <div class="dbg-head">
       <strong>{{ title ?? 'Debugger widget' }}</strong>
       <div class="dbg-inline-actions">
-        <button type="button" class="dbg-icon-btn dbg-icon-btn--play" @click="stepLine" :disabled="isDone" :aria-label="advanceLabel" :title="advanceLabel">
+        <button type="button" class="dbg-icon-btn dbg-icon-btn--play" @click="stepLine" :aria-label="advanceLabel" :title="advanceLabel">
           <span aria-hidden="true">{{ advanceIcon }}</span>
-        </button>
-        <button type="button" class="dbg-icon-btn" @click="resetDebugger" aria-label="Reset playback" title="Reset playback">
-          <span aria-hidden="true">↺</span>
         </button>
       </div>
     </div>
