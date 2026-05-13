@@ -597,7 +597,7 @@ export interface TableResult<T = any> extends AsyncIterable<{ row: SmartRow<T>; 
    * Initializes the table by resolving headers. Must be called before using sync methods.
    * @param options Optional timeout for header resolution (default: 3000ms)
    */
-  init(options?: { timeout?: number }): Promise<TableResult>;
+  init(options?: { timeout?: number }): Promise<TableResult<T>>;
 
   /**
    * SYNC: Checks if the table has been initialized.
@@ -617,7 +617,7 @@ export interface TableResult<T = any> extends AsyncIterable<{ row: SmartRow<T>; 
   getRow: (
     filters: Record<string, FilterValue>,
     options?: { exact?: boolean }
-  ) => SmartRow;
+  ) => SmartRow<T>;
 
   /**
    * Gets a row by 0-based index on the current page.
@@ -626,7 +626,7 @@ export interface TableResult<T = any> extends AsyncIterable<{ row: SmartRow<T>; 
    */
   getRowByIndex: (
     index: number
-  ) => SmartRow;
+  ) => SmartRow<T>;
 
   /**
    * ASYNC: Searches for a single row across pages using pagination.
@@ -637,7 +637,7 @@ export interface TableResult<T = any> extends AsyncIterable<{ row: SmartRow<T>; 
   findRow: (
     filters: Record<string, FilterValue>,
     options?: { exact?: boolean, maxPages?: number }
-  ) => Promise<SmartRow>;
+  ) => Promise<SmartRow<T>>;
 
   /**
    * ASYNC: Searches for all matching rows across pages using pagination.
