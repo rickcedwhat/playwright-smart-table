@@ -1,0 +1,72 @@
+# Dependabot PRs: required status check — blocks merge until all bumped npm
+# packages have been published for at least 7 days.
+# Add "Dependabot npm package age (≥ 7 days)" to branch protection required checks.
+name: "Dependabot npm package age (≥ 7 days)"
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize]
+
+jobs:
+  age-check:
+    runs-on: ubuntu-latest
+    if: github.actor == 'dependabot[bot]'
+    steps:
+      - name: Verify npm packages are ≥ 7 days old
+        uses: actions/github-script@v9
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pr = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+            });
+            const body = pr.data.body || '';
+            const MIN_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+            const now = Date.now();
+            // Matches: Updates `<pkg>` from X.Y.Z to A.B.C
+            const updateRegex = /Updates\s+`([^`]+)`\s+from\s+[\d][^\s]*\s+to\s+([\d][^\s]*)/ig;
+            let m;
+            const tooYoung = [];
+
+            while ((m = updateRegex.exec(body)) !== null) {
+              const pkg = m[1];
+              const version = m[2];
+              const encoded = pkg.startsWith('@') ? pkg.replace('/', '%2F') : pkg;
+              const url = `https://registry.npmjs.org/${encoded}`;
+
+              let data;
+              try {
+                const response = await fetch(url);
+                if (!response.ok) {
+                  core.setFailed(`Failed to fetch npm metadata for ${pkg}: HTTP ${response.status}`);
+                  return;
+                }
+                data = await response.json();
+              } catch (err) {
+                core.setFailed(`Network error fetching npm metadata for ${pkg}: ${err.message}`);
+                return;
+              }
+
+              const publishedAt = data.time?.[version];
+              if (!publishedAt) {
+                core.setFailed(`No publish timestamp found for ${pkg}@${version} on npm`);
+                return;
+              }
+
+              const ageMs = now - new Date(publishedAt).getTime();
+              const ageDays = (ageMs / (24 * 60 * 60 * 1000)).toFixed(1);
+              if (ageMs < MIN_AGE_MS) {
+                tooYoung.push(`${pkg}@${version} (published ${ageDays} days ago)`);
+              } else {
+                core.info(`✓ ${pkg}@${version} is ${ageDays} days old`);
+              }
+            }
+
+            if (tooYoung.length > 0) {
+              core.setFailed(
+                `The following packages are less than 7 days old on npm — waiting for the soak period:\n` +
+                tooYoung.map(p => `  • ${p}`).join('\n')
+              );
+            }
