@@ -10,7 +10,7 @@ on:
 jobs:
   age-check:
     runs-on: ubuntu-latest
-    if: github.actor == 'dependabot[bot]'
+    if: github.actor == 'dependabot[bot]' || github.triggering_actor == 'dependabot[bot]'
     steps:
       - name: Verify npm packages are ≥ 7 days old
         uses: actions/github-script@v9
