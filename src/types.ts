@@ -556,6 +556,8 @@ export type RowIterationContext<T = any> = {
   rowIndex: number;
   /** 0-based iteration counter — the order this row was visited, not its DOM position or grid identity. */
   index: number;
+  /** 0-based page index — which page this row was collected from. */
+  pageIndex: number;
   stop: () => void;
 };
 
@@ -586,7 +588,7 @@ export type RowIterationOptions = {
   useBulkPagination?: boolean;
 };
 
-export interface TableResult<T = any> extends AsyncIterable<{ row: SmartRow<T>; rowIndex: number; index: number }> {
+export interface TableResult<T = any> extends AsyncIterable<{ row: SmartRow<T>; rowIndex: number; index: number; pageIndex: number }> {
   /**
    * Represents the current page index of the table's DOM.
    * Starts at 0. Automatically maintained by the library during pagination and bringIntoView.
