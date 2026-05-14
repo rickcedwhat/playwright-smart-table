@@ -126,6 +126,7 @@ function makeEnv(
     createSmartRowArray: (arr: any[]) => arr as any,
     config,
     getPage: () => ({ evaluate: async () => { } } as any),
+    getCurrentPageIndex: () => 0,
   };
 }
 

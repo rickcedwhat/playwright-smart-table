@@ -452,7 +452,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
           const barrier = new NavigationBarrier(newIndices.length);
 
           for (const idx of newIndices) {
-            yield { row: _makeSmart(pageRows[idx], map, rowIndex, pagesScanned - 1, barrier), index: rowIndex, rowIndex, pageIndex: pagesScanned - 1 };
+            yield { row: _makeSmart(pageRows[idx], map, rowIndex, tableState.currentPageIndex, barrier), index: rowIndex, rowIndex, pageIndex: tableState.currentPageIndex };
             rowIndex++;
           }
 
@@ -479,6 +479,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
           createSmartRowArray,
           config,
           getPage: () => rootLocator.page(),
+          getCurrentPageIndex: () => tableState.currentPageIndex,
         },
         callback,
         options
@@ -497,6 +498,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
           createSmartRowArray,
           config,
           getPage: () => rootLocator.page(),
+          getCurrentPageIndex: () => tableState.currentPageIndex,
         },
         callback,
         options
@@ -515,6 +517,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
           createSmartRowArray,
           config,
           getPage: () => rootLocator.page(),
+          getCurrentPageIndex: () => tableState.currentPageIndex,
         },
         predicate,
         options
