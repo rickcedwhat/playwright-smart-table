@@ -1,0 +1,30 @@
+name: Upstream Blocker Label Mutex
+
+# Keeps upstream-blocker:waiting and upstream-blocker:cleared mutually exclusive.
+# Applying either label automatically removes the other.
+
+on:
+  issues:
+    types: [labeled]
+
+jobs:
+  mutex:
+    name: Enforce label mutex
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+
+    steps:
+      - name: Remove :waiting when :cleared is applied
+        if: github.event.label.name == 'upstream-blocker:cleared'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE: ${{ github.event.issue.number }}
+        run: gh issue edit $ISSUE --remove-label "upstream-blocker:waiting" || true
+
+      - name: Remove :cleared when :waiting is applied
+        if: github.event.label.name == 'upstream-blocker:waiting'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ISSUE: ${{ github.event.issue.number }}
+        run: gh issue edit $ISSUE --remove-label "upstream-blocker:cleared" || true

@@ -1,0 +1,84 @@
+name: Upstream Blocker
+description: Track work that is blocked on an upstream dependency or external release
+title: "chore: <summary> (blocked on <dependency>)"
+labels: ["upstream-blocker:waiting"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template for work that can't proceed until an upstream dependency
+        ships a release. A weekly automated check will monitor the condition below
+        and swap the label to **upstream-blocker:cleared** once it is met.
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context
+      description: What is blocked and why?
+      placeholder: |
+        vitest 4.x requires vite >=6, but vitepress@1.x bundles vite@5 as a hard
+        dependency, causing a fatal peer conflict under pnpm strict resolution.
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-needs-to-happen
+    attributes:
+      label: What needs to happen
+      description: Ordered steps to unblock this work once the upstream condition is met.
+      placeholder: |
+        1. vitepress 2.0 stable ships
+        2. Merge the Dependabot PR for vitepress 2.0
+        3. Remove the vitest ignore rules in dependabot.yml
+    validations:
+      required: true
+
+  - type: input
+    id: blocked-pr
+    attributes:
+      label: Blocked PR (optional)
+      description: PR number that was closed or held because of this blocker.
+      placeholder: "116"
+
+  - type: markdown
+    attributes:
+      value: |
+        ---
+        ### Automated check configuration
+
+        The block below is parsed by the weekly upstream-blocker-check workflow.
+        **Do not remove it.** Fill in `package`, `condition`, and optionally
+        `blocked-pr` to wire up automatic detection.
+
+        Supported `type` values: `npm` (checks `dist-tags.latest` on npm).
+        `condition` format: `latest <semver-range>` e.g. `latest >= 2.0.0`.
+        The yaml block must be inside a `<details>` tag so it renders visibly
+        (collapsed by default) rather than being hidden as an HTML comment.
+
+  - type: textarea
+    id: upstream-check
+    attributes:
+      label: Upstream check block
+      description: Paste and fill in the block below exactly as shown — the workflow parses the yaml code block inside the details tag.
+      value: |
+        <details>
+        <summary>Automated upstream check</summary>
+
+        ```yaml
+        type: npm
+        package: <package-name>
+        condition: latest >= <version>
+        blocked-pr: <pr-number>
+        ```
+        </details>
+    validations:
+      required: true
+
+  - type: textarea
+    id: references
+    attributes:
+      label: References
+      description: Relevant links (upstream issue tracker, changelog, release page).
+      placeholder: |
+        - https://github.com/vuejs/vitepress/releases
