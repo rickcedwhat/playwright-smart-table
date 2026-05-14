@@ -10,7 +10,7 @@ on:
 jobs:
   age-check:
     runs-on: ubuntu-latest
-    if: github.actor == 'dependabot[bot]'
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
     steps:
       - name: Verify npm packages are ≥ 7 days old
         uses: actions/github-script@v9
@@ -29,8 +29,10 @@ jobs:
             const updateRegex = /Updates\s+`([^`]+)`\s+from\s+[\d][^\s]*\s+to\s+([\d][^\s]*)/ig;
             let m;
             const tooYoung = [];
+            let matchFound = false;
 
             while ((m = updateRegex.exec(body)) !== null) {
+              matchFound = true;
               const pkg = m[1];
               const version = m[2];
               const encoded = pkg.startsWith('@') ? pkg.replace('/', '%2F') : pkg;
@@ -62,6 +64,11 @@ jobs:
               } else {
                 core.info(`✓ ${pkg}@${version} is ${ageDays} days old`);
               }
+            }
+
+            if (!matchFound) {
+              core.setFailed('No package updates found in PR body — Dependabot format may have changed');
+              return;
             }
 
             if (tooYoung.length > 0) {

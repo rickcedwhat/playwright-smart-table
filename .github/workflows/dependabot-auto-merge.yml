@@ -9,7 +9,7 @@ on:
 jobs:
   enable-automerge:
     runs-on: ubuntu-latest
-    if: github.actor == 'dependabot[bot]'
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
     permissions:
       contents: write
       pull-requests: write
@@ -28,12 +28,17 @@ jobs:
             const body = pr.data.body || '';
             const regex = /from\s+([0-9]+)\.([0-9]+)\.([0-9]+)[^\n]*to\s+([0-9]+)\.([0-9]+)\.([0-9]+)/ig;
             let m;
+            let foundMatch = false;
             while ((m = regex.exec(body)) !== null) {
+              foundMatch = true;
               const fromMajor = parseInt(m[1], 10);
               const toMajor = parseInt(m[4], 10);
               if (toMajor > fromMajor) {
                 core.setFailed(`Contains a major version bump: ${m[0]}`);
               }
+            }
+            if (!foundMatch) {
+              core.setFailed('No version bump patterns found in PR body — Dependabot format may have changed');
             }
 
       - name: Enable auto-merge for Dependabot PR (squash)
