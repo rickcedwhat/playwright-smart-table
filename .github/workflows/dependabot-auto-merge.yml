@@ -37,9 +37,61 @@ jobs:
             }
             core.setOutput('ok', 'true');
 
+      - name: Check npm package publish age (≥ 7 days)
+        id: check-age
+        uses: actions/github-script@v9
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pr = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+            });
+            const body = pr.data.body || '';
+            const MIN_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+            const now = Date.now();
+            // Matches: Updates `<pkg>` from X.Y.Z to A.B.C
+            const updateRegex = /Updates\s+`([^`]+)`\s+from\s+[\d][^\s]*\s+to\s+([\d][^\s]*)/ig;
+            let m;
+            let tooYoung = [];
+            while ((m = updateRegex.exec(body)) !== null) {
+              const pkg = m[1];
+              const version = m[2];
+              const encoded = pkg.startsWith('@')
+                ? pkg.replace('/', '%2F')
+                : pkg;
+              const url = `https://registry.npmjs.org/${encoded}`;
+              const response = await fetch(url);
+              if (!response.ok) {
+                core.warning(`Could not fetch npm metadata for ${pkg}: HTTP ${response.status}`);
+                continue;
+              }
+              const data = await response.json();
+              const publishedAt = data.time?.[version];
+              if (!publishedAt) {
+                core.warning(`No publish timestamp found for ${pkg}@${version} — skipping age check`);
+                continue;
+              }
+              const ageMs = now - new Date(publishedAt).getTime();
+              const ageDays = (ageMs / (24 * 60 * 60 * 1000)).toFixed(1);
+              if (ageMs < MIN_AGE_MS) {
+                tooYoung.push(`${pkg}@${version} (published ${ageDays} days ago)`);
+              } else {
+                core.info(`✓ ${pkg}@${version} is ${ageDays} days old`);
+              }
+            }
+            if (tooYoung.length > 0) {
+              core.setFailed(
+                `The following packages are less than 7 days old on npm — waiting for the soak period:\n` +
+                tooYoung.map(p => `  • ${p}`).join('\n')
+              );
+            }
+            core.setOutput('ok', 'true');
+
       - name: Enable auto-merge for Dependabot PR (squash)
         uses: peter-evans/enable-pull-request-automerge@v3
-        if: steps.check-major.outputs.ok == 'true'
+        if: steps.check-major.outputs.ok == 'true' && steps.check-age.outputs.ok == 'true'
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           pull-request-number: ${{ github.event.pull_request.number }}
