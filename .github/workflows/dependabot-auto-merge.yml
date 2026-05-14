@@ -35,11 +35,10 @@ jobs:
                 core.setFailed(`Contains a major version bump: ${m[0]}`);
               }
             }
-            core.setOutput('ok', 'true');
 
       - name: Enable auto-merge for Dependabot PR (squash)
         uses: peter-evans/enable-pull-request-automerge@v3
-        if: steps.check-major.outputs.ok == 'true'
+        if: steps.check-major.conclusion == 'success'
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           pull-request-number: ${{ github.event.pull_request.number }}
