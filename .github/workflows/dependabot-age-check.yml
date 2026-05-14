@@ -91,7 +91,7 @@ jobs:
                 body: `<!-- age-check-rebase-after: ${rebaseAfterISO} -->\n` +
                   `⏳ **npm soak period active** — one or more packages are less than 7 days old.\n\n` +
                   tooYoung.map(p => `- ${p}`).join('\n') + '\n\n' +
-                  `Safe to rebase on **${rebaseAfterISO}**. Run \`@dependabot rebase\` then.`,
+                  `Safe to merge after **${rebaseAfterISO}**. Trigger a Dependabot rebase then.`,
               });
 
               core.setFailed(
