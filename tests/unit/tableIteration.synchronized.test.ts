@@ -60,6 +60,7 @@ function makeBarrierEnv(rowCount: number): TableIterationEnv<any> {
     createSmartRowArray: (arr: any[]) => arr as any,
     config,
     getPage: () => ({}) as any,
+    getCurrentPageIndex: () => 0,
   };
 }
 

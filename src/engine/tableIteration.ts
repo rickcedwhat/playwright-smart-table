@@ -15,6 +15,7 @@ export interface TableIterationEnv<T = any> {
   createSmartRowArray: (rows: SmartRow<T>[]) => SmartRowArray<T>;
   config: FinalTableConfig<T>;
   getPage: () => Page;
+  getCurrentPageIndex: () => number;
 }
 
 function log(config: FinalTableConfig, msg: string) {
@@ -100,8 +101,8 @@ export async function runMap<T, R>(
         const barrier = useBarrier ? new NavigationBarrier(batchSize) : undefined;
         const actionMutex = useMutex ? new Mutex() : null;
         
-        const smartRows = newIndices.map((idx, i) => 
-          env.makeSmartRow(pageRows[idx], map, rowIndex + i, pagesScanned - 1, barrier)
+        const smartRows = newIndices.map((idx, i) =>
+          env.makeSmartRow(pageRows[idx], map, rowIndex + i, env.getCurrentPageIndex(), barrier)
         );
 
         const processRow = async (row: SmartRow<T>) => {
@@ -123,7 +124,7 @@ export async function runMap<T, R>(
             const runCallback = async () => {
               if (stopped && row.rowIndex! > stoppedIndex) return SKIP;
               log(env.config, `${label}: processing row ${row.rowIndex}`);
-              return await callback({ row, index: row.rowIndex!, rowIndex: row.rowIndex!, stop: () => stop(row.rowIndex!) });
+              return await callback({ row, index: row.rowIndex!, rowIndex: row.rowIndex!, pageIndex: env.getCurrentPageIndex(), stop: () => stop(row.rowIndex!) });
             };
 
             if (actionMutex) {
