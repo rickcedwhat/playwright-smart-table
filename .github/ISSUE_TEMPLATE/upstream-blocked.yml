@@ -52,20 +52,26 @@ body:
         `blocked-pr` to wire up automatic detection.
 
         Supported `type` values: `npm` (checks `dist-tags.latest` on npm).
-        `condition` format: `latest <semver-range>` e.g. `latest >= 2.0.0`
+        `condition` format: `latest <semver-range>` e.g. `latest >= 2.0.0`.
+        The yaml block must be inside a `<details>` tag so it renders visibly
+        (collapsed by default) rather than being hidden as an HTML comment.
 
   - type: textarea
     id: upstream-check
     attributes:
       label: Upstream check block
-      description: Paste and fill in the block below exactly as shown — the workflow parses it as-is.
+      description: Paste and fill in the block below exactly as shown — the workflow parses the yaml code block inside the details tag.
       value: |
-        <!-- upstream-check
+        <details>
+        <summary>Automated upstream check</summary>
+
+        ```yaml
         type: npm
         package: <package-name>
         condition: latest >= <version>
         blocked-pr: <pr-number>
-        -->
+        ```
+        </details>
     validations:
       required: true
 

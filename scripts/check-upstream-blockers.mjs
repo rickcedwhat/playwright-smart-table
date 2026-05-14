@@ -15,9 +15,9 @@ console.log(`Found ${issues.length} issue(s) with upstream-blocker:waiting`);
 for (const { number, title, body } of issues) {
   console.log(`\n── Issue #${number}: ${title}`);
 
-  const blockMatch = body.match(/<!--\s*upstream-check\s*([\s\S]*?)-->/);
+  const blockMatch = body.match(/```yaml\s*([\s\S]*?)```/);
   if (!blockMatch) {
-    console.log('  No upstream-check block found — skipping');
+    console.log('  No upstream-check yaml block found — skipping');
     continue;
   }
 
