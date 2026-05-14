@@ -11,6 +11,8 @@ jobs:
   age-check:
     runs-on: ubuntu-latest
     if: github.event.pull_request.user.login == 'dependabot[bot]'
+    permissions:
+      pull-requests: write
     steps:
       - name: Verify npm packages are ≥ 7 days old
         uses: actions/github-script@v9
@@ -30,6 +32,7 @@ jobs:
             let m;
             const tooYoung = [];
             let matchFound = false;
+            let latestPublish = 0;
 
             while ((m = updateRegex.exec(body)) !== null) {
               matchFound = true;
@@ -57,7 +60,10 @@ jobs:
                 return;
               }
 
-              const ageMs = now - new Date(publishedAt).getTime();
+              const publishedMs = new Date(publishedAt).getTime();
+              if (publishedMs > latestPublish) latestPublish = publishedMs;
+
+              const ageMs = now - publishedMs;
               const ageDays = (ageMs / (24 * 60 * 60 * 1000)).toFixed(1);
               if (ageMs < MIN_AGE_MS) {
                 tooYoung.push(`${pkg}@${version} (published ${ageDays} days ago)`);
@@ -72,8 +78,24 @@ jobs:
             }
 
             if (tooYoung.length > 0) {
+              const rebaseAfter = new Date(latestPublish + MIN_AGE_MS);
+              const rebaseAfterISO = rebaseAfter.toISOString().slice(0, 10);
+
+              // Post a comment with a machine-readable marker so a future cron job
+              // can find PRs that are ready to rebase and post "@dependabot rebase".
+              // Format: <!-- age-check-rebase-after: YYYY-MM-DD -->
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                body: `<!-- age-check-rebase-after: ${rebaseAfterISO} -->\n` +
+                  `⏳ **npm soak period active** — one or more packages are less than 7 days old.\n\n` +
+                  tooYoung.map(p => `- ${p}`).join('\n') + '\n\n' +
+                  `Safe to rebase on **${rebaseAfterISO}**. Run \`@dependabot rebase\` then.`,
+              });
+
               core.setFailed(
-                `The following packages are less than 7 days old on npm — waiting for the soak period:\n` +
+                `The following packages are less than 7 days old on npm — safe to rebase on ${rebaseAfterISO}:\n` +
                 tooYoung.map(p => `  • ${p}`).join('\n')
               );
             }
