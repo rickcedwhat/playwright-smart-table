@@ -32,6 +32,7 @@ jobs:
             let m;
             const tooYoung = [];
             let matchFound = false;
+            let npmPackageFound = false;
             let latestPublish = 0;
 
             while ((m = updateRegex.exec(body)) !== null) {
@@ -44,6 +45,10 @@ jobs:
               let data;
               try {
                 const response = await fetch(url);
+                if (response.status === 404) {
+                  core.info(`${pkg} not found on npm — skipping (likely a GitHub Actions dependency)`);
+                  continue;
+                }
                 if (!response.ok) {
                   core.setFailed(`Failed to fetch npm metadata for ${pkg}: HTTP ${response.status}`);
                   return;
@@ -54,6 +59,7 @@ jobs:
                 return;
               }
 
+              npmPackageFound = true;
               const publishedAt = data.time?.[version];
               if (!publishedAt) {
                 core.setFailed(`No publish timestamp found for ${pkg}@${version} on npm`);
@@ -74,6 +80,10 @@ jobs:
 
             if (!matchFound) {
               core.setFailed('No package updates found in PR body — Dependabot format may have changed');
+              return;
+            }
+            if (!npmPackageFound) {
+              core.info('No npm packages found — skipping age check (GitHub Actions dependencies only)');
               return;
             }
 
