@@ -91,18 +91,36 @@ jobs:
               const rebaseAfter = new Date(latestPublish + MIN_AGE_MS);
               const rebaseAfterISO = rebaseAfter.toISOString().slice(0, 10);
 
-              // Post a comment with a machine-readable marker so a future cron job
+              // Upsert a comment with a machine-readable marker so a future cron job
               // can find PRs that are ready to rebase and post "@dependabot rebase".
               // Format: <!-- age-check-rebase-after: YYYY-MM-DD -->
-              await github.rest.issues.createComment({
+              const MARKER = '<!-- age-check-rebase-after:';
+              const commentBody = `<!-- age-check-rebase-after: ${rebaseAfterISO} -->\n` +
+                `⏳ **npm soak period active** — one or more packages are less than 7 days old.\n\n` +
+                tooYoung.map(p => `- ${p}`).join('\n') + '\n\n' +
+                `Safe to merge after **${rebaseAfterISO}**. Trigger a Dependabot rebase then.`;
+
+              const { data: comments } = await github.rest.issues.listComments({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: context.payload.pull_request.number,
-                body: `<!-- age-check-rebase-after: ${rebaseAfterISO} -->\n` +
-                  `⏳ **npm soak period active** — one or more packages are less than 7 days old.\n\n` +
-                  tooYoung.map(p => `- ${p}`).join('\n') + '\n\n' +
-                  `Safe to merge after **${rebaseAfterISO}**. Trigger a Dependabot rebase then.`,
               });
+              const existing = comments.find(c => c.body?.includes(MARKER));
+              if (existing) {
+                await github.rest.issues.updateComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: existing.id,
+                  body: commentBody,
+                });
+              } else {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.payload.pull_request.number,
+                  body: commentBody,
+                });
+              }
 
               core.setFailed(
                 `The following packages are less than 7 days old on npm — safe to rebase on ${rebaseAfterISO}:\n` +
