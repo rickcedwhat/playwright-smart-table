@@ -312,14 +312,14 @@ const _navigateToCell = async (params: {
 
             const horizontalSteps = Math.abs(cDiff);
             if (horizontalSteps > 0) {
-                const settleMs = Math.min(2500, 60 + horizontalSteps * 12);
+                const settleMs = nav.settleMs ?? Math.min(2500, 60 + horizontalSteps * 12);
                 await page.waitForTimeout(settleMs);
             }
 
             // Wait for active cell to match target: poll getActiveCell or fallback to fixed delay
             // This is the "Midas Touch" buffer needed for Glide's async accessibility updates.
             const pollIntervalMs = 10;
-            const maxWaitMs = Math.min(6000, 250 + horizontalSteps * 25);
+            const maxWaitMs = nav.maxWaitMs ?? Math.min(6000, 250 + horizontalSteps * 25);
             const start = Date.now();
             while (Date.now() - start < maxWaitMs) {
                 if (config.strategies.getActiveCell) {

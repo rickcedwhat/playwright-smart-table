@@ -31,17 +31,31 @@ export const glideGoRight = async (context: StrategyContext) => {
     await nudgePageScroller(context.page, 400);
 };
 
-/** Coarse `scrollLeft` toward `columnIndex`; `goLeft`/`goRight` correct the remainder. */
-export const glideSeekColumnIndex = async (context: StrategyContext, columnIndex: number) => {
-    const { page } = context;
-    const scroller = page.locator('.dvn-scroller').first();
-    await scroller.evaluate((el, colIdx: number) => {
-        const max = Math.max(0, el.scrollWidth - el.clientWidth);
-        const ratio = Math.min(1, Math.max(0, (colIdx + 0.5) / 64));
-        el.scrollLeft = Math.floor(ratio * max);
-    }, columnIndex);
-    await page.waitForTimeout(100);
-};
+/**
+ * Factory for `seekColumnIndex` with a configurable total column count.
+ * The ratio used to compute `scrollLeft` depends on knowing the total number of columns.
+ * Pass the actual column count of your grid so the coarse seek lands in the right region.
+ */
+export const createGlideSeekColumnIndex = (columnCount: number) =>
+    async (context: StrategyContext, columnIndex: number) => {
+        const { page } = context;
+        const scroller = page.locator('.dvn-scroller').first();
+        await scroller.evaluate(
+            (el, { colIdx, count }: { colIdx: number; count: number }) => {
+                const max = Math.max(0, el.scrollWidth - el.clientWidth);
+                const ratio = Math.min(1, Math.max(0, (colIdx + 0.5) / count));
+                el.scrollLeft = Math.floor(ratio * max);
+            },
+            { colIdx: columnIndex, count: columnCount }
+        );
+        await page.waitForTimeout(100);
+    };
+
+/**
+ * Coarse `scrollLeft` toward `columnIndex`; `goLeft`/`goRight` correct the remainder.
+ * Assumes 64 columns — use `createGlide({ columnCount })` for a different grid size.
+ */
+export const glideSeekColumnIndex = createGlideSeekColumnIndex(64);
 
 /** `scrollLeft = 0` so low `aria-colindex` cells exist again (see smartRow for optional `Home`). */
 export const glideSnapFirstColumnIntoView = async (context: StrategyContext) => {

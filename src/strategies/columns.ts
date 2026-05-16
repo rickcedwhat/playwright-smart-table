@@ -22,6 +22,16 @@ export interface NavigationPrimitives {
      * Implementations should leave a small delta for the caller to correct with primitives.
      */
     seekColumnIndex?: (context: StrategyContext, columnIndex: number) => Promise<void>;
+    /**
+     * Override the settle delay (ms) after horizontal goLeft/goRight steps.
+     * Defaults to `Math.min(2500, 60 + steps * 12)`. Tune when your grid settles faster or slower.
+     */
+    settleMs?: number;
+    /**
+     * Override the maximum poll window (ms) waiting for the active cell to confirm position.
+     * Defaults to `Math.min(6000, 250 + steps * 25)`. Tune when accessibility updates lag differently.
+     */
+    maxWaitMs?: number;
 }
 
 /**

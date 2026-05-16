@@ -5,7 +5,8 @@ import {
     glideGoLeft,
     glideGoRight,
     glideSnapFirstColumnIntoView,
-    glideSeekColumnIndex
+    glideSeekColumnIndex,
+    createGlideSeekColumnIndex
 } from './columns';
 import { scrollRightHeader } from './headers';
 import { PaginationStrategies } from '../../strategies/pagination';
@@ -123,10 +124,45 @@ export const GlideStrategies = {
     fillSimple: glideFillSimple
 };
 
+export interface GlideOptions {
+    /**
+     * Total number of columns in the grid.
+     * Used to compute the horizontal scroll ratio in `seekColumnIndex`.
+     * Default: 64. Grids with more or fewer columns must set this to avoid scrolling to the wrong position.
+     */
+    columnCount?: number;
+}
+
+/**
+ * Factory that returns a configured Glide preset.
+ * Use when your grid differs from the 64-column default:
+ * ```ts
+ * useTable(loc, { ...createGlide({ columnCount: 128 }), maxPages: 5 })
+ * ```
+ */
+export function createGlide(options: GlideOptions = {}): Partial<TableConfig> {
+    const { columnCount = 64 } = options;
+    const seekFn = columnCount === 64 ? glideSeekColumnIndex : createGlideSeekColumnIndex(columnCount);
+    return {
+        headerSelector: 'table[role="grid"] thead tr th',
+        rowSelector: 'table[role="grid"] tbody tr',
+        cellSelector: 'td',
+        concurrency: 'sequential',
+        strategies: {
+            ...GlideDefaultStrategies,
+            navigation: {
+                ...GlideDefaultStrategies.navigation,
+                seekColumnIndex: seekFn
+            }
+        }
+    };
+}
+
 /**
  * Full preset for Glide Data Grid (selectors + default strategies only).
  * Spread: useTable(loc, { ...Plugins.Glide, maxPages: 5 }).
  * Strategies only (including fillSimple): useTable(loc, { rowSelector: '...', strategies: Plugins.Glide.Strategies }).
+ * For a non-64-column grid, use `createGlide({ columnCount })` instead.
  */
 const GlidePreset: Partial<TableConfig> = {
     headerSelector: 'table[role="grid"] thead tr th',
