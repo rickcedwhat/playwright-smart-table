@@ -218,6 +218,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     if (pagesJumped > 0) {
       tableState.currentPageIndex += pagesJumped;
       log(`_advancePage: ${primitive} advanced ${pagesJumped} page(s) — now at page ${tableState.currentPageIndex}`);
+      await debugDelay(config, 'pagination');
     } else {
       log(`_advancePage: ${primitive} returned false — end of data`);
     }
@@ -463,6 +464,8 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       const effectiveMaxPages = config.maxPages;
       const tracker = new ElementTracker('iterator');
       const useBulk = false; // iterator has no options; default goNext
+
+      log(`iterator: starting (maxPages=${effectiveMaxPages})`);
 
       try {
         let rowIndex = 0;

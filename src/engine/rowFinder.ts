@@ -135,6 +135,7 @@ export class RowFinder<T = any> {
                 this.tableState.currentPageIndex += pagesJumped;
                 pagesScanned += pagesJumped;
                 this.log(`findRows: advanced ${pagesJumped} page(s), now at page ${this.tableState.currentPageIndex}`);
+                await debugDelay(this.config, 'pagination');
                 await collectMatches();
             }
         } finally {
@@ -232,6 +233,7 @@ export class RowFinder<T = any> {
                     const pagesJumped = typeof paginationResult === 'number' ? paginationResult : 1;
                     this.tableState.currentPageIndex += pagesJumped;
                     pagesScanned += pagesJumped;
+                    await debugDelay(this.config, 'pagination');
                     continue;
                 } else {
                     this.log(`Page ${this.tableState.currentPageIndex}: Pagination failed (end of data).`);
