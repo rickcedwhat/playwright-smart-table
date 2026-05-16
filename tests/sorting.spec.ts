@@ -111,3 +111,37 @@ test.describe('AriaSort Strategy', () => {
     await expect(table.sorting.apply('Name', 'asc')).rejects.toThrow(/Failed to sort column "Name" to "asc" after 3 attempts/);
   });
 });
+
+test.describe('sorting.apply() — loading stabilization', () => {
+  test('polls isTableLoading until false before checking sort state', async ({ page }) => {
+    await page.setContent(`
+      <table id="t">
+        <thead><tr><th>Name</th></tr></thead>
+        <tbody><tr><td>Alice</td></tr></tbody>
+      </table>
+    `);
+
+    let isLoadingCallCount = 0;
+    let doSortCallCount = 0;
+
+    const table = await useTable(page.locator('#t'), {
+      strategies: {
+        sorting: {
+          doSort: async () => { doSortCallCount++; },
+          getSortState: async () => (isLoadingCallCount >= 3 ? 'asc' : 'none'),
+        },
+        loading: {
+          isTableLoading: async () => {
+            isLoadingCallCount++;
+            return isLoadingCallCount < 3;
+          },
+        },
+      },
+    }).init();
+
+    await table.sorting.apply('Name', 'asc');
+
+    expect(doSortCallCount).toBe(1);
+    expect(isLoadingCallCount).toBeGreaterThanOrEqual(3);
+  });
+});

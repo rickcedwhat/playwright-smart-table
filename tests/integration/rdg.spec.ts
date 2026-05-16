@@ -89,6 +89,49 @@ test.describe('React Data Grid (RDG)', () => {
         expect(uniqueIds.size).toBe(dataRows.length);
     });
 
+    // ─── Issue #120: synchronized map must not fail on overscan rows ─────────────
+    //
+    // Virtual-scroll grids (RDG) render overscan rows beyond the visible viewport
+    // edge. In `synchronized` mode the peek/commit split in ElementTracker defers
+    // overscan rows that have been evicted before the horizontal scroll barrier
+    // fires. Without the fix those stale locators throw
+    // "could not reach cell … after exhausting navigation strategies".
+    //
+    // This test collects 50+ rows across multiple virtual pages using
+    // concurrency:'synchronized' and asserts no errors and no duplicate IDs.
+    test('synchronized map collects 50+ unique rows without stale-locator errors (issue #120)', async ({ page }) => {
+        await page.goto('https://comcast.github.io/react-data-grid/#/CommonFeatures', { waitUntil: 'domcontentloaded' });
+
+        const grid = page.locator('[role="grid"]').first();
+        await expect(grid).toBeAttached({ timeout: 10000 });
+
+        const table = useTable(grid, {
+            ...presets.rdg,
+            strategies: {
+                ...presets.rdg.strategies,
+                dedupe: async (row) => row.getCell('ID').innerText(),
+            },
+        });
+
+        await table.init();
+
+        const rows = await table.map(
+            ({ row }) => row.toJSON({ columns: ['ID', 'Task'] }),
+            { concurrency: 'synchronized', maxPages: 4 },
+        );
+
+        const dataRows = rows.filter((r: any) => r.ID !== 'Total');
+
+        expect(dataRows.length).toBeGreaterThanOrEqual(50);
+
+        // All IDs must be valid positive integers (stale locators produce garbled data)
+        expect(dataRows.every((r: any) => /^\d+$/.test(String(r.ID)))).toBe(true);
+
+        // No duplicates — overscan rows must not be processed twice
+        const uniqueIds = new Set(dataRows.map((r: any) => r.ID));
+        expect(uniqueIds.size).toBe(dataRows.length);
+    });
+
     test('should handle reading specific columns from middle of table', async ({ page }) => {
         await page.goto('https://comcast.github.io/react-data-grid/#/CommonFeatures', { waitUntil: 'domcontentloaded' });
 

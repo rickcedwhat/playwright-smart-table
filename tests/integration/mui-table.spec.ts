@@ -107,3 +107,40 @@ test.describe('Bug #105: goToFirst() 50-retry cap', () => {
         await expect(page.locator('.MuiTablePagination-displayedRows')).toHaveText(/^1[–\-]/);
     });
 });
+
+// ─── Bug #105 safety net: goToFirst() returns false on no-progress ────────────
+//
+// When the prev button is always enabled but clicking it never changes the
+// displayed-rows text, goToFirst() must abort after NO_PROGRESS_LIMIT (3)
+// consecutive non-advancing clicks and return false.
+//
+// The empty displayedRows text exploits the waitForMuiPaginationStabilization
+// fast-exit: it only polls when oldText is truthy, so an empty element causes
+// the stabilization helper to return immediately without a 5-second wait.
+
+test.describe('Bug #105 safety net: goToFirst() no-progress guard', () => {
+    test('goToFirst() returns false when pagination clicks make no progress', async ({ page }) => {
+        await page.setContent(`
+            <div id="table-wrapper">
+                <table><thead><tr><th>Name</th></tr></thead>
+                       <tbody><tr><td>Alice</td></tr></tbody></table>
+                <div class="MuiTablePagination-root">
+                    <button aria-label="Go to previous page">Prev</button>
+                    <p class="MuiTablePagination-displayedRows"></p>
+                </div>
+            </div>
+        `);
+
+        const context: TableContext = {
+            root: page.locator('#table-wrapper'),
+            page,
+            config: { strategies: {}, debug: { logLevel: 'none' } } as TableContext['config'],
+            resolve: (selector, root) => (root as Locator).locator(selector as string),
+        };
+
+        const goToFirst = presets.muiTable.strategies!.pagination!.goToFirst!;
+        const result = await goToFirst(context);
+
+        expect(result).toBe(false);
+    });
+});
