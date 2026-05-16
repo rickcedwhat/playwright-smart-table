@@ -3,8 +3,8 @@
 
 reviews:
   auto_review:
-    # Skip automatic review on draft PRs and Dependabot PRs.
-    # Trigger manually with `@coderabbitai review` when ready.
     drafts: false
-    ignore_usernames:
-      - "dependabot[bot]"
+  path_filters:
+    - "!pnpm-lock.yaml"
+    - "!package-lock.json"
+    - "!package.json"
