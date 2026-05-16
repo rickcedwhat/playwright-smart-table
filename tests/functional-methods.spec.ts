@@ -445,6 +445,13 @@ test.describe('new API additions', () => {
         expect(await table.countRows()).toBe(2);
     });
 
+    test('countRows returns current page count when maxPages > 1 but no pagination primitive', async ({ page }) => {
+        await page.setContent(TABLE_HTML);
+        const table = useTable(page.locator('#tbl'), { maxPages: 3 });
+
+        expect(await table.countRows()).toBe(2);
+    });
+
     test('mapColumn collects values for a single column', async ({ page }) => {
         await page.setContent(TABLE_HTML);
         const table = makeTable(page);
