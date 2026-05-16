@@ -1,0 +1,331 @@
+name: Bot Listener
+
+# Handles all @rickcedwhat-ai commands posted in issue or PR comments.
+# Only fires when the comment starts with the bot mention and was not
+# posted by the bot itself (prevents loops).
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  parse:
+    name: Parse command
+    runs-on: ubuntu-latest
+    if: |
+      startsWith(github.event.comment.body, '@rickcedwhat-ai ') &&
+      github.event.comment.user.login != 'rickcedwhat-ai'
+    outputs:
+      namespace:   ${{ steps.parse.outputs.namespace }}
+      subcommand:  ${{ steps.parse.outputs.subcommand }}
+      args:        ${{ steps.parse.outputs.args }}
+      is_pr:       ${{ steps.parse.outputs.is_pr }}
+      valid:       ${{ steps.parse.outputs.valid }}
+    steps:
+      - name: Parse command
+        id: parse
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = context.payload.comment.body.trim();
+            const match = body.match(/^@rickcedwhat-ai\s+(\w+)\s+(\w+)(?:\s+([\s\S]*))?$/);
+            if (!match) {
+              core.setOutput('valid', 'false');
+              return;
+            }
+            const [, namespace, subcommand, args = ''] = match;
+            core.setOutput('valid', 'true');
+            core.setOutput('namespace', namespace);
+            core.setOutput('subcommand', subcommand);
+            core.setOutput('args', args.trim());
+            core.setOutput('is_pr', String(!!context.payload.issue.pull_request));
+
+  # ── upstream watch ─────────────────────────────────────────────────────────
+  upstream-watch:
+    name: upstream watch
+    needs: parse
+    if: |
+      needs.parse.outputs.valid == 'true' &&
+      needs.parse.outputs.namespace == 'upstream' &&
+      needs.parse.outputs.subcommand == 'watch'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Run upstream watch
+        env:
+          GH_TOKEN: ${{ secrets.BOT_PAT }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ARGS: ${{ needs.parse.outputs.args }}
+        run: node scripts/bot-upstream-watch.mjs
+
+  # ── upstream check ─────────────────────────────────────────────────────────
+  upstream-check:
+    name: upstream check
+    needs: parse
+    if: |
+      needs.parse.outputs.valid == 'true' &&
+      needs.parse.outputs.namespace == 'upstream' &&
+      needs.parse.outputs.subcommand == 'check'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Fetch this issue as array
+        env:
+          GH_TOKEN: ${{ secrets.BOT_PAT }}
+        run: |
+          gh issue view ${{ github.event.issue.number }} \
+            --json number,body,title > /tmp/single.json
+          node -e "
+            const d = require('/tmp/single.json');
+            require('fs').writeFileSync('issues.json', JSON.stringify([d]));
+          "
+      - name: Run check
+        env:
+          GH_TOKEN: ${{ secrets.BOT_PAT }}
+        run: node scripts/check-upstream-blockers.mjs
+
+  # ── upstream schedule ──────────────────────────────────────────────────────
+  upstream-schedule:
+    name: upstream schedule
+    needs: parse
+    if: |
+      needs.parse.outputs.valid == 'true' &&
+      needs.parse.outputs.namespace == 'upstream' &&
+      needs.parse.outputs.subcommand == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enqueue upstream check via QStash
+        env:
+          QSTASH_TOKEN: ${{ secrets.QSTASH_TOKEN }}
+          BOT_PAT:      ${{ secrets.BOT_PAT }}
+          DELAY_STR:    ${{ needs.parse.outputs.args }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          REPO:         ${{ github.repository }}
+        run: |
+          DELAY_SECS=$(node -e "
+            const s = process.env.DELAY_STR;
+            const m = s.match(/^(\d+)(m|h|d|w)$/);
+            if (!m) { console.error('Invalid delay: ' + s); process.exit(1); }
+            const mult = { m: 60, h: 3600, d: 86400, w: 604800 };
+            console.log(parseInt(m[1]) * mult[m[2]]);
+          ")
+          PAYLOAD=$(node -e "console.log(JSON.stringify({
+            event_type: 'bot-upstream-check',
+            client_payload: {
+              issue_number: parseInt(process.env.ISSUE_NUMBER),
+              repo: process.env.REPO
+            }
+          }))")
+          curl -sf -X POST \
+            "https://qstash.upstash.io/v2/publish/https://api.github.com/repos/$REPO/dispatches" \
+            -H "Authorization: Bearer $QSTASH_TOKEN" \
+            -H "Upstash-Delay: ${DELAY_SECS}s" \
+            -H "Upstash-Forward-Authorization: Bearer $BOT_PAT" \
+            -H "Upstash-Forward-Content-Type: application/json" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD"
+      - name: Confirm
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.BOT_PAT }}
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `⏱️ Upstream check scheduled in **${{ needs.parse.outputs.args }}**.`
+            });
+
+  # ── upstream link ──────────────────────────────────────────────────────────
+  upstream-link:
+    name: upstream link
+    needs: parse
+    if: |
+      needs.parse.outputs.valid == 'true' &&
+      needs.parse.outputs.namespace == 'upstream' &&
+      needs.parse.outputs.subcommand == 'link'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Update blocked-pr in issue body
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.BOT_PAT }}
+          script: |
+            const args = `${{ needs.parse.outputs.args }}`;
+            const prMatch = args.match(/#?(\d+)/);
+            if (!prMatch) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: '❌ Could not parse PR number. Usage: `@rickcedwhat-ai upstream link pr #N`'
+              });
+              return;
+            }
+            const prNumber = prMatch[1];
+            const { data: issue } = await github.rest.issues.get({
+              owner: context.repo.owner, repo: context.repo.repo,
+              issue_number: context.issue.number
+            });
+            let body = issue.body || '';
+            if (/^blocked-pr:/m.test(body)) {
+              body = body.replace(/^blocked-pr:.*$/m, `blocked-pr: "#${prNumber}"`);
+            } else {
+              body = body.replace(/(condition:[^\n]*)/m, `$1\nblocked-pr: "#${prNumber}"`);
+            }
+            await github.rest.issues.update({
+              owner: context.repo.owner, repo: context.repo.repo,
+              issue_number: context.issue.number, body
+            });
+            await github.rest.issues.createComment({
+              owner: context.repo.owner, repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `🔗 Linked blocked PR to #${prNumber}.`
+            });
+
+  # ── upstream unblock ───────────────────────────────────────────────────────
+  upstream-unblock:
+    name: upstream unblock
+    needs: parse
+    if: |
+      needs.parse.outputs.valid == 'true' &&
+      needs.parse.outputs.namespace == 'upstream' &&
+      needs.parse.outputs.subcommand == 'unblock'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mark cleared
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.BOT_PAT }}
+          script: |
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            try {
+              await github.rest.issues.removeLabel({
+                owner, repo, issue_number, name: 'upstream-blocker:waiting'
+              });
+            } catch {}
+            await github.rest.issues.addLabels({
+              owner, repo, issue_number, labels: ['upstream-blocker:cleared']
+            });
+            await github.rest.issues.createComment({
+              owner, repo, issue_number,
+              body: '✅ Marked as cleared manually.'
+            });
+
+  # ── coderabbit retry ───────────────────────────────────────────────────────
+  coderabbit-retry:
+    name: coderabbit retry
+    needs: parse
+    if: |
+      needs.parse.outputs.valid == 'true' &&
+      needs.parse.outputs.namespace == 'coderabbit' &&
+      needs.parse.outputs.subcommand == 'retry' &&
+      needs.parse.outputs.is_pr == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enqueue CodeRabbit review via QStash
+        env:
+          QSTASH_TOKEN: ${{ secrets.QSTASH_TOKEN }}
+          BOT_PAT:      ${{ secrets.BOT_PAT }}
+          DELAY_STR:    ${{ needs.parse.outputs.args }}
+          PR_NUMBER:    ${{ github.event.issue.number }}
+          REPO:         ${{ github.repository }}
+        run: |
+          DELAY_SECS=$(node -e "
+            const s = process.env.DELAY_STR;
+            const m = s.match(/^(\d+)(m|h|d|w)$/);
+            if (!m) { console.error('Invalid delay: ' + s); process.exit(1); }
+            const mult = { m: 60, h: 3600, d: 86400, w: 604800 };
+            console.log(parseInt(m[1]) * mult[m[2]]);
+          ")
+          PAYLOAD=$(node -e "console.log(JSON.stringify({
+            event_type: 'bot-coderabbit-retry',
+            client_payload: {
+              pr_number: parseInt(process.env.PR_NUMBER),
+              repo: process.env.REPO
+            }
+          }))")
+          curl -sf -X POST \
+            "https://qstash.upstash.io/v2/publish/https://api.github.com/repos/$REPO/dispatches" \
+            -H "Authorization: Bearer $QSTASH_TOKEN" \
+            -H "Upstash-Delay: ${DELAY_SECS}s" \
+            -H "Upstash-Forward-Authorization: Bearer $BOT_PAT" \
+            -H "Upstash-Forward-Content-Type: application/json" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD"
+      - name: Confirm
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.BOT_PAT }}
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `⏱️ CodeRabbit review scheduled in **${{ needs.parse.outputs.args }}**.`
+            });
+
+  # ── help / unknown ─────────────────────────────────────────────────────────
+  help:
+    name: help
+    needs: parse
+    if: |
+      needs.parse.outputs.valid == 'true' &&
+      needs.parse.outputs.namespace == 'help'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post help
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.BOT_PAT }}
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: [
+                '### @rickcedwhat-ai commands',
+                '',
+                '**On issues:**',
+                '| Command | Description |',
+                '|---|---|',
+                '| `@rickcedwhat-ai upstream watch npm <pkg> >= <version>` | Register upstream check + add `:waiting` label |',
+                '| `@rickcedwhat-ai upstream check` | Immediate semver check for this issue |',
+                '| `@rickcedwhat-ai upstream schedule <delay>` | Re-check after delay (e.g. `2w`, `3d`) |',
+                '| `@rickcedwhat-ai upstream link pr #N` | Link a blocked PR to this issue |',
+                '| `@rickcedwhat-ai upstream unblock` | Manually mark this issue as cleared |',
+                '',
+                '**On PRs:**',
+                '| Command | Description |',
+                '|---|---|',
+                '| `@rickcedwhat-ai coderabbit retry <delay>` | Schedule a CodeRabbit review after delay (e.g. `36m`) |',
+              ].join('\n')
+            });
+
+  unknown-command:
+    name: Unknown command
+    needs: parse
+    if: needs.parse.outputs.valid == 'false'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post unknown command message
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.BOT_PAT }}
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: '❓ Unknown command. Comment `@rickcedwhat-ai help` to see available commands.'
+            });
