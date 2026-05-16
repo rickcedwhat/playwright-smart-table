@@ -286,10 +286,33 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     },
 
     countRows: async (): Promise<number> => {
-      log("countRows: counting rows in current viewport");
       await _autoInit();
-      const allRows = resolve(config.rowSelector, rootLocator);
-      return allRows.count();
+      const pag = config.strategies.pagination;
+      const hasPagination = config.maxPages > 1 && !!(pag?.goNext || pag?.goNextBulk);
+      if (!hasPagination) {
+        log("countRows: counting rows in current viewport (no pagination)");
+        return resolve(config.rowSelector, rootLocator).count();
+      }
+
+      log(`countRows: paginating up to ${config.maxPages} page(s)`);
+      const tracker = new ElementTracker('countRows');
+      let total = 0;
+      let pagesScanned = 1;
+      try {
+        while (true) {
+          const newIndices = await tracker.getUnseenIndices(resolve(config.rowSelector, rootLocator));
+          total += newIndices.length;
+          log(`countRows: page ${pagesScanned} — ${newIndices.length} row(s) (running total: ${total})`);
+          if (pagesScanned >= config.maxPages) break;
+          if (!await _advancePage(false)) break;
+          pagesScanned++;
+        }
+      } finally {
+        await tracker.cleanup(rootLocator.page());
+      }
+      log(`countRows: ${total} total row(s) across ${pagesScanned} page(s) — resetting`);
+      await result.reset();
+      return total;
     },
 
     mapColumn: async <R = string>(columnName: string, options: import('./types').RowIterationOptions = {}): Promise<R[]> => {
