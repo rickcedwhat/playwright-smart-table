@@ -288,7 +288,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     countRows: async (): Promise<number> => {
       await _autoInit();
       const pag = config.strategies.pagination;
-      const hasPagination = config.maxPages > 1 && !!(pag?.goNext || pag?.goNextBulk || pag?.goToPage);
+      const hasPagination = config.maxPages > 1 && !!(pag?.goNext || pag?.goNextBulk);
       if (!hasPagination) {
         log("countRows: counting rows in current viewport (no pagination)");
         return resolve(config.rowSelector, rootLocator).count();
