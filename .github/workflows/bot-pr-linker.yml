@@ -1,0 +1,52 @@
+name: Bot — PR Issue Linker
+
+# Reminds the author to add a "Closes #N" reference when a non-draft PR
+# is opened or converted from draft without linking an issue.
+
+on:
+  pull_request:
+    types: [opened, ready_for_review]
+
+jobs:
+  check-link:
+    name: Check for issue link
+    runs-on: ubuntu-latest
+    # Skip Dependabot PRs — they never have issue links
+    if: github.event.pull_request.user.login != 'dependabot[bot]'
+    steps:
+      - name: Check PR body for issue reference
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.BOT_PAT }}
+          script: |
+            const body = context.payload.pull_request.body || '';
+            const hasLink = /(close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+#\d+/i.test(body);
+            if (hasLink) {
+              core.info('Issue reference found — no reminder needed.');
+              return;
+            }
+
+            // Check if we already posted this reminder (avoid duplicate comments)
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number
+            });
+            const alreadyPosted = comments.some(
+              c => c.user.login === 'rickcedwhat-ai' &&
+                   c.body.includes('link this PR to an issue')
+            );
+            if (alreadyPosted) return;
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.pull_request.number,
+              body: [
+                '👋 Heads up — this PR doesn\'t appear to link to an issue.',
+                'If it closes one, add a `Closes #N` line to the PR description so',
+                'the issue closes automatically on merge and stays tracked in the work queue.',
+                '',
+                '_If this PR intentionally has no linked issue, ignore this message._',
+              ].join('\n')
+            });
