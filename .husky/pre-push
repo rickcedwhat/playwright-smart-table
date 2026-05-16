@@ -4,8 +4,17 @@
 
 git fetch origin main --quiet 2>/dev/null || exit 0
 
-main=$(git rev-parse origin/main)
-base=$(git merge-base HEAD "$main")
+main=$(git rev-parse origin/main 2>/dev/null)
+if [ -z "$main" ]; then
+  echo "✗ pre-push: could not resolve origin/main — skipping rebase check."
+  exit 1
+fi
+
+base=$(git merge-base HEAD "$main" 2>/dev/null)
+if [ -z "$base" ]; then
+  echo "✗ pre-push: could not compute merge-base with origin/main — skipping rebase check."
+  exit 1
+fi
 
 if [ "$base" != "$main" ]; then
   echo "✗ Branch is not rebased onto origin/main."
