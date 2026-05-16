@@ -1,0 +1,14 @@
+#!/bin/sh
+# Verify the branch is rebased onto origin/main before pushing.
+# Fetches origin/main first; if offline, skips the check silently.
+
+git fetch origin main --quiet 2>/dev/null || exit 0
+
+main=$(git rev-parse origin/main)
+base=$(git merge-base HEAD "$main")
+
+if [ "$base" != "$main" ]; then
+  echo "✗ Branch is not rebased onto origin/main."
+  echo "  Run: git fetch origin && git rebase origin/main"
+  exit 1
+fi
