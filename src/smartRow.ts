@@ -12,6 +12,7 @@ type StrategyContext = {
     root: Locator;
     page: Page;
     resolve: (item: any, parent: Locator | Page) => Locator;
+    getHeaders?: () => Promise<string[]>;
 };
 
 /**
@@ -24,13 +25,14 @@ const _navigateToCell = async (params: {
     rootLocator: Locator;
     page: Page;
     resolve: (item: any, parent: Locator | Page) => Locator;
+    getHeaders?: () => Promise<string[]>;
     column: string;
     index: number;
     rowLocator: Locator;
     rowIndex?: number;
     barrier?: NavigationBarrier;
 }): Promise<Locator> => {
-    const { config, rootLocator, page, resolve, column, index, rowLocator, rowIndex, barrier } = params;
+    const { config, rootLocator, page, resolve, getHeaders, column, index, rowLocator, rowIndex, barrier } = params;
     const rowLabel = typeof rowIndex === 'number' ? `row ${rowIndex}` : 'row ?';
     logDebug(
         config,
@@ -55,7 +57,7 @@ const _navigateToCell = async (params: {
         }
     }
 
-    const context: StrategyContext = { config, root: rootLocator, page, resolve };
+    const context: StrategyContext = { config, root: rootLocator, page, resolve, getHeaders };
 
     // Shared helper: is the target cell currently in the DOM?
     const targetReached = async () => {
@@ -429,6 +431,7 @@ const createSmartRow = <T = any>(
                 rootLocator,
                 page: rootLocator.page(),
                 resolve,
+                getHeaders: table?.getHeaders,
                 column: colName,
                 index: idx,
                 rowLocator,
@@ -491,6 +494,7 @@ const createSmartRow = <T = any>(
                 rootLocator,
                 page,
                 resolve,
+                getHeaders: table?.getHeaders,
                 column: col,
                 index: idx,
                 rowLocator,
@@ -546,6 +550,7 @@ const createSmartRow = <T = any>(
                 rootLocator,
                 page: rootLocator.page(),
                 resolve,
+                getHeaders: table?.getHeaders,
                 column: colName,
                 index: colIdx,
                 rowLocator,
