@@ -1,0 +1,12 @@
+{
+  "url": "https://mui.com/x/react-data-grid/",
+  "options": {
+    "llm": true,
+    "model1": "openai/gpt-5",
+    "model2": "openai/o3-mini",
+    "generateSnapshot": true,
+    "verbosity": "full",
+    "headless": false,
+    "interactive": true
+  }
+}
