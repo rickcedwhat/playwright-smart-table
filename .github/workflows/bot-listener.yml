@@ -344,6 +344,21 @@ jobs:
       needs.parse.outputs.namespace == 'reminder'
     runs-on: ubuntu-latest
     steps:
+      - name: Validate args
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.BOT_PAT }}
+          script: |
+            const args = `${{ needs.parse.outputs.args }}`.trim();
+            if (!args || !/^\d+(m|h|d|w)$/.test(args)) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: '❌ Please specify a delay. Usage: `@rickcedwhat-ai reminder 2h` (supports `m`, `h`, `d`, `w`)'
+              });
+              core.setFailed('Missing or invalid delay argument');
+            }
       - name: Enqueue reminder via QStash
         env:
           QSTASH_TOKEN: ${{ secrets.QSTASH_TOKEN }}
@@ -385,11 +400,11 @@ jobs:
         with:
           github-token: ${{ secrets.BOT_PAT }}
           script: |
-            await github.rest.issues.createComment({
+            await github.rest.reactions.createForIssueComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              issue_number: context.issue.number,
-              body: `⏱️ Reminder set for **${{ needs.parse.outputs.args }}** from now.`
+              comment_id: context.payload.comment.id,
+              content: '+1'
             });
 
   # ── help / unknown ─────────────────────────────────────────────────────────
