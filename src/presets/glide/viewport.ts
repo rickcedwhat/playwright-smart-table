@@ -31,10 +31,15 @@ export interface GlideViewportOptions {
  * - `scrollToColumn`       — sets `.dvn-scroller.scrollLeft` via ratio, waits for cell mount
  * - `scrollToRow`          — sets `.dvn-scroller.scrollTop` via rowHeight estimate, waits for row mount
  */
+const sanitize = (value: number | undefined, fallback: number): number => {
+    const n = Number(value);
+    return Number.isFinite(n) && n > 0 ? n : fallback;
+};
+
 export const createGlideViewport = (options: GlideViewportOptions = {}): ViewportStrategy => {
-    const columnCount = options.columnCount ?? 64;
-    const rowHeight = options.rowHeight ?? 34;
-    const attachTimeout = options.attachTimeout ?? 3000;
+    const columnCount = sanitize(options.columnCount, 64);
+    const rowHeight = sanitize(options.rowHeight, 34);
+    const attachTimeout = sanitize(options.attachTimeout, 3000);
 
     return {
         getVisibleColumnRange: async ({ page }) => {
@@ -84,7 +89,8 @@ export const createGlideViewport = (options: GlideViewportOptions = {}): Viewpor
             // the scroller right by one viewport width and retry with the full timeout.
             try {
                 await target.waitFor({ state: 'attached', timeout: 800 });
-            } catch {
+            } catch (err) {
+                if ((err as any)?.name !== 'TimeoutError') throw err;
                 await scroller.evaluate((el) => {
                     el.scrollLeft = Math.min(el.scrollLeft + el.clientWidth, el.scrollWidth);
                 });

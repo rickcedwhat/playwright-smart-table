@@ -4,7 +4,7 @@ import { PaginationStrategies } from '../../strategies/pagination';
 import { StabilizationStrategies } from '../../strategies/stabilization';
 export { createGlideViewport } from './viewport';
 export type { GlideViewportOptions } from './viewport';
-import { createGlideViewport } from './viewport';
+import { createGlideViewport, GlideViewportOptions } from './viewport';
 
 const glideFillStrategy: FillStrategy = async ({ row, columnName, value, page }) => {
     // Canvas-aware click: Glide is a canvas grid. The accessibility 'td' elements
@@ -110,23 +110,8 @@ export const GlideStrategies = {
     fillSimple: glideFillSimple
 };
 
-export interface GlideOptions {
-    /**
-     * Total column count. Used to compute the horizontal scroll ratio when seeking
-     * to an off-screen column. Default: 64.
-     */
-    columnCount?: number;
-    /**
-     * Row height in pixels. Used to estimate `scrollTop` when the target row is not
-     * yet rendered. Matches Glide's default row height. Default: 34.
-     */
-    rowHeight?: number;
-    /**
-     * Milliseconds to wait for a cell or row to appear in the DOM after scrolling.
-     * Default: 3000.
-     */
-    attachTimeout?: number;
-}
+/** Alias of {@link GlideViewportOptions}. All fields are forwarded to the viewport strategy. */
+export type GlideOptions = GlideViewportOptions;
 
 /**
  * Factory that returns a configured Glide preset.

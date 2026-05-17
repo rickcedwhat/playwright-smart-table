@@ -133,9 +133,10 @@ describe('createGlideViewport — scrollToColumn', () => {
     it('uses 800ms for the fast-path waitFor, falling back to attachTimeout on retry', async () => {
         const viewport = createGlideViewport({ attachTimeout: 1500 });
         const scrollerLoc = loc();
-        // First waitFor rejects (fast-path miss), second resolves (after nudge)
+        // First waitFor rejects with a TimeoutError (fast-path miss), second resolves (after nudge)
+        const timeoutErr = Object.assign(new Error('Timeout 800ms exceeded'), { name: 'TimeoutError' });
         const waitFor = vi.fn()
-            .mockRejectedValueOnce(new Error('timeout'))
+            .mockRejectedValueOnce(timeoutErr)
             .mockResolvedValueOnce(undefined);
         const cellLoc = loc({ waitFor });
 
