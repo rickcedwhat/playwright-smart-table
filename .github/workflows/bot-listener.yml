@@ -349,8 +349,8 @@ jobs:
         with:
           github-token: ${{ secrets.BOT_PAT }}
           script: |
-            const args = `${{ needs.parse.outputs.args }}`.trim();
-            if (!args || !/^\d+(m|h|d|w)$/.test(args)) {
+            const delay = `${{ needs.parse.outputs.subcommand }}`.trim();
+            if (!delay || !/^\d+(m|h|d|w)$/.test(delay)) {
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
@@ -363,7 +363,7 @@ jobs:
         env:
           QSTASH_TOKEN: ${{ secrets.QSTASH_TOKEN }}
           BOT_PAT:      ${{ secrets.BOT_PAT }}
-          DELAY_STR:    ${{ needs.parse.outputs.args }}
+          DELAY_STR:    ${{ needs.parse.outputs.subcommand }}
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           REPO:         ${{ github.repository }}
         run: |
