@@ -8,14 +8,14 @@ describe('Issue 104: Glide preset configurable column count and timing', () => {
             expect(preset.strategies?.viewport).toBeDefined();
         });
 
-        it('different columnCount options produce different viewport instances', () => {
-            const preset64 = createGlide({ columnCount: 64 });
-            const preset128 = createGlide({ columnCount: 128 });
-            expect(preset128.strategies?.viewport).not.toBe(preset64.strategies?.viewport);
+        it('different attachTimeout options produce different viewport instances', () => {
+            const preset1 = createGlide({ attachTimeout: 1000 });
+            const preset2 = createGlide({ attachTimeout: 5000 });
+            expect(preset1.strategies?.viewport).not.toBe(preset2.strategies?.viewport);
         });
 
         it('includes required selectors and concurrency', () => {
-            const preset = createGlide({ columnCount: 32 });
+            const preset = createGlide();
             expect(preset.headerSelector).toBe('table[role="grid"] thead tr th');
             expect(preset.rowSelector).toBe('table[role="grid"] tbody tr');
             expect(preset.concurrency).toBe('sequential');

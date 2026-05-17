@@ -2,16 +2,6 @@ import { ViewportStrategy } from '../../types';
 
 export interface GlideViewportOptions {
     /**
-     * Total column count. Used to compute the horizontal scroll ratio when the
-     * target column is not yet mounted. Default: 64.
-     */
-    columnCount?: number;
-    /**
-     * Row height in pixels, used to estimate scrollTop when the target row is not
-     * yet mounted. Matches Glide's default row height. Default: 34.
-     */
-    rowHeight?: number;
-    /**
      * Milliseconds to wait for a cell/row to appear in the DOM after a scroll.
      * Default: 3000.
      */
@@ -28,8 +18,8 @@ export interface GlideViewportOptions {
  * This strategy:
  * - `getVisibleColumnRange` — reads `aria-colindex` values from the first visible row
  * - `getVisibleRowRange`   — reads `aria-rowindex` values from visible rows (2-based: header = 1)
- * - `scrollToColumn`       — sets `.dvn-scroller.scrollLeft` via ratio, waits for cell mount
- * - `scrollToRow`          — sets `.dvn-scroller.scrollTop` via rowHeight estimate, waits for row mount
+ * - `scrollToColumn`       — sets `.dvn-scroller.scrollLeft` via ratio derived from header count, waits for cell mount
+ * - `scrollToRow`          — sets `.dvn-scroller.scrollTop` via measured row height, waits for row mount
  */
 const sanitize = (value: number | undefined, fallback: number): number => {
     const n = Number(value);
@@ -37,8 +27,6 @@ const sanitize = (value: number | undefined, fallback: number): number => {
 };
 
 export const createGlideViewport = (options: GlideViewportOptions = {}): ViewportStrategy => {
-    const columnCount = sanitize(options.columnCount, 64);
-    const rowHeight = sanitize(options.rowHeight, 34);
     const attachTimeout = sanitize(options.attachTimeout, 3000);
 
     return {
@@ -69,24 +57,33 @@ export const createGlideViewport = (options: GlideViewportOptions = {}): Viewpor
             return { first: Math.min(...indices), last: Math.max(...indices) };
         },
 
-        scrollToColumn: async ({ page }, colIndex) => {
+        scrollToColumn: async (context, colIndex) => {
+            const { page } = context;
             const scroller = page.locator('.dvn-scroller').first();
-            await scroller.evaluate(
-                (el, { idx, count }: { idx: number; count: number }) => {
-                    const max = Math.max(0, el.scrollWidth - el.clientWidth);
-                    const ratio = Math.min(1, Math.max(0, (idx + 0.5) / count));
-                    el.scrollLeft = Math.floor(ratio * max);
-                },
-                { idx: colIndex, count: columnCount }
-            );
+
+            // Derive total column count from the initialized header map (available post-init).
+            // Falls back to a ratio seek only by position if headers are unavailable.
+            const headers = await context.getHeaders?.();
+            const totalColumns = headers?.length ?? 0;
+
+            if (totalColumns > 0) {
+                await scroller.evaluate(
+                    (el, { idx, count }: { idx: number; count: number }) => {
+                        const max = Math.max(0, el.scrollWidth - el.clientWidth);
+                        const ratio = Math.min(1, Math.max(0, (idx + 0.5) / count));
+                        el.scrollLeft = Math.floor(ratio * max);
+                    },
+                    { idx: colIndex, count: totalColumns }
+                );
+            }
 
             const target = page
                 .locator(`table[role="grid"] tbody tr td[aria-colindex="${colIndex + 1}"]`)
                 .first();
 
             // Fast path: most columns appear quickly after the ratio seek.
-            // If the seek undershoots (e.g. columnCount > actual column count), nudge
-            // the scroller right by one viewport width and retry with the full timeout.
+            // If the seek undershoots (e.g. near the last column), nudge the scroller
+            // right by one viewport width and retry with the full timeout.
             try {
                 await target.waitFor({ state: 'attached', timeout: 800 });
             } catch (err) {
@@ -104,17 +101,25 @@ export const createGlideViewport = (options: GlideViewportOptions = {}): Viewpor
             const ariaRowIndex = rowIndex + 2;
             const rowSel = `table[role="grid"] tbody tr[aria-rowindex="${ariaRowIndex}"]`;
 
-            // If the row is already mounted, scroll it into view; otherwise estimate via rowHeight
+            // If the row is already mounted, scroll it into view directly.
             const isAttached = await page.locator(rowSel).count() > 0;
             if (isAttached) {
                 await page.locator(rowSel).first().scrollIntoViewIfNeeded();
             } else {
+                // Measure actual row height from the DOM; fall back to Glide's default (34px).
+                const rowHeight = await page
+                    .locator('table[role="grid"] tbody tr')
+                    .first()
+                    .evaluate((el) => (el as HTMLElement).getBoundingClientRect().height)
+                    .catch(() => 34);
+                const height = rowHeight > 0 ? rowHeight : 34;
+
                 await scroller.evaluate(
-                    (el, { idx, height }: { idx: number; height: number }) => {
-                        const targetTop = idx * height;
+                    (el, { idx, height: h }: { idx: number; height: number }) => {
+                        const targetTop = idx * h;
                         el.scrollTop = Math.max(0, targetTop - Math.floor(el.clientHeight / 2));
                     },
-                    { idx: rowIndex, height: rowHeight }
+                    { idx: rowIndex, height }
                 );
                 await page
                     .locator(rowSel)

@@ -17,7 +17,13 @@ const loc = (overrides: Record<string, any> = {}): any => {
     return self;
 };
 
-const ctx = (pageMock: any) => ({ page: pageMock, root: loc(), config: {} as any, resolve: vi.fn() });
+const ctx = (pageMock: any, headers?: string[]) => ({
+    page: pageMock,
+    root: loc(),
+    config: {} as any,
+    resolve: vi.fn(),
+    getHeaders: vi.fn().mockResolvedValue(headers ?? Array.from({ length: 60 }, (_, i) => `col${i}`)),
+});
 
 // ─── getVisibleColumnRange ────────────────────────────────────────────────────
 
@@ -90,8 +96,8 @@ describe('createGlideViewport — getVisibleRowRange', () => {
 // ─── scrollToColumn ───────────────────────────────────────────────────────────
 
 describe('createGlideViewport — scrollToColumn', () => {
-    it('passes colIndex and columnCount to the scroller evaluate', async () => {
-        const viewport = createGlideViewport({ columnCount: 100 });
+    it('passes colIndex and header-derived column count to the scroller evaluate', async () => {
+        const viewport = createGlideViewport();
 
         let capturedArgs: any;
         const scrollerLoc = loc({
@@ -107,11 +113,13 @@ describe('createGlideViewport — scrollToColumn', () => {
             ),
         };
 
-        await viewport.scrollToColumn!(ctx(page) as any, 50);
+        // 100-column header list
+        const headers = Array.from({ length: 100 }, (_, i) => `col${i}`);
+        await viewport.scrollToColumn!(ctx(page, headers) as any, 50);
         expect(capturedArgs).toEqual({ idx: 50, count: 100 });
     });
 
-    it('defaults to columnCount=64', async () => {
+    it('derives column count from getHeaders (60 columns)', async () => {
         const viewport = createGlideViewport();
         let capturedCount: number | undefined;
         const scrollerLoc = loc({
@@ -126,8 +134,8 @@ describe('createGlideViewport — scrollToColumn', () => {
             ),
         };
 
-        await viewport.scrollToColumn!(ctx(page) as any, 10);
-        expect(capturedCount).toBe(64);
+        await viewport.scrollToColumn!(ctx(page) as any, 10); // default ctx has 60 headers
+        expect(capturedCount).toBe(60);
     });
 
     it('uses 800ms for the fast-path waitFor, falling back to attachTimeout on retry', async () => {
@@ -152,7 +160,7 @@ describe('createGlideViewport — scrollToColumn', () => {
     });
 
     it('waits for the correct aria-colindex selector', async () => {
-        const viewport = createGlideViewport({ columnCount: 64 });
+        const viewport = createGlideViewport();
         const scrollerLoc = loc();
         const waitFor = vi.fn().mockResolvedValue(undefined);
         const cellLoc = loc({ waitFor });
@@ -168,6 +176,24 @@ describe('createGlideViewport — scrollToColumn', () => {
 
         await viewport.scrollToColumn!(ctx(page) as any, 7); // colIndex 7 → aria-colindex="8"
         expect(requestedSel).toContain('aria-colindex="8"');
+    });
+
+    it('skips ratio seek when getHeaders returns empty array', async () => {
+        const viewport = createGlideViewport();
+        const scrollerEvaluate = vi.fn().mockResolvedValue(undefined);
+        const scrollerLoc = loc({ evaluate: scrollerEvaluate });
+        const cellLoc = loc({ waitFor: vi.fn().mockResolvedValue(undefined) });
+
+        const page = {
+            locator: vi.fn().mockImplementation((sel: string) =>
+                sel.includes('dvn-scroller') ? scrollerLoc : cellLoc
+            ),
+        };
+
+        const emptyCtx = { ...ctx(page, []), getHeaders: vi.fn().mockResolvedValue([]) };
+        await viewport.scrollToColumn!(emptyCtx as any, 5);
+        // evaluate should not have been called for the ratio seek
+        expect(scrollerEvaluate).not.toHaveBeenCalled();
     });
 });
 
@@ -187,8 +213,8 @@ describe('createGlideViewport — scrollToRow', () => {
         expect(scrollIntoViewIfNeeded).toHaveBeenCalled();
     });
 
-    it('sets scrollTop via rowHeight when row is not mounted', async () => {
-        const viewport = createGlideViewport({ rowHeight: 34, attachTimeout: 2000 });
+    it('measures row height from DOM and passes it to the scroller evaluate', async () => {
+        const viewport = createGlideViewport({ attachTimeout: 2000 });
 
         let capturedArgs: any;
         const scrollerLoc = loc({
@@ -196,32 +222,63 @@ describe('createGlideViewport — scrollToRow', () => {
                 capturedArgs = args;
             }),
         });
-        const waitFor = vi.fn().mockResolvedValue(undefined);
-        const rowLoc = loc({ count: vi.fn().mockResolvedValue(0), waitFor });
+
+        // First locator call is for the aria-rowindex row (count=0, not mounted).
+        // Second call is for measuring the first row height (evaluate → 40).
+        // Third call is for the scroller.
+        const notMountedRow = loc({ count: vi.fn().mockResolvedValue(0), waitFor: vi.fn().mockResolvedValue(undefined) });
+        const firstRowLoc = loc({ evaluate: vi.fn().mockResolvedValue(40) });
 
         const page = {
-            locator: vi.fn().mockImplementation((sel: string) =>
-                sel.includes('dvn-scroller') ? scrollerLoc : rowLoc
-            ),
+            locator: vi.fn().mockImplementation((sel: string) => {
+                if (sel.includes('dvn-scroller')) return scrollerLoc;
+                if (sel === 'table[role="grid"] tbody tr') return firstRowLoc;
+                return notMountedRow;
+            }),
         };
 
         await viewport.scrollToRow!(ctx(page) as any, 10);
-        expect(capturedArgs).toEqual({ idx: 10, height: 34 });
-        expect(waitFor).toHaveBeenCalledWith({ state: 'attached', timeout: 2000 });
+        expect(capturedArgs).toEqual({ idx: 10, height: 40 });
+    });
+
+    it('falls back to 34px row height when DOM measurement fails', async () => {
+        const viewport = createGlideViewport();
+
+        let capturedHeight: number | undefined;
+        const scrollerLoc = loc({
+            evaluate: vi.fn().mockImplementation(async (_fn: Function, args: any) => {
+                capturedHeight = args.height;
+            }),
+        });
+        const notMountedRow = loc({ count: vi.fn().mockResolvedValue(0), waitFor: vi.fn().mockResolvedValue(undefined) });
+        const firstRowLoc = loc({ evaluate: vi.fn().mockRejectedValue(new Error('not found')) });
+
+        const page = {
+            locator: vi.fn().mockImplementation((sel: string) => {
+                if (sel.includes('dvn-scroller')) return scrollerLoc;
+                if (sel === 'table[role="grid"] tbody tr') return firstRowLoc;
+                return notMountedRow;
+            }),
+        };
+
+        await viewport.scrollToRow!(ctx(page) as any, 10);
+        expect(capturedHeight).toBe(34);
     });
 
     it('waits for aria-rowindex = rowIndex + 2 when estimating', async () => {
         const viewport = createGlideViewport({ attachTimeout: 3000 });
         const scrollerLoc = loc();
         const waitFor = vi.fn().mockResolvedValue(undefined);
-        const rowLoc = loc({ count: vi.fn().mockResolvedValue(0), waitFor });
+        const notMountedRow = loc({ count: vi.fn().mockResolvedValue(0), waitFor });
+        const firstRowLoc = loc({ evaluate: vi.fn().mockResolvedValue(34) });
 
         let requestedSel = '';
         const page = {
             locator: vi.fn().mockImplementation((sel: string) => {
                 if (sel.includes('dvn-scroller')) return scrollerLoc;
+                if (sel === 'table[role="grid"] tbody tr') return firstRowLoc;
                 requestedSel = sel;
-                return rowLoc;
+                return notMountedRow;
             }),
         };
 
@@ -245,8 +302,8 @@ describe('Glide preset — viewport replaces navigation', () => {
     });
 
     it('createGlide passes options through to the viewport', () => {
-        const a = createGlide({ columnCount: 64 });
-        const b = createGlide({ columnCount: 128 });
+        const a = createGlide({ attachTimeout: 1000 });
+        const b = createGlide({ attachTimeout: 5000 });
         // Different options → different viewport instances
         expect(a.strategies?.viewport).not.toBe(b.strategies?.viewport);
     });

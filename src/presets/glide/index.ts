@@ -117,7 +117,7 @@ export type GlideOptions = GlideViewportOptions;
  * Factory that returns a configured Glide preset.
  * Use when your grid differs from the defaults:
  * ```ts
- * useTable(loc, { ...createGlide({ columnCount: 128, rowHeight: 40 }), maxPages: 5 })
+ * useTable(loc, { ...createGlide({ attachTimeout: 5000 }), maxPages: 5 })
  * ```
  */
 export function createGlide(options: GlideOptions = {}): Partial<TableConfig> {
