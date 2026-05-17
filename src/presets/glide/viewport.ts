@@ -81,10 +81,11 @@ export const createGlideViewport = (options: GlideViewportOptions = {}): Viewpor
                 .locator(`table[role="grid"] tbody tr td[aria-colindex="${colIndex + 1}"]`)
                 .first();
 
-            // Wait for the cell to attach. Each iteration uses a short probe window (800ms)
-            // capped by the remaining deadline. On TimeoutError, nudge scrollLeft right by
-            // one viewport width (handles ratio-seek undershoot) and retry.
-            const deadline = Date.now() + attachTimeout;
+            // Wait for the cell to attach. The first probe is short (800ms fast path); after
+            // any nudge the probe uses the full remaining budget so Glide has time to re-render.
+            // Total ceiling = 800ms + attachTimeout, matching the original two-phase behaviour.
+            const deadline = Date.now() + 800 + attachTimeout;
+            let nudged = false;
             while (true) {
                 const remaining = deadline - Date.now();
                 if (remaining <= 0) throw Object.assign(
@@ -92,13 +93,14 @@ export const createGlideViewport = (options: GlideViewportOptions = {}): Viewpor
                     { name: 'TimeoutError' }
                 );
                 try {
-                    await target.waitFor({ state: 'attached', timeout: Math.min(800, remaining) });
+                    await target.waitFor({ state: 'attached', timeout: nudged ? remaining : Math.min(800, remaining) });
                     break;
                 } catch (err) {
                     if (!(err instanceof Error) || err.name !== 'TimeoutError') throw err;
                     await scroller.evaluate((el) => {
                         el.scrollLeft = Math.min(el.scrollLeft + el.clientWidth, el.scrollWidth);
                     });
+                    nudged = true;
                 }
             }
         },
