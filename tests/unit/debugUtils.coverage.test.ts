@@ -255,7 +255,8 @@ function makeRowFinder(config: FinalTableConfig, paginationPages = 1) {
     (_item: any, parent: any) => parent,
     filterEngine,
     tableMapper,
-    makeSmartRow
+    makeSmartRow,
+    { currentPageIndex: 0 }
   );
 }
 
