@@ -46,12 +46,29 @@ describe('Navigation Orchestrator Utilities', () => {
     it('should broadcast even if all remaining rows finish', async () => {
       const barrier = new NavigationBarrier(2);
       const action = vi.fn().mockResolvedValue(undefined);
-      
+
       const p1 = barrier.sync(10, action);
       barrier.markFinished(); // Row 2 finishes
-      
+
       await p1;
       expect(action).not.toHaveBeenCalled(); // No move needed because everyone finished or moved
+    });
+
+    it('resolves immediately and calls moveAction when total is 0', async () => {
+      const barrier = new NavigationBarrier(0);
+      const action = vi.fn().mockResolvedValue('result');
+
+      const result = await barrier.sync(0, action);
+
+      expect(action).toHaveBeenCalledOnce();
+      expect(result).toBe('result');
+    });
+
+    it('resolves immediately without calling moveAction when total is 0 and no action given', async () => {
+      const barrier = new NavigationBarrier(0);
+      // should not throw or hang
+      const result = await barrier.sync(0);
+      expect(result).toBeUndefined();
     });
   });
 

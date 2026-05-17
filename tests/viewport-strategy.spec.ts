@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { useTable, Strategies } from '../src';
+import type { ViewportStrategy } from '../src/types';
 
 // ─── Shared HTML builders ──────────────────────────────────────────────────────
 
@@ -272,6 +273,56 @@ test.describe('Viewport strategy — synchronized map()', () => {
             expect(r.ID).toMatch(/^\d+$/);
             expect(r.Country).toBeTruthy();
         });
+    });
+});
+
+// ─── ViewportStrategies.dataAttribute estimated-width fallback ────────────────
+//
+// When scrollToColumn() is called for a column index whose header element is
+// not yet in the DOM, the strategy must estimate the scroll offset from the
+// widths of the currently-visible headers (or fall back to 120 px) and still
+// bring the target cell into view.
+
+test.describe('Viewport strategy — estimated-width fallback', () => {
+    test('scrollToColumn scrolls to correct position when target header is not yet mounted', async ({ page }) => {
+        // makeHorizontalVirtHtml creates headers for columns 1-3 only.
+        // Column 4 (aria-colindex="4") mounts via the scroll event once scrollLeft >= 200.
+        await page.setContent(makeHorizontalVirtHtml(3));
+        await page.waitForTimeout(200);
+
+        const vp: ViewportStrategy = Strategies.Viewport.dataAttribute({
+            scrollContainer: '#scroller',
+            rowAttribute: 'aria-rowindex',
+            columnAttribute: 'aria-colindex',
+            rowOffset: 2,
+            columnOffset: 1,
+        });
+
+        const context = {
+            root: page.locator('[role="grid"]'),
+            config: {
+                rowSelector: '.row[aria-rowindex]',
+                headerSelector: '[role="columnheader"]',
+                cellSelector: '[role="gridcell"]',
+            },
+        } as any;
+
+        // Column index 3 maps to aria-colindex="4" (colOffset=1).
+        // The header for index 3 is not in the DOM initially, so the strategy
+        // falls back to an estimated width from the three visible headers.
+        if (!vp.scrollToColumn) throw new Error('scrollToColumn not implemented');
+        await vp.scrollToColumn(context, 3);
+
+        // The container must have scrolled (was 0 before the call)
+        const scrollLeft = await page.evaluate(
+            () => (document.querySelector('#scroller') as HTMLElement).scrollLeft
+        );
+        expect(scrollLeft).toBeGreaterThan(0);
+
+        // The target cell must now be attached (mounted by the scroll-event handler)
+        await expect(
+            page.locator('.row[aria-rowindex] [aria-colindex="4"]').first()
+        ).toBeAttached();
     });
 });
 
