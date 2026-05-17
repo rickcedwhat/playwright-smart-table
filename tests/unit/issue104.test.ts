@@ -42,18 +42,15 @@ describe('Issue 104: Glide preset configurable column count and timing', () => {
     });
 
     describe('createGlide', () => {
-        it('returns a preset with default 64-column seekColumnIndex when no options given', () => {
+        it('returns a preset with a viewport strategy', () => {
             const preset = createGlide();
-            expect(preset.strategies?.navigation?.seekColumnIndex).toBeDefined();
+            expect(preset.strategies?.viewport).toBeDefined();
         });
 
-        it('uses a custom seekColumnIndex when columnCount is provided', () => {
+        it('different columnCount options produce different viewport instances', () => {
             const preset64 = createGlide({ columnCount: 64 });
             const preset128 = createGlide({ columnCount: 128 });
-            // Different column counts produce different seek functions
-            expect(preset128.strategies?.navigation?.seekColumnIndex).not.toBe(
-                preset64.strategies?.navigation?.seekColumnIndex
-            );
+            expect(preset128.strategies?.viewport).not.toBe(preset64.strategies?.viewport);
         });
 
         it('includes required selectors and concurrency', () => {

@@ -1,16 +1,10 @@
-import { TableContext, FillStrategy, TableConfig } from '../../types';
-import {
-    glideGoUp,
-    glideGoDown,
-    glideGoLeft,
-    glideGoRight,
-    glideSnapFirstColumnIntoView,
-    glideSeekColumnIndex,
-    createGlideSeekColumnIndex
-} from './columns';
+import { FillStrategy, TableConfig } from '../../types';
 import { scrollRightHeader } from './headers';
 import { PaginationStrategies } from '../../strategies/pagination';
 import { StabilizationStrategies } from '../../strategies/stabilization';
+export { createGlideViewport } from './viewport';
+export type { GlideViewportOptions } from './viewport';
+import { createGlideViewport } from './viewport';
 
 const glideFillStrategy: FillStrategy = async ({ row, columnName, value, page }) => {
     // Canvas-aware click: Glide is a canvas grid. The accessibility 'td' elements
@@ -102,15 +96,7 @@ const GlideDefaultStrategies = {
     fill: glideFillStrategy,
     pagination: glidePaginationStrategy,
     header: scrollRightHeader,
-    navigation: {
-        goUp: glideGoUp,
-        goDown: glideGoDown,
-        goLeft: glideGoLeft,
-        goRight: glideGoRight,
-        goHome: glideSnapFirstColumnIntoView,
-        snapFirstColumnIntoView: glideSnapFirstColumnIntoView,
-        seekColumnIndex: glideSeekColumnIndex
-    },
+    viewport: createGlideViewport(),
     loading: {
         isHeaderLoading: async () => false
     },
@@ -126,23 +112,30 @@ export const GlideStrategies = {
 
 export interface GlideOptions {
     /**
-     * Total number of columns in the grid.
-     * Used to compute the horizontal scroll ratio in `seekColumnIndex`.
-     * Default: 64. Grids with more or fewer columns must set this to avoid scrolling to the wrong position.
+     * Total column count. Used to compute the horizontal scroll ratio when seeking
+     * to an off-screen column. Default: 64.
      */
     columnCount?: number;
+    /**
+     * Row height in pixels. Used to estimate `scrollTop` when the target row is not
+     * yet rendered. Matches Glide's default row height. Default: 34.
+     */
+    rowHeight?: number;
+    /**
+     * Milliseconds to wait for a cell or row to appear in the DOM after scrolling.
+     * Default: 3000.
+     */
+    attachTimeout?: number;
 }
 
 /**
  * Factory that returns a configured Glide preset.
- * Use when your grid differs from the 64-column default:
+ * Use when your grid differs from the defaults:
  * ```ts
- * useTable(loc, { ...createGlide({ columnCount: 128 }), maxPages: 5 })
+ * useTable(loc, { ...createGlide({ columnCount: 128, rowHeight: 40 }), maxPages: 5 })
  * ```
  */
 export function createGlide(options: GlideOptions = {}): Partial<TableConfig> {
-    const { columnCount = 64 } = options;
-    const seekFn = columnCount === 64 ? glideSeekColumnIndex : createGlideSeekColumnIndex(columnCount);
     return {
         headerSelector: 'table[role="grid"] thead tr th',
         rowSelector: 'table[role="grid"] tbody tr',
@@ -150,10 +143,7 @@ export function createGlide(options: GlideOptions = {}): Partial<TableConfig> {
         concurrency: 'sequential',
         strategies: {
             ...GlideDefaultStrategies,
-            navigation: {
-                ...GlideDefaultStrategies.navigation,
-                seekColumnIndex: seekFn
-            }
+            viewport: createGlideViewport(options)
         }
     };
 }
