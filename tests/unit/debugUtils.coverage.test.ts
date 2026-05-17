@@ -207,3 +207,96 @@ describe('Iteration engine verbose logging', () => {
     expect(loggedMessages.some(m => m.includes('dedupe skip'))).toBe(true);
   });
 });
+
+// ─── RowFinder verbose logging tests ─────────────────────────────────────────
+
+import { RowFinder } from '../../src/engine/rowFinder';
+
+function makeRowFinder(config: FinalTableConfig, paginationPages = 1) {
+  let pagesAdvanced = 0;
+  const fakeRows: any[] = [];
+
+  const makeLocator = (): any => ({
+    all: async () => fakeRows,
+    count: async () => fakeRows.length,
+    filter: () => makeLocator(),
+    first: () => fakeRows[0],
+    page: () => ({ waitForTimeout: async () => {} }),
+  });
+
+  const rootLocator: any = {
+    ...makeLocator(),
+    page: () => ({ waitForTimeout: async () => {} }),
+  };
+
+  const filterEngine: any = {
+    applyFilters: () => ({ count: async () => 0, all: async () => [], first: () => null }),
+  };
+
+  const tableMapper: any = {
+    getMap: async () => new Map([['Name', 0]]),
+  };
+
+  const paginationStrategy = paginationPages > 1
+    ? { goNext: async () => { pagesAdvanced++; return pagesAdvanced < paginationPages; } }
+    : undefined;
+
+  const cfgWithPagination: FinalTableConfig = {
+    ...config,
+    strategies: { ...config.strategies, pagination: paginationStrategy },
+  } as any;
+
+  const makeSmartRow = (_loc: any, _map: any, idx: number) =>
+    ({ rowIndex: idx, getCell: () => ({}), toJSON: async () => ({}) } as any);
+
+  return new RowFinder(
+    rootLocator,
+    cfgWithPagination,
+    (_item: any, parent: any) => parent,
+    filterEngine,
+    tableMapper,
+    makeSmartRow,
+    { currentPageIndex: 0 }
+  );
+}
+
+describe('RowFinder verbose logging', () => {
+  let logSpy: ReturnType<typeof vi.spyOn>;
+  let loggedMessages: string[];
+
+  beforeEach(() => {
+    loggedMessages = [];
+    logSpy = vi.spyOn(console, 'log').mockImplementation((...args: any[]) => {
+      loggedMessages.push(args.join(' '));
+    });
+  });
+
+  afterEach(() => {
+    logSpy.mockRestore();
+  });
+
+  it('findRows emits "findRows: starting" under verbose', async () => {
+    const config = makeVerboseConfig();
+    await makeRowFinder(config).findRows({});
+    expect(loggedMessages.some(m => m.includes('findRows: starting'))).toBe(true);
+  });
+
+  it('findRows emits "findRows: done" under verbose', async () => {
+    const config = makeVerboseConfig();
+    await makeRowFinder(config).findRows({});
+    expect(loggedMessages.some(m => m.includes('findRows: done'))).toBe(true);
+  });
+
+  it('findRow emits "Searching for row" at info level', async () => {
+    const config = makeVerboseConfig({ debug: { logLevel: 'info' } } as any);
+    await makeRowFinder(config).findRow({});
+    expect(loggedMessages.some(m => m.includes('Searching for row'))).toBe(true);
+  });
+
+  it('findRows suppresses verbose logs when logLevel is "none"', async () => {
+    const config = makeVerboseConfig({ debug: { logLevel: 'none' } } as any);
+    await makeRowFinder(config).findRows({});
+    const smartTableLogs = loggedMessages.filter(m => m.includes('[SmartTable]'));
+    expect(smartTableLogs.length).toBe(0);
+  });
+});
