@@ -28,6 +28,19 @@ jobs:
         with:
           script: |
             const body = context.payload.comment.body.trim();
+
+            // Single-word commands: help
+            const single = body.match(/^@rickcedwhat-ai\s+(help)$/);
+            if (single) {
+              core.setOutput('valid', 'true');
+              core.setOutput('namespace', single[1]);
+              core.setOutput('subcommand', '');
+              core.setOutput('args', '');
+              core.setOutput('is_pr', String(!!context.payload.issue.pull_request));
+              return;
+            }
+
+            // Two-word commands: <namespace> <subcommand> [args]
             const match = body.match(/^@rickcedwhat-ai\s+(\w+)\s+(\w+)(?:\s+([\s\S]*))?$/);
             if (!match) {
               core.setOutput('valid', 'false');
