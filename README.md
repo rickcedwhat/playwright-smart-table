@@ -45,6 +45,14 @@ await table.forEach(async ({ row }) => {
 npm install @rickcedwhat/playwright-smart-table
 ```
 
+> **Telemetry notice:** This package includes [`@scarf/scarf`](https://scarf.sh/) for anonymous install analytics. Telemetry is **opt-in** — nothing is collected unless you explicitly enable it. To opt in, add the following to your `package.json`:
+>
+> ```json
+> "scarfSettings": { "defaultOptIn": true }
+> ```
+>
+> Alternatively, set the environment variable `SCARF_ANALYTICS=false` to disable any analytics at install time.
+
 ## Quick Start
 
 ```typescript

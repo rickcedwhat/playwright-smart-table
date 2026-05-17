@@ -5,6 +5,9 @@
 ### Added
 - **Unit tests for `mapColumn` / `getColumnValues`** — Dedicated Vitest unit tests covering single-column extraction, whitespace trimming, empty-table edge case, `bringIntoView` call verification, `columnOverrides.read` delegation, column-not-found error (including fuzzy-match suggestions), and `maxPages` option. Closes #84.
 
+### Changed
+- **Scarf telemetry is now opt-in** — `scarfSettings.defaultOptIn` is set to `false` in `package.json`. No install analytics are collected unless consumers explicitly opt in. A telemetry disclosure has been added to the README. Closes #106.
+
 ## [6.12.0] - 2026-05-05
 
 ### Fixed

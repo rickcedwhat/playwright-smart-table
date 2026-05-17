@@ -97,6 +97,9 @@
     "vitepress": "^1.6.4",
     "vitest": "^3.2.4"
   },
+  "scarfSettings": {
+    "defaultOptIn": false
+  },
   "dependencies": {
     "@scarf/scarf": "^1.4.0"
   },
