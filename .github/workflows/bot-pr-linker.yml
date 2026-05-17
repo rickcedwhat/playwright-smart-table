@@ -5,7 +5,7 @@ name: Bot — PR Issue Linker
 
 on:
   pull_request:
-    types: [opened, ready_for_review]
+    types: [opened]
 
 jobs:
   check-link:
@@ -34,7 +34,7 @@ jobs:
             });
             const alreadyPosted = comments.some(
               c => c.user.login === 'rickcedwhat-ai' &&
-                   c.body.includes('link this PR to an issue')
+                   c.body.includes('intentionally has no linked issue')
             );
             if (alreadyPosted) return;
 
