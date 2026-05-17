@@ -81,17 +81,25 @@ export const createGlideViewport = (options: GlideViewportOptions = {}): Viewpor
                 .locator(`table[role="grid"] tbody tr td[aria-colindex="${colIndex + 1}"]`)
                 .first();
 
-            // Fast path: most columns appear quickly after the ratio seek.
-            // If the seek undershoots (e.g. near the last column), nudge the scroller
-            // right by one viewport width and retry with the full timeout.
-            try {
-                await target.waitFor({ state: 'attached', timeout: 800 });
-            } catch (err) {
-                if ((err as any)?.name !== 'TimeoutError') throw err;
-                await scroller.evaluate((el) => {
-                    el.scrollLeft = Math.min(el.scrollLeft + el.clientWidth, el.scrollWidth);
-                });
-                await target.waitFor({ state: 'attached', timeout: attachTimeout });
+            // Wait for the cell to attach. Each iteration uses a short probe window (800ms)
+            // capped by the remaining deadline. On TimeoutError, nudge scrollLeft right by
+            // one viewport width (handles ratio-seek undershoot) and retry.
+            const deadline = Date.now() + attachTimeout;
+            while (true) {
+                const remaining = deadline - Date.now();
+                if (remaining <= 0) throw Object.assign(
+                    new Error(`Timed out after ${attachTimeout}ms waiting for aria-colindex="${colIndex + 1}" to attach`),
+                    { name: 'TimeoutError' }
+                );
+                try {
+                    await target.waitFor({ state: 'attached', timeout: Math.min(800, remaining) });
+                    break;
+                } catch (err) {
+                    if (!(err instanceof Error) || err.name !== 'TimeoutError') throw err;
+                    await scroller.evaluate((el) => {
+                        el.scrollLeft = Math.min(el.scrollLeft + el.clientWidth, el.scrollWidth);
+                    });
+                }
             }
         },
 

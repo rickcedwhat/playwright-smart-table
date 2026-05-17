@@ -1,26 +1,49 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, type Mock } from 'vitest';
 import { createGlideViewport } from '../../src/presets/glide/viewport';
 import { createGlide, Glide } from '../../src/presets/glide';
 
-// Build a minimal chainable Playwright locator mock.
-const loc = (overrides: Record<string, any> = {}): any => {
-    const self: any = {
+interface LocatorMock {
+    evaluate: Mock;
+    evaluateAll: Mock;
+    waitFor: Mock;
+    scrollIntoViewIfNeeded: Mock;
+    count: Mock;
+    locator: Mock;
+    first: Mock;
+}
+
+interface PageMock {
+    locator: Mock;
+}
+
+interface ContextMock {
+    page: PageMock;
+    root: LocatorMock;
+    config: Record<string, never>;
+    resolve: Mock;
+    getHeaders: Mock;
+}
+
+const loc = (overrides: Partial<LocatorMock> = {}): LocatorMock => {
+    const self: LocatorMock = {
         evaluate: vi.fn().mockResolvedValue(undefined),
         evaluateAll: vi.fn().mockResolvedValue([]),
         waitFor: vi.fn().mockResolvedValue(undefined),
         scrollIntoViewIfNeeded: vi.fn().mockResolvedValue(undefined),
         count: vi.fn().mockResolvedValue(0),
+        locator: vi.fn(),
+        first: vi.fn(),
         ...overrides,
     };
-    self.locator = overrides.locator ?? vi.fn().mockReturnValue(self);
-    self.first = overrides.first ?? vi.fn().mockReturnValue(self);
+    if (!overrides.locator) self.locator = vi.fn().mockReturnValue(self);
+    if (!overrides.first) self.first = vi.fn().mockReturnValue(self);
     return self;
 };
 
-const ctx = (pageMock: any, headers?: string[]) => ({
+const ctx = (pageMock: PageMock, headers?: string[]): ContextMock => ({
     page: pageMock,
     root: loc(),
-    config: {} as any,
+    config: {} as Record<string, never>,
     resolve: vi.fn(),
     getHeaders: vi.fn().mockResolvedValue(headers ?? Array.from({ length: 60 }, (_, i) => `col${i}`)),
 });
@@ -31,9 +54,8 @@ describe('createGlideViewport — getVisibleColumnRange', () => {
     it('converts 1-based aria-colindex to 0-based range', async () => {
         const viewport = createGlideViewport();
 
-        // Build the locator chain: page.locator(tableRowSel).first().locator(cellSel).evaluateAll(fn)
         const cellLoc = loc({
-            evaluateAll: vi.fn().mockImplementation(async (fn: Function) =>
+            evaluateAll: vi.fn().mockImplementation(async (fn: (els: unknown[]) => unknown) =>
                 fn([
                     { getAttribute: () => '1' },
                     { getAttribute: () => '3' },
@@ -42,19 +64,20 @@ describe('createGlideViewport — getVisibleColumnRange', () => {
             ),
         });
         const rowLoc = loc({ locator: vi.fn().mockReturnValue(cellLoc) });
+        const page: PageMock = { locator: vi.fn().mockReturnValue(rowLoc) };
 
-        const page = { locator: vi.fn().mockReturnValue(rowLoc) };
         const range = await viewport.getVisibleColumnRange!(ctx(page) as any);
-
         // aria-colindex 1,3,6 → 0-based 0,2,5
         expect(range).toEqual({ first: 0, last: 5 });
     });
 
     it('returns {first:0, last:0} when no cells found', async () => {
         const viewport = createGlideViewport();
-        const cellLoc = loc({ evaluateAll: vi.fn().mockImplementation(async (fn: Function) => fn([])) });
+        const cellLoc = loc({
+            evaluateAll: vi.fn().mockImplementation(async (fn: (els: unknown[]) => unknown) => fn([])),
+        });
         const rowLoc = loc({ locator: vi.fn().mockReturnValue(cellLoc) });
-        const page = { locator: vi.fn().mockReturnValue(rowLoc) };
+        const page: PageMock = { locator: vi.fn().mockReturnValue(rowLoc) };
 
         const range = await viewport.getVisibleColumnRange!(ctx(page) as any);
         expect(range).toEqual({ first: 0, last: 0 });
@@ -67,9 +90,8 @@ describe('createGlideViewport — getVisibleRowRange', () => {
     it('converts aria-rowindex (2-based data rows) to 0-based range', async () => {
         const viewport = createGlideViewport();
 
-        // page.locator(rowSel).evaluateAll(fn)
         const rowLoc = loc({
-            evaluateAll: vi.fn().mockImplementation(async (fn: Function) =>
+            evaluateAll: vi.fn().mockImplementation(async (fn: (els: unknown[]) => unknown) =>
                 fn([
                     { getAttribute: () => '2' },  // data row 0
                     { getAttribute: () => '3' },  // data row 1
@@ -77,7 +99,7 @@ describe('createGlideViewport — getVisibleRowRange', () => {
                 ])
             ),
         });
-        const page = { locator: vi.fn().mockReturnValue(rowLoc) };
+        const page: PageMock = { locator: vi.fn().mockReturnValue(rowLoc) };
 
         const range = await viewport.getVisibleRowRange!(ctx(page) as any);
         expect(range).toEqual({ first: 0, last: 9 });
@@ -85,8 +107,10 @@ describe('createGlideViewport — getVisibleRowRange', () => {
 
     it('returns {first:0, last:0} when no rows found', async () => {
         const viewport = createGlideViewport();
-        const rowLoc = loc({ evaluateAll: vi.fn().mockImplementation(async (fn: Function) => fn([])) });
-        const page = { locator: vi.fn().mockReturnValue(rowLoc) };
+        const rowLoc = loc({
+            evaluateAll: vi.fn().mockImplementation(async (fn: (els: unknown[]) => unknown) => fn([])),
+        });
+        const page: PageMock = { locator: vi.fn().mockReturnValue(rowLoc) };
 
         const range = await viewport.getVisibleRowRange!(ctx(page) as any);
         expect(range).toEqual({ first: 0, last: 0 });
@@ -99,21 +123,20 @@ describe('createGlideViewport — scrollToColumn', () => {
     it('passes colIndex and header-derived column count to the scroller evaluate', async () => {
         const viewport = createGlideViewport();
 
-        let capturedArgs: any;
+        let capturedArgs: { idx: number; count: number } | undefined;
         const scrollerLoc = loc({
-            evaluate: vi.fn().mockImplementation(async (_fn: Function, args: any) => {
+            evaluate: vi.fn().mockImplementation(async (_fn: unknown, args: { idx: number; count: number }) => {
                 capturedArgs = args;
             }),
         });
         const cellLoc = loc({ waitFor: vi.fn().mockResolvedValue(undefined) });
 
-        const page = {
+        const page: PageMock = {
             locator: vi.fn().mockImplementation((sel: string) =>
                 sel.includes('dvn-scroller') ? scrollerLoc : cellLoc
             ),
         };
 
-        // 100-column header list
         const headers = Array.from({ length: 100 }, (_, i) => `col${i}`);
         await viewport.scrollToColumn!(ctx(page, headers) as any, 50);
         expect(capturedArgs).toEqual({ idx: 50, count: 100 });
@@ -123,12 +146,12 @@ describe('createGlideViewport — scrollToColumn', () => {
         const viewport = createGlideViewport();
         let capturedCount: number | undefined;
         const scrollerLoc = loc({
-            evaluate: vi.fn().mockImplementation(async (_fn: Function, args: any) => {
+            evaluate: vi.fn().mockImplementation(async (_fn: unknown, args: { idx: number; count: number }) => {
                 capturedCount = args.count;
             }),
         });
         const cellLoc = loc();
-        const page = {
+        const page: PageMock = {
             locator: vi.fn().mockImplementation((sel: string) =>
                 sel.includes('dvn-scroller') ? scrollerLoc : cellLoc
             ),
@@ -138,25 +161,63 @@ describe('createGlideViewport — scrollToColumn', () => {
         expect(capturedCount).toBe(60);
     });
 
-    it('uses 800ms for the fast-path waitFor, falling back to attachTimeout on retry', async () => {
+    it('caps per-iteration timeout to 800ms and nudges scroller on each TimeoutError', async () => {
+        // attachTimeout=1500 — well above 800ms, so each iteration uses 800ms
         const viewport = createGlideViewport({ attachTimeout: 1500 });
-        const scrollerLoc = loc();
-        // First waitFor rejects with a TimeoutError (fast-path miss), second resolves (after nudge)
+        const scrollerEvaluate = vi.fn().mockResolvedValue(undefined);
+        const scrollerLoc = loc({ evaluate: scrollerEvaluate });
+
         const timeoutErr = Object.assign(new Error('Timeout 800ms exceeded'), { name: 'TimeoutError' });
         const waitFor = vi.fn()
             .mockRejectedValueOnce(timeoutErr)
             .mockResolvedValueOnce(undefined);
         const cellLoc = loc({ waitFor });
 
-        const page = {
+        const page: PageMock = {
             locator: vi.fn().mockImplementation((sel: string) =>
                 sel.includes('dvn-scroller') ? scrollerLoc : cellLoc
             ),
         };
 
         await viewport.scrollToColumn!(ctx(page) as any, 15);
+        // Both iterations use Math.min(800, remaining) which is 800 when attachTimeout=1500
         expect(waitFor).toHaveBeenNthCalledWith(1, { state: 'attached', timeout: 800 });
-        expect(waitFor).toHaveBeenNthCalledWith(2, { state: 'attached', timeout: 1500 });
+        expect(waitFor).toHaveBeenNthCalledWith(2, { state: 'attached', timeout: 800 });
+        // Scroller was nudged once between the two waitFor calls
+        expect(scrollerEvaluate).toHaveBeenCalledTimes(2); // ratio seek + nudge
+    });
+
+    it('caps iteration timeout to remaining budget when attachTimeout < 800ms', async () => {
+        // attachTimeout=200 — below 800ms, so first iteration is capped at 200ms
+        const viewport = createGlideViewport({ attachTimeout: 200 });
+        const scrollerLoc = loc();
+        const waitFor = vi.fn().mockResolvedValue(undefined);
+        const cellLoc = loc({ waitFor });
+
+        const page: PageMock = {
+            locator: vi.fn().mockImplementation((sel: string) =>
+                sel.includes('dvn-scroller') ? scrollerLoc : cellLoc
+            ),
+        };
+
+        await viewport.scrollToColumn!(ctx(page) as any, 15);
+        const [[{ timeout }]] = waitFor.mock.calls;
+        expect(timeout).toBeLessThanOrEqual(200);
+    });
+
+    it('rethrows non-TimeoutErrors immediately', async () => {
+        const viewport = createGlideViewport();
+        const scrollerLoc = loc();
+        const networkErr = new Error('network error');
+        const cellLoc = loc({ waitFor: vi.fn().mockRejectedValue(networkErr) });
+
+        const page: PageMock = {
+            locator: vi.fn().mockImplementation((sel: string) =>
+                sel.includes('dvn-scroller') ? scrollerLoc : cellLoc
+            ),
+        };
+
+        await expect(viewport.scrollToColumn!(ctx(page) as any, 5)).rejects.toThrow('network error');
     });
 
     it('waits for the correct aria-colindex selector', async () => {
@@ -166,7 +227,7 @@ describe('createGlideViewport — scrollToColumn', () => {
         const cellLoc = loc({ waitFor });
 
         let requestedSel = '';
-        const page = {
+        const page: PageMock = {
             locator: vi.fn().mockImplementation((sel: string) => {
                 if (sel.includes('dvn-scroller')) return scrollerLoc;
                 requestedSel = sel;
@@ -184,15 +245,15 @@ describe('createGlideViewport — scrollToColumn', () => {
         const scrollerLoc = loc({ evaluate: scrollerEvaluate });
         const cellLoc = loc({ waitFor: vi.fn().mockResolvedValue(undefined) });
 
-        const page = {
+        const page: PageMock = {
             locator: vi.fn().mockImplementation((sel: string) =>
                 sel.includes('dvn-scroller') ? scrollerLoc : cellLoc
             ),
         };
 
-        const emptyCtx = { ...ctx(page, []), getHeaders: vi.fn().mockResolvedValue([]) };
+        const emptyCtx: ContextMock = { ...ctx(page, []), getHeaders: vi.fn().mockResolvedValue([]) };
         await viewport.scrollToColumn!(emptyCtx as any, 5);
-        // evaluate should not have been called for the ratio seek
+        // evaluate should not have been called for the ratio seek (no scroller.evaluate with idx/count)
         expect(scrollerEvaluate).not.toHaveBeenCalled();
     });
 });
@@ -207,7 +268,7 @@ describe('createGlideViewport — scrollToRow', () => {
             count: vi.fn().mockResolvedValue(1),
             scrollIntoViewIfNeeded,
         });
-        const page = { locator: vi.fn().mockReturnValue(rowLoc) };
+        const page: PageMock = { locator: vi.fn().mockReturnValue(rowLoc) };
 
         await viewport.scrollToRow!(ctx(page) as any, 5);
         expect(scrollIntoViewIfNeeded).toHaveBeenCalled();
@@ -216,20 +277,17 @@ describe('createGlideViewport — scrollToRow', () => {
     it('measures row height from DOM and passes it to the scroller evaluate', async () => {
         const viewport = createGlideViewport({ attachTimeout: 2000 });
 
-        let capturedArgs: any;
+        let capturedArgs: { idx: number; height: number } | undefined;
         const scrollerLoc = loc({
-            evaluate: vi.fn().mockImplementation(async (_fn: Function, args: any) => {
+            evaluate: vi.fn().mockImplementation(async (_fn: unknown, args: { idx: number; height: number }) => {
                 capturedArgs = args;
             }),
         });
 
-        // First locator call is for the aria-rowindex row (count=0, not mounted).
-        // Second call is for measuring the first row height (evaluate → 40).
-        // Third call is for the scroller.
         const notMountedRow = loc({ count: vi.fn().mockResolvedValue(0), waitFor: vi.fn().mockResolvedValue(undefined) });
         const firstRowLoc = loc({ evaluate: vi.fn().mockResolvedValue(40) });
 
-        const page = {
+        const page: PageMock = {
             locator: vi.fn().mockImplementation((sel: string) => {
                 if (sel.includes('dvn-scroller')) return scrollerLoc;
                 if (sel === 'table[role="grid"] tbody tr') return firstRowLoc;
@@ -246,14 +304,14 @@ describe('createGlideViewport — scrollToRow', () => {
 
         let capturedHeight: number | undefined;
         const scrollerLoc = loc({
-            evaluate: vi.fn().mockImplementation(async (_fn: Function, args: any) => {
+            evaluate: vi.fn().mockImplementation(async (_fn: unknown, args: { idx: number; height: number }) => {
                 capturedHeight = args.height;
             }),
         });
         const notMountedRow = loc({ count: vi.fn().mockResolvedValue(0), waitFor: vi.fn().mockResolvedValue(undefined) });
         const firstRowLoc = loc({ evaluate: vi.fn().mockRejectedValue(new Error('not found')) });
 
-        const page = {
+        const page: PageMock = {
             locator: vi.fn().mockImplementation((sel: string) => {
                 if (sel.includes('dvn-scroller')) return scrollerLoc;
                 if (sel === 'table[role="grid"] tbody tr') return firstRowLoc;
@@ -273,7 +331,7 @@ describe('createGlideViewport — scrollToRow', () => {
         const firstRowLoc = loc({ evaluate: vi.fn().mockResolvedValue(34) });
 
         let requestedSel = '';
-        const page = {
+        const page: PageMock = {
             locator: vi.fn().mockImplementation((sel: string) => {
                 if (sel.includes('dvn-scroller')) return scrollerLoc;
                 if (sel === 'table[role="grid"] tbody tr') return firstRowLoc;
@@ -304,7 +362,6 @@ describe('Glide preset — viewport replaces navigation', () => {
     it('createGlide passes options through to the viewport', () => {
         const a = createGlide({ attachTimeout: 1000 });
         const b = createGlide({ attachTimeout: 5000 });
-        // Different options → different viewport instances
         expect(a.strategies?.viewport).not.toBe(b.strategies?.viewport);
     });
 });
