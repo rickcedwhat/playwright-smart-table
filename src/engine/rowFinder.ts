@@ -229,6 +229,7 @@ export class RowFinder<T = any> {
                     const pagesJumped = typeof paginationResult === 'number' ? paginationResult : 1;
                     this.tableState.currentPageIndex += pagesJumped;
                     pagesScanned += pagesJumped;
+                    logDebug(this.config, 'verbose', `findRowLocator: advanced ${pagesJumped} page(s), now at page ${this.tableState.currentPageIndex}`);
                     await debugDelay(this.config, 'pagination');
                     continue;
                 } else {
