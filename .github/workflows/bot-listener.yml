@@ -75,6 +75,17 @@ jobs:
     permissions:
       issues: write
     steps:
+      - name: Acknowledge
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.BOT_PAT }}
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: '🔍 Running upstream check now...'
+            });
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
@@ -93,6 +104,30 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.BOT_PAT }}
         run: node scripts/check-upstream-blockers.mjs
+      - name: Post still-blocked status
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.BOT_PAT }}
+          script: |
+            // Only post if the check script didn't already post a cleared comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const justCleared = comments.some(
+              c => c.user.login === 'rickcedwhat-ai' &&
+                   c.body.includes('Upstream blocker cleared')
+            );
+            if (!justCleared) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: '⏳ Still blocked — upstream dependency not yet satisfied.'
+              });
+            }
 
   # ── upstream schedule ──────────────────────────────────────────────────────
   upstream-schedule:
@@ -287,6 +322,63 @@ jobs:
               body: `⏱️ CodeRabbit review scheduled in **${{ needs.parse.outputs.args }}**.`
             });
 
+  # ── reminder ───────────────────────────────────────────────────────────────
+  reminder:
+    name: reminder
+    needs: parse
+    if: |
+      needs.parse.outputs.valid == 'true' &&
+      needs.parse.outputs.namespace == 'reminder'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enqueue reminder via QStash
+        env:
+          QSTASH_TOKEN: ${{ secrets.QSTASH_TOKEN }}
+          BOT_PAT:      ${{ secrets.BOT_PAT }}
+          DELAY_STR:    ${{ needs.parse.outputs.args }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          REPO:         ${{ github.repository }}
+        run: |
+          DELAY_SECS=$(node -e "
+            const s = process.env.DELAY_STR;
+            const m = s.match(/^(\d+)(m|h|d|w)$/);
+            if (!m) { console.error('Invalid delay: ' + s); process.exit(1); }
+            const mult = { m: 60, h: 3600, d: 86400, w: 604800 };
+            console.log(parseInt(m[1]) * mult[m[2]]);
+          ")
+          PAYLOAD=$(node -e "console.log(JSON.stringify({
+            event_type: 'bot-reminder',
+            client_payload: {
+              issue_number: parseInt(process.env.ISSUE_NUMBER),
+              repo: process.env.REPO
+            }
+          }))")
+          DISPATCH_URL="https://api.github.com/repos/$REPO/dispatches"
+          HTTP_CODE=$(curl -s -o /tmp/qstash-response.json -w "%{http_code}" -X POST \
+            "https://qstash.upstash.io/v2/publish/$DISPATCH_URL" \
+            -H "Authorization: Bearer $QSTASH_TOKEN" \
+            -H "Upstash-Delay: ${DELAY_SECS}s" \
+            -H "Upstash-Forward-Authorization: Bearer $BOT_PAT" \
+            -H "Upstash-Forward-Content-Type: application/json" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD")
+          echo "QStash response ($HTTP_CODE): $(cat /tmp/qstash-response.json)"
+          if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+            echo "QStash enqueue failed with HTTP $HTTP_CODE"
+            exit 1
+          fi
+      - name: Confirm
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.BOT_PAT }}
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `⏱️ Reminder set for **${{ needs.parse.outputs.args }}** from now.`
+            });
+
   # ── help / unknown ─────────────────────────────────────────────────────────
   help:
     name: help
@@ -321,6 +413,11 @@ jobs:
                 '| Command | Description |',
                 '|---|---|',
                 '| `@rickcedwhat-ai coderabbit retry <delay>` | Schedule a CodeRabbit review after delay (e.g. `36m`) |',
+                '',
+                '**Anywhere:**',
+                '| Command | Description |',
+                '|---|---|',
+                '| `@rickcedwhat-ai reminder <delay>` | Post a reminder comment here after delay (e.g. `2h`, `1d`) |',
               ].join('\n')
             });
 
