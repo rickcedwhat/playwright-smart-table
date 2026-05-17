@@ -130,10 +130,13 @@ describe('createGlideViewport — scrollToColumn', () => {
         expect(capturedCount).toBe(64);
     });
 
-    it('waits for the target cell with the configured attachTimeout', async () => {
+    it('uses 800ms for the fast-path waitFor, falling back to attachTimeout on retry', async () => {
         const viewport = createGlideViewport({ attachTimeout: 1500 });
         const scrollerLoc = loc();
-        const waitFor = vi.fn().mockResolvedValue(undefined);
+        // First waitFor rejects (fast-path miss), second resolves (after nudge)
+        const waitFor = vi.fn()
+            .mockRejectedValueOnce(new Error('timeout'))
+            .mockResolvedValueOnce(undefined);
         const cellLoc = loc({ waitFor });
 
         const page = {
@@ -143,7 +146,8 @@ describe('createGlideViewport — scrollToColumn', () => {
         };
 
         await viewport.scrollToColumn!(ctx(page) as any, 15);
-        expect(waitFor).toHaveBeenCalledWith({ state: 'attached', timeout: 1500 });
+        expect(waitFor).toHaveBeenNthCalledWith(1, { state: 'attached', timeout: 800 });
+        expect(waitFor).toHaveBeenNthCalledWith(2, { state: 'attached', timeout: 1500 });
     });
 
     it('waits for the correct aria-colindex selector', async () => {

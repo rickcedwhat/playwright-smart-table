@@ -74,11 +74,22 @@ export const createGlideViewport = (options: GlideViewportOptions = {}): Viewpor
                 },
                 { idx: colIndex, count: columnCount }
             );
-            // Wait for Glide to mount the target td in its virtual accessibility window
-            await page
+
+            const target = page
                 .locator(`table[role="grid"] tbody tr td[aria-colindex="${colIndex + 1}"]`)
-                .first()
-                .waitFor({ state: 'attached', timeout: attachTimeout });
+                .first();
+
+            // Fast path: most columns appear quickly after the ratio seek.
+            // If the seek undershoots (e.g. columnCount > actual column count), nudge
+            // the scroller right by one viewport width and retry with the full timeout.
+            try {
+                await target.waitFor({ state: 'attached', timeout: 800 });
+            } catch {
+                await scroller.evaluate((el) => {
+                    el.scrollLeft = Math.min(el.scrollLeft + el.clientWidth, el.scrollWidth);
+                });
+                await target.waitFor({ state: 'attached', timeout: attachTimeout });
+            }
         },
 
         scrollToRow: async ({ page }, rowIndex) => {
