@@ -100,7 +100,7 @@ Running `pnpm run build` executes all generators then compiles TypeScript.
    ```bash
    git fetch origin && git rebase origin/main
    ```
-2. **Always open PRs as drafts** (`gh pr create --draft`). This staggers CodeRabbit reviews and prevents hitting rate limits. Only mark ready when the PR is actually ready for review.
+2. Only open PRs as drafts for genuine WIP. CodeRabbit auto-review is disabled — trigger reviews manually with `@rickcedwhat-ai coderabbit review` when ready.
 
 ## PR Checklist
 
@@ -109,4 +109,3 @@ Running `pnpm run build` executes all generators then compiles TypeScript.
 - [ ] Commit messages follow Conventional Commits
 - [ ] `CHANGELOG.md` updated if version was bumped
 - [ ] `pnpm-lock.yaml` staged if version was bumped
-- [ ] PR opened as draft (`gh pr create --draft`)
