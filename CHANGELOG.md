@@ -10,7 +10,7 @@
 
 ### Changed
 - **Removed `@scarf/scarf`** — Install-time telemetry dependency removed entirely. No analytics are collected. Closes #106.
-- **Glide preset: configurable column count and timing** — `createGlide({ columnCount })` is a new factory export for grids that are not 64 columns wide. The static `Glide` export is unchanged for backward compatibility. Navigation timing overrides (`settleMs`, `maxWaitMs`) are now accepted as options. Closes #104.
+- **Glide preset: `createGlide()` factory + automatic column count** — `scrollToColumn` previously used a hardcoded 64-column cap when computing the scroll ratio; it now reads the real column count from the initialized header map automatically. `createGlide({ attachTimeout })` is exported as a factory for configuring the cell-attach timeout. The static `Glide` spread is unchanged. Closes #104.
 
 ### Fixed
 - **`countRows()` now paginates correctly** — previously only counted rows on the current page; now iterates through all pages up to `config.maxPages` and resets to page 1 afterward. Single-page behavior is unchanged. Closes #154.
