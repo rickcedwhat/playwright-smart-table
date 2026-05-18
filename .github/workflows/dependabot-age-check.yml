@@ -134,21 +134,21 @@ jobs:
                 event_type: 'bot-dependabot-rebase',
                 client_payload: { pr_number: context.payload.pull_request.number, repo }
               });
-              const { execSync } = require('child_process');
-              const curlCmd =
-                `curl -s -o /tmp/qs-age.json -w "%{http_code}" -X POST ` +
-                `"https://qstash.upstash.io/v2/publish/${dispatchUrl}" ` +
-                `-H "Authorization: Bearer ${process.env.QSTASH_TOKEN}" ` +
-                `-H "Upstash-Delay: ${delaySecs}s" ` +
-                `-H "Upstash-Forward-Authorization: Bearer ${process.env.BOT_PAT}" ` +
-                `-H "Upstash-Forward-Content-Type: application/json" ` +
-                `-H "Content-Type: application/json" ` +
-                `-d '${qstashPayload.replace(/'/g, "'\\''")}'`;
-              const httpCode = parseInt(execSync(curlCmd).toString().trim(), 10);
-              if (httpCode >= 200 && httpCode < 300) {
+              const qstashRes = await fetch(`https://qstash.upstash.io/v2/publish/${dispatchUrl}`, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${process.env.QSTASH_TOKEN}`,
+                  'Upstash-Delay': `${delaySecs}s`,
+                  'Upstash-Forward-Authorization': `Bearer ${process.env.BOT_PAT}`,
+                  'Upstash-Forward-Content-Type': 'application/json',
+                  'Content-Type': 'application/json',
+                },
+                body: qstashPayload,
+              });
+              if (qstashRes.ok) {
                 core.info(`✓ Queued @dependabot rebase in ${delaySecs}s (fires ${rebaseAfterISO})`);
               } else {
-                core.warning(`QStash enqueue failed (HTTP ${httpCode}) — rebase will need to be triggered manually when soak period expires`);
+                core.warning(`QStash enqueue failed (HTTP ${qstashRes.status}) — rebase will need to be triggered manually when soak period expires`);
               }
 
               core.setFailed(
