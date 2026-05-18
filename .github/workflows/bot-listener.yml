@@ -310,19 +310,34 @@ jobs:
             await github.rest.issues.addLabels({
               owner, repo, issue_number, labels: ['coderabbit: waiting']
             });
+      - name: Post status comment
+        id: post-status
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.BOT_PAT }}
+          script: |
+            const { data: comment } = await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: '🔄 CodeRabbit review triggered'
+            });
+            core.setOutput('comment_id', comment.id);
       - name: Enqueue bot-coderabbit-trigger via QStash
         env:
-          QSTASH_TOKEN: ${{ secrets.QSTASH_TOKEN }}
-          BOT_PAT:      ${{ secrets.BOT_PAT }}
-          PR_NUMBER:    ${{ github.event.issue.number }}
-          REPO:         ${{ github.repository }}
+          QSTASH_TOKEN:      ${{ secrets.QSTASH_TOKEN }}
+          BOT_PAT:           ${{ secrets.BOT_PAT }}
+          PR_NUMBER:         ${{ github.event.issue.number }}
+          REPO:              ${{ github.repository }}
+          STATUS_COMMENT_ID: ${{ steps.post-status.outputs.comment_id }}
         run: |
           PAYLOAD=$(node -e "console.log(JSON.stringify({
             event_type: 'bot-coderabbit-trigger',
             client_payload: {
               pr_number: parseInt(process.env.PR_NUMBER),
               repo: process.env.REPO,
-              attempt: 1
+              attempt: 1,
+              status_comment_id: parseInt(process.env.STATUS_COMMENT_ID)
             }
           }))")
           DISPATCH_URL="https://api.github.com/repos/$REPO/dispatches"

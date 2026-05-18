@@ -107,23 +107,35 @@ jobs:
         with:
           github-token: ${{ secrets.BOT_PAT }}
           script: |
-            const { pr_number, repo } = context.payload.client_payload;
+            const { pr_number, repo, attempt, status_comment_id } = context.payload.client_payload;
             const [owner, repoName] = repo.split('/');
             const { data: comment } = await github.rest.issues.createComment({
               owner, repo: repoName, issue_number: pr_number,
               body: '@coderabbitai full review'
             });
             core.setOutput('trigger_time', comment.created_at);
+            // Update the living status comment to show we're waiting
+            if (status_comment_id) {
+              try {
+                await github.rest.issues.updateComment({
+                  owner, repo: repoName, comment_id: status_comment_id,
+                  body: `⏳ Waiting for CodeRabbit response... _(attempt ${attempt})_`
+                });
+              } catch (e) {
+                core.warning(`Could not update status comment: ${e.message}`);
+              }
+            }
 
-      - name: Enqueue bot-coderabbit-check via QStash (90s delay)
+      - name: Enqueue bot-coderabbit-check via QStash (180s delay)
         if: steps.check-attempt.outputs.stop != 'true'
         env:
-          QSTASH_TOKEN:  ${{ secrets.QSTASH_TOKEN }}
-          BOT_PAT:       ${{ secrets.BOT_PAT }}
-          PR_NUMBER:     ${{ github.event.client_payload.pr_number }}
-          REPO:          ${{ github.event.client_payload.repo }}
-          ATTEMPT:       ${{ github.event.client_payload.attempt }}
-          TRIGGER_TIME:  ${{ steps.post-review.outputs.trigger_time }}
+          QSTASH_TOKEN:      ${{ secrets.QSTASH_TOKEN }}
+          BOT_PAT:           ${{ secrets.BOT_PAT }}
+          PR_NUMBER:         ${{ github.event.client_payload.pr_number }}
+          REPO:              ${{ github.event.client_payload.repo }}
+          ATTEMPT:           ${{ github.event.client_payload.attempt }}
+          TRIGGER_TIME:      ${{ steps.post-review.outputs.trigger_time }}
+          STATUS_COMMENT_ID: ${{ github.event.client_payload.status_comment_id }}
         run: |
           PAYLOAD=$(node -e "console.log(JSON.stringify({
             event_type: 'bot-coderabbit-check',
@@ -132,14 +144,15 @@ jobs:
               repo: process.env.REPO,
               attempt: parseInt(process.env.ATTEMPT),
               trigger_time: process.env.TRIGGER_TIME,
-              wait_count: 0
+              wait_count: 0,
+              status_comment_id: process.env.STATUS_COMMENT_ID ? parseInt(process.env.STATUS_COMMENT_ID) : undefined
             }
           }))")
           DISPATCH_URL="https://api.github.com/repos/$REPO/dispatches"
           HTTP_CODE=$(curl -s -o /tmp/qstash-response.json -w "%{http_code}" -X POST \
             "https://qstash.upstash.io/v2/publish/$DISPATCH_URL" \
             -H "Authorization: Bearer $QSTASH_TOKEN" \
-            -H "Upstash-Delay: 90s" \
+            -H "Upstash-Delay: 180s" \
             -H "Upstash-Forward-Authorization: Bearer $BOT_PAT" \
             -H "Upstash-Forward-Content-Type: application/json" \
             -H "Content-Type: application/json" \
@@ -164,7 +177,7 @@ jobs:
         with:
           github-token: ${{ secrets.BOT_PAT }}
           script: |
-            const { pr_number, repo, attempt, trigger_time, wait_count = 0 } =
+            const { pr_number, repo, attempt, trigger_time, wait_count = 0, status_comment_id } =
               context.payload.client_payload;
             const [owner, repoName] = repo.split('/');
 
@@ -194,6 +207,18 @@ jobs:
                 owner, repo: repoName, sha: pr.head.sha,
                 state, context: 'coderabbit-review', description
               });
+            }
+
+            // Helper: edit the living status comment (no-op if no comment_id)
+            async function updateStatus(body) {
+              if (!status_comment_id) return;
+              try {
+                await github.rest.issues.updateComment({
+                  owner, repo: repoName, comment_id: status_comment_id, body
+                });
+              } catch (e) {
+                core.warning(`Could not update status comment: ${e.message}`);
+              }
             }
 
             // Helper: enqueue QStash
@@ -231,13 +256,14 @@ jobs:
             if (crComments.length === 0) {
               // No response yet — wait up to 5 times then re-trigger
               if (wait_count < 5) {
+                await updateStatus(`⏳ Waiting for CodeRabbit response... _(check ${wait_count + 1}/5)_`);
                 await enqueue('bot-coderabbit-check', {
-                  pr_number, repo, attempt, trigger_time, wait_count: wait_count + 1
+                  pr_number, repo, attempt, trigger_time, wait_count: wait_count + 1, status_comment_id
                 }, 60);
               } else {
-                // Re-trigger with incremented attempt
+                await updateStatus(`🔄 Re-triggering CodeRabbit review _(attempt ${attempt + 1})_`);
                 await enqueue('bot-coderabbit-trigger', {
-                  pr_number, repo, attempt: attempt + 1
+                  pr_number, repo, attempt: attempt + 1, status_comment_id
                 }, 0);
               }
               return;
@@ -262,8 +288,9 @@ jobs:
               // Add 1 minute buffer
               delaySecs += 60;
 
+              await updateStatus(`⚠️ Rate limited — retrying in ~${Math.round(delaySecs / 60)}m`);
               await enqueue('bot-coderabbit-trigger', {
-                pr_number, repo, attempt: attempt + 1
+                pr_number, repo, attempt: attempt + 1, status_comment_id
               }, delaySecs);
               return;
             }
@@ -299,22 +326,25 @@ jobs:
               if (unresolvedCR.length > 0) {
                 await swapLabel('coderabbit: unresolved');
                 await postStatus('failure', 'CodeRabbit has unresolved comments');
+                await updateStatus(`⚠️ Review complete — ${unresolvedCR.length} unresolved thread${unresolvedCR.length > 1 ? 's' : ''} remain`);
               } else {
                 await swapLabel('coderabbit: complete');
                 await postStatus('success', 'CodeRabbit review complete');
+                await updateStatus('✅ No actionable comments — review complete');
               }
               return;
             }
 
             // Response found but not clearly a review yet — wait one more cycle
             if (wait_count < 5) {
+              await updateStatus(`⏳ Waiting for CodeRabbit response... _(check ${wait_count + 1}/5)_`);
               await enqueue('bot-coderabbit-check', {
-                pr_number, repo, attempt, trigger_time, wait_count: wait_count + 1
+                pr_number, repo, attempt, trigger_time, wait_count: wait_count + 1, status_comment_id
               }, 60);
             } else {
-              // Give up and mark waiting → re-enqueue trigger
+              await updateStatus(`🔄 Re-triggering CodeRabbit review _(attempt ${attempt + 1})_`);
               await enqueue('bot-coderabbit-trigger', {
-                pr_number, repo, attempt: attempt + 1
+                pr_number, repo, attempt: attempt + 1, status_comment_id
               }, 0);
             }
 
