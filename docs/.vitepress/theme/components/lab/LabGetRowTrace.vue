@@ -24,31 +24,38 @@ const TARGET_CELL  = 'Office'
 const TARGET_VALUE = 'Sydney'
 const targetPage   = pages.findIndex(p => p.some(r => r.name === TARGET_NAME))
 
-// idle → checking → rejected (user clicks Next) | found → asserting → done
-type Phase = 'idle' | 'checking' | 'rejected' | 'found' | 'asserting' | 'done'
+type Scenario = 'success' | 'exhausted'
+const scenario  = ref<Scenario>('success')
+const started   = ref(false)
+const MAX_PAGES: Record<Scenario, number> = { success: 5, exhausted: 2 }
+
+// idle → checking → rejected (user clicks Next) | found → asserting → done | exhausted
+type Phase = 'idle' | 'checking' | 'rejected' | 'found' | 'asserting' | 'done' | 'exhausted'
 const phase   = ref<Phase>('idle')
 const pageIdx = ref(0)
 
 const currentRows = computed(() => pages[pageIdx.value])
 
 function rowState(name: string): 'idle' | 'checking' | 'rejected' | 'match' {
-  if (phase.value === 'idle')     return 'idle'
-  if (phase.value === 'checking') return 'checking'
-  if (phase.value === 'rejected') return 'rejected'
+  if (phase.value === 'idle')       return 'idle'
+  if (phase.value === 'checking')   return 'checking'
+  if (phase.value === 'rejected' || phase.value === 'exhausted') return 'rejected'
   if (phase.value === 'found' || phase.value === 'asserting' || phase.value === 'done')
     return name === TARGET_NAME ? 'match' : 'rejected'
   return 'idle'
 }
 
 const statusText = computed(() => {
-  if (phase.value === 'idle')     return ''
-  if (phase.value === 'checking') return `checking page ${pageIdx.value + 1}…`
-  if (phase.value === 'rejected') return `no match on page ${pageIdx.value + 1}`
-  if (phase.value === 'found')    return `✓ found on page ${pageIdx.value + 1}`
+  if (phase.value === 'idle')       return ''
+  if (phase.value === 'checking')   return `checking page ${pageIdx.value + 1}…`
+  if (phase.value === 'rejected')   return `no match on page ${pageIdx.value + 1}`
+  if (phase.value === 'exhausted')  return `✗ maxPages (${MAX_PAGES[scenario.value]}) exhausted — row not found`
+  if (phase.value === 'found')      return `✓ found on page ${pageIdx.value + 1}`
   if (phase.value === 'asserting' || phase.value === 'done') return `✓ '${TARGET_VALUE}' matches`
   return ''
 })
-const statusOk = computed(() => ['found','asserting','done'].includes(phase.value))
+const statusOk  = computed(() => ['found','asserting','done'].includes(phase.value))
+const statusErr = computed(() => phase.value === 'exhausted')
 
 const timers: ReturnType<typeof setTimeout>[] = []
 function after(ms: number, fn: () => void) { timers.push(setTimeout(fn, ms)) }
@@ -57,16 +64,26 @@ onUnmounted(() => timers.forEach(clearTimeout))
 function landOnPage() {
   phase.value = 'checking'
   after(700, () => {
-    if (pageIdx.value === targetPage) {
+    if (pageIdx.value === targetPage && scenario.value === 'success') {
       phase.value = 'found'
       after(1000, () => {
         phase.value = 'asserting'
         after(1800, () => { phase.value = 'done' })
       })
     } else {
-      phase.value = 'rejected'
+      // Check if we've hit maxPages limit
+      if (pageIdx.value + 1 >= MAX_PAGES[scenario.value]) {
+        phase.value = 'exhausted'
+      } else {
+        phase.value = 'rejected'
+      }
     }
   })
+}
+
+function onStart() {
+  started.value = true
+  landOnPage()
 }
 
 function onNext() {
@@ -76,30 +93,52 @@ function onNext() {
   after(200, () => landOnPage())
 }
 
-function onReplay() {
+function reset() {
   timers.forEach(clearTimeout)
   timers.length = 0
   phase.value = 'idle'
   pageIdx.value = 0
-  after(300, () => landOnPage())
+  started.value = false
 }
 
-// auto-start
-landOnPage()
+function setScenario(s: Scenario) {
+  if (scenario.value === s) return
+  scenario.value = s
+  reset()
+}
 </script>
 
 <template>
   <div class="grt">
+
+    <!-- Scenario toggle -->
+    <div class="grt-toggle-row">
+      <button
+        class="grt-toggle-btn"
+        :class="{ 'grt-toggle-btn--active': scenario === 'success' }"
+        @click="setScenario('success')"
+      >✓ Success (maxPages: 5)</button>
+      <button
+        class="grt-toggle-btn grt-toggle-btn--err"
+        :class="{ 'grt-toggle-btn--active': scenario === 'exhausted' }"
+        @click="setScenario('exhausted')"
+      >✗ maxPages exhausted (maxPages: 2)</button>
+    </div>
 
     <!-- Code panel -->
     <div class="grt-editor">
       <div class="grt-code-block" :class="phase === 'asserting' || phase === 'done' ? 'grt-block--muted' : 'grt-block--on'">
         <div class="grt-ln"><span class="t-kw">const</span><span class="t-dim">&nbsp;</span><span class="t-var">row</span><span class="t-dim"> = </span><span class="t-kw">await</span><span class="t-dim">&nbsp;</span><span class="t-root">table</span><span class="t-dim">.</span><span class="t-fn">findRow</span><span class="t-brace">(</span></div>
         <div class="grt-ln"><span class="t-indent">&nbsp;&nbsp;</span><span class="t-brace">{</span><span class="t-dim"> </span><span class="t-prop">Name</span><span class="t-dim">: </span><span class="t-str">'{{ TARGET_NAME }}'</span><span class="t-dim"> </span><span class="t-brace">}</span><span class="t-dim">,</span></div>
-        <div class="grt-ln"><span class="t-indent">&nbsp;&nbsp;</span><span class="t-brace">{</span><span class="t-dim"> </span><span class="t-prop">maxPages</span><span class="t-dim">: </span><span class="t-num">5</span><span class="t-dim"> </span><span class="t-brace">}</span></div>
+        <div class="grt-ln">
+          <span class="t-indent">&nbsp;&nbsp;</span><span class="t-brace">{</span><span class="t-dim"> </span><span class="t-prop">maxPages</span><span class="t-dim">: </span>
+          <span class="t-num" :class="{ 'grt-num--err': scenario === 'exhausted' }">{{ MAX_PAGES[scenario] }}</span>
+          <span class="t-dim"> </span><span class="t-brace">}</span>
+        </div>
         <div class="grt-ln"><span class="t-brace">)</span></div>
         <transition name="grt-fade">
-          <div v-if="phase !== 'idle'" class="grt-ln grt-status" :class="statusOk ? 'grt-status--ok' : 'grt-status--dim'">
+          <div v-if="phase !== 'idle'" class="grt-ln grt-status"
+            :class="statusErr ? 'grt-status--err' : statusOk ? 'grt-status--ok' : 'grt-status--dim'">
             <span class="t-dim">// </span>{{ statusText }}
           </div>
         </transition>
@@ -124,19 +163,27 @@ landOnPage()
       <div class="grt-table-head">
         <span class="grt-page-label">Page {{ pageIdx + 1 }} / {{ pages.length }}</span>
         <div class="grt-dots">
-          <span v-for="(_, i) in pages" :key="i" class="grt-dot" :class="{ 'grt-dot--active': i === pageIdx }" />
+          <span v-for="(_, i) in pages" :key="i" class="grt-dot"
+            :class="{
+              'grt-dot--active': i === pageIdx,
+              'grt-dot--exhausted': scenario === 'exhausted' && i >= MAX_PAGES[scenario]
+            }" />
         </div>
-        <button
-          v-if="phase !== 'done'"
-          class="grt-btn"
-          :class="{ 'grt-btn--ready': phase === 'rejected' }"
-          :disabled="phase !== 'rejected'"
-          @click="onNext"
-        >Next →</button>
-        <button v-else class="grt-btn grt-btn--replay" @click="onReplay">↺ Replay</button>
+        <template v-if="!started">
+          <button class="grt-btn grt-btn--ready" @click="onStart">Start →</button>
+        </template>
+        <template v-else-if="phase !== 'done' && phase !== 'exhausted'">
+          <button
+            class="grt-btn"
+            :class="{ 'grt-btn--ready': phase === 'rejected' }"
+            :disabled="phase !== 'rejected'"
+            @click="onNext"
+          >Next →</button>
+        </template>
+        <button v-else class="grt-btn" :class="phase === 'exhausted' ? 'grt-btn--replay-err' : 'grt-btn--replay'" @click="reset">↺ Replay</button>
       </div>
 
-      <div class="grt-table-shell">
+      <div class="grt-table-shell" :class="{ 'grt-table-shell--err': phase === 'exhausted' }">
         <table class="grt-table">
           <thead><tr><th>Name</th><th>Role</th><th>Office</th></tr></thead>
           <tbody>
@@ -148,6 +195,12 @@ landOnPage()
           </tbody>
         </table>
       </div>
+
+      <transition name="grt-fade">
+        <div v-if="phase === 'exhausted'" class="grt-exhausted-note">
+          Row not found within <strong>maxPages: {{ MAX_PAGES[scenario] }}</strong>. Increase <code>maxPages</code> or check the filter.
+        </div>
+      </transition>
     </div>
 
   </div>
@@ -157,14 +210,47 @@ landOnPage()
 .grt {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
-  gap: 16px;
+  grid-template-rows: auto auto;
+  gap: 10px 16px;
   align-items: start;
   margin: 16px 0;
 }
-@media (max-width: 760px) { .grt { grid-template-columns: 1fr; } }
+.grt-toggle-row {
+  grid-column: 1 / -1;
+  display: flex; gap: 6px; flex-wrap: wrap;
+}
+@media (max-width: 760px) {
+  .grt { grid-template-columns: 1fr; }
+  .grt-editor { grid-column: 1; grid-row: auto; }
+  .grt-right  { grid-column: 1; grid-row: auto; }
+}
+
+/* Scenario toggle */
+.grt-toggle-btn {
+  font-size: 0.71rem; font-weight: 600;
+  padding: 3px 11px; border-radius: 6px;
+  border: 1px solid var(--vp-c-divider);
+  background: var(--vp-c-bg-soft);
+  color: var(--vp-c-text-2);
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+}
+.grt-toggle-btn--active {
+  border-color: var(--vp-c-brand-1);
+  color: var(--vp-c-brand-1);
+  background: color-mix(in srgb, var(--vp-c-brand-1) 8%, var(--vp-c-bg-soft));
+}
+.grt-toggle-btn--err.grt-toggle-btn--active {
+  border-color: #f87171;
+  color: #f87171;
+  background: color-mix(in srgb, #ef4444 8%, var(--vp-c-bg-soft));
+}
 
 /* Editor */
 .grt-editor {
+  grid-row: 2;
+  grid-column: 1;
+  align-self: start;
   background: #1e1e1e;
   border: 1px solid #2d2d2d;
   border-radius: 10px;
@@ -189,15 +275,17 @@ landOnPage()
 .t-prop  { color: #9cdcfe; }
 .t-str   { color: #ce9178; }
 .t-num   { color: #b5cea8; }
+.t-num.grt-num--err { color: #f87171; }
 .t-brace { color: #da70d6; }
 .t-dim   { color: #858585; }
 
 .grt-status { font-size: 0.72rem; }
 .grt-status--dim { color: #858585; }
 .grt-status--ok  { color: #4ec994; }
+.grt-status--err { color: #f87171; }
 
 /* Right panel */
-.grt-right { display: flex; flex-direction: column; gap: 8px; }
+.grt-right { grid-row: 2; grid-column: 2; align-self: start; display: flex; flex-direction: column; gap: 8px; }
 .grt-table-head { display: flex; align-items: center; gap: 10px; }
 .grt-page-label {
   font-size: 0.69rem; font-weight: 700; text-transform: uppercase;
@@ -210,6 +298,7 @@ landOnPage()
   transition: background 0.25s, transform 0.25s;
 }
 .grt-dot--active { background: var(--vp-c-brand-1); transform: scale(1.35); }
+.grt-dot--exhausted { background: color-mix(in srgb, #ef4444 40%, var(--vp-c-divider)); }
 
 .grt-btn {
   margin-left: auto;
@@ -232,23 +321,31 @@ landOnPage()
   background: color-mix(in srgb, var(--vp-c-brand-1) 15%, var(--vp-c-bg-soft));
 }
 .grt-btn--replay {
-  border-color: #22c55e;
-  color: #22c55e;
+  border-color: #22c55e; color: #22c55e;
   background: color-mix(in srgb, #22c55e 8%, var(--vp-c-bg-soft));
   cursor: pointer;
   box-shadow: 0 0 0 2px color-mix(in srgb, #22c55e 20%, transparent);
 }
-.grt-btn--replay:hover {
-  background: color-mix(in srgb, #22c55e 15%, var(--vp-c-bg-soft));
+.grt-btn--replay:hover { background: color-mix(in srgb, #22c55e 15%, var(--vp-c-bg-soft)); }
+.grt-btn--replay-err {
+  border-color: #f87171; color: #f87171;
+  background: color-mix(in srgb, #ef4444 8%, var(--vp-c-bg-soft));
+  cursor: pointer;
+  box-shadow: 0 0 0 2px color-mix(in srgb, #ef4444 20%, transparent);
 }
+.grt-btn--replay-err:hover { background: color-mix(in srgb, #ef4444 15%, var(--vp-c-bg-soft)); }
 
 /* Table */
 .grt-table-shell {
   border: 1px solid color-mix(in srgb, var(--vp-c-divider) 85%, transparent);
   border-radius: 10px; overflow: hidden; background: var(--vp-c-bg);
   display: flex; justify-content: center;
+  transition: border-color 0.3s;
 }
-.grt-table { width: auto; min-width: 260px; border-collapse: collapse; font-size: 0.76rem; }
+.grt-table-shell--err {
+  border-color: color-mix(in srgb, #ef4444 45%, var(--vp-c-divider));
+}
+.grt-table { width: auto; min-width: 260px; border-collapse: collapse; font-size: 0.76rem; margin: 0; }
 .grt-table th, .grt-table td {
   padding: 7px 10px;
   border-bottom: 1px solid color-mix(in srgb, var(--vp-c-divider) 70%, transparent);
@@ -278,6 +375,20 @@ landOnPage()
   transition: background 0.25s;
 }
 .grt-row--match td:first-child { box-shadow: inset 3px 0 0 #22c55e; }
+
+/* Exhausted note */
+.grt-exhausted-note {
+  font-size: 0.72rem; line-height: 1.5;
+  padding: 8px 12px; border-radius: 8px;
+  background: color-mix(in srgb, #ef4444 8%, var(--vp-c-bg-soft));
+  border: 1px solid color-mix(in srgb, #ef4444 30%, var(--vp-c-divider));
+  color: var(--vp-c-text-2);
+}
+.grt-exhausted-note strong { color: #f87171; }
+.grt-exhausted-note code {
+  font-size: 0.69rem; padding: 1px 4px; border-radius: 3px;
+  background: color-mix(in srgb, var(--vp-c-bg) 60%, transparent);
+}
 
 /* Transition */
 .grt-fade-enter-active, .grt-fade-leave-active { transition: opacity 0.2s, transform 0.2s; }
