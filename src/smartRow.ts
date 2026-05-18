@@ -439,10 +439,6 @@ const createSmartRow = <T = any>(
                 rowIndex,
                 barrier: (smart as any)._barrier
             });
-            if (navigatedCell && (navigatedCell as any)._locator) {
-                (smartCell as any)._locator = (navigatedCell as any)._locator;
-            }
-
             // Run beforeCellRead hook (same as toJSON does after navigation).
             if (config.strategies.beforeCellRead) {
                 const getHeaderCell = table?.getHeaderCell
