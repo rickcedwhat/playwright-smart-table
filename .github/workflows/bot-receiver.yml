@@ -270,12 +270,27 @@ jobs:
               c => /## Summary|walkthrough/i.test(c.body) && c.body.length > 500
             );
             if (reviewComment) {
-              // Check for unresolved CodeRabbit review threads
-              const { data: reviewComments } = await github.rest.pulls.listReviewComments({
-                owner, repo: repoName, pull_number: pr_number
-              });
-              const unresolvedCR = reviewComments.filter(
-                c => c.user.login === 'coderabbitai[bot]'
+              // Check unresolved CodeRabbit threads via GraphQL (REST listReviewComments
+              // does not expose thread resolution state)
+              const gqlResult = await github.graphql(`
+                query($owner: String!, $repo: String!, $number: Int!) {
+                  repository(owner: $owner, name: $repo) {
+                    pullRequest(number: $number) {
+                      reviewThreads(first: 100) {
+                        nodes {
+                          isResolved
+                          comments(first: 1) {
+                            nodes { author { login } }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              `, { owner, repo: repoName, number: pr_number });
+              const unresolvedCR = gqlResult.repository.pullRequest.reviewThreads.nodes.filter(
+                t => !t.isResolved &&
+                     t.comments.nodes[0]?.author?.login === 'coderabbitai[bot]'
               );
 
               if (unresolvedCR.length > 0) {
