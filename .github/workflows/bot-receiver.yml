@@ -339,9 +339,13 @@ jobs:
                 }
               `, { owner, repo: repoName, number: pr_number });
 
+              // GraphQL author.login for the CR bot is 'coderabbitai' (no '[bot]' suffix),
+              // unlike the REST API which returns 'coderabbitai[bot]'. Use startsWith to
+              // handle both forms defensively.
+              const isCR = (login) => login?.startsWith('coderabbitai');
+
               const unresolvedCR = gqlResult.repository.pullRequest.reviewThreads.nodes.filter(
-                t => !t.isResolved &&
-                     t.comments.nodes[0]?.author?.login === 'coderabbitai[bot]'
+                t => !t.isResolved && isCR(t.comments.nodes[0]?.author?.login)
               );
 
               // Nitpick comments are posted in a formal review body (state: COMMENTED)
@@ -349,7 +353,7 @@ jobs:
               // submitted after trigger_time as unresolved feedback.
               const triggerDate = new Date(trigger_time);
               const crNitpickReviews = gqlResult.repository.pullRequest.reviews.nodes.filter(
-                r => r.author?.login === 'coderabbitai[bot]' &&
+                r => isCR(r.author?.login) &&
                      r.state === 'COMMENTED' &&
                      new Date(r.submittedAt) > triggerDate &&
                      r.body.trim().length > 0
