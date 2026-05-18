@@ -2,12 +2,22 @@
 
 ## [Unreleased]
 
+## [6.13.0] - 2026-05-18
+
 ### Added
 - **`SmartCell` type and `getCell()` drop-in upgrade** — `SmartRow.getCell(column)` now returns a `SmartCell` (a `Locator` extended with `bringIntoView(): Promise<void>`). Calling `bringIntoView()` runs the full single-cell navigation pipeline (`_navigateToCell` + `beforeCellRead` hook), so `expect(row.getCell('Region')).toHaveText(...)` works correctly on horizontally virtualized grids without any extra boilerplate. `SmartCell` is exported from the package's public surface. Closes #43.
-- **Unit tests for `mapColumn` / `getColumnValues`** — Dedicated Vitest unit tests covering single-column extraction, whitespace trimming, empty-table edge case, `bringIntoView` call verification, `columnOverrides.read` delegation, column-not-found error (including fuzzy-match suggestions), and `maxPages` option. Closes #84.
+- **`pageIndex` in iteration callbacks** — `RowIterationContext` (used by `forEach`, `map`, `filter`, and `for await...of`) now includes a 0-based `pageIndex` so callbacks can detect page boundaries without external state. Closes #148.
 
 ### Changed
 - **Removed `@scarf/scarf`** — Install-time telemetry dependency removed entirely. No analytics are collected. Closes #106.
+- **Glide preset: `createGlide()` factory + automatic column count** — `scrollToColumn` previously used a hardcoded 64-column cap when computing the scroll ratio; it now reads the real column count from the initialized header map automatically. `createGlide({ attachTimeout })` is exported as a factory for configuring the cell-attach timeout. The static `Glide` spread is unchanged. Closes #104.
+
+### Fixed
+- **`countRows()` now paginates correctly** — previously only counted rows on the current page; now iterates through all pages up to `config.maxPages` and resets to page 1 afterward. Single-page behavior is unchanged. Closes #154.
+- **`debug.slow.pagination` now takes effect** — the delay was never actually applied after page advances. Now fires after every `_advancePage` call across `forEach`/`map`/`filter`, the async iterator, and both `findRow`/`findRows` loops. Closes #117.
+- **Generic `T` propagates through core methods** — `init()`, `getRow()`, `getRowByIndex()`, and `findRow()` were dropping the generic and collapsing to `any`. All four are now correctly typed as `TableResult<T>` / `SmartRow<T>`. `findRows` was already correct. Closes #146.
+- **`parallel` mode is now truly parallel** — `NavigationBarrier` was incorrectly applied to `parallel` mode (same as `synchronized`), negating any throughput benefit. The barrier is now scoped to `synchronized` only. Closes #141.
+- **`scrollToRow` no longer evicts batch rows in synchronized/parallel mode** — `scrollToRow` was called inside the barrier callback, snapping the viewport to one row's position and evicting all other rows in the batch from the DOM. It is now skipped when a barrier is active (i.e. not in sequential mode). Closes #128.
 
 ## [6.12.0] - 2026-05-05
 
