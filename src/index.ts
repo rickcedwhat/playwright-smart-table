@@ -6,6 +6,7 @@ export type {
     TableConfig,
     TableResult,
     SmartRow,
+    SmartCell,
     Selector,
     FilterValue,
     PaginationPrimitives,

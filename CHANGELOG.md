@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Added
+- **`SmartCell` type and `getCell()` drop-in upgrade** — `SmartRow.getCell(column)` now returns a `SmartCell` (a `Locator` extended with `bringIntoView(): Promise<void>`). Calling `bringIntoView()` runs the full single-cell navigation pipeline (`_navigateToCell` + `beforeCellRead` hook), so `expect(row.getCell('Region')).toHaveText(...)` works correctly on horizontally virtualized grids without any extra boilerplate. `SmartCell` is exported from the package's public surface. Closes #43.
 - **Unit tests for `mapColumn` / `getColumnValues`** — Dedicated Vitest unit tests covering single-column extraction, whitespace trimming, empty-table edge case, `bringIntoView` call verification, `columnOverrides.read` delegation, column-not-found error (including fuzzy-match suggestions), and `maxPages` option. Closes #84.
 
 ### Changed
