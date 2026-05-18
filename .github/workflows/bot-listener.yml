@@ -29,12 +29,16 @@ jobs:
           script: |
             const body = context.payload.comment.body.trim();
 
-            // Single-word commands: help
-            const single = body.match(/^@rickcedwhat-ai\s+(help)$/);
+            // Single-word commands: help, review (alias for coderabbit review)
+            const single = body.match(/^@rickcedwhat-ai\s+(help|review)$/);
             if (single) {
+              const word = single[1];
+              // 'review' is a shorthand alias for 'coderabbit review'
+              const namespace = word === 'review' ? 'coderabbit' : word;
+              const subcommand = word === 'review' ? 'review' : '';
               core.setOutput('valid', 'true');
-              core.setOutput('namespace', single[1]);
-              core.setOutput('subcommand', '');
+              core.setOutput('namespace', namespace);
+              core.setOutput('subcommand', subcommand);
               core.setOutput('args', '');
               core.setOutput('is_pr', String(!!context.payload.issue.pull_request));
               return;
@@ -510,7 +514,7 @@ jobs:
                 '**On PRs:**',
                 '| Command | Description |',
                 '|---|---|',
-                '| `@rickcedwhat-ai coderabbit review` | Trigger CodeRabbit review now (auto-retries on rate limit) |',
+                '| `@rickcedwhat-ai review` | Trigger CodeRabbit review now (auto-retries on rate limit) |',
                 '| `@rickcedwhat-ai coderabbit retry <delay>` | Schedule a CodeRabbit review after delay (e.g. `36m`) |',
                 '',
                 '**Anywhere:**',
