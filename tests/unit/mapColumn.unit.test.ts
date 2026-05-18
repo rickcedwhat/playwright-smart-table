@@ -14,6 +14,21 @@ import { runMap } from '../../src/engine/tableIteration';
 import type { TableIterationEnv } from '../../src/engine/tableIteration';
 import type { FinalTableConfig } from '../../src/types';
 
+/** Minimal cell shape returned by makeCell / the mock SmartRow.getCell. */
+interface MockCell {
+  bringIntoView: ReturnType<typeof vi.fn>;
+  innerText: ReturnType<typeof vi.fn>;
+}
+
+/** Minimal row shape used throughout these tests. */
+interface MockRow {
+  rowIndex: number;
+  getCell: (col: string) => MockCell;
+  wasFound: () => boolean;
+  toJSON?: () => Promise<Record<string, unknown>>;
+  table?: unknown;
+}
+
 // ─── Mock ElementTracker so we can run without Playwright ────────────────────
 vi.mock('../../src/utils/elementTracker', () => ({
   ElementTracker: class {
@@ -73,23 +88,23 @@ function makeEnv(
   const rowCount = Math.max(...Object.values(columnValues).map((v) => v.length), 0);
   const config = makeConfig(configOverrides);
 
-  const makeCell = (value: string) => ({
+  const makeCell = (value: string): MockCell => ({
     bringIntoView: vi.fn().mockResolvedValue(undefined),
     innerText: vi.fn().mockResolvedValue(value),
   });
 
-  const makeSmartRow = (_loc: any, _map: any, idx: number) => ({
+  const makeSmartRow = (_loc: unknown, _map: unknown, idx: number): MockRow => ({
     rowIndex: idx,
     getCell: (col: string) => makeCell(columnValues[col]?.[idx] ?? ''),
     toJSON: async () => ({}),
-    table: {} as any,
+    table: {},
     wasFound: () => true,
-  }) as any;
+  });
 
   const fakeLocators = {
     all: async () =>
       Array.from({ length: rowCount }, (_, i) => ({ _rowIndex: i, count: async () => 1 })),
-  } as any;
+  };
 
   const map = new Map(columns.map((c, i) => [c, i]));
 
@@ -98,11 +113,11 @@ function makeEnv(
     getMap: () => map,
     advancePage: async () => false,
     makeSmartRow,
-    createSmartRowArray: (rows: any[]) => rows as any,
+    createSmartRowArray: (rows: unknown[]) => rows,
     config,
-    getPage: () => ({}) as any,
+    getPage: () => ({} as ReturnType<TableIterationEnv<MockRow>['getPage']>),
     getCurrentPageIndex: () => 0,
-  };
+  } as unknown as TableIterationEnv<MockRow>;
 }
 
 // ─── mapColumn semantics (via runMap + getCell) ───────────────────────────────
@@ -163,14 +178,14 @@ describe('mapColumn — single-column value extraction', () => {
     const bringIntoView = vi.fn().mockResolvedValue(undefined);
     const env: TableIterationEnv<any> = {
       ...makeEnv({ Col: ['a', 'b'] }, ['Col']),
-      makeSmartRow: (_loc: any, _map: any, idx: number) => ({
+      makeSmartRow: (_loc: unknown, _map: unknown, idx: number): MockRow => ({
         rowIndex: idx,
         getCell: () => ({
           bringIntoView,
           innerText: vi.fn().mockResolvedValue(['a', 'b'][idx]),
         }),
         wasFound: () => true,
-      }) as any,
+      }),
     };
 
     await runMap(env, async ({ row }) => {
@@ -291,8 +306,7 @@ describe('mapColumn — maxPages option', () => {
       ['Carol', 'Dave'],  // page 1
     ];
 
-    let rowIndex = 0;
-    const env: TableIterationEnv<any> = {
+    const env: TableIterationEnv<MockRow> = {
       getRowLocators: () => ({
         all: async () =>
           data[page].map((name) => ({ _name: name, count: async () => 1 })),
@@ -302,15 +316,15 @@ describe('mapColumn — maxPages option', () => {
         page++;
         return page < data.length;
       },
-      makeSmartRow: (loc: any, _map: any, idx: number) => ({
+      makeSmartRow: (loc: { _name: string }, _map: unknown, idx: number): MockRow => ({
         rowIndex: idx,
         getCell: () => ({
           bringIntoView: vi.fn().mockResolvedValue(undefined),
           innerText: vi.fn().mockResolvedValue(loc._name),
         }),
         wasFound: () => true,
-      }) as any,
-      createSmartRowArray: (rows: any[]) => rows as any,
+      }),
+      createSmartRowArray: (rows: unknown[]) => rows,
       config: makeConfig({ maxPages: 2 }),
       getPage: () => ({}) as any,
       getCurrentPageIndex: () => page,
