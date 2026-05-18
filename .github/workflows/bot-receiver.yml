@@ -7,6 +7,8 @@ on:
   repository_dispatch:
     types:
       - bot-coderabbit-retry
+      - bot-coderabbit-trigger
+      - bot-coderabbit-check
       - bot-upstream-check
       - bot-upstream-nudge
       - bot-dependabot-rebase
@@ -32,6 +34,286 @@ jobs:
               issue_number: pr_number,
               body: '@coderabbitai full review'
             });
+
+  # ── coderabbit trigger ─────────────────────────────────────────────────────
+  coderabbit-trigger:
+    name: Trigger CodeRabbit review
+    runs-on: ubuntu-latest
+    if: github.event.action == 'bot-coderabbit-trigger'
+    steps:
+      - name: Check attempt limit
+        id: check-attempt
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.BOT_PAT }}
+          script: |
+            const { pr_number, repo, attempt } = context.payload.client_payload;
+            const [owner, repoName] = repo.split('/');
+            if (attempt > 10) {
+              await github.rest.issues.createComment({
+                owner, repo: repoName, issue_number: pr_number,
+                body: '❌ CodeRabbit review failed after 10 attempts. Please trigger manually.'
+              });
+              // Swap label back to not started
+              const { data: labels } = await github.rest.issues.listLabelsOnIssue({
+                owner, repo: repoName, issue_number: pr_number
+              });
+              for (const l of labels.filter(l => l.name.startsWith('coderabbit:'))) {
+                try {
+                  await github.rest.issues.removeLabel({
+                    owner, repo: repoName, issue_number: pr_number, name: l.name
+                  });
+                } catch {}
+              }
+              await github.rest.issues.addLabels({
+                owner, repo: repoName, issue_number: pr_number,
+                labels: ['coderabbit: not started']
+              });
+              core.setOutput('stop', 'true');
+            } else {
+              core.setOutput('stop', 'false');
+            }
+
+      - name: Swap label to waiting
+        if: steps.check-attempt.outputs.stop != 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.BOT_PAT }}
+          script: |
+            const { pr_number, repo } = context.payload.client_payload;
+            const [owner, repoName] = repo.split('/');
+            const { data: labels } = await github.rest.issues.listLabelsOnIssue({
+              owner, repo: repoName, issue_number: pr_number
+            });
+            for (const l of labels.filter(l => l.name.startsWith('coderabbit:'))) {
+              try {
+                await github.rest.issues.removeLabel({
+                  owner, repo: repoName, issue_number: pr_number, name: l.name
+                });
+              } catch {}
+            }
+            await github.rest.issues.addLabels({
+              owner, repo: repoName, issue_number: pr_number,
+              labels: ['coderabbit: waiting']
+            });
+
+      - name: Post @coderabbitai full review and record timestamp
+        id: post-review
+        if: steps.check-attempt.outputs.stop != 'true'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.BOT_PAT }}
+          script: |
+            const { pr_number, repo } = context.payload.client_payload;
+            const [owner, repoName] = repo.split('/');
+            const { data: comment } = await github.rest.issues.createComment({
+              owner, repo: repoName, issue_number: pr_number,
+              body: '@coderabbitai full review'
+            });
+            core.setOutput('trigger_time', comment.created_at);
+
+      - name: Enqueue bot-coderabbit-check via QStash (90s delay)
+        if: steps.check-attempt.outputs.stop != 'true'
+        env:
+          QSTASH_TOKEN:  ${{ secrets.QSTASH_TOKEN }}
+          BOT_PAT:       ${{ secrets.BOT_PAT }}
+          PR_NUMBER:     ${{ github.event.client_payload.pr_number }}
+          REPO:          ${{ github.event.client_payload.repo }}
+          ATTEMPT:       ${{ github.event.client_payload.attempt }}
+          TRIGGER_TIME:  ${{ steps.post-review.outputs.trigger_time }}
+        run: |
+          PAYLOAD=$(node -e "console.log(JSON.stringify({
+            event_type: 'bot-coderabbit-check',
+            client_payload: {
+              pr_number: parseInt(process.env.PR_NUMBER),
+              repo: process.env.REPO,
+              attempt: parseInt(process.env.ATTEMPT),
+              trigger_time: process.env.TRIGGER_TIME,
+              wait_count: 0
+            }
+          }))")
+          DISPATCH_URL="https://api.github.com/repos/$REPO/dispatches"
+          HTTP_CODE=$(curl -s -o /tmp/qstash-response.json -w "%{http_code}" -X POST \
+            "https://qstash.upstash.io/v2/publish/$DISPATCH_URL" \
+            -H "Authorization: Bearer $QSTASH_TOKEN" \
+            -H "Upstash-Delay: 90s" \
+            -H "Upstash-Forward-Authorization: Bearer $BOT_PAT" \
+            -H "Upstash-Forward-Content-Type: application/json" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD")
+          echo "QStash response ($HTTP_CODE): $(cat /tmp/qstash-response.json)"
+          if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+            echo "QStash enqueue failed with HTTP $HTTP_CODE"
+            exit 1
+          fi
+
+  # ── coderabbit check ───────────────────────────────────────────────────────
+  coderabbit-check:
+    name: Check CodeRabbit response
+    runs-on: ubuntu-latest
+    if: github.event.action == 'bot-coderabbit-check'
+    steps:
+      - name: Inspect CodeRabbit response and act
+        uses: actions/github-script@v7
+        env:
+          QSTASH_TOKEN: ${{ secrets.QSTASH_TOKEN }}
+          BOT_PAT:      ${{ secrets.BOT_PAT }}
+        with:
+          github-token: ${{ secrets.BOT_PAT }}
+          script: |
+            const { pr_number, repo, attempt, trigger_time, wait_count = 0 } =
+              context.payload.client_payload;
+            const [owner, repoName] = repo.split('/');
+
+            // Helper: swap label
+            async function swapLabel(newLabel) {
+              const { data: labels } = await github.rest.issues.listLabelsOnIssue({
+                owner, repo: repoName, issue_number: pr_number
+              });
+              for (const l of labels.filter(l => l.name.startsWith('coderabbit:'))) {
+                try {
+                  await github.rest.issues.removeLabel({
+                    owner, repo: repoName, issue_number: pr_number, name: l.name
+                  });
+                } catch {}
+              }
+              await github.rest.issues.addLabels({
+                owner, repo: repoName, issue_number: pr_number, labels: [newLabel]
+              });
+            }
+
+            // Helper: post commit status
+            async function postStatus(state, description) {
+              const { data: pr } = await github.rest.pulls.get({
+                owner, repo: repoName, pull_number: pr_number
+              });
+              await github.rest.repos.createCommitStatus({
+                owner, repo: repoName, sha: pr.head.sha,
+                state, context: 'coderabbit-review', description
+              });
+            }
+
+            // Helper: enqueue QStash
+            async function enqueue(event_type, payload, delaySecs) {
+              const dispatchUrl = `https://api.github.com/repos/${repo}/dispatches`;
+              const body = JSON.stringify({ event_type, client_payload: payload });
+              const headers = [
+                `-H "Authorization: Bearer ${process.env.QSTASH_TOKEN}"`,
+                `-H "Upstash-Forward-Authorization: Bearer ${process.env.BOT_PAT}"`,
+                `-H "Upstash-Forward-Content-Type: application/json"`,
+                `-H "Content-Type: application/json"`,
+                delaySecs > 0 ? `-H "Upstash-Delay: ${delaySecs}s"` : ''
+              ].filter(Boolean).join(' ');
+              // We'll use exec for this — but in github-script we use child_process
+              const { execSync } = require('child_process');
+              const cmd = `curl -s -o /tmp/qs.json -w "%{http_code}" -X POST ` +
+                `"https://qstash.upstash.io/v2/publish/${dispatchUrl}" ` +
+                `${headers} -d '${body.replace(/'/g, "'\\''")}'`;
+              const code = execSync(cmd).toString().trim();
+              if (parseInt(code) < 200 || parseInt(code) >= 300) {
+                throw new Error(`QStash failed HTTP ${code}`);
+              }
+            }
+
+            // Fetch CodeRabbit comments posted after trigger_time
+            const triggerDate = new Date(trigger_time);
+            const { data: allComments } = await github.rest.issues.listComments({
+              owner, repo: repoName, issue_number: pr_number, per_page: 100
+            });
+            const crComments = allComments.filter(c =>
+              c.user.login === 'coderabbitai[bot]' &&
+              new Date(c.created_at) > triggerDate
+            );
+
+            if (crComments.length === 0) {
+              // No response yet — wait up to 5 times then re-trigger
+              if (wait_count < 5) {
+                await enqueue('bot-coderabbit-check', {
+                  pr_number, repo, attempt, trigger_time, wait_count: wait_count + 1
+                }, 60);
+              } else {
+                // Re-trigger with incremented attempt
+                await enqueue('bot-coderabbit-trigger', {
+                  pr_number, repo, attempt: attempt + 1
+                }, 0);
+              }
+              return;
+            }
+
+            // Check for rate-limit message
+            const rateLimitComment = crComments.find(
+              c => /rate.?limit/i.test(c.body)
+            );
+            if (rateLimitComment) {
+              await swapLabel('coderabbit: rate-limited');
+              await postStatus('pending', 'CodeRabbit rate-limited — retry queued');
+
+              // Parse duration from message
+              const durationMatch = rateLimitComment.body.match(/(\d+)\s*(minute|min|hour)/i);
+              let delaySecs = 30 * 60; // default 30 minutes
+              if (durationMatch) {
+                const val = parseInt(durationMatch[1]);
+                const unit = durationMatch[2].toLowerCase();
+                delaySecs = unit.startsWith('hour') ? val * 3600 : val * 60;
+              }
+              // Add 1 minute buffer
+              delaySecs += 60;
+
+              await enqueue('bot-coderabbit-trigger', {
+                pr_number, repo, attempt: attempt + 1
+              }, delaySecs);
+              return;
+            }
+
+            // Check for review completion (Summary or walkthrough sections)
+            const reviewComment = crComments.find(
+              c => /## Summary|walkthrough/i.test(c.body) && c.body.length > 500
+            );
+            if (reviewComment) {
+              // Check unresolved CodeRabbit threads via GraphQL (REST listReviewComments
+              // does not expose thread resolution state)
+              const gqlResult = await github.graphql(`
+                query($owner: String!, $repo: String!, $number: Int!) {
+                  repository(owner: $owner, name: $repo) {
+                    pullRequest(number: $number) {
+                      reviewThreads(first: 100) {
+                        nodes {
+                          isResolved
+                          comments(first: 1) {
+                            nodes { author { login } }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              `, { owner, repo: repoName, number: pr_number });
+              const unresolvedCR = gqlResult.repository.pullRequest.reviewThreads.nodes.filter(
+                t => !t.isResolved &&
+                     t.comments.nodes[0]?.author?.login === 'coderabbitai[bot]'
+              );
+
+              if (unresolvedCR.length > 0) {
+                await swapLabel('coderabbit: unresolved');
+                await postStatus('failure', 'CodeRabbit has unresolved comments');
+              } else {
+                await swapLabel('coderabbit: complete');
+                await postStatus('success', 'CodeRabbit review complete');
+              }
+              return;
+            }
+
+            // Response found but not clearly a review yet — wait one more cycle
+            if (wait_count < 5) {
+              await enqueue('bot-coderabbit-check', {
+                pr_number, repo, attempt, trigger_time, wait_count: wait_count + 1
+              }, 60);
+            } else {
+              // Give up and mark waiting → re-enqueue trigger
+              await enqueue('bot-coderabbit-trigger', {
+                pr_number, repo, attempt: attempt + 1
+              }, 0);
+            }
 
   # ── upstream check (scheduled) ─────────────────────────────────────────────
   upstream-check:
