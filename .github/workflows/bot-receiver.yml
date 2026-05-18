@@ -250,7 +250,8 @@ jobs:
             });
             const crComments = allComments.filter(c =>
               c.user.login === 'coderabbitai[bot]' &&
-              (new Date(c.created_at) > triggerDate || new Date(c.updated_at) > triggerDate)
+              (new Date(c.created_at) > triggerDate || new Date(c.updated_at) > triggerDate) &&
+              !/Full review triggered/.test(c.body)  // exclude trigger acknowledgments — they are never actionable
             );
 
             if (crComments.length === 0) {
