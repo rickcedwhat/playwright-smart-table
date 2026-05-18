@@ -47,13 +47,22 @@ jobs:
         with:
           github-token: ${{ secrets.BOT_PAT }}
           script: |
-            const { pr_number, repo, attempt } = context.payload.client_payload;
+            const { pr_number, repo, attempt, status_comment_id } = context.payload.client_payload;
             const [owner, repoName] = repo.split('/');
             if (attempt > 10) {
               await github.rest.issues.createComment({
                 owner, repo: repoName, issue_number: pr_number,
                 body: '❌ CodeRabbit review failed after 10 attempts. Please trigger manually.'
               });
+              // Update the living status comment to reflect final failure
+              if (status_comment_id) {
+                try {
+                  await github.rest.issues.updateComment({
+                    owner, repo: repoName, comment_id: status_comment_id,
+                    body: '❌ Review failed after 10 attempts — please trigger manually'
+                  });
+                } catch {}
+              }
               // Swap label back to not started
               const { data: labels } = await github.rest.issues.listLabelsOnIssue({
                 owner, repo: repoName, issue_number: pr_number
@@ -257,15 +266,15 @@ jobs:
             if (crComments.length === 0) {
               // No response yet — wait up to 5 times then re-trigger
               if (wait_count < 5) {
-                await updateStatus(`⏳ Waiting for CodeRabbit response... _(check ${wait_count + 1}/5)_`);
                 await enqueue('bot-coderabbit-check', {
                   pr_number, repo, attempt, trigger_time, wait_count: wait_count + 1, status_comment_id
                 }, 60);
+                await updateStatus(`⏳ Waiting for CodeRabbit response... _(check ${wait_count + 1}/5)_`);
               } else {
-                await updateStatus(`🔄 Re-triggering CodeRabbit review _(attempt ${attempt + 1})_`);
                 await enqueue('bot-coderabbit-trigger', {
                   pr_number, repo, attempt: attempt + 1, status_comment_id
                 }, 0);
+                await updateStatus(`🔄 Re-triggering CodeRabbit review _(attempt ${attempt + 1})_`);
               }
               return;
             }
@@ -289,10 +298,10 @@ jobs:
               // Add 1 minute buffer
               delaySecs += 60;
 
-              await updateStatus(`⚠️ Rate limited — retrying in ~${Math.round(delaySecs / 60)}m`);
               await enqueue('bot-coderabbit-trigger', {
                 pr_number, repo, attempt: attempt + 1, status_comment_id
               }, delaySecs);
+              await updateStatus(`⚠️ Rate limited — retrying in ~${Math.round(delaySecs / 60)}m`);
               return;
             }
 
@@ -338,15 +347,15 @@ jobs:
 
             // Response found but not clearly a review yet — wait one more cycle
             if (wait_count < 5) {
-              await updateStatus(`⏳ Waiting for CodeRabbit response... _(check ${wait_count + 1}/5)_`);
               await enqueue('bot-coderabbit-check', {
                 pr_number, repo, attempt, trigger_time, wait_count: wait_count + 1, status_comment_id
               }, 60);
+              await updateStatus(`⏳ Waiting for CodeRabbit response... _(check ${wait_count + 1}/5)_`);
             } else {
-              await updateStatus(`🔄 Re-triggering CodeRabbit review _(attempt ${attempt + 1})_`);
               await enqueue('bot-coderabbit-trigger', {
                 pr_number, repo, attempt: attempt + 1, status_comment_id
               }, 0);
+              await updateStatus(`🔄 Re-triggering CodeRabbit review _(attempt ${attempt + 1})_`);
             }
 
   # ── upstream check (scheduled) ─────────────────────────────────────────────

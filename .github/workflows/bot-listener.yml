@@ -291,78 +291,69 @@ jobs:
       needs.parse.outputs.is_pr == 'true'
     runs-on: ubuntu-latest
     steps:
-      - name: Swap label to waiting
+      - name: Swap label, post status comment, enqueue, and react
+        env:
+          QSTASH_TOKEN: ${{ secrets.QSTASH_TOKEN }}
+          BOT_PAT:      ${{ secrets.BOT_PAT }}
+          PR_NUMBER:    ${{ github.event.issue.number }}
+          REPO:         ${{ github.repository }}
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.BOT_PAT }}
           script: |
+            const { execSync } = require('child_process');
             const { owner, repo } = context.repo;
             const issue_number = context.issue.number;
-            // Remove all coderabbit: * labels
-            const { data: labels } = await github.rest.issues.listLabelsOnIssue({
-              owner, repo, issue_number
-            });
-            for (const l of labels.filter(l => l.name.startsWith('coderabbit:'))) {
-              try {
-                await github.rest.issues.removeLabel({ owner, repo, issue_number, name: l.name });
-              } catch {}
+            const prNumber = parseInt(process.env.PR_NUMBER);
+            const repoFull = process.env.REPO;
+
+            // 1. Swap label to waiting
+            const { data: currentLabels } = await github.rest.issues.listLabelsOnIssue({ owner, repo, issue_number });
+            for (const l of currentLabels.filter(l => l.name.startsWith('coderabbit:'))) {
+              try { await github.rest.issues.removeLabel({ owner, repo, issue_number, name: l.name }); } catch {}
             }
-            await github.rest.issues.addLabels({
-              owner, repo, issue_number, labels: ['coderabbit: waiting']
+            await github.rest.issues.addLabels({ owner, repo, issue_number, labels: ['coderabbit: waiting'] });
+
+            // 2. Create status comment
+            const { data: statusComment } = await github.rest.issues.createComment({
+              owner, repo, issue_number, body: '🔄 CodeRabbit review triggered'
             });
-      - name: Post status comment
-        id: post-status
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.BOT_PAT }}
-          script: |
-            const { data: comment } = await github.rest.issues.createComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              body: '🔄 CodeRabbit review triggered'
+
+            // 3. Enqueue via QStash — if this fails, roll back label and delete comment
+            const payload = JSON.stringify({
+              event_type: 'bot-coderabbit-trigger',
+              client_payload: { pr_number: prNumber, repo: repoFull, attempt: 1, status_comment_id: statusComment.id }
             });
-            core.setOutput('comment_id', comment.id);
-      - name: Enqueue bot-coderabbit-trigger via QStash
-        env:
-          QSTASH_TOKEN:      ${{ secrets.QSTASH_TOKEN }}
-          BOT_PAT:           ${{ secrets.BOT_PAT }}
-          PR_NUMBER:         ${{ github.event.issue.number }}
-          REPO:              ${{ github.repository }}
-          STATUS_COMMENT_ID: ${{ steps.post-status.outputs.comment_id }}
-        run: |
-          PAYLOAD=$(node -e "console.log(JSON.stringify({
-            event_type: 'bot-coderabbit-trigger',
-            client_payload: {
-              pr_number: parseInt(process.env.PR_NUMBER),
-              repo: process.env.REPO,
-              attempt: 1,
-              status_comment_id: parseInt(process.env.STATUS_COMMENT_ID)
+            const dispatchUrl = `https://api.github.com/repos/${repoFull}/dispatches`;
+            const cmd = `curl -s -o /tmp/qs.json -w "%{http_code}" -X POST ` +
+              `"https://qstash.upstash.io/v2/publish/${dispatchUrl}" ` +
+              `-H "Authorization: Bearer ${process.env.QSTASH_TOKEN}" ` +
+              `-H "Upstash-Forward-Authorization: Bearer ${process.env.BOT_PAT}" ` +
+              `-H "Upstash-Forward-Content-Type: application/json" ` +
+              `-H "Content-Type: application/json" ` +
+              `-d '${payload.replace(/'/g, "'\\''")}'`;
+            let httpCode;
+            try {
+              httpCode = execSync(cmd).toString().trim();
+            } catch (e) {
+              await github.rest.issues.deleteComment({ owner, repo, comment_id: statusComment.id });
+              for (const l of (await github.rest.issues.listLabelsOnIssue({ owner, repo, issue_number })).data.filter(l => l.name.startsWith('coderabbit:'))) {
+                try { await github.rest.issues.removeLabel({ owner, repo, issue_number, name: l.name }); } catch {}
+              }
+              throw new Error(`QStash enqueue failed: ${e.message}`);
             }
-          }))")
-          DISPATCH_URL="https://api.github.com/repos/$REPO/dispatches"
-          HTTP_CODE=$(curl -s -o /tmp/qstash-response.json -w "%{http_code}" -X POST \
-            "https://qstash.upstash.io/v2/publish/$DISPATCH_URL" \
-            -H "Authorization: Bearer $QSTASH_TOKEN" \
-            -H "Upstash-Forward-Authorization: Bearer $BOT_PAT" \
-            -H "Upstash-Forward-Content-Type: application/json" \
-            -H "Content-Type: application/json" \
-            -d "$PAYLOAD")
-          echo "QStash response ($HTTP_CODE): $(cat /tmp/qstash-response.json)"
-          if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
-            echo "QStash enqueue failed with HTTP $HTTP_CODE"
-            exit 1
-          fi
-      - name: React with thumbs up
-        uses: actions/github-script@v7
-        with:
-          github-token: ${{ secrets.BOT_PAT }}
-          script: |
+            if (parseInt(httpCode) < 200 || parseInt(httpCode) >= 300) {
+              const body = require('fs').readFileSync('/tmp/qs.json', 'utf8');
+              await github.rest.issues.deleteComment({ owner, repo, comment_id: statusComment.id });
+              for (const l of (await github.rest.issues.listLabelsOnIssue({ owner, repo, issue_number })).data.filter(l => l.name.startsWith('coderabbit:'))) {
+                try { await github.rest.issues.removeLabel({ owner, repo, issue_number, name: l.name }); } catch {}
+              }
+              throw new Error(`QStash enqueue failed HTTP ${httpCode}: ${body}`);
+            }
+
+            // 4. React with thumbs up on the original command comment
             await github.rest.reactions.createForIssueComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              comment_id: context.payload.comment.id,
-              content: '+1'
+              owner, repo, comment_id: context.payload.comment.id, content: '+1'
             });
 
   # ── coderabbit retry ───────────────────────────────────────────────────────
