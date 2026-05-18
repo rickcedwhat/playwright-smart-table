@@ -426,10 +426,11 @@ const createSmartRow = <T = any>(
 
         const smartCell = baseLocator as SmartCell;
         smartCell.bringIntoView = async () => {
+            const page = rootLocator.page();
             const navigatedCell = await _navigateToCell({
                 config,
                 rootLocator,
-                page: rootLocator.page(),
+                page,
                 resolve,
                 getHeaders: table?.getHeaders,
                 column: colName,
@@ -438,8 +439,24 @@ const createSmartRow = <T = any>(
                 rowIndex,
                 barrier: (smart as any)._barrier
             });
-            if (navigatedCell && (navigatedCell as any)._locator) {
-                (smartCell as any)._locator = (navigatedCell as any)._locator;
+            // Run beforeCellRead hook (same as toJSON does after navigation).
+            if (config.strategies.beforeCellRead) {
+                const getHeaderCell = table?.getHeaderCell
+                    ? table.getHeaderCell.bind(table)
+                    : async (colNameArg: string) => {
+                        const i = map.get(colNameArg);
+                        if (i === undefined) throw new Error(`Column "${colNameArg}" not found`);
+                        return resolve(config.headerSelector as any, rootLocator).nth(i);
+                    };
+                await config.strategies.beforeCellRead({
+                    cell: navigatedCell ?? baseLocator,
+                    columnName: colName,
+                    columnIndex: idx,
+                    row: rowLocator,
+                    page,
+                    root: rootLocator,
+                    getHeaderCell,
+                });
             }
         };
 
