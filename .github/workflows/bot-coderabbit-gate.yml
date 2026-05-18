@@ -1,0 +1,133 @@
+name: Bot — CodeRabbit Gate
+
+# Updates the coderabbit-review commit status based on the PR's current
+# CodeRabbit label. On pull_request_review events, also checks GraphQL
+# reviewThreads to auto-transition unresolved ↔ complete.
+#
+# Note: pull_request_review_thread is not a supported GHA workflow trigger;
+# we use pull_request_review (submitted/dismissed) as the closest proxy —
+# it fires when CodeRabbit posts its review and when users respond.
+
+on:
+  pull_request:
+    types: [labeled, unlabeled, opened, synchronize]
+  pull_request_review:
+    types: [submitted, dismissed]
+
+jobs:
+  gate:
+    name: gate
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      statuses: write
+    steps:
+      - name: Update commit status from label
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.BOT_PAT }}
+          script: |
+            const { owner, repo } = context.repo;
+
+            const pr_number = context.payload.pull_request
+              ? context.payload.pull_request.number
+              : context.payload.review
+                ? context.payload.review.pull_request_url.split('/').pop()
+                : null;
+
+            if (!pr_number) {
+              core.warning('Could not determine PR number');
+              return;
+            }
+
+            // Get PR head SHA and current labels
+            const { data: pr } = await github.rest.pulls.get({
+              owner, repo, pull_number: Number(pr_number)
+            });
+            const sha = pr.head.sha;
+
+            const { data: labelData } = await github.rest.issues.listLabelsOnIssue({
+              owner, repo, issue_number: Number(pr_number)
+            });
+            const labelNames = labelData.map(l => l.name);
+
+            // Helper: swap label
+            async function swapLabel(newLabel) {
+              for (const l of labelNames.filter(n => n.startsWith('coderabbit:'))) {
+                try {
+                  await github.rest.issues.removeLabel({
+                    owner, repo, issue_number: Number(pr_number), name: l
+                  });
+                } catch {}
+              }
+              await github.rest.issues.addLabels({
+                owner, repo, issue_number: Number(pr_number), labels: [newLabel]
+              });
+            }
+
+            // Helper: post commit status
+            async function postStatus(state, description) {
+              await github.rest.repos.createCommitStatus({
+                owner, repo, sha,
+                state, context: 'coderabbit-review', description
+              });
+            }
+
+            // Helper: count unresolved CodeRabbit threads via GraphQL
+            async function unresolvedCRThreadCount() {
+              const result = await github.graphql(`
+                query($owner: String!, $repo: String!, $number: Int!) {
+                  repository(owner: $owner, name: $repo) {
+                    pullRequest(number: $number) {
+                      reviewThreads(first: 100) {
+                        nodes {
+                          isResolved
+                          comments(first: 1) {
+                            nodes { author { login } }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              `, { owner, repo, number: Number(pr_number) });
+              return result.repository.pullRequest.reviewThreads.nodes.filter(
+                t => !t.isResolved &&
+                     t.comments.nodes[0]?.author?.login === 'coderabbitai[bot]'
+              ).length;
+            }
+
+            // On review events, re-evaluate thread state and auto-transition label
+            if (context.eventName === 'pull_request_review') {
+              const unresolved = await unresolvedCRThreadCount();
+              const hasCRLabel = labelNames.some(n => n.startsWith('coderabbit:'));
+              // Only transition if we're already in an active CR state
+              if (hasCRLabel && !labelNames.includes('coderabbit: waiting') &&
+                  !labelNames.includes('coderabbit: rate-limited') &&
+                  !labelNames.includes('coderabbit: not started')) {
+                if (unresolved === 0 && labelNames.includes('coderabbit: unresolved')) {
+                  await swapLabel('coderabbit: complete');
+                  await postStatus('success', 'CodeRabbit review complete');
+                  return;
+                }
+                if (unresolved > 0 && labelNames.includes('coderabbit: complete')) {
+                  await swapLabel('coderabbit: unresolved');
+                  await postStatus('failure', 'CodeRabbit has unresolved comments');
+                  return;
+                }
+              }
+            }
+
+            // Map label to commit status
+            if (labelNames.includes('coderabbit: complete')) {
+              await postStatus('success', 'CodeRabbit review complete');
+            } else if (labelNames.includes('coderabbit: unresolved')) {
+              await postStatus('failure', 'CodeRabbit has unresolved comments');
+            } else if (labelNames.includes('coderabbit: rate-limited')) {
+              await postStatus('pending', 'CodeRabbit rate-limited — retry queued');
+            } else if (labelNames.includes('coderabbit: waiting')) {
+              await postStatus('pending', 'CodeRabbit review in progress');
+            } else {
+              // not started or no coderabbit label
+              await postStatus('pending', 'CodeRabbit review not started — comment @rickcedwhat-ai coderabbit review');
+            }
