@@ -9,7 +9,7 @@ name: Bot — PR HQ Comment
 
 on:
   pull_request:
-    types: [opened, edited]
+    types: [opened, edited, synchronize]
 
 jobs:
   upsert-hq:
@@ -84,8 +84,10 @@ jobs:
               c => c.user.login === 'rickcedwhat-ai' && c.body.includes('<!-- bot-hq -->')
             );
 
+            const action = context.payload.action;
+
             if (!existing) {
-              // First open — create the HQ comment
+              // First open — create the HQ comment (covers `opened` and edge cases)
               await github.rest.issues.createComment({
                 owner, repo, issue_number: pr_number,
                 body: buildInitialBody(prBody)
@@ -93,7 +95,25 @@ jobs:
               return;
             }
 
-            // PR body edited — refresh the issue-link section only.
+            if (action === 'synchronize') {
+              // New commits pushed — reset the CR section so the author knows
+              // a fresh review is needed. Leave the issue-link section untouched.
+              const pendingContent = [
+                '### 🔍 CodeRabbit Review',
+                '- [ ] Request review',
+                '',
+                '> ⚠️ New commits pushed — check the box to request a fresh review.',
+              ].join('\n');
+              const updatedBody = updateHQSection(existing.body, 'coderabbit', pendingContent);
+              if (updatedBody !== existing.body) {
+                await github.rest.issues.updateComment({
+                  owner, repo, comment_id: existing.id, body: updatedBody
+                });
+              }
+              return;
+            }
+
+            // `edited` — PR body changed: refresh the issue-link section only.
             // The coderabbit section is left untouched (preserves checkbox + status).
             const newContent = buildIssueLinkContent(prBody);
             const updatedBody = updateHQSection(existing.body, 'issue-link', newContent);
