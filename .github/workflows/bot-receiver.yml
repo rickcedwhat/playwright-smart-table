@@ -326,7 +326,7 @@ jobs:
                           }
                         }
                       }
-                      reviews(first: 50) {
+                      reviews(last: 50) {
                         nodes {
                           author { login }
                           state
