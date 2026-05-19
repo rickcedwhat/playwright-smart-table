@@ -6,13 +6,112 @@ name: Bot Listener
 
 on:
   issue_comment:
-    types: [created]
+    types: [created, edited]
 
 jobs:
+  # ── HQ checkbox handler ────────────────────────────────────────────────────
+  # Fires when a human checks the "Request review" checkbox in the Bot HQ comment.
+  hq-checkbox:
+    name: HQ checkbox — trigger CR review
+    runs-on: ubuntu-latest
+    if: |
+      github.event.action == 'edited' &&
+      github.event.comment.user.login == 'rickcedwhat-ai' &&
+      github.event.sender.login != 'rickcedwhat-ai' &&
+      contains(github.event.comment.body, '<!-- bot-hq -->') &&
+      contains(github.event.comment.body, '- [x] Request review')
+    steps:
+      - name: Trigger CodeRabbit review via checkbox
+        env:
+          QSTASH_TOKEN: ${{ secrets.QSTASH_TOKEN }}
+          BOT_PAT:      ${{ secrets.BOT_PAT }}
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.BOT_PAT }}
+          script: |
+            // Guard: only act on a [ ] → [x] transition, not on every bot-driven update
+            const oldBody = context.payload.changes?.body?.from ?? '';
+            const wasUnchecked = /- \[ \] Request review/.test(oldBody);
+            if (!wasUnchecked) {
+              core.info('Checkbox was already checked — ignoring.');
+              return;
+            }
+
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const prNumber = parseInt(issue_number);
+            const repoFull = `${owner}/${repo}`;
+            const hqCommentId = context.payload.comment.id;
+            const currentBody = context.payload.comment.body;
+
+            function updateHQSection(body, name, content) {
+              const s = `<!-- bot-hq:${name} -->`;
+              const e = `<!-- /bot-hq:${name} -->`;
+              return body.replace(new RegExp(`${s}[\\s\\S]*?${e}`), `${s}\n${content}\n${e}`);
+            }
+
+            // 1. Swap label to waiting
+            const { data: currentLabels } = await github.rest.issues.listLabelsOnIssue({ owner, repo, issue_number });
+            for (const l of currentLabels.filter(l => l.name.startsWith('coderabbit:'))) {
+              try { await github.rest.issues.removeLabel({ owner, repo, issue_number, name: l.name }); } catch {}
+            }
+            await github.rest.issues.addLabels({ owner, repo, issue_number, labels: ['coderabbit: waiting'] });
+
+            // 2. Update HQ coderabbit section to "triggered"
+            const triggeredContent = [
+              '### 🔍 CodeRabbit Review',
+              '- [x] Request review',
+              '',
+              '> 🔄 Review triggered — waiting for CodeRabbit...',
+            ].join('\n');
+            await github.rest.issues.updateComment({
+              owner, repo, comment_id: hqCommentId,
+              body: updateHQSection(currentBody, 'coderabbit', triggeredContent)
+            });
+
+            // 3. Enqueue via QStash
+            const payload = JSON.stringify({
+              event_type: 'bot-coderabbit-trigger',
+              client_payload: { pr_number: prNumber, repo: repoFull, attempt: 1, hq_comment_id: hqCommentId }
+            });
+            const dispatchUrl = `https://api.github.com/repos/${repoFull}/dispatches`;
+            const qRes = await fetch(`https://qstash.upstash.io/v2/publish/${dispatchUrl}`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${process.env.QSTASH_TOKEN}`,
+                'Upstash-Forward-Authorization': `Bearer ${process.env.BOT_PAT}`,
+                'Upstash-Forward-Content-Type': 'application/json',
+                'Content-Type': 'application/json',
+              },
+              body: payload,
+            });
+            if (!qRes.ok) {
+              // Rollback label and HQ section
+              const { data: rollbackLabels } = await github.rest.issues.listLabelsOnIssue({ owner, repo, issue_number });
+              for (const l of rollbackLabels.filter(l => l.name.startsWith('coderabbit:'))) {
+                try { await github.rest.issues.removeLabel({ owner, repo, issue_number, name: l.name }); } catch {}
+              }
+              const rollbackContent = [
+                '### 🔍 CodeRabbit Review',
+                '- [ ] Request review',
+                '',
+                '> ❌ Failed to enqueue review — please try again.',
+              ].join('\n');
+              try {
+                await github.rest.issues.updateComment({
+                  owner, repo, comment_id: hqCommentId,
+                  body: updateHQSection(currentBody, 'coderabbit', rollbackContent)
+                });
+              } catch {}
+              throw new Error(`QStash enqueue failed HTTP ${qRes.status}: ${await qRes.text()}`);
+            }
+
+  # ── command parser (text commands) ────────────────────────────────────────
   parse:
     name: Parse command
     runs-on: ubuntu-latest
     if: |
+      github.event.action == 'created' &&
       startsWith(github.event.comment.body, '@rickcedwhat-ai ') &&
       github.event.comment.user.login != 'rickcedwhat-ai'
     outputs:
@@ -291,7 +390,7 @@ jobs:
       needs.parse.outputs.is_pr == 'true'
     runs-on: ubuntu-latest
     steps:
-      - name: Swap label, post status comment, enqueue, and react
+      - name: Swap label, update HQ comment, enqueue, and react
         env:
           QSTASH_TOKEN: ${{ secrets.QSTASH_TOKEN }}
           BOT_PAT:      ${{ secrets.BOT_PAT }}
@@ -301,11 +400,16 @@ jobs:
         with:
           github-token: ${{ secrets.BOT_PAT }}
           script: |
-            const { execSync } = require('child_process');
             const { owner, repo } = context.repo;
             const issue_number = context.issue.number;
             const prNumber = parseInt(process.env.PR_NUMBER);
             const repoFull = process.env.REPO;
+
+            function updateHQSection(body, name, content) {
+              const s = `<!-- bot-hq:${name} -->`;
+              const e = `<!-- /bot-hq:${name} -->`;
+              return body.replace(new RegExp(`${s}[\\s\\S]*?${e}`), `${s}\n${content}\n${e}`);
+            }
 
             // 1. Swap label to waiting
             const { data: currentLabels } = await github.rest.issues.listLabelsOnIssue({ owner, repo, issue_number });
@@ -314,44 +418,74 @@ jobs:
             }
             await github.rest.issues.addLabels({ owner, repo, issue_number, labels: ['coderabbit: waiting'] });
 
-            // 2. Create status comment
-            const { data: statusComment } = await github.rest.issues.createComment({
-              owner, repo, issue_number, body: '🔄 CodeRabbit review triggered'
+            // 2. Find HQ comment (may not exist on very old PRs — graceful degradation)
+            const { data: allComments } = await github.rest.issues.listComments({
+              owner, repo, issue_number, per_page: 100
             });
+            const hqComment = allComments.find(
+              c => c.user.login === 'rickcedwhat-ai' && c.body.includes('<!-- bot-hq -->')
+            );
+            const hqCommentId = hqComment?.id ?? null;
 
-            // 3. Enqueue via QStash — if this fails, roll back label and delete comment
+            // 3. Update HQ coderabbit section to "triggered"
+            if (hqComment) {
+              const triggeredContent = [
+                '### 🔍 CodeRabbit Review',
+                '- [x] Request review',
+                '',
+                '> 🔄 Review triggered',
+              ].join('\n');
+              try {
+                await github.rest.issues.updateComment({
+                  owner, repo, comment_id: hqCommentId,
+                  body: updateHQSection(hqComment.body, 'coderabbit', triggeredContent)
+                });
+              } catch (e) {
+                core.warning(`Could not update HQ comment: ${e.message}`);
+              }
+            }
+
+            // 4. Enqueue via QStash — rollback on failure
             const payload = JSON.stringify({
               event_type: 'bot-coderabbit-trigger',
-              client_payload: { pr_number: prNumber, repo: repoFull, attempt: 1, status_comment_id: statusComment.id }
+              client_payload: { pr_number: prNumber, repo: repoFull, attempt: 1, hq_comment_id: hqCommentId }
             });
             const dispatchUrl = `https://api.github.com/repos/${repoFull}/dispatches`;
-            const cmd = `curl -s -o /tmp/qs.json -w "%{http_code}" -X POST ` +
-              `"https://qstash.upstash.io/v2/publish/${dispatchUrl}" ` +
-              `-H "Authorization: Bearer ${process.env.QSTASH_TOKEN}" ` +
-              `-H "Upstash-Forward-Authorization: Bearer ${process.env.BOT_PAT}" ` +
-              `-H "Upstash-Forward-Content-Type: application/json" ` +
-              `-H "Content-Type: application/json" ` +
-              `-d '${payload.replace(/'/g, "'\\''")}'`;
-            let httpCode;
-            try {
-              httpCode = execSync(cmd).toString().trim();
-            } catch (e) {
-              await github.rest.issues.deleteComment({ owner, repo, comment_id: statusComment.id });
-              for (const l of (await github.rest.issues.listLabelsOnIssue({ owner, repo, issue_number })).data.filter(l => l.name.startsWith('coderabbit:'))) {
+            const qRes = await fetch(`https://qstash.upstash.io/v2/publish/${dispatchUrl}`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${process.env.QSTASH_TOKEN}`,
+                'Upstash-Forward-Authorization': `Bearer ${process.env.BOT_PAT}`,
+                'Upstash-Forward-Content-Type': 'application/json',
+                'Content-Type': 'application/json',
+              },
+              body: payload,
+            });
+            if (!qRes.ok) {
+              // Rollback label
+              const { data: rbLabels } = await github.rest.issues.listLabelsOnIssue({ owner, repo, issue_number });
+              for (const l of rbLabels.filter(l => l.name.startsWith('coderabbit:'))) {
                 try { await github.rest.issues.removeLabel({ owner, repo, issue_number, name: l.name }); } catch {}
               }
-              throw new Error(`QStash enqueue failed: ${e.message}`);
-            }
-            if (parseInt(httpCode) < 200 || parseInt(httpCode) >= 300) {
-              const body = require('fs').readFileSync('/tmp/qs.json', 'utf8');
-              await github.rest.issues.deleteComment({ owner, repo, comment_id: statusComment.id });
-              for (const l of (await github.rest.issues.listLabelsOnIssue({ owner, repo, issue_number })).data.filter(l => l.name.startsWith('coderabbit:'))) {
-                try { await github.rest.issues.removeLabel({ owner, repo, issue_number, name: l.name }); } catch {}
+              // Rollback HQ section
+              if (hqComment) {
+                const rollbackContent = [
+                  '### 🔍 CodeRabbit Review',
+                  '- [ ] Request review',
+                  '',
+                  '> ❌ Failed to enqueue review — please try again.',
+                ].join('\n');
+                try {
+                  await github.rest.issues.updateComment({
+                    owner, repo, comment_id: hqCommentId,
+                    body: updateHQSection(hqComment.body, 'coderabbit', rollbackContent)
+                  });
+                } catch {}
               }
-              throw new Error(`QStash enqueue failed HTTP ${httpCode}: ${body}`);
+              throw new Error(`QStash enqueue failed HTTP ${qRes.status}: ${await qRes.text()}`);
             }
 
-            // 4. React with thumbs up on the original command comment
+            // 5. React with thumbs up on the original command comment
             await github.rest.reactions.createForIssueComment({
               owner, repo, comment_id: context.payload.comment.id, content: '+1'
             });
