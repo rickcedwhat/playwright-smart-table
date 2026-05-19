@@ -124,7 +124,7 @@ navigation: {
 }
 ```
 
-**Do NOT use `beforeCellRead` or `columnOverrides` for scrolling.** Those are for reading special cell content (popovers, color indicators, etc). Navigation belongs in `navigation` primitives.
+**`beforeCellRead`** is for pre-read setup: waiting for lazy content, hovering to open popovers, or scrolling a column header into view on column-only (X-axis) virtualized grids. It **must not** be used for Y-axis scrolling — `scrollIntoViewIfNeeded` adjusts both axes and will unmount the current row on row-virtualized grids, producing empty reads. For 2D virtualized grids, use the `viewport` strategy instead. See [`docs/api/strategies.md` — beforeCellRead Hook](../../docs/api/strategies.md#beforecellread-hook) for details.
 
 ---
 
