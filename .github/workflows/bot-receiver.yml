@@ -311,7 +311,9 @@ jobs:
             );
             if (reviewComment) {
               // Check unresolved CodeRabbit threads via GraphQL (REST listReviewComments
-              // does not expose thread resolution state)
+              // does not expose thread resolution state).
+              // Also fetch formal reviews: CR posts nitpick-level content in the review
+              // body (state: COMMENTED) rather than as resolvable threads.
               const gqlResult = await github.graphql(`
                 query($owner: String!, $repo: String!, $number: Int!) {
                   repository(owner: $owner, name: $repo) {
@@ -324,19 +326,46 @@ jobs:
                           }
                         }
                       }
+                      reviews(last: 50) {
+                        nodes {
+                          author { login }
+                          state
+                          submittedAt
+                          body
+                        }
+                      }
                     }
                   }
                 }
               `, { owner, repo: repoName, number: pr_number });
+
+              // GraphQL author.login for the CR bot is 'coderabbitai' (no '[bot]' suffix),
+              // unlike the REST API which returns 'coderabbitai[bot]'. Use startsWith to
+              // handle both forms defensively.
+              const isCR = (login) => login?.startsWith('coderabbitai');
+
               const unresolvedCR = gqlResult.repository.pullRequest.reviewThreads.nodes.filter(
-                t => !t.isResolved &&
-                     t.comments.nodes[0]?.author?.login === 'coderabbitai[bot]'
+                t => !t.isResolved && isCR(t.comments.nodes[0]?.author?.login)
               );
 
-              if (unresolvedCR.length > 0) {
+              // Nitpick comments are posted in a formal review body (state: COMMENTED)
+              // rather than as inline threads. Treat any non-empty CR review body
+              // submitted after trigger_time as unresolved feedback.
+              const triggerDate = new Date(trigger_time);
+              const crNitpickReviews = gqlResult.repository.pullRequest.reviews.nodes.filter(
+                r => isCR(r.author?.login) &&
+                     r.state === 'COMMENTED' &&
+                     new Date(r.submittedAt) > triggerDate &&
+                     r.body.trim().length > 0
+              );
+
+              if (unresolvedCR.length > 0 || crNitpickReviews.length > 0) {
+                const detail = unresolvedCR.length > 0
+                  ? `${unresolvedCR.length} unresolved thread${unresolvedCR.length > 1 ? 's' : ''}`
+                  : 'nitpick comments';
                 await swapLabel('coderabbit: unresolved');
                 await postStatus('failure', 'CodeRabbit has unresolved comments');
-                await updateStatus(`⚠️ Review complete — ${unresolvedCR.length} unresolved thread${unresolvedCR.length > 1 ? 's' : ''} remain`);
+                await updateStatus(`⚠️ Review complete — ${detail} remain`);
               } else {
                 await swapLabel('coderabbit: complete');
                 await postStatus('success', 'CodeRabbit review complete');
