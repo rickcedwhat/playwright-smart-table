@@ -260,6 +260,78 @@ The function receives `{ row, root, columnName, columnIndex, rowIndex?, page, co
 
 ---
 
+## beforeCellRead Hook
+
+`beforeCellRead` is called once per cell immediately before the cell value is read — in both `toJSON()` and any `columnOverrides.read` calls. Use it to handle cases where the cell content is not yet in a readable state when the row becomes visible.
+
+### Signature
+
+```typescript
+strategies: {
+  beforeCellRead: async ({ cell, columnName, columnIndex, row, page, root, getHeaderCell }) => {
+    // scroll, hover, wait — whatever the cell needs before its value can be read
+  }
+}
+```
+
+### When to use it
+
+| Use case | Safe? |
+|---|---|
+| Scroll a **column header** into view on a grid with **column-only** (X-axis) virtualization | ✅ Safe |
+| Hover a cell to trigger a tooltip / popover, then wait for it to render | ✅ Safe |
+| Wait for an async cell renderer to finish loading | ✅ Safe |
+| Call `scrollIntoViewIfNeeded()` on any element in a **row-virtualized** grid | ❌ Footgun |
+
+### Column-only horizontal virtualization
+
+For grids that keep all rows in the DOM but only render visible columns, scrolling the header into view forces the column to mount:
+
+```typescript
+strategies: {
+  beforeCellRead: async ({ columnName, getHeaderCell }) => {
+    const header = await getHeaderCell(columnName);
+    await header.scrollIntoViewIfNeeded();
+  }
+}
+```
+
+### Lazy-rendered cell content (popovers, tooltips)
+
+```typescript
+strategies: {
+  beforeCellRead: async ({ cell, page }) => {
+    await cell.hover();
+    await page.waitForSelector('.cell-tooltip', { state: 'visible' });
+  }
+}
+```
+
+### ⚠️ Y-scroll footgun on row-virtualized grids
+
+`scrollIntoViewIfNeeded` adjusts **both** scroll axes. On grids that recycle DOM nodes based on the Y scroll position (MUI DataGrid, AG Grid, `react-window`, etc.) calling it inside `beforeCellRead` will shift the viewport vertically, unmounting the row currently being read and silently returning stale or empty values for the rest of the row.
+
+**Do not use `beforeCellRead` for Y-axis scrolling.** Instead, configure the [`viewport` strategy](#viewport-strategy) — it drives explicit per-row and per-column scroll commands and understands the virtualization lifecycle.
+
+```typescript
+// ❌ Breaks row-virtualized grids — Y-scroll unmounts the current row mid-read
+strategies: {
+  beforeCellRead: async ({ cell }) => {
+    await cell.scrollIntoViewIfNeeded(); // scrolls Y → row recycled → empty values
+  }
+}
+
+// ✅ Correct approach for 2D virtualized grids
+strategies: {
+  viewport: Strategies.Viewport.dataAttribute({
+    rowAttribute: 'data-rowindex',
+    columnAttribute: 'data-colindex',
+  })
+}
+```
+
+---
+
 ## Viewport Strategy
 
 Viewport strategies help with 2D virtualized grids where rows and columns are both mounted only when visible. They let the cell-reading engine detect what is currently in the DOM and jump directly to the target row or column when scrolling one axis causes the other axis to unmount.
