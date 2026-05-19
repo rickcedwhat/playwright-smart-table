@@ -33,15 +33,16 @@ jobs:
               return /(close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+#\d+/i.test(body);
             }
 
-            function extractIssueRef(body) {
-              const m = body.match(/(close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+(#\d+)/i);
-              return m ? m[2] : null;
+            function extractIssueRefs(body) {
+              const refs = [...body.matchAll(/(close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+(#\d+)/gi)]
+                .map(m => m[2]);
+              return refs.length > 0 ? refs.join(', ') : null;
             }
 
             function buildIssueLinkContent(body) {
               if (hasIssueLink(body)) {
-                const ref = extractIssueRef(body) ?? 'an issue';
-                return `### 🔗 Issue Link\n✅ Linked to ${ref}`;
+                const refs = extractIssueRefs(body) ?? 'an issue';
+                return `### 🔗 Issue Link\n✅ Linked to ${refs}`;
               }
               return '### 🔗 Issue Link\n⚠️ No `Closes #N` found — add one to the PR description to auto-close on merge.';
             }
@@ -76,10 +77,10 @@ jobs:
 
             // ── find existing HQ comment ─────────────────────────────────────
 
-            const { data: comments } = await github.rest.issues.listComments({
+            const allComments = await github.paginate(github.rest.issues.listComments, {
               owner, repo, issue_number: pr_number, per_page: 100
             });
-            const existing = comments.find(
+            const existing = allComments.find(
               c => c.user.login === 'rickcedwhat-ai' && c.body.includes('<!-- bot-hq -->')
             );
 

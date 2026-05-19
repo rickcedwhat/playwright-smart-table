@@ -50,8 +50,10 @@ jobs:
               return body.replace(new RegExp(`${s}[\\s\\S]*?${e}`), `${s}\n${content}\n${e}`);
             }
 
-            // 1. Swap label to waiting
+            // 1. Swap label to waiting (capture original for rollback)
             const { data: currentLabels } = await github.rest.issues.listLabelsOnIssue({ owner, repo, issue_number });
+            const originalCRLabel = currentLabels.find(l => l.name.startsWith('coderabbit:'))?.name
+              ?? 'coderabbit: not started';
             for (const l of currentLabels.filter(l => l.name.startsWith('coderabbit:'))) {
               try { await github.rest.issues.removeLabel({ owner, repo, issue_number, name: l.name }); } catch {}
             }
@@ -86,11 +88,12 @@ jobs:
               body: payload,
             });
             if (!qRes.ok) {
-              // Rollback label and HQ section
+              // Rollback: remove waiting label, restore original, reset HQ section
               const { data: rollbackLabels } = await github.rest.issues.listLabelsOnIssue({ owner, repo, issue_number });
               for (const l of rollbackLabels.filter(l => l.name.startsWith('coderabbit:'))) {
                 try { await github.rest.issues.removeLabel({ owner, repo, issue_number, name: l.name }); } catch {}
               }
+              await github.rest.issues.addLabels({ owner, repo, issue_number, labels: [originalCRLabel] });
               const rollbackContent = [
                 '### 🔍 CodeRabbit Review',
                 '- [ ] Request review',
@@ -411,15 +414,17 @@ jobs:
               return body.replace(new RegExp(`${s}[\\s\\S]*?${e}`), `${s}\n${content}\n${e}`);
             }
 
-            // 1. Swap label to waiting
+            // 1. Swap label to waiting (capture original for rollback)
             const { data: currentLabels } = await github.rest.issues.listLabelsOnIssue({ owner, repo, issue_number });
+            const originalCRLabel = currentLabels.find(l => l.name.startsWith('coderabbit:'))?.name
+              ?? 'coderabbit: not started';
             for (const l of currentLabels.filter(l => l.name.startsWith('coderabbit:'))) {
               try { await github.rest.issues.removeLabel({ owner, repo, issue_number, name: l.name }); } catch {}
             }
             await github.rest.issues.addLabels({ owner, repo, issue_number, labels: ['coderabbit: waiting'] });
 
-            // 2. Find HQ comment (may not exist on very old PRs — graceful degradation)
-            const { data: allComments } = await github.rest.issues.listComments({
+            // 2. Find HQ comment via paginated fetch (may not exist on very old PRs)
+            const allComments = await github.paginate(github.rest.issues.listComments, {
               owner, repo, issue_number, per_page: 100
             });
             const hqComment = allComments.find(
@@ -462,11 +467,12 @@ jobs:
               body: payload,
             });
             if (!qRes.ok) {
-              // Rollback label
+              // Rollback: remove waiting label, restore original
               const { data: rbLabels } = await github.rest.issues.listLabelsOnIssue({ owner, repo, issue_number });
               for (const l of rbLabels.filter(l => l.name.startsWith('coderabbit:'))) {
                 try { await github.rest.issues.removeLabel({ owner, repo, issue_number, name: l.name }); } catch {}
               }
+              await github.rest.issues.addLabels({ owner, repo, issue_number, labels: [originalCRLabel] });
               // Rollback HQ section
               if (hqComment) {
                 const rollbackContent = [

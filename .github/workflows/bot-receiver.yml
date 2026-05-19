@@ -182,7 +182,7 @@ jobs:
               attempt: parseInt(process.env.ATTEMPT),
               trigger_time: process.env.TRIGGER_TIME,
               wait_count: 0,
-              hq_comment_id: process.env.HQ_COMMENT_ID ? parseInt(process.env.HQ_COMMENT_ID) : undefined
+              hq_comment_id: (() => { const v = process.env.HQ_COMMENT_ID?.trim(); return v && v !== 'null' && v !== 'undefined' ? parseInt(v, 10) : undefined; })()
             }
           }))")
           DISPATCH_URL="https://api.github.com/repos/$REPO/dispatches"
@@ -396,7 +396,7 @@ jobs:
 
               if (unresolvedCR.length > 0 || crNitpickReviews.length > 0) {
                 const detail = unresolvedCR.length > 0
-                  ? `${unresolvedCR.length} unresolved thread${unresolvedCR.length > 1 ? 's' : ''} remain`
+                  ? `${unresolvedCR.length} unresolved thread${unresolvedCR.length > 1 ? 's remain' : ' remains'}`
                   : 'nitpick comments';
                 await swapLabel('coderabbit: unresolved');
                 await postStatus('failure', 'CodeRabbit has unresolved comments');
