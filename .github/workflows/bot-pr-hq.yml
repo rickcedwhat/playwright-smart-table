@@ -1,0 +1,124 @@
+name: Bot — PR HQ Comment
+
+# Posts and maintains the "Bot HQ" comment on every non-Dependabot PR.
+# The HQ comment is the central status surface for each PR:
+#   - Issue link check (updates live when the PR body is edited)
+#   - CodeRabbit review status + one-click trigger checkbox
+#
+# Additional sections can be appended between the section markers in future.
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize]
+
+jobs:
+  upsert-hq:
+    name: Upsert HQ comment
+    runs-on: ubuntu-latest
+    # Skip Dependabot PRs — they never have issue links and don't use CodeRabbit
+    if: github.event.pull_request.user.login != 'dependabot[bot]'
+    steps:
+      - name: Upsert Bot HQ comment
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.BOT_PAT }}
+          script: |
+            const { owner, repo } = context.repo;
+            const pr_number = context.payload.pull_request.number;
+            const prBody = context.payload.pull_request.body || '';
+
+            // ── helpers ──────────────────────────────────────────────────────
+
+            function hasIssueLink(body) {
+              return /(close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+#\d+/i.test(body);
+            }
+
+            function extractIssueRefs(body) {
+              const refs = [...body.matchAll(/(close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+(#\d+)/gi)]
+                .map(m => m[2]);
+              return refs.length > 0 ? refs.join(', ') : null;
+            }
+
+            function buildIssueLinkContent(body) {
+              if (hasIssueLink(body)) {
+                const refs = extractIssueRefs(body) ?? 'an issue';
+                return `### 🔗 Issue Link\n✅ Linked to ${refs}`;
+              }
+              return '### 🔗 Issue Link\n⚠️ No `Closes #N` found — add one to the PR description to auto-close on merge.';
+            }
+
+            function updateHQSection(body, name, content) {
+              const s = `<!-- bot-hq:${name} -->`;
+              const e = `<!-- /bot-hq:${name} -->`;
+              return body.replace(new RegExp(`${s}[\\s\\S]*?${e}`), `${s}\n${content}\n${e}`);
+            }
+
+            function buildInitialBody(prBody) {
+              const issueLinkContent = buildIssueLinkContent(prBody);
+              return [
+                '<!-- bot-hq -->',
+                '## 🤖 Bot HQ',
+                '',
+                `<!-- bot-hq:issue-link -->`,
+                issueLinkContent,
+                `<!-- /bot-hq:issue-link -->`,
+                '',
+                `<!-- bot-hq:coderabbit -->`,
+                '### 🔍 CodeRabbit Review',
+                '- [ ] Request review',
+                '',
+                '> _Not yet requested_',
+                `<!-- /bot-hq:coderabbit -->`,
+                '',
+                '---',
+                '<sub>This comment is managed by the bot — do not edit directly.</sub>',
+              ].join('\n');
+            }
+
+            // ── find existing HQ comment ─────────────────────────────────────
+
+            const allComments = await github.paginate(github.rest.issues.listComments, {
+              owner, repo, issue_number: pr_number, per_page: 100
+            });
+            const existing = allComments.find(
+              c => c.user.login === 'rickcedwhat-ai' && c.body.includes('<!-- bot-hq -->')
+            );
+
+            const action = context.payload.action;
+
+            if (!existing) {
+              // First open — create the HQ comment (covers `opened` and edge cases)
+              await github.rest.issues.createComment({
+                owner, repo, issue_number: pr_number,
+                body: buildInitialBody(prBody)
+              });
+              return;
+            }
+
+            if (action === 'synchronize') {
+              // New commits pushed — reset the CR section so the author knows
+              // a fresh review is needed. Leave the issue-link section untouched.
+              const pendingContent = [
+                '### 🔍 CodeRabbit Review',
+                '- [ ] Request review',
+                '',
+                '> ⚠️ New commits pushed — check the box to request a fresh review.',
+              ].join('\n');
+              const updatedBody = updateHQSection(existing.body, 'coderabbit', pendingContent);
+              if (updatedBody !== existing.body) {
+                await github.rest.issues.updateComment({
+                  owner, repo, comment_id: existing.id, body: updatedBody
+                });
+              }
+              return;
+            }
+
+            // `edited` — PR body changed: refresh the issue-link section only.
+            // The coderabbit section is left untouched (preserves checkbox + status).
+            const newContent = buildIssueLinkContent(prBody);
+            const updatedBody = updateHQSection(existing.body, 'issue-link', newContent);
+            if (updatedBody !== existing.body) {
+              await github.rest.issues.updateComment({
+                owner, repo, comment_id: existing.id, body: updatedBody
+              });
+            }
