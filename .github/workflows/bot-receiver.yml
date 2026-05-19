@@ -293,6 +293,79 @@ jobs:
               }
             }
 
+            // Helper: drain the coderabbit review queue — fires the oldest queued PR
+            async function drainQueue() {
+              try {
+                const { data: queuedIssues } = await github.rest.issues.listForRepo({
+                  owner, repo: repoName,
+                  state: 'open',
+                  labels: 'coderabbit: queued',
+                  per_page: 100,
+                  sort: 'created',
+                  direction: 'asc',
+                });
+                const nextPR = queuedIssues.find(i => i.pull_request);
+                if (!nextPR) return;
+
+                const nextNum = nextPR.number;
+
+                // Swap queued → waiting
+                try {
+                  await github.rest.issues.removeLabel({
+                    owner, repo: repoName, issue_number: nextNum, name: 'coderabbit: queued'
+                  });
+                } catch {}
+                await github.rest.issues.addLabels({
+                  owner, repo: repoName, issue_number: nextNum, labels: ['coderabbit: waiting']
+                });
+
+                // Find HQ comment
+                const nextComments = await github.paginate(github.rest.issues.listComments, {
+                  owner, repo: repoName, issue_number: nextNum, per_page: 100
+                });
+                const nextHQ = nextComments.find(
+                  c => c.user.login === 'rickcedwhat-ai' && c.body.includes('<!-- bot-hq -->')
+                );
+                const nextHQId = nextHQ?.id ?? null;
+
+                // Update HQ section to triggered
+                if (nextHQ) {
+                  const triggeredContent = [
+                    '### 🔍 CodeRabbit Review',
+                    '- [x] Request review',
+                    '',
+                    '> 🔄 Review triggered — waiting for CodeRabbit...',
+                  ].join('\n');
+                  const s = '<!-- bot-hq:coderabbit -->';
+                  const e = '<!-- /bot-hq:coderabbit -->';
+                  const updated = nextHQ.body.replace(
+                    new RegExp(`${s}[\\s\\S]*?${e}`),
+                    `${s}\n${triggeredContent}\n${e}`
+                  );
+                  try {
+                    await github.rest.issues.updateComment({
+                      owner, repo: repoName, comment_id: nextHQId, body: updated
+                    });
+                  } catch {}
+                }
+
+                // Dispatch trigger directly (no QStash needed — we're already async)
+                await github.rest.repos.createDispatchEvent({
+                  owner, repo: repoName,
+                  event_type: 'bot-coderabbit-trigger',
+                  client_payload: {
+                    pr_number: nextNum,
+                    repo: `${owner}/${repoName}`,
+                    attempt: 1,
+                    hq_comment_id: nextHQId
+                  }
+                });
+                core.info(`Queue drained: triggered review for PR #${nextNum}`);
+              } catch (err) {
+                core.warning(`drainQueue failed: ${err.message}`);
+              }
+            }
+
             // Fetch CodeRabbit comments posted after trigger_time
             const triggerDate = new Date(trigger_time);
             const { data: allComments } = await github.rest.issues.listComments({
@@ -406,6 +479,7 @@ jobs:
                 await postStatus('success', 'CodeRabbit review complete');
                 await updateStatus('✅ No actionable comments — review complete');
               }
+              await drainQueue();
               return;
             }
 

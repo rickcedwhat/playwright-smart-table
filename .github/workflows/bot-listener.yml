@@ -50,16 +50,44 @@ jobs:
               return body.replace(new RegExp(`${s}[\\s\\S]*?${e}`), `${s}\n${content}\n${e}`);
             }
 
-            // 1. Swap label to waiting (capture original for rollback)
+            // 1. Capture current CR label for rollback
             const { data: currentLabels } = await github.rest.issues.listLabelsOnIssue({ owner, repo, issue_number });
             const originalCRLabel = currentLabels.find(l => l.name.startsWith('coderabbit:'))?.name
               ?? 'coderabbit: not started';
+
+            // 2. Check if another PR already has a review in progress (waiting or rate-limited)
+            const [{ data: waitingIssues }, { data: rateLimitedIssues }] = await Promise.all([
+              github.rest.issues.listForRepo({ owner, repo, state: 'open', labels: 'coderabbit: waiting', per_page: 10 }),
+              github.rest.issues.listForRepo({ owner, repo, state: 'open', labels: 'coderabbit: rate-limited', per_page: 10 }),
+            ]);
+            const isBlocked =
+              waitingIssues.some(i => i.pull_request && i.number !== prNumber) ||
+              rateLimitedIssues.some(i => i.pull_request && i.number !== prNumber);
+
+            // 3. Remove existing CR labels
             for (const l of currentLabels.filter(l => l.name.startsWith('coderabbit:'))) {
               try { await github.rest.issues.removeLabel({ owner, repo, issue_number, name: l.name }); } catch {}
             }
-            await github.rest.issues.addLabels({ owner, repo, issue_number, labels: ['coderabbit: waiting'] });
 
-            // 2. Update HQ coderabbit section to "triggered"
+            if (isBlocked) {
+              // Queue this PR — another review is already running
+              await github.rest.issues.addLabels({ owner, repo, issue_number, labels: ['coderabbit: queued'] });
+              const queuedContent = [
+                '### 🔍 CodeRabbit Review',
+                '- [x] Request review',
+                '',
+                '> ⏳ Queued — another review is in progress. This PR will be triggered automatically when the queue clears.',
+              ].join('\n');
+              await github.rest.issues.updateComment({
+                owner, repo, comment_id: hqCommentId,
+                body: updateHQSection(currentBody, 'coderabbit', queuedContent)
+              });
+              core.info(`PR #${prNumber} queued — another review is in progress.`);
+              return;
+            }
+
+            // 4. No review in progress — trigger immediately
+            await github.rest.issues.addLabels({ owner, repo, issue_number, labels: ['coderabbit: waiting'] });
             const triggeredContent = [
               '### 🔍 CodeRabbit Review',
               '- [x] Request review',
@@ -71,7 +99,7 @@ jobs:
               body: updateHQSection(currentBody, 'coderabbit', triggeredContent)
             });
 
-            // 3. Enqueue via QStash
+            // 5. Enqueue via QStash
             const payload = JSON.stringify({
               event_type: 'bot-coderabbit-trigger',
               client_payload: { pr_number: prNumber, repo: repoFull, attempt: 1, hq_comment_id: hqCommentId }
