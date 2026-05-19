@@ -16,6 +16,9 @@ jobs:
     steps:
       - name: Verify npm packages are ≥ 7 days old
         uses: actions/github-script@v9
+        env:
+          QSTASH_TOKEN: ${{ secrets.QSTASH_TOKEN }}
+          BOT_PAT:      ${{ secrets.BOT_PAT }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -120,6 +123,32 @@ jobs:
                   issue_number: context.payload.pull_request.number,
                   body: commentBody,
                 });
+              }
+
+              // Enqueue a bot-dependabot-rebase via QStash to fire when the soak period expires.
+              // Delay = exact seconds until latestPublish + 7 days — rebase lands automatically.
+              const delaySecs = Math.ceil((latestPublish + MIN_AGE_MS - Date.now()) / 1000);
+              const repo = `${context.repo.owner}/${context.repo.repo}`;
+              const dispatchUrl = `https://api.github.com/repos/${repo}/dispatches`;
+              const qstashPayload = JSON.stringify({
+                event_type: 'bot-dependabot-rebase',
+                client_payload: { pr_number: context.payload.pull_request.number, repo }
+              });
+              const qstashRes = await fetch(`https://qstash.upstash.io/v2/publish/${dispatchUrl}`, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${process.env.QSTASH_TOKEN}`,
+                  'Upstash-Delay': `${delaySecs}s`,
+                  'Upstash-Forward-Authorization': `Bearer ${process.env.BOT_PAT}`,
+                  'Upstash-Forward-Content-Type': 'application/json',
+                  'Content-Type': 'application/json',
+                },
+                body: qstashPayload,
+              });
+              if (qstashRes.ok) {
+                core.info(`✓ Queued @dependabot rebase in ${delaySecs}s (fires ${rebaseAfterISO})`);
+              } else {
+                core.warning(`QStash enqueue failed (HTTP ${qstashRes.status}) — rebase will need to be triggered manually when soak period expires`);
               }
 
               core.setFailed(
