@@ -25,7 +25,7 @@ jobs:
         env:
           QSTASH_TOKEN: ${{ secrets.QSTASH_TOKEN }}
           BOT_PAT:      ${{ secrets.BOT_PAT }}
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           github-token: ${{ secrets.BOT_PAT }}
           script: |
@@ -154,7 +154,7 @@ jobs:
     steps:
       - name: Parse command
         id: parse
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const body = context.payload.comment.body.trim();
@@ -199,8 +199,8 @@ jobs:
     permissions:
       issues: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: '20'
       - name: Run upstream watch
@@ -223,7 +223,7 @@ jobs:
       issues: write
     steps:
       - name: Acknowledge
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           github-token: ${{ secrets.BOT_PAT }}
           script: |
@@ -233,8 +233,8 @@ jobs:
               issue_number: context.issue.number,
               body: '🔍 Running upstream check now...'
             });
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: '20'
       - name: Fetch this issue as array
@@ -253,7 +253,7 @@ jobs:
         run: node scripts/check-upstream-blockers.mjs
       - name: Post still-blocked status
         if: success()
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           github-token: ${{ secrets.BOT_PAT }}
           script: |
@@ -323,7 +323,7 @@ jobs:
             exit 1
           fi
       - name: Confirm
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           github-token: ${{ secrets.BOT_PAT }}
           script: |
@@ -345,7 +345,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Update blocked-pr in issue body
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           github-token: ${{ secrets.BOT_PAT }}
           script: |
@@ -391,7 +391,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Mark cleared
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           github-token: ${{ secrets.BOT_PAT }}
           script: |
@@ -427,7 +427,7 @@ jobs:
           BOT_PAT:      ${{ secrets.BOT_PAT }}
           PR_NUMBER:    ${{ github.event.issue.number }}
           REPO:         ${{ github.repository }}
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           github-token: ${{ secrets.BOT_PAT }}
           script: |
@@ -572,7 +572,7 @@ jobs:
             exit 1
           fi
       - name: Confirm
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           github-token: ${{ secrets.BOT_PAT }}
           script: |
@@ -593,7 +593,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Validate args
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           github-token: ${{ secrets.BOT_PAT }}
           script: |
@@ -644,7 +644,7 @@ jobs:
             exit 1
           fi
       - name: Confirm
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           github-token: ${{ secrets.BOT_PAT }}
           script: |
@@ -665,7 +665,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Post help
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           github-token: ${{ secrets.BOT_PAT }}
           script: |
@@ -705,7 +705,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Post unknown command message
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           github-token: ${{ secrets.BOT_PAT }}
           script: |

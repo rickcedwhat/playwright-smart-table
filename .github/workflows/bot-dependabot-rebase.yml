@@ -17,7 +17,7 @@ jobs:
       contains(github.event.comment.body, 'age-check-rebase-after:')
     steps:
       - name: Parse date and enqueue
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           github-token: ${{ secrets.BOT_PAT }}
           script: |
