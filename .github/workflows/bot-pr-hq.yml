@@ -1,8 +1,8 @@
 name: Bot — PR HQ Comment
 
-# Posts and maintains the "Bot HQ" comment on every non-Dependabot PR.
+# Posts and maintains the "Bot HQ" comment on every PR (including Dependabot).
 # The HQ comment is the central status surface for each PR:
-#   - Issue link check (updates live when the PR body is edited)
+#   - Issue link check (updates live when the PR body is edited; N/A for Dependabot)
 #   - CodeRabbit review status + one-click trigger checkbox
 #
 # Additional sections can be appended between the section markers in future.
@@ -15,8 +15,6 @@ jobs:
   upsert-hq:
     name: Upsert HQ comment
     runs-on: ubuntu-latest
-    # Skip Dependabot PRs — they never have issue links and don't use CodeRabbit
-    if: github.event.pull_request.user.login != 'dependabot[bot]'
     steps:
       - name: Upsert Bot HQ comment
         uses: actions/github-script@v9
@@ -26,6 +24,7 @@ jobs:
             const { owner, repo } = context.repo;
             const pr_number = context.payload.pull_request.number;
             const prBody = context.payload.pull_request.body || '';
+            const isDependabot = context.payload.pull_request.user.login === 'dependabot[bot]';
 
             // ── helpers ──────────────────────────────────────────────────────
 
@@ -40,6 +39,9 @@ jobs:
             }
 
             function buildIssueLinkContent(body) {
+              if (isDependabot) {
+                return '### 🔗 Issue Link\n_N/A — automated dependency update_';
+              }
               if (hasIssueLink(body)) {
                 const refs = extractIssueRefs(body) ?? 'an issue';
                 return `### 🔗 Issue Link\n✅ Linked to ${refs}`;
