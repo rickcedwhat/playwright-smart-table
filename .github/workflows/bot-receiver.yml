@@ -74,6 +74,20 @@ jobs:
               }
             }
 
+            // Check terminal labels FIRST — before the retry-limit branch, so a
+            // queued trigger arriving after attempt > 10 can never overwrite a
+            // manually-set complete/unresolved label.
+            const { data: labels } = await github.rest.issues.listLabelsOnIssue({
+              owner, repo: repoName, issue_number: pr_number
+            });
+            const isTerminal = labels.some(l =>
+              l.name === 'coderabbit: complete' || l.name === 'coderabbit: unresolved'
+            );
+            if (isTerminal) {
+              core.setOutput('stop', 'true');
+              return;
+            }
+
             if (attempt > 10) {
               await github.rest.issues.createComment({
                 owner, repo: repoName, issue_number: pr_number,
@@ -81,9 +95,6 @@ jobs:
               });
               await updateHQCRSection(hq_comment_id, '❌ Review failed after 10 attempts — please trigger manually');
               // Swap label back to not started
-              const { data: labels } = await github.rest.issues.listLabelsOnIssue({
-                owner, repo: repoName, issue_number: pr_number
-              });
               for (const l of labels.filter(l => l.name.startsWith('coderabbit:'))) {
                 try {
                   await github.rest.issues.removeLabel({
@@ -214,8 +225,11 @@ jobs:
         with:
           github-token: ${{ secrets.BOT_PAT }}
           script: |
-            const { pr_number, repo, attempt, trigger_time, wait_count = 0, hq_comment_id } =
-              context.payload.client_payload;
+            const {
+              pr_number, repo, attempt, trigger_time,
+              wait_count = 0, submission_wait_count = 0,
+              hq_comment_id
+            } = context.payload.client_payload;
             const [owner, repoName] = repo.split('/');
 
             // Helper: swap label
@@ -420,6 +434,26 @@ jobs:
               return;
             }
 
+            // Check for "review skipped" (e.g. lock-file-only PR, all files excluded by path filters)
+            const skippedComment = crComments.find(
+              c => /review was skipped|Review skipped/i.test(c.body)
+            );
+            if (skippedComment) {
+              // A skipped review has no new findings — but if the PR already has
+              // unresolved threads from a previous run, preserve that state.
+              const { data: currentLabels } = await github.rest.issues.listLabelsOnIssue({
+                owner, repo: repoName, issue_number: pr_number
+              });
+              const alreadyUnresolved = currentLabels.some(l => l.name === 'coderabbit: unresolved');
+              if (!alreadyUnresolved) {
+                await swapLabel('coderabbit: complete');
+                await postStatus('success', 'CodeRabbit review skipped — no reviewable files');
+                await updateStatus('✅ Review skipped — no reviewable files (e.g. lock file only)');
+              }
+              await drainQueue();
+              return;
+            }
+
             // Check for review completion (Summary or walkthrough sections)
             const reviewComment = crComments.find(
               c => /## Summary|walkthrough/i.test(c.body) && c.body.length > 500
@@ -455,6 +489,24 @@ jobs:
               `, { owner, repo: repoName, number: pr_number });
 
               const pr = gqlResult.repository.pullRequest;
+
+              // Gate: CR updates its walkthrough issue comment first, then submits
+              // the formal PR review (with inline threads) ~30s later. If no formal
+              // review has landed yet, wait one more 60s cycle to avoid racing past
+              // unresolved threads. Allow up to 3 extra waits (~3 min total buffer).
+              const crFormalReview = pr.reviews.nodes.some(
+                r => isCR(r.author?.login) && new Date(r.submittedAt) > triggerDate
+              );
+              if (!crFormalReview && submission_wait_count < 3) {
+                await enqueue('bot-coderabbit-check', {
+                  pr_number, repo, attempt, trigger_time,
+                  wait_count, submission_wait_count: submission_wait_count + 1,
+                  hq_comment_id
+                }, 60);
+                await updateStatus(`⏳ Waiting for CodeRabbit review submission... _(check ${submission_wait_count + 1}/3)_`);
+                return;
+              }
+
               const unresolvedCR = pr.reviewThreads.nodes.filter(
                 t => !t.isResolved && isCR(t.comments.nodes[0]?.author?.login)
               );
