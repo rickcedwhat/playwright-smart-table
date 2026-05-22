@@ -14,7 +14,7 @@ jobs:
     if: github.event.label.name == 'upstream-blocker:cleared'
     steps:
       - name: Parse blocked-pr and notify
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           github-token: ${{ secrets.BOT_PAT }}
           script: |

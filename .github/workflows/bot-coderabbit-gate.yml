@@ -23,7 +23,7 @@ jobs:
       statuses: write
     steps:
       - name: Update commit status from label
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           github-token: ${{ secrets.BOT_PAT }}
           script: |
