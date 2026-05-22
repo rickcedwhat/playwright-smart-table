@@ -22,7 +22,7 @@ jobs:
     if: github.event.action == 'bot-coderabbit-retry'
     steps:
       - name: Post @coderabbitai full review
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           github-token: ${{ secrets.BOT_PAT }}
           script: |
@@ -43,7 +43,7 @@ jobs:
     steps:
       - name: Check attempt limit
         id: check-attempt
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           github-token: ${{ secrets.BOT_PAT }}
           script: |
@@ -102,7 +102,7 @@ jobs:
 
       - name: Swap label to waiting
         if: steps.check-attempt.outputs.stop != 'true'
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           github-token: ${{ secrets.BOT_PAT }}
           script: |
@@ -129,7 +129,7 @@ jobs:
       - name: Post @coderabbitai full review and record timestamp
         id: post-review
         if: steps.check-attempt.outputs.stop != 'true'
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           github-token: ${{ secrets.BOT_PAT }}
           script: |
@@ -207,7 +207,7 @@ jobs:
     if: github.event.action == 'bot-coderabbit-check'
     steps:
       - name: Inspect CodeRabbit response and act
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         env:
           QSTASH_TOKEN: ${{ secrets.QSTASH_TOKEN }}
           BOT_PAT:      ${{ secrets.BOT_PAT }}
@@ -503,7 +503,9 @@ jobs:
     if: github.event.action == 'bot-upstream-check'
     steps:
       - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           node-version: '20'
       - name: Prepare single-issue input
@@ -528,7 +530,7 @@ jobs:
     if: github.event.action == 'bot-upstream-nudge'
     steps:
       - name: Check if still unstarted and nudge
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           github-token: ${{ secrets.BOT_PAT }}
           script: |
@@ -554,7 +556,7 @@ jobs:
     if: github.event.action == 'bot-dependabot-rebase'
     steps:
       - name: Post @dependabot rebase
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           github-token: ${{ secrets.BOT_PAT }}
           script: |
@@ -574,7 +576,7 @@ jobs:
     if: github.event.action == 'bot-reminder'
     steps:
       - name: Post reminder comment
-        uses: actions/github-script@v9
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
         with:
           github-token: ${{ secrets.BOT_PAT }}
           script: |
