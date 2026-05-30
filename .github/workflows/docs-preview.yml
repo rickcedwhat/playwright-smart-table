@@ -1,0 +1,76 @@
+name: Docs PR Preview
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  deploy-preview:
+    name: Deploy preview
+    runs-on: ubuntu-latest
+    if: github.event.action != 'closed'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Check if docs changed
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            docs:
+              - 'docs/**'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - '.github/workflows/docs-check.yml'
+              - '.github/workflows/deploy-docs.yml'
+              - '.github/workflows/docs-preview.yml'
+              - 'scripts/docs-build-prod.mjs'
+              - 'scripts/verify-vitepress-links.mjs'
+
+      - name: Setup pnpm
+        if: steps.filter.outputs.docs == 'true'
+        uses: pnpm/action-setup@v6
+
+      - name: Setup Node
+        if: steps.filter.outputs.docs == 'true'
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        if: steps.filter.outputs.docs == 'true'
+        run: pnpm install --frozen-lockfile
+
+      - name: Build VitePress site (preview base)
+        if: steps.filter.outputs.docs == 'true'
+        run: npx vitepress build docs --base /playwright-smart-table/pr-preview/pr-${{ github.event.pull_request.number }}/
+
+      - name: Deploy PR preview
+        if: steps.filter.outputs.docs == 'true'
+        uses: rossjrw/pr-preview-action@v1
+        with:
+          source-dir: docs/.vitepress/dist
+          preview-branch: gh-pages
+          umbrella-dir: pr-preview
+
+  cleanup-preview:
+    name: Remove preview
+    runs-on: ubuntu-latest
+    if: github.event.action == 'closed'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Remove PR preview
+        uses: rossjrw/pr-preview-action@v1
+        with:
+          source-dir: docs/.vitepress/dist
+          preview-branch: gh-pages
+          umbrella-dir: pr-preview
+          action: remove
