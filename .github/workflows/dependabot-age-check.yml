@@ -129,16 +129,18 @@ jobs:
               // Delay = exact seconds until latestPublish + 7 days — rebase lands automatically.
               const delaySecs = Math.ceil((latestPublish + MIN_AGE_MS - Date.now()) / 1000);
               const repo = `${context.repo.owner}/${context.repo.repo}`;
+              const prNumber = context.payload.pull_request.number;
               const dispatchUrl = `https://api.github.com/repos/${repo}/dispatches`;
               const qstashPayload = JSON.stringify({
                 event_type: 'bot-dependabot-rebase',
-                client_payload: { pr_number: context.payload.pull_request.number, repo }
+                client_payload: { pr_number: prNumber, repo }
               });
               const qstashRes = await fetch(`https://qstash.upstash.io/v2/publish/${dispatchUrl}`, {
                 method: 'POST',
                 headers: {
                   'Authorization': `Bearer ${process.env.QSTASH_TOKEN}`,
                   'Upstash-Delay': `${delaySecs}s`,
+                  'Upstash-Deduplication-Id': `dependabot-rebase-${repo}-pr-${prNumber}`,
                   'Upstash-Forward-Authorization': `Bearer ${process.env.BOT_PAT}`,
                   'Upstash-Forward-Content-Type': 'application/json',
                   'Content-Type': 'application/json',
