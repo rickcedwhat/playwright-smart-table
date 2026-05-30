@@ -99,6 +99,12 @@ jobs:
 
             // On review events, re-evaluate thread state and auto-transition label
             if (context.eventName === 'pull_request_review') {
+              // Ignore skip/rate-limit notices — they fire pull_request_review events
+              // but are not real reviews, so 0 unresolved threads is meaningless.
+              const reviewBody = context.payload.review?.body || '';
+              const isSkipOrRateLimit = /skip review|rate.?limit/i.test(reviewBody);
+              if (isSkipOrRateLimit) return;
+
               const unresolved = await unresolvedCRThreadCount();
               const hasCRLabel = labelNames.some(n => n.startsWith('coderabbit:'));
               const isActive = hasCRLabel &&
