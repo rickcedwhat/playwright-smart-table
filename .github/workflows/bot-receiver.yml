@@ -416,16 +416,24 @@ jobs:
               await swapLabel('coderabbit: rate-limited');
               await postStatus('pending', 'CodeRabbit rate-limited — retry queued');
 
-              // Parse duration from message
-              const durationMatch = rateLimitComment.body.match(/(\d+)\s*(minute|min|hour)/i);
-              let delaySecs = 30 * 60; // default 30 minutes
-              if (durationMatch) {
-                const val = parseInt(durationMatch[1]);
-                const unit = durationMatch[2].toLowerCase();
-                delaySecs = unit.startsWith('hour') ? val * 3600 : val * 60;
-              }
-              // Add 1 minute buffer
-              delaySecs += 60;
+              // Parse hours/minutes/seconds from the rate-limit comment body,
+              // then anchor to when CR *posted* the comment so elapsed processing
+              // time doesn't inflate the delay.
+              const body = rateLimitComment.body;
+              const hMatch = body.match(/(\d+)\s*hour/i);
+              const mMatch = body.match(/(\d+)\s*min/i);
+              const sMatch = body.match(/(\d+)\s*sec/i);
+              let durationMs =
+                (hMatch ? parseInt(hMatch[1]) * 3600000 : 0) +
+                (mMatch ? parseInt(mMatch[1]) * 60000   : 0) +
+                (sMatch ? parseInt(sMatch[1]) * 1000    : 0);
+              if (!durationMs) durationMs = 30 * 60 * 1000; // fallback 30 min
+
+              const commentedAt = new Date(rateLimitComment.created_at).getTime();
+              const availableAt = commentedAt + durationMs;
+              // 60s buffer after CR becomes available; floor at 30s in case we're
+              // already past the window when this handler runs.
+              const delaySecs = Math.max(30, Math.ceil((availableAt - Date.now()) / 1000)) + 60;
 
               await enqueue('bot-coderabbit-trigger', {
                 pr_number, repo, attempt: attempt + 1, hq_comment_id
