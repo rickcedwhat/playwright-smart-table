@@ -28,6 +28,27 @@ jobs:
           script: |
             const { pr_number, repo } = context.payload.client_payload;
             const [owner, repoName] = repo.split('/');
+
+            // Guard: only fire if still rate-limited (duplicate QStash messages skip)
+            const { data: labels } = await github.rest.issues.listLabelsOnIssue({
+              owner, repo: repoName, issue_number: pr_number
+            });
+            const labelNames = labels.map(l => l.name);
+            if (!labelNames.includes('coderabbit: rate-limited')) {
+              core.info(`PR #${pr_number} is no longer rate-limited (label: ${labelNames.join(', ')}), skipping retry`);
+              return;
+            }
+
+            // Swap label first so any subsequent duplicate messages skip
+            try {
+              await github.rest.issues.removeLabel({
+                owner, repo: repoName, issue_number: pr_number, name: 'coderabbit: rate-limited'
+              });
+            } catch {}
+            await github.rest.issues.addLabels({
+              owner, repo: repoName, issue_number: pr_number, labels: ['coderabbit: waiting']
+            });
+
             await github.rest.issues.createComment({
               owner,
               repo: repoName,
@@ -416,16 +437,28 @@ jobs:
               await swapLabel('coderabbit: rate-limited');
               await postStatus('pending', 'CodeRabbit rate-limited — retry queued');
 
-              // Parse duration from message
-              const durationMatch = rateLimitComment.body.match(/(\d+)\s*(minute|min|hour)/i);
-              let delaySecs = 30 * 60; // default 30 minutes
-              if (durationMatch) {
-                const val = parseInt(durationMatch[1]);
-                const unit = durationMatch[2].toLowerCase();
-                delaySecs = unit.startsWith('hour') ? val * 3600 : val * 60;
+              // Parse hours/minutes/seconds from the rate-limit comment body,
+              // then anchor to when CR *posted* the comment so elapsed processing
+              // time doesn't inflate the delay.
+              const body = rateLimitComment.body;
+              const hMatch = body.match(/(\d+)\s*hour/i);
+              const mMatch = body.match(/(\d+)\s*min/i);
+              const sMatch = body.match(/(\d+)\s*sec/i);
+              let durationMs =
+                (hMatch ? parseInt(hMatch[1]) * 3600000 : 0) +
+                (mMatch ? parseInt(mMatch[1]) * 60000   : 0) +
+                (sMatch ? parseInt(sMatch[1]) * 1000    : 0);
+              if (!durationMs) durationMs = 30 * 60 * 1000; // fallback 30 min
+
+              const commentedAt = new Date(rateLimitComment.created_at).getTime();
+              if (isNaN(commentedAt)) {
+                core.warning('Rate-limit comment missing valid created_at — falling back to 30 min from now');
+                durationMs = 30 * 60 * 1000;
               }
-              // Add 1 minute buffer
-              delaySecs += 60;
+              const availableAt = (isNaN(commentedAt) ? Date.now() : commentedAt) + durationMs;
+              // 60s buffer after CR becomes available; floor at 30s in case we're
+              // already past the window when this handler runs.
+              const delaySecs = Math.max(30, Math.ceil((availableAt - Date.now()) / 1000)) + 60;
 
               await enqueue('bot-coderabbit-trigger', {
                 pr_number, repo, attempt: attempt + 1, hq_comment_id
@@ -490,6 +523,8 @@ jobs:
 
               const pr = gqlResult.repository.pullRequest;
 
+              const triggerDate = new Date(trigger_time);
+
               // Gate: CR updates its walkthrough issue comment first, then submits
               // the formal PR review (with inline threads) ~30s later. If no formal
               // review has landed yet, wait one more 60s cycle to avoid racing past
@@ -511,7 +546,6 @@ jobs:
                 t => !t.isResolved && isCR(t.comments.nodes[0]?.author?.login)
               );
 
-              const triggerDate = new Date(trigger_time);
               const crNitpickReviews = pr.reviews.nodes.filter(
                 r => isCR(r.author?.login) &&
                      r.state === 'COMMENTED' &&
