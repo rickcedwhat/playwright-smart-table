@@ -28,9 +28,21 @@ test('find and verify employee', async ({ page }) => {
 
 ## Why This Works
 
-`useTable()` reads the table headers and remembers which column index belongs to each name. `getRow()` finds a row by cell text, and `getCell()` returns a normal Playwright `Locator`, so Playwright assertions and actions still work.
+Those three lines hide a small but important pipeline. Press **Play** to step through it and see what happens internally each time a line runs.
 
-That means your test can say “the row where `Name` is `Airi Satou`, then the `Office` cell” instead of relying on `nth()` indexes.
+<LabInitGetRowDebug />
+
+Here is what you just saw:
+
+1. **`init()` builds the header map.** Smart Table reads the `<th>` elements once and records which column index belongs to each name — for example `Name → 1`, `Office → 4`. This map is frozen for the lifetime of the table object, so every subsequent lookup is O(1).
+
+2. **`getRow()` translates your filter into a Playwright locator.** It looks up each key in the header map and builds a `.filter()` chain — one filter per column. No DOM access happens yet; you get back a locator that is ready to evaluate.
+
+3. **`getCell()` returns a plain Playwright `Locator`.** You can pass it straight to `expect()`, `click()`, `fill()`, or any other Playwright API.
+
+4. **Typos are caught at the filter stage.** If a key does not match any header, Smart Table throws immediately with a list of close matches — no cryptic “element not found” error deep in a test run.
+
+That is why your test can say “the row where `Name` is `Airi Satou`, then the `Office` cell” instead of relying on `nth()` indexes that break the moment a column is reordered.
 
 ## Which Method Should I Use?
 
