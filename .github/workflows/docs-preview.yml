@@ -143,8 +143,8 @@ jobs:
               let syncTarget = null;
 
               function navigate(page) {
-                fC.src = CANONICAL + (page || '');
-                fP.src = PREVIEW   + (page || '');
+                fC.src = CANONICAL + (page ? page + '.html' : '');
+                fP.src = PREVIEW   + (page ? page + '.html' : '');
                 document.querySelectorAll('#page-nav button').forEach(b =>
                   b.classList.toggle('active', b.dataset.page === page));
                 history.replaceState(null, '', '#' + page);
@@ -224,7 +224,7 @@ jobs:
             const rows = pages.length
               ? pages.map(p => {
                   const label = p || '(home)';
-                  const path  = p ? p + '/' : '';
+                  const path  = p ? p + '.html' : '';
                   return `| \`${label}\` | [view](${CANONICAL}${path}) | [preview](${PREVIEW}${path}) | [compare](${COMPARE}#${p}) |`;
                 }).join('\n')
               : '| _(non-page files changed)_ | — | — | — |';
