@@ -16,6 +16,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - name: Check if docs changed
         uses: dorny/paths-filter@v3
@@ -51,6 +53,143 @@ jobs:
         if: steps.filter.outputs.docs == 'true'
         run: npx vitepress build docs --base /playwright-smart-table/pr-preview/pr-${{ github.event.pull_request.number }}/
 
+      - name: Get changed doc pages
+        if: steps.filter.outputs.docs == 'true'
+        id: pages
+        run: |
+          LIST=$(git diff --name-only ${{ github.event.pull_request.base.sha }} HEAD -- docs/ \
+            | grep '\.md$' \
+            | grep -v '\.vitepress' \
+            | sed 's|^docs/||; s|\.md$||; s|^index$||' \
+            | tr '\n' ',' \
+            | sed 's/,$//')
+          echo "list=$LIST" >> $GITHUB_OUTPUT
+
+      - name: Generate compare page
+        if: steps.filter.outputs.docs == 'true'
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          CHANGED_PAGES: ${{ steps.pages.outputs.list }}
+        run: |
+          cat > /tmp/gen-compare.mjs << 'GENSCRIPT'
+          const fs   = require('fs');
+          const pr   = process.env.PR_NUMBER;
+          const raw  = process.env.CHANGED_PAGES || '';
+          const pages = raw ? raw.split(',').filter(Boolean) : [];
+
+          const CANONICAL = '/playwright-smart-table/';
+          const PREVIEW   = `/playwright-smart-table/pr-preview/pr-${pr}/`;
+
+          const html = `<!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Docs Compare \u2014 PR #${pr}</title>
+            <style>
+              *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+              html, body { height: 100%; overflow: hidden;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+              #toolbar {
+                display: flex; align-items: center; gap: 12px; padding: 6px 14px;
+                background: #24292f; color: #e6edf3; font-size: 12px;
+                border-bottom: 1px solid #30363d; height: 37px;
+              }
+              #toolbar strong { white-space: nowrap; }
+              #page-nav { display: flex; gap: 6px; flex-wrap: wrap; }
+              #page-nav button {
+                background: #30363d; color: #e6edf3; border: 1px solid #444c56;
+                border-radius: 6px; padding: 3px 10px; font-size: 12px; cursor: pointer;
+              }
+              #page-nav button:hover { background: #444c56; }
+              #page-nav button.active { background: #1f6feb; border-color: #1f6feb; }
+              #frames { display: flex; height: calc(100vh - 37px); }
+              .pane { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+              .pane + .pane { border-left: 2px solid #30363d; }
+              .pane-label {
+                padding: 3px 10px; font-size: 11px; font-weight: 600;
+                text-align: center; flex-shrink: 0;
+              }
+              .pane:first-child .pane-label { background: #ddf4ff; color: #0550ae; }
+              .pane:last-child .pane-label  { background: #fff8c5; color: #7d4e00; }
+              iframe { flex: 1; border: none; width: 100%; }
+            </style>
+          </head>
+          <body>
+            <div id="toolbar">
+              <strong>PR #${pr} compare</strong>
+              <div id="page-nav"></div>
+            </div>
+            <div id="frames">
+              <div class="pane">
+                <div class="pane-label">main (canonical)</div>
+                <iframe id="f-canonical"></iframe>
+              </div>
+              <div class="pane">
+                <div class="pane-label">PR #${pr} (preview)</div>
+                <iframe id="f-preview"></iframe>
+              </div>
+            </div>
+            <script>
+              const CANONICAL = '${CANONICAL}';
+              const PREVIEW   = '${PREVIEW}';
+              const PAGES     = ${JSON.stringify(pages)};
+
+              const fC = document.getElementById('f-canonical');
+              const fP = document.getElementById('f-preview');
+              let syncing = false;
+
+              function navigate(page) {
+                fC.src = CANONICAL + (page || '');
+                fP.src = PREVIEW   + (page || '');
+                document.querySelectorAll('#page-nav button').forEach(b =>
+                  b.classList.toggle('active', b.dataset.page === page));
+                history.replaceState(null, '', '#' + page);
+              }
+
+              function syncScroll(src, tgt) {
+                if (syncing) return;
+                syncing = true;
+                try {
+                  const sw = src.contentWindow, tw = tgt.contentWindow;
+                  const ratio = sw.scrollY /
+                    Math.max(1, sw.document.body.scrollHeight - sw.innerHeight);
+                  tw.scrollTo(0,
+                    ratio * Math.max(0, tw.document.body.scrollHeight - tw.innerHeight));
+                } catch (_) {}
+                requestAnimationFrame(() => { syncing = false; });
+              }
+
+              function attach(frame, other) {
+                try {
+                  frame.contentWindow.addEventListener('scroll',
+                    () => syncScroll(frame, other), { passive: true });
+                } catch (_) {}
+              }
+
+              fC.addEventListener('load', () => attach(fC, fP));
+              fP.addEventListener('load', () => attach(fP, fC));
+
+              const nav = document.getElementById('page-nav');
+              PAGES.forEach(page => {
+                const btn = document.createElement('button');
+                btn.textContent = page || '(home)';
+                btn.dataset.page = page;
+                btn.onclick = () => navigate(page);
+                nav.appendChild(btn);
+              });
+
+              const initial = location.hash.slice(1);
+              navigate(PAGES.includes(initial) ? initial : (PAGES[0] ?? ''));
+            <\/script>
+          </body>
+          </html>`;
+
+          fs.writeFileSync('docs/.vitepress/dist/compare.html', html);
+          console.log('Generated compare.html, pages:', pages);
+          GENSCRIPT
+          node /tmp/gen-compare.mjs
+
       - name: Deploy PR preview
         if: steps.filter.outputs.docs == 'true'
         uses: rossjrw/pr-preview-action@v1
@@ -58,6 +197,71 @@ jobs:
           source-dir: docs/.vitepress/dist
           preview-branch: gh-pages
           umbrella-dir: pr-preview
+
+      - name: Upsert preview comment
+        if: steps.filter.outputs.docs == 'true'
+        uses: actions/github-script@v9
+        env:
+          CHANGED_PAGES: ${{ steps.pages.outputs.list }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          COMMIT_SHA: ${{ github.event.pull_request.head.sha }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { owner, repo } = context.repo;
+            const prNumber = parseInt(process.env.PR_NUMBER);
+            const sha = process.env.COMMIT_SHA.slice(0, 7);
+            const raw = process.env.CHANGED_PAGES || '';
+            const pages = raw ? raw.split(',').filter(Boolean) : [];
+
+            const CANONICAL = 'https://rickcedwhat.github.io/playwright-smart-table/';
+            const PREVIEW   = `https://rickcedwhat.github.io/playwright-smart-table/pr-preview/pr-${prNumber}/`;
+            const COMPARE   = `${PREVIEW}compare.html`;
+
+            // Build changed-pages table rows
+            const rows = pages.length
+              ? pages.map(p => {
+                  const label = p || '(home)';
+                  const path  = p ? p + '/' : '';
+                  return `| \`${label}\` | [view](${CANONICAL}${path}) | [preview](${PREVIEW}${path}) | [compare](${COMPARE}#${p}) |`;
+                }).join('\n')
+              : '| _(non-page files changed)_ | — | — | — |';
+
+            const MARKER = '<!-- docs-preview -->';
+            const body = [
+              MARKER,
+              `## 📖 Docs Preview — PR #${prNumber}`,
+              '',
+              '| Page | Canonical | Preview | Compare |',
+              '|---|---|---|---|',
+              rows,
+              '',
+              `[Open full compare view](${COMPARE})`,
+              '',
+              `> Built from \`${sha}\``,
+            ].join('\n');
+
+            // Delete the rossjrw auto-comment if present, then upsert ours
+            const allComments = await github.paginate(github.rest.issues.listComments, {
+              owner, repo, issue_number: prNumber, per_page: 100
+            });
+
+            for (const c of allComments) {
+              if (c.user.login === 'github-actions[bot]' && c.body?.includes('PR Preview Action')) {
+                await github.rest.issues.deleteComment({ owner, repo, comment_id: c.id });
+              }
+            }
+
+            const existing = allComments.find(c => c.body?.includes(MARKER));
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner, repo, comment_id: existing.id, body
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner, repo, issue_number: prNumber, body
+              });
+            }
 
   cleanup-preview:
     name: Remove preview
