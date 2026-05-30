@@ -94,14 +94,14 @@ getRow(
 const row = table.getRow({ Name: 'John' });
 
 // ✅ Multi-column filter (must match ALL)
-const adminRow = table.getRow({ 
+const adminRow = table.getRow({
   Role: 'Admin',
   Status: 'Active'
 });
 
 // ✅ Regex matching
-const gmailRow = table.getRow({ 
-  Email: /@gmail\.com$/ 
+const gmailRow = table.getRow({
+  Email: /@gmail\.com$/
 });
 ```
 
@@ -182,6 +182,12 @@ const exactRow = await table.findRow(
 );
 ```
 
+### Interactive trace
+
+Step through how `findRow` scans pages, highlights matches, and surfaces the `maxPages` exhausted error — without running a real browser.
+
+<LabGetRowTrace />
+
 [Back to Top](#table-methods)
 
 ---
@@ -235,6 +241,12 @@ const exactRows = await table.findRows(
   { exact: true }
 );
 ```
+
+### See it in action
+
+Walk through a full `findRow` flow end-to-end: table init, header mapping, multi-page scan, match highlight, and the final `getCell` + checkbox interaction — all animated step by step.
+
+<LabFindRowPaginationDebug />
 
 [Back to Top](#table-methods)
 
