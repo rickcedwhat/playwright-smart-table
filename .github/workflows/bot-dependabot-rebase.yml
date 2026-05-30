@@ -1,0 +1,77 @@
+name: Bot — Dependabot Rebase Scheduler
+
+# Watches for the age-check-rebase-after marker posted by dependabot-age-check.yml.
+# When found, enqueues an @dependabot rebase via QStash to fire at exactly that date.
+
+on:
+  issue_comment:
+    types: [created]
+
+jobs:
+  schedule-rebase:
+    name: Schedule @dependabot rebase
+    runs-on: ubuntu-latest
+    # Only fire on PR comments that contain the age-check marker
+    if: |
+      github.event.issue.pull_request != null &&
+      contains(github.event.comment.body, 'age-check-rebase-after:')
+    steps:
+      - name: Parse date and enqueue
+        uses: actions/github-script@v9
+        with:
+          github-token: ${{ secrets.BOT_PAT }}
+          script: |
+            const body = context.payload.comment.body;
+            const match = body.match(/age-check-rebase-after:\s*(\d{4}-\d{2}-\d{2})/);
+            if (!match) {
+              core.info('No rebase-after date found — skipping.');
+              return;
+            }
+
+            const rebaseAfterDate = match[1];
+            const rebaseAfterMs = new Date(rebaseAfterDate).getTime();
+            const nowMs = Date.now();
+
+            if (rebaseAfterMs <= nowMs) {
+              core.info('Rebase date is in the past — skipping.');
+              return;
+            }
+
+            // Use Upstash-Not-Before (Unix timestamp in seconds) for exact timing
+            const notBefore = Math.ceil(rebaseAfterMs / 1000);
+
+            const { owner, repo } = context.repo;
+            const pr_number = context.issue.number;
+
+            const payload = JSON.stringify({
+              event_type: 'bot-dependabot-rebase',
+              client_payload: { pr_number, repo: `${owner}/${repo}` }
+            });
+
+            const DISPATCH_URL =
+              `https://api.github.com/repos/${owner}/${repo}/dispatches`;
+
+            const res = await fetch(
+              `https://qstash.upstash.io/v2/publish/${DISPATCH_URL}`,
+              {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${process.env.QSTASH_TOKEN}`,
+                  'Upstash-Not-Before': String(notBefore),
+                  'Upstash-Forward-Authorization': `Bearer ${process.env.BOT_PAT}`,
+                  'Upstash-Forward-Content-Type': 'application/json',
+                  'Content-Type': 'application/json',
+                },
+                body: payload
+              }
+            );
+
+            if (!res.ok) {
+              core.setFailed(`QStash enqueue failed: ${res.status} ${await res.text()}`);
+              return;
+            }
+
+            core.info(`@dependabot rebase scheduled for ${rebaseAfterDate} on PR #${pr_number}.`);
+        env:
+          QSTASH_TOKEN: ${{ secrets.QSTASH_TOKEN }}
+          BOT_PAT: ${{ secrets.BOT_PAT }}

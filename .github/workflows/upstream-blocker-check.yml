@@ -1,0 +1,36 @@
+name: Upstream Blocker Check
+
+on:
+  schedule:
+    - cron: '0 9 * * 1'  # Every Monday at 09:00 UTC
+  workflow_dispatch:
+
+jobs:
+  check:
+    name: Check upstream blockers
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+
+      - name: Fetch issues with upstream-blocker:waiting
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue list \
+            --label "upstream-blocker:waiting" \
+            --json number,body,title \
+            --limit 100 \
+            > issues.json
+          echo "Issues found: $(node -e 'process.stdout.write(String(require("./issues.json").length))')"
+
+      - name: Run checks and update labels
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/check-upstream-blockers.mjs

@@ -12,6 +12,7 @@ type StrategyContext = {
     root: Locator;
     page: Page;
     resolve: (item: any, parent: Locator | Page) => Locator;
+    getHeaders?: () => Promise<string[]>;
 };
 
 /**
@@ -24,13 +25,14 @@ const _navigateToCell = async (params: {
     rootLocator: Locator;
     page: Page;
     resolve: (item: any, parent: Locator | Page) => Locator;
+    getHeaders?: () => Promise<string[]>;
     column: string;
     index: number;
     rowLocator: Locator;
     rowIndex?: number;
     barrier?: NavigationBarrier;
 }): Promise<Locator> => {
-    const { config, rootLocator, page, resolve, column, index, rowLocator, rowIndex, barrier } = params;
+    const { config, rootLocator, page, resolve, getHeaders, column, index, rowLocator, rowIndex, barrier } = params;
     const rowLabel = typeof rowIndex === 'number' ? `row ${rowIndex}` : 'row ?';
     logDebug(
         config,
@@ -55,7 +57,7 @@ const _navigateToCell = async (params: {
         }
     }
 
-    const context: StrategyContext = { config, root: rootLocator, page, resolve };
+    const context: StrategyContext = { config, root: rootLocator, page, resolve, getHeaders };
 
     // Shared helper: is the target cell currently in the DOM?
     const targetReached = async () => {
@@ -312,14 +314,16 @@ const _navigateToCell = async (params: {
 
             const horizontalSteps = Math.abs(cDiff);
             if (horizontalSteps > 0) {
-                const settleMs = Math.min(2500, 60 + horizontalSteps * 12);
+                const computed = Math.min(2500, 60 + horizontalSteps * 12);
+                const settleMs = (Number.isFinite(nav.settleMs) && nav.settleMs! >= 0) ? nav.settleMs! : computed;
                 await page.waitForTimeout(settleMs);
             }
 
             // Wait for active cell to match target: poll getActiveCell or fallback to fixed delay
             // This is the "Midas Touch" buffer needed for Glide's async accessibility updates.
             const pollIntervalMs = 10;
-            const maxWaitMs = Math.min(6000, 250 + horizontalSteps * 25);
+            const computedMax = Math.min(6000, 250 + horizontalSteps * 25);
+            const maxWaitMs = (Number.isFinite(nav.maxWaitMs) && nav.maxWaitMs! >= 0) ? nav.maxWaitMs! : computedMax;
             const start = Date.now();
             while (Date.now() - start < maxWaitMs) {
                 if (config.strategies.getActiveCell) {
@@ -422,19 +426,37 @@ const createSmartRow = <T = any>(
 
         const smartCell = baseLocator as SmartCell;
         smartCell.bringIntoView = async () => {
+            const page = rootLocator.page();
             const navigatedCell = await _navigateToCell({
                 config,
                 rootLocator,
-                page: rootLocator.page(),
+                page,
                 resolve,
+                getHeaders: table?.getHeaders,
                 column: colName,
                 index: idx,
                 rowLocator,
                 rowIndex,
                 barrier: (smart as any)._barrier
             });
-            if (navigatedCell && (navigatedCell as any)._locator) {
-                (smartCell as any)._locator = (navigatedCell as any)._locator;
+            // Run beforeCellRead hook (same as toJSON does after navigation).
+            if (config.strategies.beforeCellRead) {
+                const getHeaderCell = table?.getHeaderCell
+                    ? table.getHeaderCell.bind(table)
+                    : async (colNameArg: string) => {
+                        const i = map.get(colNameArg);
+                        if (i === undefined) throw new Error(`Column "${colNameArg}" not found`);
+                        return resolve(config.headerSelector as any, rootLocator).nth(i);
+                    };
+                await config.strategies.beforeCellRead({
+                    cell: navigatedCell ?? baseLocator,
+                    columnName: colName,
+                    columnIndex: idx,
+                    row: rowLocator,
+                    page,
+                    root: rootLocator,
+                    getHeaderCell,
+                });
             }
         };
 
@@ -489,6 +511,7 @@ const createSmartRow = <T = any>(
                 rootLocator,
                 page,
                 resolve,
+                getHeaders: table?.getHeaders,
                 column: col,
                 index: idx,
                 rowLocator,
@@ -544,6 +567,7 @@ const createSmartRow = <T = any>(
                 rootLocator,
                 page: rootLocator.page(),
                 resolve,
+                getHeaders: table?.getHeaders,
                 column: colName,
                 index: colIdx,
                 rowLocator,

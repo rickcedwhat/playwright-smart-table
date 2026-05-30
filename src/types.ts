@@ -41,16 +41,45 @@ export type GetCellLocatorFn = (args: {
 }) => Locator;
 
 /**
- * Hook called before each cell value is read in toJSON (and columnOverrides.read).
- * Use this to scroll off-screen columns into view in horizontally virtualized tables,
- * wait for lazy-rendered content, or perform any pre-read setup.
+ * Hook called before each cell value is read in `toJSON` (and `columnOverrides.read`).
+ *
+ * Use this to scroll off-screen columns into view in **horizontally** virtualized tables,
+ * wait for lazy-rendered content (popovers, tooltips, async cell renderers), or perform
+ * any other pre-read setup that doesn't involve Y-axis scrolling.
+ *
+ * ---
+ *
+ * **⚠️ Y-scroll footgun — do NOT call `scrollIntoViewIfNeeded()` on row-virtualized grids.**
+ *
+ * `scrollIntoViewIfNeeded` adjusts *both* scroll axes. On grids that recycle DOM nodes
+ * based on the Y position (MUI DataGrid, AG Grid, react-window, etc.) calling it will
+ * shift the viewport vertically, unmounting the row you are currently reading and
+ * silently returning stale or empty cell values for the remainder of the row.
+ *
+ * Safe uses:
+ * - Column-only (X-axis) virtualization where rows are always in the DOM.
+ * - Calling `scrollIntoViewIfNeeded` on the **header cell** only, when that header is
+ *   guaranteed not to trigger a Y-scroll (e.g. sticky header grids).
+ *
+ * For grids with **both** row and column virtualization, use the `viewport` strategy
+ * instead — it drives explicit `scrollToRow` / `scrollToColumn` calls and is aware of
+ * the virtualization lifecycle.
  *
  * @example
- * // Scroll the column header into view to trigger horizontal virtualization render
+ * // Safe: column-only horizontal virtualization (rows always in DOM)
  * strategies: {
  *   beforeCellRead: async ({ columnName, getHeaderCell }) => {
  *     const header = await getHeaderCell(columnName);
- *     await header.scrollIntoViewIfNeeded();
+ *     await header.scrollIntoViewIfNeeded(); // only scrolls X — rows stay mounted
+ *   }
+ * }
+ *
+ * @example
+ * // Safe: wait for a lazy-rendered popover/tooltip before reading its text
+ * strategies: {
+ *   beforeCellRead: async ({ cell }) => {
+ *     await cell.hover();
+ *     await cell.page().waitForSelector('.cell-tooltip', { state: 'visible' });
  *   }
  * }
  */
@@ -556,6 +585,8 @@ export type RowIterationContext<T = any> = {
   rowIndex: number;
   /** 0-based iteration counter — the order this row was visited, not its DOM position or grid identity. */
   index: number;
+  /** 0-based page index — which page this row was collected from. */
+  pageIndex: number;
   stop: () => void;
 };
 
@@ -586,7 +617,7 @@ export type RowIterationOptions = {
   useBulkPagination?: boolean;
 };
 
-export interface TableResult<T = any> extends AsyncIterable<{ row: SmartRow<T>; rowIndex: number; index: number }> {
+export interface TableResult<T = any> extends AsyncIterable<{ row: SmartRow<T>; rowIndex: number; index: number; pageIndex: number }> {
   /**
    * Represents the current page index of the table's DOM.
    * Starts at 0. Automatically maintained by the library during pagination and bringIntoView.
@@ -597,7 +628,7 @@ export interface TableResult<T = any> extends AsyncIterable<{ row: SmartRow<T>; 
    * Initializes the table by resolving headers. Must be called before using sync methods.
    * @param options Optional timeout for header resolution (default: 3000ms)
    */
-  init(options?: { timeout?: number }): Promise<TableResult>;
+  init(options?: { timeout?: number }): Promise<TableResult<T>>;
 
   /**
    * SYNC: Checks if the table has been initialized.
@@ -617,7 +648,7 @@ export interface TableResult<T = any> extends AsyncIterable<{ row: SmartRow<T>; 
   getRow: (
     filters: Record<string, FilterValue>,
     options?: { exact?: boolean }
-  ) => SmartRow;
+  ) => SmartRow<T>;
 
   /**
    * Gets a row by 0-based index on the current page.
@@ -626,7 +657,7 @@ export interface TableResult<T = any> extends AsyncIterable<{ row: SmartRow<T>; 
    */
   getRowByIndex: (
     index: number
-  ) => SmartRow;
+  ) => SmartRow<T>;
 
   /**
    * ASYNC: Searches for a single row across pages using pagination.
@@ -637,7 +668,7 @@ export interface TableResult<T = any> extends AsyncIterable<{ row: SmartRow<T>; 
   findRow: (
     filters: Record<string, FilterValue>,
     options?: { exact?: boolean, maxPages?: number }
-  ) => Promise<SmartRow>;
+  ) => Promise<SmartRow<T>>;
 
   /**
    * ASYNC: Searches for all matching rows across pages using pagination.

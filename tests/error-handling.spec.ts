@@ -211,4 +211,42 @@ test.describe('Error Handling and Validation', () => {
             expect(await table.getHeaders()).toHaveLength(5);
         });
     });
+
+    test.describe('Strategy validation', () => {
+        const SIMPLE_TABLE_HTML = `
+          <table id="t">
+            <thead><tr><th>Name</th></tr></thead>
+            <tbody>
+              <tr><td>Alice</td></tr>
+              <tr><td>Bob</td></tr>
+            </tbody>
+          </table>
+        `;
+
+        test('init() throws early for a sorting strategy missing getSortState', async ({ page }) => {
+            await page.setContent(SIMPLE_TABLE_HTML);
+
+            // @ts-expect-error intentional invalid strategy to test runtime validation
+            const table = useTable(page.locator('#t'), {
+                strategies: {
+                    sorting: { doSort: async () => {} },
+                },
+            });
+
+            await expect(table.init()).rejects.toThrow(/getSortState/);
+        });
+
+        test('init() throws early for a fill strategy that is not a function', async ({ page }) => {
+            await page.setContent(SIMPLE_TABLE_HTML);
+
+            // @ts-expect-error intentional invalid strategy to test runtime validation
+            const table = useTable(page.locator('#t'), {
+                strategies: {
+                    fill: { someKey: true },
+                },
+            });
+
+            await expect(table.init()).rejects.toThrow(/Fill strategy must be a function/);
+        });
+    });
 });

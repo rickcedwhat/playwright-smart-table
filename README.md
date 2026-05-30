@@ -45,6 +45,7 @@ await table.forEach(async ({ row }) => {
 npm install @rickcedwhat/playwright-smart-table
 ```
 
+
 ## Quick Start
 
 ```typescript

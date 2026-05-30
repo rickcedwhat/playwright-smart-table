@@ -17,6 +17,7 @@ const TABLE_HTML = `
     <tbody id="tbody"></tbody>
   </table>
   <button id="next">Next</button>
+  <button id="first">First</button>
   <script>
     const pages = [
       [['1','Alice','Active'],['2','Bob','Inactive']],
@@ -33,6 +34,9 @@ const TABLE_HTML = `
     }
     document.getElementById('next').addEventListener('click', () => {
       if (currentPage < pages.length - 1) { currentPage++; render(); }
+    });
+    document.getElementById('first').addEventListener('click', () => {
+      currentPage = 0; render();
     });
     render();
   </script>
@@ -417,10 +421,34 @@ test.describe('numeric pagination result in useTable iteration', () => {
 
 // ─── new API additions (#89, #84, #43, #82) ───────────────────────────────────
 test.describe('new API additions', () => {
-    test('countRows counts the rows on current page', async ({ page }) => {
+    test('countRows paginates and returns total row count across all pages', async ({ page }) => {
         await page.setContent(TABLE_HTML);
-        const table = makeTable(page);
-        
+        const table = useTable(page.locator('#tbl'), {
+            maxPages: 3,
+            strategies: {
+                pagination: Strategies.Pagination.click({
+                    next: () => page.locator('#next'),
+                    first: () => page.locator('#first'),
+                }),
+            },
+        });
+
+        expect(await table.countRows()).toBe(6);
+        // reset() via goToFirst should have returned us to page 1
+        expect(await page.locator('#current-page').innerText()).toBe('1');
+    });
+
+    test('countRows returns current page count when no pagination configured', async ({ page }) => {
+        await page.setContent(TABLE_HTML);
+        const table = useTable(page.locator('#tbl'), {});
+
+        expect(await table.countRows()).toBe(2);
+    });
+
+    test('countRows returns current page count when maxPages > 1 but no pagination primitive', async ({ page }) => {
+        await page.setContent(TABLE_HTML);
+        const table = useTable(page.locator('#tbl'), { maxPages: 3 });
+
         expect(await table.countRows()).toBe(2);
     });
 

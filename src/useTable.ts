@@ -218,6 +218,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     if (pagesJumped > 0) {
       tableState.currentPageIndex += pagesJumped;
       log(`_advancePage: ${primitive} advanced ${pagesJumped} page(s) — now at page ${tableState.currentPageIndex}`);
+      await debugDelay(config, 'pagination');
     } else {
       log(`_advancePage: ${primitive} returned false — end of data`);
     }
@@ -286,10 +287,33 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     },
 
     countRows: async (): Promise<number> => {
-      log("countRows: counting rows in current viewport");
       await _autoInit();
-      const allRows = resolve(config.rowSelector, rootLocator);
-      return allRows.count();
+      const pag = config.strategies.pagination;
+      const hasPagination = config.maxPages > 1 && !!(pag?.goNext || pag?.goNextBulk);
+      if (!hasPagination) {
+        log("countRows: counting rows in current viewport (no pagination)");
+        return resolve(config.rowSelector, rootLocator).count();
+      }
+
+      log(`countRows: paginating up to ${config.maxPages} page(s)`);
+      const tracker = new ElementTracker('countRows');
+      let total = 0;
+      let pagesScanned = 1;
+      try {
+        while (true) {
+          const newIndices = await tracker.getUnseenIndices(resolve(config.rowSelector, rootLocator));
+          total += newIndices.length;
+          log(`countRows: page ${pagesScanned} — ${newIndices.length} row(s) (running total: ${total})`);
+          if (pagesScanned >= config.maxPages) break;
+          if (!await _advancePage(false)) break;
+          pagesScanned++;
+        }
+      } finally {
+        await tracker.cleanup(rootLocator.page());
+      }
+      log(`countRows: ${total} total row(s) across ${pagesScanned} page(s) — resetting`);
+      await result.reset();
+      return total;
     },
 
     mapColumn: async <R = string>(columnName: string, options: import('./types').RowIterationOptions = {}): Promise<R[]> => {
@@ -434,12 +458,14 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
 
     // ─── Shared async row iterator ───────────────────────────────────────────
 
-    async *[Symbol.asyncIterator](): AsyncIterableIterator<{ row: SmartRowType<T>; index: number; rowIndex: number }> {
+    async *[Symbol.asyncIterator](): AsyncIterableIterator<{ row: SmartRowType<T>; index: number; rowIndex: number; pageIndex: number }> {
       await _autoInit();
       const map = tableMapper.getMapSync()!;
       const effectiveMaxPages = config.maxPages;
       const tracker = new ElementTracker('iterator');
       const useBulk = false; // iterator has no options; default goNext
+
+      log(`iterator: starting (maxPages=${effectiveMaxPages})`);
 
       try {
         let rowIndex = 0;
@@ -452,7 +478,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
           const barrier = new NavigationBarrier(newIndices.length);
 
           for (const idx of newIndices) {
-            yield { row: _makeSmart(pageRows[idx], map, rowIndex, pagesScanned - 1, barrier), index: rowIndex, rowIndex };
+            yield { row: _makeSmart(pageRows[idx], map, rowIndex, tableState.currentPageIndex, barrier), index: rowIndex, rowIndex, pageIndex: tableState.currentPageIndex };
             rowIndex++;
           }
 
@@ -479,6 +505,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
           createSmartRowArray,
           config,
           getPage: () => rootLocator.page(),
+          getCurrentPageIndex: () => tableState.currentPageIndex,
         },
         callback,
         options
@@ -497,6 +524,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
           createSmartRowArray,
           config,
           getPage: () => rootLocator.page(),
+          getCurrentPageIndex: () => tableState.currentPageIndex,
         },
         callback,
         options
@@ -515,6 +543,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
           createSmartRowArray,
           config,
           getPage: () => rootLocator.page(),
+          getCurrentPageIndex: () => tableState.currentPageIndex,
         },
         predicate,
         options

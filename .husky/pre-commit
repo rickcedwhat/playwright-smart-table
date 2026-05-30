@@ -13,4 +13,4 @@ fi
 pnpm run build || { echo "Build failed, commit aborted."; exit 1; }
 
 # Add generated/modified files to the commit (dist is intentionally ignored)
-git add README.md src/typeContext.ts
+git add README.md src/typeContext.ts src/packageVersion.ts src/minimalConfigContext.ts

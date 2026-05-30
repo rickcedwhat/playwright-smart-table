@@ -1,0 +1,721 @@
+name: Bot Listener
+
+# Handles all @rickcedwhat-ai commands posted in issue or PR comments.
+# Only fires when the comment starts with the bot mention and was not
+# posted by the bot itself (prevents loops).
+
+on:
+  issue_comment:
+    types: [created, edited]
+
+jobs:
+  # ── HQ checkbox handler ────────────────────────────────────────────────────
+  # Fires when a human checks the "Request review" checkbox in the Bot HQ comment.
+  hq-checkbox:
+    name: HQ checkbox — trigger CR review
+    runs-on: ubuntu-latest
+    if: |
+      github.event.action == 'edited' &&
+      github.event.comment.user.login == 'rickcedwhat-ai' &&
+      github.event.sender.login != 'rickcedwhat-ai' &&
+      contains(github.event.comment.body, '<!-- bot-hq -->') &&
+      contains(github.event.comment.body, '- [x] Request review')
+    steps:
+      - name: Trigger CodeRabbit review via checkbox
+        env:
+          QSTASH_TOKEN: ${{ secrets.QSTASH_TOKEN }}
+          BOT_PAT:      ${{ secrets.BOT_PAT }}
+        uses: actions/github-script@v9
+        with:
+          github-token: ${{ secrets.BOT_PAT }}
+          script: |
+            // Guard: only act on a [ ] → [x] transition, not on every bot-driven update
+            const oldBody = context.payload.changes?.body?.from ?? '';
+            const wasUnchecked = /- \[ \] Request review/.test(oldBody);
+            if (!wasUnchecked) {
+              core.info('Checkbox was already checked — ignoring.');
+              return;
+            }
+
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const prNumber = parseInt(issue_number);
+            const repoFull = `${owner}/${repo}`;
+            const hqCommentId = context.payload.comment.id;
+            const currentBody = context.payload.comment.body;
+
+            function updateHQSection(body, name, content) {
+              const s = `<!-- bot-hq:${name} -->`;
+              const e = `<!-- /bot-hq:${name} -->`;
+              return body.replace(new RegExp(`${s}[\\s\\S]*?${e}`), `${s}\n${content}\n${e}`);
+            }
+
+            // 1. Capture current CR label for rollback
+            const { data: currentLabels } = await github.rest.issues.listLabelsOnIssue({ owner, repo, issue_number });
+            const originalCRLabel = currentLabels.find(l => l.name.startsWith('coderabbit:'))?.name
+              ?? 'coderabbit: not started';
+
+            // 2. Check if another PR already has a review in progress (waiting or rate-limited)
+            const [{ data: waitingIssues }, { data: rateLimitedIssues }] = await Promise.all([
+              github.rest.issues.listForRepo({ owner, repo, state: 'open', labels: 'coderabbit: waiting', per_page: 10 }),
+              github.rest.issues.listForRepo({ owner, repo, state: 'open', labels: 'coderabbit: rate-limited', per_page: 10 }),
+            ]);
+            const isBlocked =
+              waitingIssues.some(i => i.pull_request && i.number !== prNumber) ||
+              rateLimitedIssues.some(i => i.pull_request && i.number !== prNumber);
+
+            // 3. Remove existing CR labels
+            for (const l of currentLabels.filter(l => l.name.startsWith('coderabbit:'))) {
+              try { await github.rest.issues.removeLabel({ owner, repo, issue_number, name: l.name }); } catch {}
+            }
+
+            if (isBlocked) {
+              // Queue this PR — another review is already running
+              await github.rest.issues.addLabels({ owner, repo, issue_number, labels: ['coderabbit: queued'] });
+              const queuedContent = [
+                '### 🔍 CodeRabbit Review',
+                '- [x] Request review',
+                '',
+                '> ⏳ Queued — another review is in progress. This PR will be triggered automatically when the queue clears.',
+              ].join('\n');
+              await github.rest.issues.updateComment({
+                owner, repo, comment_id: hqCommentId,
+                body: updateHQSection(currentBody, 'coderabbit', queuedContent)
+              });
+              core.info(`PR #${prNumber} queued — another review is in progress.`);
+              return;
+            }
+
+            // 4. No review in progress — trigger immediately
+            await github.rest.issues.addLabels({ owner, repo, issue_number, labels: ['coderabbit: waiting'] });
+            const triggeredContent = [
+              '### 🔍 CodeRabbit Review',
+              '- [x] Request review',
+              '',
+              '> 🔄 Review triggered — waiting for CodeRabbit...',
+            ].join('\n');
+            await github.rest.issues.updateComment({
+              owner, repo, comment_id: hqCommentId,
+              body: updateHQSection(currentBody, 'coderabbit', triggeredContent)
+            });
+
+            // 5. Enqueue via QStash
+            const payload = JSON.stringify({
+              event_type: 'bot-coderabbit-trigger',
+              client_payload: { pr_number: prNumber, repo: repoFull, attempt: 1, hq_comment_id: hqCommentId }
+            });
+            const dispatchUrl = `https://api.github.com/repos/${repoFull}/dispatches`;
+            const qRes = await fetch(`https://qstash.upstash.io/v2/publish/${dispatchUrl}`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${process.env.QSTASH_TOKEN}`,
+                'Upstash-Forward-Authorization': `Bearer ${process.env.BOT_PAT}`,
+                'Upstash-Forward-Content-Type': 'application/json',
+                'Content-Type': 'application/json',
+              },
+              body: payload,
+            });
+            if (!qRes.ok) {
+              // Rollback: remove waiting label, restore original, reset HQ section
+              const { data: rollbackLabels } = await github.rest.issues.listLabelsOnIssue({ owner, repo, issue_number });
+              for (const l of rollbackLabels.filter(l => l.name.startsWith('coderabbit:'))) {
+                try { await github.rest.issues.removeLabel({ owner, repo, issue_number, name: l.name }); } catch {}
+              }
+              await github.rest.issues.addLabels({ owner, repo, issue_number, labels: [originalCRLabel] });
+              const rollbackContent = [
+                '### 🔍 CodeRabbit Review',
+                '- [ ] Request review',
+                '',
+                '> ❌ Failed to enqueue review — please try again.',
+              ].join('\n');
+              try {
+                await github.rest.issues.updateComment({
+                  owner, repo, comment_id: hqCommentId,
+                  body: updateHQSection(currentBody, 'coderabbit', rollbackContent)
+                });
+              } catch {}
+              throw new Error(`QStash enqueue failed HTTP ${qRes.status}: ${await qRes.text()}`);
+            }
+
+  # ── command parser (text commands) ────────────────────────────────────────
+  parse:
+    name: Parse command
+    runs-on: ubuntu-latest
+    if: |
+      github.event.action == 'created' &&
+      startsWith(github.event.comment.body, '@rickcedwhat-ai ') &&
+      github.event.comment.user.login != 'rickcedwhat-ai'
+    outputs:
+      namespace:   ${{ steps.parse.outputs.namespace }}
+      subcommand:  ${{ steps.parse.outputs.subcommand }}
+      args:        ${{ steps.parse.outputs.args }}
+      is_pr:       ${{ steps.parse.outputs.is_pr }}
+      valid:       ${{ steps.parse.outputs.valid }}
+    steps:
+      - name: Parse command
+        id: parse
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const body = context.payload.comment.body.trim();
+
+            // Single-word commands: help, review (alias for coderabbit review)
+            const single = body.match(/^@rickcedwhat-ai\s+(help|review)$/);
+            if (single) {
+              const word = single[1];
+              // 'review' is a shorthand alias for 'coderabbit review'
+              const namespace = word === 'review' ? 'coderabbit' : word;
+              const subcommand = word === 'review' ? 'review' : '';
+              core.setOutput('valid', 'true');
+              core.setOutput('namespace', namespace);
+              core.setOutput('subcommand', subcommand);
+              core.setOutput('args', '');
+              core.setOutput('is_pr', String(!!context.payload.issue.pull_request));
+              return;
+            }
+
+            // Two-word commands: <namespace> <subcommand> [args]
+            const match = body.match(/^@rickcedwhat-ai\s+(\w+)\s+(\w+)(?:\s+([\s\S]*))?$/);
+            if (!match) {
+              core.setOutput('valid', 'false');
+              return;
+            }
+            const [, namespace, subcommand, args = ''] = match;
+            core.setOutput('valid', 'true');
+            core.setOutput('namespace', namespace);
+            core.setOutput('subcommand', subcommand);
+            core.setOutput('args', args.trim());
+            core.setOutput('is_pr', String(!!context.payload.issue.pull_request));
+
+  # ── upstream watch ─────────────────────────────────────────────────────────
+  upstream-watch:
+    name: upstream watch
+    needs: parse
+    if: |
+      needs.parse.outputs.valid == 'true' &&
+      needs.parse.outputs.namespace == 'upstream' &&
+      needs.parse.outputs.subcommand == 'watch'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+      - name: Run upstream watch
+        env:
+          GH_TOKEN: ${{ secrets.BOT_PAT }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ARGS: ${{ needs.parse.outputs.args }}
+        run: node scripts/bot-upstream-watch.mjs
+
+  # ── upstream check ─────────────────────────────────────────────────────────
+  upstream-check:
+    name: upstream check
+    needs: parse
+    if: |
+      needs.parse.outputs.valid == 'true' &&
+      needs.parse.outputs.namespace == 'upstream' &&
+      needs.parse.outputs.subcommand == 'check'
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Acknowledge
+        uses: actions/github-script@v9
+        with:
+          github-token: ${{ secrets.BOT_PAT }}
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: '🔍 Running upstream check now...'
+            });
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+      - name: Fetch this issue as array
+        env:
+          GH_TOKEN: ${{ secrets.BOT_PAT }}
+        run: |
+          gh issue view ${{ github.event.issue.number }} \
+            --json number,body,title > /tmp/single.json
+          node -e "
+            const d = require('/tmp/single.json');
+            require('fs').writeFileSync('issues.json', JSON.stringify([d]));
+          "
+      - name: Run check
+        env:
+          GH_TOKEN: ${{ secrets.BOT_PAT }}
+        run: node scripts/check-upstream-blockers.mjs
+      - name: Post still-blocked status
+        if: success()
+        uses: actions/github-script@v9
+        with:
+          github-token: ${{ secrets.BOT_PAT }}
+          script: |
+            // Only post if the check script didn't already post a cleared comment
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+            const justCleared = comments.some(
+              c => c.user.login === 'rickcedwhat-ai' &&
+                   c.body.includes('Upstream blocker cleared')
+            );
+            if (!justCleared) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: '⏳ Still blocked — upstream dependency not yet satisfied.'
+              });
+            }
+
+  # ── upstream schedule ──────────────────────────────────────────────────────
+  upstream-schedule:
+    name: upstream schedule
+    needs: parse
+    if: |
+      needs.parse.outputs.valid == 'true' &&
+      needs.parse.outputs.namespace == 'upstream' &&
+      needs.parse.outputs.subcommand == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enqueue upstream check via QStash
+        env:
+          QSTASH_TOKEN: ${{ secrets.QSTASH_TOKEN }}
+          BOT_PAT:      ${{ secrets.BOT_PAT }}
+          DELAY_STR:    ${{ needs.parse.outputs.args }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          REPO:         ${{ github.repository }}
+        run: |
+          DELAY_SECS=$(node -e "
+            const s = process.env.DELAY_STR;
+            const m = s.match(/^(\d+)(m|h|d|w)$/);
+            if (!m) { console.error('Invalid delay: ' + s); process.exit(1); }
+            const mult = { m: 60, h: 3600, d: 86400, w: 604800 };
+            console.log(parseInt(m[1]) * mult[m[2]]);
+          ")
+          PAYLOAD=$(node -e "console.log(JSON.stringify({
+            event_type: 'bot-upstream-check',
+            client_payload: {
+              issue_number: parseInt(process.env.ISSUE_NUMBER),
+              repo: process.env.REPO
+            }
+          }))")
+          DISPATCH_URL="https://api.github.com/repos/$REPO/dispatches"
+          HTTP_CODE=$(curl -s -o /tmp/qstash-response.json -w "%{http_code}" -X POST \
+            "https://qstash.upstash.io/v2/publish/$DISPATCH_URL" \
+            -H "Authorization: Bearer $QSTASH_TOKEN" \
+            -H "Upstash-Delay: ${DELAY_SECS}s" \
+            -H "Upstash-Forward-Authorization: Bearer $BOT_PAT" \
+            -H "Upstash-Forward-Content-Type: application/json" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD")
+          echo "QStash response ($HTTP_CODE): $(cat /tmp/qstash-response.json)"
+          if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+            echo "QStash enqueue failed with HTTP $HTTP_CODE"
+            exit 1
+          fi
+      - name: Confirm
+        uses: actions/github-script@v9
+        with:
+          github-token: ${{ secrets.BOT_PAT }}
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `⏱️ Upstream check scheduled in **${{ needs.parse.outputs.args }}**.`
+            });
+
+  # ── upstream link ──────────────────────────────────────────────────────────
+  upstream-link:
+    name: upstream link
+    needs: parse
+    if: |
+      needs.parse.outputs.valid == 'true' &&
+      needs.parse.outputs.namespace == 'upstream' &&
+      needs.parse.outputs.subcommand == 'link'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Update blocked-pr in issue body
+        uses: actions/github-script@v9
+        with:
+          github-token: ${{ secrets.BOT_PAT }}
+          script: |
+            const args = `${{ needs.parse.outputs.args }}`;
+            const prMatch = args.match(/#?(\d+)/);
+            if (!prMatch) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: '❌ Could not parse PR number. Usage: `@rickcedwhat-ai upstream link pr #N`'
+              });
+              return;
+            }
+            const prNumber = prMatch[1];
+            const { data: issue } = await github.rest.issues.get({
+              owner: context.repo.owner, repo: context.repo.repo,
+              issue_number: context.issue.number
+            });
+            let body = issue.body || '';
+            if (/^blocked-pr:/m.test(body)) {
+              body = body.replace(/^blocked-pr:.*$/m, `blocked-pr: "#${prNumber}"`);
+            } else {
+              body = body.replace(/(condition:[^\n]*)/m, `$1\nblocked-pr: "#${prNumber}"`);
+            }
+            await github.rest.issues.update({
+              owner: context.repo.owner, repo: context.repo.repo,
+              issue_number: context.issue.number, body
+            });
+            await github.rest.issues.createComment({
+              owner: context.repo.owner, repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `🔗 Linked blocked PR to #${prNumber}.`
+            });
+
+  # ── upstream unblock ───────────────────────────────────────────────────────
+  upstream-unblock:
+    name: upstream unblock
+    needs: parse
+    if: |
+      needs.parse.outputs.valid == 'true' &&
+      needs.parse.outputs.namespace == 'upstream' &&
+      needs.parse.outputs.subcommand == 'unblock'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Mark cleared
+        uses: actions/github-script@v9
+        with:
+          github-token: ${{ secrets.BOT_PAT }}
+          script: |
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            try {
+              await github.rest.issues.removeLabel({
+                owner, repo, issue_number, name: 'upstream-blocker:waiting'
+              });
+            } catch {}
+            await github.rest.issues.addLabels({
+              owner, repo, issue_number, labels: ['upstream-blocker:cleared']
+            });
+            await github.rest.issues.createComment({
+              owner, repo, issue_number,
+              body: '✅ Marked as cleared manually.'
+            });
+
+  # ── coderabbit review ─────────────────────────────────────────────────────
+  coderabbit-review:
+    name: coderabbit review
+    needs: parse
+    if: |
+      needs.parse.outputs.valid == 'true' &&
+      needs.parse.outputs.namespace == 'coderabbit' &&
+      needs.parse.outputs.subcommand == 'review' &&
+      needs.parse.outputs.is_pr == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Swap label, update HQ comment, enqueue, and react
+        env:
+          QSTASH_TOKEN: ${{ secrets.QSTASH_TOKEN }}
+          BOT_PAT:      ${{ secrets.BOT_PAT }}
+          PR_NUMBER:    ${{ github.event.issue.number }}
+          REPO:         ${{ github.repository }}
+        uses: actions/github-script@v9
+        with:
+          github-token: ${{ secrets.BOT_PAT }}
+          script: |
+            const { owner, repo } = context.repo;
+            const issue_number = context.issue.number;
+            const prNumber = parseInt(process.env.PR_NUMBER);
+            const repoFull = process.env.REPO;
+
+            function updateHQSection(body, name, content) {
+              const s = `<!-- bot-hq:${name} -->`;
+              const e = `<!-- /bot-hq:${name} -->`;
+              return body.replace(new RegExp(`${s}[\\s\\S]*?${e}`), `${s}\n${content}\n${e}`);
+            }
+
+            // 1. Swap label to waiting (capture original for rollback)
+            const { data: currentLabels } = await github.rest.issues.listLabelsOnIssue({ owner, repo, issue_number });
+            const originalCRLabel = currentLabels.find(l => l.name.startsWith('coderabbit:'))?.name
+              ?? 'coderabbit: not started';
+            for (const l of currentLabels.filter(l => l.name.startsWith('coderabbit:'))) {
+              try { await github.rest.issues.removeLabel({ owner, repo, issue_number, name: l.name }); } catch {}
+            }
+            await github.rest.issues.addLabels({ owner, repo, issue_number, labels: ['coderabbit: waiting'] });
+
+            // 2. Find HQ comment via paginated fetch (may not exist on very old PRs)
+            const allComments = await github.paginate(github.rest.issues.listComments, {
+              owner, repo, issue_number, per_page: 100
+            });
+            const hqComment = allComments.find(
+              c => c.user.login === 'rickcedwhat-ai' && c.body.includes('<!-- bot-hq -->')
+            );
+            const hqCommentId = hqComment?.id ?? null;
+
+            // 3. Update HQ coderabbit section to "triggered"
+            if (hqComment) {
+              const triggeredContent = [
+                '### 🔍 CodeRabbit Review',
+                '- [x] Request review',
+                '',
+                '> 🔄 Review triggered',
+              ].join('\n');
+              try {
+                await github.rest.issues.updateComment({
+                  owner, repo, comment_id: hqCommentId,
+                  body: updateHQSection(hqComment.body, 'coderabbit', triggeredContent)
+                });
+              } catch (e) {
+                core.warning(`Could not update HQ comment: ${e.message}`);
+              }
+            }
+
+            // 4. Enqueue via QStash — rollback on failure
+            const payload = JSON.stringify({
+              event_type: 'bot-coderabbit-trigger',
+              client_payload: { pr_number: prNumber, repo: repoFull, attempt: 1, hq_comment_id: hqCommentId }
+            });
+            const dispatchUrl = `https://api.github.com/repos/${repoFull}/dispatches`;
+            const qRes = await fetch(`https://qstash.upstash.io/v2/publish/${dispatchUrl}`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${process.env.QSTASH_TOKEN}`,
+                'Upstash-Forward-Authorization': `Bearer ${process.env.BOT_PAT}`,
+                'Upstash-Forward-Content-Type': 'application/json',
+                'Content-Type': 'application/json',
+              },
+              body: payload,
+            });
+            if (!qRes.ok) {
+              // Rollback: remove waiting label, restore original
+              const { data: rbLabels } = await github.rest.issues.listLabelsOnIssue({ owner, repo, issue_number });
+              for (const l of rbLabels.filter(l => l.name.startsWith('coderabbit:'))) {
+                try { await github.rest.issues.removeLabel({ owner, repo, issue_number, name: l.name }); } catch {}
+              }
+              await github.rest.issues.addLabels({ owner, repo, issue_number, labels: [originalCRLabel] });
+              // Rollback HQ section
+              if (hqComment) {
+                const rollbackContent = [
+                  '### 🔍 CodeRabbit Review',
+                  '- [ ] Request review',
+                  '',
+                  '> ❌ Failed to enqueue review — please try again.',
+                ].join('\n');
+                try {
+                  await github.rest.issues.updateComment({
+                    owner, repo, comment_id: hqCommentId,
+                    body: updateHQSection(hqComment.body, 'coderabbit', rollbackContent)
+                  });
+                } catch {}
+              }
+              throw new Error(`QStash enqueue failed HTTP ${qRes.status}: ${await qRes.text()}`);
+            }
+
+            // 5. React with thumbs up on the original command comment
+            await github.rest.reactions.createForIssueComment({
+              owner, repo, comment_id: context.payload.comment.id, content: '+1'
+            });
+
+  # ── coderabbit retry ───────────────────────────────────────────────────────
+  coderabbit-retry:
+    name: coderabbit retry
+    needs: parse
+    if: |
+      needs.parse.outputs.valid == 'true' &&
+      needs.parse.outputs.namespace == 'coderabbit' &&
+      needs.parse.outputs.subcommand == 'retry' &&
+      needs.parse.outputs.is_pr == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enqueue CodeRabbit review via QStash
+        env:
+          QSTASH_TOKEN: ${{ secrets.QSTASH_TOKEN }}
+          BOT_PAT:      ${{ secrets.BOT_PAT }}
+          DELAY_STR:    ${{ needs.parse.outputs.args }}
+          PR_NUMBER:    ${{ github.event.issue.number }}
+          REPO:         ${{ github.repository }}
+        run: |
+          DELAY_SECS=$(node -e "
+            const s = process.env.DELAY_STR;
+            const m = s.match(/^(\d+)(m|h|d|w)$/);
+            if (!m) { console.error('Invalid delay: ' + s); process.exit(1); }
+            const mult = { m: 60, h: 3600, d: 86400, w: 604800 };
+            console.log(parseInt(m[1]) * mult[m[2]]);
+          ")
+          PAYLOAD=$(node -e "console.log(JSON.stringify({
+            event_type: 'bot-coderabbit-retry',
+            client_payload: {
+              pr_number: parseInt(process.env.PR_NUMBER),
+              repo: process.env.REPO
+            }
+          }))")
+          DISPATCH_URL="https://api.github.com/repos/$REPO/dispatches"
+          HTTP_CODE=$(curl -s -o /tmp/qstash-response.json -w "%{http_code}" -X POST \
+            "https://qstash.upstash.io/v2/publish/$DISPATCH_URL" \
+            -H "Authorization: Bearer $QSTASH_TOKEN" \
+            -H "Upstash-Delay: ${DELAY_SECS}s" \
+            -H "Upstash-Forward-Authorization: Bearer $BOT_PAT" \
+            -H "Upstash-Forward-Content-Type: application/json" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD")
+          echo "QStash response ($HTTP_CODE): $(cat /tmp/qstash-response.json)"
+          if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+            echo "QStash enqueue failed with HTTP $HTTP_CODE"
+            exit 1
+          fi
+      - name: Confirm
+        uses: actions/github-script@v9
+        with:
+          github-token: ${{ secrets.BOT_PAT }}
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: `⏱️ CodeRabbit review scheduled in **${{ needs.parse.outputs.args }}**.`
+            });
+
+  # ── reminder ───────────────────────────────────────────────────────────────
+  reminder:
+    name: reminder
+    needs: parse
+    if: |
+      needs.parse.outputs.valid == 'true' &&
+      needs.parse.outputs.namespace == 'reminder'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate args
+        uses: actions/github-script@v9
+        with:
+          github-token: ${{ secrets.BOT_PAT }}
+          script: |
+            const delay = `${{ needs.parse.outputs.subcommand }}`.trim();
+            if (!delay || !/^\d+(m|h|d|w)$/.test(delay)) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: '❌ Please specify a delay. Usage: `@rickcedwhat-ai reminder 2h` (supports `m`, `h`, `d`, `w`)'
+              });
+              core.setFailed('Missing or invalid delay argument');
+            }
+      - name: Enqueue reminder via QStash
+        env:
+          QSTASH_TOKEN: ${{ secrets.QSTASH_TOKEN }}
+          BOT_PAT:      ${{ secrets.BOT_PAT }}
+          DELAY_STR:    ${{ needs.parse.outputs.subcommand }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          REPO:         ${{ github.repository }}
+        run: |
+          DELAY_SECS=$(node -e "
+            const s = process.env.DELAY_STR;
+            const m = s.match(/^(\d+)(m|h|d|w)$/);
+            if (!m) { console.error('Invalid delay: ' + s); process.exit(1); }
+            const mult = { m: 60, h: 3600, d: 86400, w: 604800 };
+            console.log(parseInt(m[1]) * mult[m[2]]);
+          ")
+          PAYLOAD=$(node -e "console.log(JSON.stringify({
+            event_type: 'bot-reminder',
+            client_payload: {
+              issue_number: parseInt(process.env.ISSUE_NUMBER),
+              repo: process.env.REPO
+            }
+          }))")
+          DISPATCH_URL="https://api.github.com/repos/$REPO/dispatches"
+          HTTP_CODE=$(curl -s -o /tmp/qstash-response.json -w "%{http_code}" -X POST \
+            "https://qstash.upstash.io/v2/publish/$DISPATCH_URL" \
+            -H "Authorization: Bearer $QSTASH_TOKEN" \
+            -H "Upstash-Delay: ${DELAY_SECS}s" \
+            -H "Upstash-Forward-Authorization: Bearer $BOT_PAT" \
+            -H "Upstash-Forward-Content-Type: application/json" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD")
+          echo "QStash response ($HTTP_CODE): $(cat /tmp/qstash-response.json)"
+          if [ "$HTTP_CODE" -lt 200 ] || [ "$HTTP_CODE" -ge 300 ]; then
+            echo "QStash enqueue failed with HTTP $HTTP_CODE"
+            exit 1
+          fi
+      - name: Confirm
+        uses: actions/github-script@v9
+        with:
+          github-token: ${{ secrets.BOT_PAT }}
+          script: |
+            await github.rest.reactions.createForIssueComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: context.payload.comment.id,
+              content: '+1'
+            });
+
+  # ── help / unknown ─────────────────────────────────────────────────────────
+  help:
+    name: help
+    needs: parse
+    if: |
+      needs.parse.outputs.valid == 'true' &&
+      needs.parse.outputs.namespace == 'help'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post help
+        uses: actions/github-script@v9
+        with:
+          github-token: ${{ secrets.BOT_PAT }}
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: [
+                '### @rickcedwhat-ai commands',
+                '',
+                '**On issues:**',
+                '| Command | Description |',
+                '|---|---|',
+                '| `@rickcedwhat-ai upstream watch npm <pkg> >= <version>` | Register upstream check + add `:waiting` label |',
+                '| `@rickcedwhat-ai upstream check` | Immediate semver check for this issue |',
+                '| `@rickcedwhat-ai upstream schedule <delay>` | Re-check after delay (e.g. `2w`, `3d`) |',
+                '| `@rickcedwhat-ai upstream link pr #N` | Link a blocked PR to this issue |',
+                '| `@rickcedwhat-ai upstream unblock` | Manually mark this issue as cleared |',
+                '',
+                '**On PRs:**',
+                '| Command | Description |',
+                '|---|---|',
+                '| `@rickcedwhat-ai review` | Trigger CodeRabbit review now (auto-retries on rate limit) |',
+                '| `@rickcedwhat-ai coderabbit retry <delay>` | Schedule a CodeRabbit review after delay (e.g. `36m`) |',
+                '',
+                '**Anywhere:**',
+                '| Command | Description |',
+                '|---|---|',
+                '| `@rickcedwhat-ai reminder <delay>` | Post a reminder comment here after delay (e.g. `2h`, `1d`) |',
+              ].join('\n')
+            });
+
+  unknown-command:
+    name: Unknown command
+    needs: parse
+    if: needs.parse.outputs.valid == 'false'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post unknown command message
+        uses: actions/github-script@v9
+        with:
+          github-token: ${{ secrets.BOT_PAT }}
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: '❓ Unknown command. Comment `@rickcedwhat-ai help` to see available commands.'
+            });

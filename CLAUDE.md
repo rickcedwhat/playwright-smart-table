@@ -96,11 +96,11 @@ Running `pnpm run build` executes all generators then compiles TypeScript.
 
 ## Before Opening a PR
 
-Always rebase onto the latest main before pushing:
-
-```bash
-git fetch origin && git rebase origin/main
-```
+1. Rebase onto the latest main:
+   ```bash
+   git fetch origin && git rebase origin/main
+   ```
+2. Only open PRs as drafts for genuine WIP. CodeRabbit auto-review is disabled — trigger reviews manually with `@rickcedwhat-ai coderabbit review` when ready.
 
 ## PR Checklist
 

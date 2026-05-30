@@ -1,0 +1,160 @@
+# Dependabot PRs: required status check — blocks merge until all bumped npm
+# packages have been published for at least 7 days.
+# Add "Dependabot npm package age (≥ 7 days)" to branch protection required checks.
+name: "Dependabot npm package age (≥ 7 days)"
+
+on:
+  pull_request_target:
+    types: [opened, reopened, synchronize]
+
+jobs:
+  age-check:
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Verify npm packages are ≥ 7 days old
+        uses: actions/github-script@v9
+        env:
+          QSTASH_TOKEN: ${{ secrets.QSTASH_TOKEN }}
+          BOT_PAT:      ${{ secrets.BOT_PAT }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pr = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: context.payload.pull_request.number,
+            });
+            const body = pr.data.body || '';
+            const MIN_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+            const now = Date.now();
+            // Matches: Updates `<pkg>` from X.Y.Z to A.B.C
+            const updateRegex = /Updates\s+`([^`]+)`\s+from\s+[\d][^\s]*\s+to\s+([\d][^\s]*)/ig;
+            let m;
+            const tooYoung = [];
+            let matchFound = false;
+            let npmPackageFound = false;
+            let latestPublish = 0;
+
+            while ((m = updateRegex.exec(body)) !== null) {
+              matchFound = true;
+              const pkg = m[1];
+              const version = m[2];
+              const encoded = pkg.startsWith('@') ? pkg.replace('/', '%2F') : pkg;
+              const url = `https://registry.npmjs.org/${encoded}`;
+
+              let data;
+              try {
+                const response = await fetch(url);
+                if (response.status === 404) {
+                  core.info(`${pkg} not found on npm — skipping (likely a GitHub Actions dependency)`);
+                  continue;
+                }
+                if (!response.ok) {
+                  core.setFailed(`Failed to fetch npm metadata for ${pkg}: HTTP ${response.status}`);
+                  return;
+                }
+                data = await response.json();
+              } catch (err) {
+                core.setFailed(`Network error fetching npm metadata for ${pkg}: ${err.message}`);
+                return;
+              }
+
+              npmPackageFound = true;
+              const publishedAt = data.time?.[version];
+              if (!publishedAt) {
+                core.setFailed(`No publish timestamp found for ${pkg}@${version} on npm`);
+                return;
+              }
+
+              const publishedMs = new Date(publishedAt).getTime();
+              if (publishedMs > latestPublish) latestPublish = publishedMs;
+
+              const ageMs = now - publishedMs;
+              const ageDays = (ageMs / (24 * 60 * 60 * 1000)).toFixed(1);
+              if (ageMs < MIN_AGE_MS) {
+                tooYoung.push(`${pkg}@${version} (published ${ageDays} days ago)`);
+              } else {
+                core.info(`✓ ${pkg}@${version} is ${ageDays} days old`);
+              }
+            }
+
+            if (!matchFound) {
+              core.setFailed('No package updates found in PR body — Dependabot format may have changed');
+              return;
+            }
+            if (!npmPackageFound) {
+              core.info('No npm packages found — skipping age check (GitHub Actions dependencies only)');
+              return;
+            }
+
+            if (tooYoung.length > 0) {
+              const rebaseAfter = new Date(latestPublish + MIN_AGE_MS);
+              const rebaseAfterISO = rebaseAfter.toISOString().slice(0, 10);
+
+              // Upsert a comment with a machine-readable marker so a future cron job
+              // can find PRs that are ready to rebase and post "@dependabot rebase".
+              // Format: <!-- age-check-rebase-after: YYYY-MM-DD -->
+              const MARKER = '<!-- age-check-rebase-after:';
+              const commentBody = `<!-- age-check-rebase-after: ${rebaseAfterISO} -->\n` +
+                `⏳ **npm soak period active** — one or more packages are less than 7 days old.\n\n` +
+                tooYoung.map(p => `- ${p}`).join('\n') + '\n\n' +
+                `Safe to merge after **${rebaseAfterISO}**. Trigger a Dependabot rebase then.`;
+
+              const { data: comments } = await github.rest.issues.listComments({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+              });
+              const existing = comments.find(c => c.body?.includes(MARKER));
+              if (existing) {
+                await github.rest.issues.updateComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: existing.id,
+                  body: commentBody,
+                });
+              } else {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: context.payload.pull_request.number,
+                  body: commentBody,
+                });
+              }
+
+              // Enqueue a bot-dependabot-rebase via QStash to fire when the soak period expires.
+              // Delay = exact seconds until latestPublish + 7 days — rebase lands automatically.
+              const delaySecs = Math.ceil((latestPublish + MIN_AGE_MS - Date.now()) / 1000);
+              const repo = `${context.repo.owner}/${context.repo.repo}`;
+              const prNumber = context.payload.pull_request.number;
+              const dispatchUrl = `https://api.github.com/repos/${repo}/dispatches`;
+              const qstashPayload = JSON.stringify({
+                event_type: 'bot-dependabot-rebase',
+                client_payload: { pr_number: prNumber, repo }
+              });
+              const qstashRes = await fetch(`https://qstash.upstash.io/v2/publish/${dispatchUrl}`, {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${process.env.QSTASH_TOKEN}`,
+                  'Upstash-Delay': `${delaySecs}s`,
+                  'Upstash-Deduplication-Id': `dependabot-rebase-${repo}-pr-${prNumber}`,
+                  'Upstash-Forward-Authorization': `Bearer ${process.env.BOT_PAT}`,
+                  'Upstash-Forward-Content-Type': 'application/json',
+                  'Content-Type': 'application/json',
+                },
+                body: qstashPayload,
+              });
+              if (qstashRes.ok) {
+                core.info(`✓ Queued @dependabot rebase in ${delaySecs}s (fires ${rebaseAfterISO})`);
+              } else {
+                core.warning(`QStash enqueue failed (HTTP ${qstashRes.status}) — rebase will need to be triggered manually when soak period expires`);
+              }
+
+              core.setFailed(
+                `The following packages are less than 7 days old on npm — safe to rebase on ${rebaseAfterISO}:\n` +
+                tooYoung.map(p => `  • ${p}`).join('\n')
+              );
+            }

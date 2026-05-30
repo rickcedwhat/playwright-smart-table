@@ -1,0 +1,76 @@
+name: Bot — Upstream Blocker Cleared
+
+# When upstream-blocker:cleared is applied (by the weekly cron or manually),
+# notify the linked blocked PR and schedule a 48h nudge if no action is taken.
+
+on:
+  issues:
+    types: [labeled]
+
+jobs:
+  notify:
+    name: Notify blocked PR and schedule nudge
+    runs-on: ubuntu-latest
+    if: github.event.label.name == 'upstream-blocker:cleared'
+    steps:
+      - name: Parse blocked-pr and notify
+        uses: actions/github-script@v9
+        with:
+          github-token: ${{ secrets.BOT_PAT }}
+          script: |
+            const { owner, repo } = context.repo;
+            const issue = context.payload.issue;
+            const body = issue.body || '';
+
+            // Extract blocked-pr from yaml block
+            const prMatch = body.match(/^blocked-pr:\s*"?#?(\d+)"?/m);
+            const blockedPr = prMatch ? prMatch[1] : null;
+
+            if (blockedPr) {
+              await github.rest.issues.createComment({
+                owner, repo,
+                issue_number: parseInt(blockedPr),
+                body: [
+                  `🟢 **Upstream blocker cleared** — issue #${issue.number} is unblocked.`,
+                  '',
+                  'This PR can now be resumed.',
+                ].join('\n')
+              });
+            }
+
+            // Enqueue 48h nudge via QStash
+            const payload = JSON.stringify({
+              event_type: 'bot-upstream-nudge',
+              client_payload: {
+                issue_number: issue.number,
+                blocked_pr: blockedPr || null,
+                repo: `${owner}/${repo}`
+              }
+            });
+
+            const DELAY_SECS = 48 * 60 * 60; // 48 hours
+            const DISPATCH_URL =
+              `https://api.github.com/repos/${owner}/${repo}/dispatches`;
+
+            const res = await fetch(
+              `https://qstash.upstash.io/v2/publish/${DISPATCH_URL}`,
+              {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${process.env.QSTASH_TOKEN}`,
+                  'Upstash-Delay': `${DELAY_SECS}s`,
+                  'Upstash-Forward-Authorization': `Bearer ${process.env.BOT_PAT}`,
+                  'Upstash-Forward-Content-Type': 'application/json',
+                  'Content-Type': 'application/json',
+                },
+                body: payload
+              }
+            );
+            if (!res.ok) {
+              core.warning(`QStash enqueue failed: ${res.status} ${await res.text()}`);
+            } else {
+              core.info('48h nudge enqueued via QStash.');
+            }
+        env:
+          QSTASH_TOKEN: ${{ secrets.QSTASH_TOKEN }}
+          BOT_PAT: ${{ secrets.BOT_PAT }}

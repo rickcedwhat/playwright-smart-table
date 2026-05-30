@@ -1,15 +1,10 @@
-import { TableContext, FillStrategy, TableConfig } from '../../types';
-import {
-    glideGoUp,
-    glideGoDown,
-    glideGoLeft,
-    glideGoRight,
-    glideSnapFirstColumnIntoView,
-    glideSeekColumnIndex
-} from './columns';
+import { FillStrategy, TableConfig } from '../../types';
 import { scrollRightHeader } from './headers';
 import { PaginationStrategies } from '../../strategies/pagination';
 import { StabilizationStrategies } from '../../strategies/stabilization';
+export { createGlideViewport } from './viewport';
+export type { GlideViewportOptions } from './viewport';
+import { createGlideViewport, GlideViewportOptions } from './viewport';
 
 const glideFillStrategy: FillStrategy = async ({ row, columnName, value, page }) => {
     // Canvas-aware click: Glide is a canvas grid. The accessibility 'td' elements
@@ -101,15 +96,7 @@ const GlideDefaultStrategies = {
     fill: glideFillStrategy,
     pagination: glidePaginationStrategy,
     header: scrollRightHeader,
-    navigation: {
-        goUp: glideGoUp,
-        goDown: glideGoDown,
-        goLeft: glideGoLeft,
-        goRight: glideGoRight,
-        goHome: glideSnapFirstColumnIntoView,
-        snapFirstColumnIntoView: glideSnapFirstColumnIntoView,
-        seekColumnIndex: glideSeekColumnIndex
-    },
+    viewport: createGlideViewport(),
     loading: {
         isHeaderLoading: async () => false
     },
@@ -123,10 +110,34 @@ export const GlideStrategies = {
     fillSimple: glideFillSimple
 };
 
+/** Alias of {@link GlideViewportOptions}. All fields are forwarded to the viewport strategy. */
+export type GlideOptions = GlideViewportOptions;
+
+/**
+ * Factory that returns a configured Glide preset.
+ * Use when your grid differs from the defaults:
+ * ```ts
+ * useTable(loc, { ...createGlide({ attachTimeout: 5000 }), maxPages: 5 })
+ * ```
+ */
+export function createGlide(options: GlideOptions = {}): Partial<TableConfig> {
+    return {
+        headerSelector: 'table[role="grid"] thead tr th',
+        rowSelector: 'table[role="grid"] tbody tr',
+        cellSelector: 'td',
+        concurrency: 'sequential',
+        strategies: {
+            ...GlideDefaultStrategies,
+            viewport: createGlideViewport(options)
+        }
+    };
+}
+
 /**
  * Full preset for Glide Data Grid (selectors + default strategies only).
  * Spread: useTable(loc, { ...Plugins.Glide, maxPages: 5 }).
  * Strategies only (including fillSimple): useTable(loc, { rowSelector: '...', strategies: Plugins.Glide.Strategies }).
+ * For a non-64-column grid, use `createGlide({ columnCount })` instead.
  */
 const GlidePreset: Partial<TableConfig> = {
     headerSelector: 'table[role="grid"] thead tr th',
