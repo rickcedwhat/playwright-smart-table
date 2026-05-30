@@ -42,6 +42,14 @@ That means your test can say “the row where `Name` is `Airi Satou`, then the `
 | Read a value from every row | `await table.map(({ row }) => ...)` |
 | Click, fill, or assert every row in order | `await table.forEach(async ({ row }) => ...)` |
 
+## Try It: Live Filter Builder
+
+The editor below mirrors what you write in a real test. Type a column name and a value — the table on the right highlights the matching row instantly. Add more key/value pairs to narrow results further.
+
+Misspell a column name (try `Naem` instead of `Name`) to see the same fuzzy error that the library throws at runtime, with suggestions shown inline.
+
+<LabQueryBuilder />
+
 ### Current Page
 
 Use `getRow()` when the row is already visible. Because it is synchronous, call `init()` first.
