@@ -104,7 +104,7 @@ jobs:
                 '### 🔍 CodeRabbit Review',
                 '- [ ] Request review',
                 '',
-                '> ⚠️ New commits pushed — check the box to request a fresh review.',
+                '> ⚠️ New commits pushed — **check the box above to request a fresh review. This PR cannot be merged until a CodeRabbit review is complete.**',
               ].join('\n');
               const updatedBody = updateHQSection(existing.body, 'coderabbit', pendingContent);
               if (updatedBody !== existing.body) {

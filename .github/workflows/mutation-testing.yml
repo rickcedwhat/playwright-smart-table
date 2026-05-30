@@ -2,13 +2,15 @@ name: Mutation Testing
 
 on:
   schedule:
-    # Run at 02:00 UTC every day
-    - cron: '0 2 * * *'
-  workflow_dispatch: # Allow manual triggering
+    # Run at 02:00 UTC every Monday
+    - cron: '0 2 * * 1'
+  workflow_dispatch:
 
 jobs:
   mutate:
     runs-on: ubuntu-latest
+    permissions:
+      issues: write
     steps:
       - name: Checkout Code
         uses: actions/checkout@v6
@@ -43,8 +45,47 @@ jobs:
 
       - name: Upload Mutation Report
         uses: actions/upload-artifact@v7
-        if: always() # Upload report even if tests fail
+        if: always()
         with:
           name: stryker-report
           path: reports/mutation/
-          retention-days: 7
+          retention-days: 30
+
+      - name: Open issue on failure
+        if: failure()
+        uses: actions/github-script@v9
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { owner, repo } = context.repo;
+            const runUrl = `https://github.com/${owner}/${repo}/actions/runs/${context.runId}`;
+            const title = 'Mutation testing failed';
+
+            // Don't open a duplicate if one is already open
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner, repo,
+              state: 'open',
+              labels: 'mutation-testing',
+            });
+            if (issues.some(i => i.title === title)) {
+              core.info('Open mutation-testing issue already exists — skipping');
+              return;
+            }
+
+            await github.rest.issues.create({
+              owner, repo,
+              title,
+              labels: ['mutation-testing'],
+              body: [
+                '## Mutation testing is broken',
+                '',
+                `The weekly Stryker run failed. [View run](${runUrl})`,
+                '',
+                'Common causes:',
+                '- Stryker or vitest-runner version incompatibility after a dependency bump',
+                '- Plugin resolution failure (check `stryker.config.json` `packageManager`)',
+                '- A mutant caused a test suite hang (check for timeout errors in the log)',
+                '',
+                'Download the `stryker-report` artifact from the run for details.',
+              ].join('\n'),
+            });

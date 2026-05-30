@@ -5,7 +5,7 @@
             "@stryker-mutator/vitest-runner"
         ]
     },
-    "packageManager": "npm",
+    "packageManager": "pnpm",
     "reporters": [
         "html",
         "clear-text",
