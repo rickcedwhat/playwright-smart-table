@@ -199,7 +199,7 @@ jobs:
           umbrella-dir: pr-preview
 
       - name: Upsert preview comment
-        if: steps.filter.outputs.docs == 'true'
+        if: steps.filter.outputs.docs == 'true' && steps.pages.outputs.list != ''
         uses: actions/github-script@v9
         env:
           CHANGED_PAGES: ${{ steps.pages.outputs.list }}
