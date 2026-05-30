@@ -498,6 +498,8 @@ jobs:
 
               const pr = gqlResult.repository.pullRequest;
 
+              const triggerDate = new Date(trigger_time);
+
               // Gate: CR updates its walkthrough issue comment first, then submits
               // the formal PR review (with inline threads) ~30s later. If no formal
               // review has landed yet, wait one more 60s cycle to avoid racing past
@@ -519,7 +521,6 @@ jobs:
                 t => !t.isResolved && isCR(t.comments.nodes[0]?.author?.login)
               );
 
-              const triggerDate = new Date(trigger_time);
               const crNitpickReviews = pr.reviews.nodes.filter(
                 r => isCR(r.author?.login) &&
                      r.state === 'COMMENTED' &&
