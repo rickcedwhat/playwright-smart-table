@@ -451,7 +451,11 @@ jobs:
               if (!durationMs) durationMs = 30 * 60 * 1000; // fallback 30 min
 
               const commentedAt = new Date(rateLimitComment.created_at).getTime();
-              const availableAt = commentedAt + durationMs;
+              if (isNaN(commentedAt)) {
+                core.warning('Rate-limit comment missing valid created_at — falling back to 30 min from now');
+                durationMs = 30 * 60 * 1000;
+              }
+              const availableAt = (isNaN(commentedAt) ? Date.now() : commentedAt) + durationMs;
               // 60s buffer after CR becomes available; floor at 30s in case we're
               // already past the window when this handler runs.
               const delaySecs = Math.max(30, Math.ceil((availableAt - Date.now()) / 1000)) + 60;
