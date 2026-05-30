@@ -71,7 +71,7 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           CHANGED_PAGES: ${{ steps.pages.outputs.list }}
         run: |
-          cat > /tmp/gen-compare.mjs << 'GENSCRIPT'
+          cat > /tmp/gen-compare.cjs << 'GENSCRIPT'
           const fs   = require('fs');
           const pr   = process.env.PR_NUMBER;
           const raw  = process.env.CHANGED_PAGES || '';
@@ -188,7 +188,7 @@ jobs:
           fs.writeFileSync('docs/.vitepress/dist/compare.html', html);
           console.log('Generated compare.html, pages:', pages);
           GENSCRIPT
-          node /tmp/gen-compare.mjs
+          node /tmp/gen-compare.cjs
 
       - name: Deploy PR preview
         if: steps.filter.outputs.docs == 'true'
