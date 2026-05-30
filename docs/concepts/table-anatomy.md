@@ -27,3 +27,24 @@ await expect(row.getCell('Office')).toHaveText('Tokyo');
 ```
 
 For messy headers, see [Header Mapping](/concepts/header-mapping). For paginated tables, see [Pagination Strategies](/concepts/pagination-strategies).
+
+## Why Column Order Must Not Matter
+
+The selector model above keeps your test code stable across layout changes — but there is a subtler threat: **column reordering**.
+
+Real tables get reshuffled all the time. A product team adds a "Priority" column to the front. A user drags "Status" to the right. An A/B test swaps two columns for half of your traffic. Any of those changes silently breaks locators that refer to columns by their numeric position (`.nth(2)`, `td:eq(3)`, etc.).
+
+Smart Table resolves cells by **header name**, not position. The column map is built once at `init()` from the live `<th>` elements, so the mapping always reflects the actual layout — even when it changes between test runs.
+
+### See it in action
+
+The demo below drives the same five questions against the same table data. Click **Shuffle columns** and watch what happens to the two approaches:
+
+- **Brittle (fixed indices):** the locator code is frozen — column numbers baked in at write time. After a shuffle it reads from whichever cell happens to land in that slot.
+- **Smart Table:** resolves column positions at runtime from the header row. The answer is always correct, regardless of column order.
+
+<LabBeforeAfterV2 />
+
+The underlying employee data never changes — only column positions do. Yet one approach returns wrong answers the moment the table is reshuffled, while the other stays correct every time.
+
+This is the core guarantee that `headerSelector` + `cellSelector` together provide: your test assertions are tied to **meaning** (the column name), not to **position** (the nth cell in a row).
