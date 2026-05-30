@@ -101,16 +101,16 @@ jobs:
             if (context.eventName === 'pull_request_review') {
               const unresolved = await unresolvedCRThreadCount();
               const hasCRLabel = labelNames.some(n => n.startsWith('coderabbit:'));
-              // Only transition if we're already in an active CR state
-              if (hasCRLabel && !labelNames.includes('coderabbit: waiting') &&
+              const isActive = hasCRLabel &&
                   !labelNames.includes('coderabbit: rate-limited') &&
-                  !labelNames.includes('coderabbit: not started')) {
-                if (unresolved === 0 && labelNames.includes('coderabbit: unresolved')) {
+                  !labelNames.includes('coderabbit: not started');
+              if (isActive) {
+                if (unresolved === 0 && !labelNames.includes('coderabbit: complete')) {
                   await swapLabel('coderabbit: complete');
                   await postStatus('success', 'CodeRabbit review complete');
                   return;
                 }
-                if (unresolved > 0 && labelNames.includes('coderabbit: complete')) {
+                if (unresolved > 0 && !labelNames.includes('coderabbit: unresolved')) {
                   await swapLabel('coderabbit: unresolved');
                   await postStatus('failure', 'CodeRabbit has unresolved comments');
                   return;
