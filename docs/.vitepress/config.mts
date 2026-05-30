@@ -50,7 +50,8 @@ export default defineConfig({
                         { text: 'Table Anatomy', link: '/concepts/table-anatomy' },
                         { text: 'Header Mapping', link: '/concepts/header-mapping' },
                         { text: 'Pagination Strategies', link: '/concepts/pagination-strategies' },
-                        { text: 'Strategies', link: '/concepts/strategies' }
+                        { text: 'Strategies', link: '/concepts/strategies' },
+                        { text: 'Concurrency Modes', link: '/concepts/concurrency' }
                     ]
                 }
             ],
