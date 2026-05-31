@@ -23,3 +23,19 @@ This page shows common pagination shapes and the strategy primitive that usually
 - Infinite scroll and load-more UIs still use the pagination strategy slot; the strategy just scrolls or loads instead of clicking a numbered pagination component.
 
 Each primitive should return `true` when movement happened and `false` when there is nowhere else to go. For exact signatures, see [Pagination Strategies](/api/strategies#pagination-strategies).
+
+---
+
+## Try It — Pagination Config Builder
+
+The sandbox below lets you explore how different pagination setups translate directly into library config. Switch between pagination types, toggle optional selectors on and off, and watch the generated config update live. Use the plan builder to pick a target page and see exactly which primitives Smart Table would call to get there — then step through or run them all at once against the mock table.
+
+<LabPaginationSandbox />
+
+### What to notice
+
+- **Toggling `first` / `last` off** removes those lines from the config and changes the plan: without `goToLast`, wrap-around paths are unavailable; without `goToFirst`, backward navigation must rely on `previous` or `previousBulk` alone.
+- **`nextBulk` / `previousBulk` trade fewer clicks for a coarser granularity.** Enable them to see the planner skip entire decades of pages instead of stepping one at a time — but note that `nextBulkPages` must match the actual number of pages your UI advances per click.
+- **`numberOfPages` unlocks wrap-around.** When it is enabled and `last` is present, the planner can jump to the end and work backwards — often the shortest path to a high-numbered page.
+- **Load More and Infinite Scroll are forward-only.** Once content is loaded it stays in the DOM; the library only needs to advance, never retreat. That is why `goToFirst` and `goToPrevious` do not appear in those configs.
+- **Every config is minimal by design.** You only describe the controls that actually exist in your UI. Anything you omit is simply not used by Smart Table during a search.
