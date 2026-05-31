@@ -9,7 +9,7 @@ Pick the example closest to what you are trying to do. If you are new, start wit
 | Find a row and assert a cell | [Basic Usage](/examples/basic) |
 | Search across pages | [Pagination](/examples/pagination) |
 | Work with infinite scroll | [Infinite Scroll](/examples/infinite-scroll) |
-| Extract many rows into data | [Data Scraping](/recipes/data-scraping) |
+| Extract many rows into data | [Data Scraping](/examples/data-scraping) |
 | Use MUI DataGrid | [MUI DataGrid](/examples/mui-datagrid) |
 | Use AG Grid | [AG Grid](/examples/ag-grid) |
 | Write a custom strategy | [Custom Strategies](/recipes/custom-strategies) |

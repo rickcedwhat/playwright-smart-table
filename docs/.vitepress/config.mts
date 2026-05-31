@@ -35,7 +35,6 @@ export default defineConfig({
                         { text: 'Getting Started', link: '/guide/getting-started' },
                         { text: 'Why Smart Table?', link: '/guide/why' },
                         { text: 'Filtering & Queries', link: '/guide/filtering' },
-                        { text: 'Core Concepts', link: '/guide/core-concepts' },
                         { text: 'Configuration', link: '/guide/configuration' },
                         {
                             text: 'How It Works',
@@ -174,7 +173,6 @@ export default defineConfig({
                 {
                     text: 'Advanced',
                     items: [
-                        { text: 'Overview', link: '/advanced/' },
                         { text: 'Custom Resolution', link: '/advanced/custom-resolution' },
                         { text: 'TypeScript Tips', link: '/advanced/typescript' },
                         { text: 'Custom Strategies', link: '/advanced/custom-strategies' },

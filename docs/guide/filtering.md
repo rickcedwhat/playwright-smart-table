@@ -38,7 +38,8 @@ Values can be:
 | `number` | `42` | Converted to string, then matched |
 | `(cell) => Locator` | `(cell) => cell.locator('[aria-checked]')` | Locator-based — use for checkboxes, icons, nested elements |
 
-## `getRow` vs `findRow`
+<details>
+<summary>`getRow` vs `findRow`</summary>
 
 Both accept the same filter object. The difference is pagination.
 
@@ -57,13 +58,19 @@ const row = await table.findRow({ Name: 'Colleen Hurst' });
 const engineers = await table.findRows({ Role: 'Engineer' });
 ```
 
-## Interactive query builder
+</details>
+
+<details>
+<summary>Interactive query builder</summary>
 
 Edit the filter object below and watch how it maps to the table on the right. Add fields, combine conditions, and misspell a column name to see the error message Smart Table produces.
 
 <LabQueryBuilder />
 
-## Typos and the column-not-found error
+</details>
+
+<details>
+<summary>Typos and the column-not-found error</summary>
 
 Column names are case-sensitive. When a key does not match any header, Smart Table throws immediately — before any network requests or page navigation — with a message that includes fuzzy suggestions:
 
@@ -99,7 +106,10 @@ const table = useTable<Employee>(page.locator('#employees'));
 const row = await table.findRow({ Nme: 'Airi Satou' });
 ```
 
-## Locator-based filters
+</details>
+
+<details>
+<summary>Locator-based filters</summary>
 
 For cells whose content cannot be read as plain text — checkboxes, icon-only status columns, custom renderers — pass a function instead of a string.
 
@@ -113,7 +123,10 @@ const row = table.getRow({
 
 The function receives the `cell` locator (already scoped to the correct column) and must return a locator that Playwright uses as a `has` constraint.
 
-## Combining filters with pagination
+</details>
+
+<details>
+<summary>Combining filters with pagination</summary>
 
 Pass a pagination strategy when the target row may not be on the first page.
 
@@ -134,8 +147,9 @@ const row = await table.findRow({ Department: 'Engineering', Office: 'Berlin' })
 await expect(row.getCell('Name')).toHaveText('George Fox');
 ```
 
+</details>
+
 ## Next steps
 
 - [Table Methods API](/api/table-methods) — full signatures for `getRow`, `findRow`, `findRows`, `filter`, `forEach`, and `map`.
-- [Core Concepts](/guide/core-concepts) — SmartRow, strategies, and type safety in depth.
 - [Configuration](/guide/configuration) — `exact`, `maxPages`, `strategies`, and selector overrides.
