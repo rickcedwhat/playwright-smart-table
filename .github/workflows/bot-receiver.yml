@@ -109,6 +109,15 @@ jobs:
               return;
             }
 
+            // If a trigger is already in progress, don't stack another one.
+            // The in-flight bot-coderabbit-check will re-trigger if CR doesn't respond.
+            const isWaiting = labels.some(l => l.name === 'coderabbit: waiting');
+            if (isWaiting && attempt <= 1) {
+              core.info(`PR #${pr_number} already has a review in progress, skipping duplicate trigger`);
+              core.setOutput('stop', 'true');
+              return;
+            }
+
             if (attempt > 10) {
               await github.rest.issues.createComment({
                 owner, repo: repoName, issue_number: pr_number,
