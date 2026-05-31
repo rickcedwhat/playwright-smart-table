@@ -143,4 +143,4 @@ test('AG Grid flow', async ({ page }) => {
 
 Learn about advanced patterns, validation, and scraping.
 
-[Go to Recipes >](/recipes/)
+[Custom Strategies >](/advanced/custom-strategies)
