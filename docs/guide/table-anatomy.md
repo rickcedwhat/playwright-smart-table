@@ -26,7 +26,7 @@ const row = table.getRow({ Name: 'Airi Satou' });
 await expect(row.getCell('Office')).toHaveText('Tokyo');
 ```
 
-For messy headers, see [Header Mapping](/concepts/header-mapping). For paginated tables, see [Pagination Strategies](/concepts/pagination-strategies).
+For messy headers, see [Header Mapping](/guide/header-mapping). For paginated tables, see [Pagination](/guide/pagination).
 
 ## Why Column Order Must Not Matter
 

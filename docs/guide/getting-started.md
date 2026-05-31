@@ -118,7 +118,7 @@ If your table needs special behavior, use a strategy. Common examples are pagina
 
 ## Next Steps
 
-- [Core Concepts](/guide/core-concepts): learn the three main ideas.
+- [How It Works](/guide/table-anatomy): understand the selector model, header mapping, and pagination.
 - [Examples](/examples/): pick a task-based example.
 - [Configuration](/guide/configuration): adapt Smart Table to a custom DOM.
 - [API Reference](/api/): look up exact method and config details.

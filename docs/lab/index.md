@@ -8,7 +8,7 @@ pageClass: table-anatomy-doc
 **Local preview:** run `npm run docs:dev`, then open **Lab** in the top nav or go to [`/lab/`](/lab/) (with the site base, e.g. `http://localhost:5173/playwright-smart-table/lab/`).  
 **Published site:** draft pages under `docs/lab` are **not** shipped; `npm run docs:build` (used in CI) excludes them. To build the full site including Lab, use `npm run docs:build:all`.
 
-Interactive rough drafts for docs and UX. Polished teaching pages live under [Concepts](/concepts/table-anatomy).
+Interactive rough drafts for docs and UX. Polished teaching pages live under [How It Works](/guide/table-anatomy).
 
 ## Pagination sandbox <LabFeedbackMark slug="pagination-sandbox" label="Pagination sandbox" />
 
@@ -96,6 +96,6 @@ Collapsible config block for embedding ready-to-use configs inline in example pa
 
 ## Existing interactives <LabFeedbackMark slug="links-concepts" label="Links to Concepts pages" />
 
-- [Table Anatomy](/concepts/table-anatomy) — selector scoping.
-- [Header Mapping](/concepts/header-mapping) — `__col_*` + `headerTransformer`.
-- [Pagination Strategies](/concepts/pagination-strategies) — pagination shapes.
+- [Table Anatomy](/guide/table-anatomy) — selector scoping.
+- [Header Mapping](/guide/header-mapping) — `__col_*` + `headerTransformer`.
+- [Pagination Strategies](/guide/pagination) — pagination shapes.

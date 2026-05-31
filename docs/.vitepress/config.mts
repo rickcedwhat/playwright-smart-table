@@ -38,11 +38,8 @@ export default defineConfig({
         nav: [
             { text: 'Guide', link: '/guide/getting-started' },
             ...(includeLabPages ? ([{ text: 'Lab', link: '/lab/' }] as const) : []),
-            { text: 'Concepts', link: '/concepts/table-anatomy' },
             { text: 'API', link: '/api/' },
             { text: 'Examples', link: '/examples/' },
-            { text: 'Recipes', link: '/recipes/' },
-            { text: 'Advanced', link: '/advanced/' },
             { text: 'Help', link: '/troubleshooting' }
         ],
 
@@ -52,23 +49,32 @@ export default defineConfig({
                     text: 'Guide',
                     items: [
                         { text: 'Getting Started', link: '/guide/getting-started' },
+                        { text: 'Why Smart Table?', link: '/guide/why' },
                         { text: 'Filtering & Queries', link: '/guide/filtering' },
-                        { text: 'Core Concepts', link: '/guide/core-concepts' },
                         { text: 'Configuration', link: '/guide/configuration' },
-                        { text: 'Debugging', link: '/guide/debugging' },
-                        { text: 'Recipes', link: '/guide/recipes' }
-                    ]
-                }
-            ],
-            '/concepts/': [
-                {
-                    text: 'Concepts',
-                    items: [
-                        { text: 'Table Anatomy', link: '/concepts/table-anatomy' },
-                        { text: 'Header Mapping', link: '/concepts/header-mapping' },
-                        { text: 'Pagination Strategies', link: '/concepts/pagination-strategies' },
-                        { text: 'Strategies', link: '/concepts/strategies' },
-                        { text: 'Concurrency Modes', link: '/concepts/concurrency' }
+                        {
+                            text: 'How It Works',
+                            collapsed: true,
+                            items: [
+                                { text: 'Table Anatomy', link: '/guide/table-anatomy' },
+                                { text: 'Header Mapping', link: '/guide/header-mapping' },
+                                { text: 'Pagination', link: '/guide/pagination' },
+                                { text: 'Strategies', link: '/guide/strategies' },
+                                { text: 'Concurrency Modes', link: '/guide/concurrency' },
+                            ]
+                        },
+                        {
+                            text: 'Advanced',
+                            collapsed: true,
+                            items: [
+                                { text: 'Custom Resolution', link: '/advanced/custom-resolution' },
+                                { text: 'TypeScript Tips', link: '/advanced/typescript' },
+                                { text: 'Custom Strategies', link: '/advanced/custom-strategies' },
+                                { text: 'Performance Tips', link: '/advanced/performance' },
+                                { text: 'Preset Development', link: '/PRESET_DEVELOPMENT' },
+                                { text: 'Preset Template', link: '/PRESET_TEMPLATE' }
+                            ]
+                        }
                     ]
                 }
             ],
@@ -91,7 +97,8 @@ export default defineConfig({
                         { text: 'Pagination', link: '/examples/pagination' },
                         { text: 'Infinite Scroll', link: '/examples/infinite-scroll' },
                         { text: 'MUI DataGrid', link: '/examples/mui-datagrid' },
-                        { text: 'AG Grid', link: '/examples/ag-grid' }
+                        { text: 'AG Grid', link: '/examples/ag-grid' },
+                        { text: 'Data Scraping', link: '/examples/data-scraping' },
                     ]
                 }
             ],
@@ -178,27 +185,16 @@ export default defineConfig({
                     ]
                 }
             ],
-            '/recipes/': [
-                {
-                    text: 'Recipes',
-                    items: [
-                        { text: 'Overview', link: '/recipes/' },
-                        { text: 'Data Scraping', link: '/recipes/data-scraping' },
-                        { text: 'Custom Strategies', link: '/recipes/custom-strategies' },
-                        { text: 'Performance Tips', link: '/recipes/performance' }
-                    ]
-                }
-            ],
             '/advanced/': [
                 {
                     text: 'Advanced',
                     items: [
-                        { text: 'Overview', link: '/advanced/' },
-                        { text: 'Debugging', link: '/advanced/debugging' },
                         { text: 'Custom Resolution', link: '/advanced/custom-resolution' },
                         { text: 'TypeScript Tips', link: '/advanced/typescript' },
-                        { text: 'Preset development', link: '/PRESET_DEVELOPMENT' },
-                        { text: 'Preset template', link: '/PRESET_TEMPLATE' }
+                        { text: 'Custom Strategies', link: '/advanced/custom-strategies' },
+                        { text: 'Performance Tips', link: '/advanced/performance' },
+                        { text: 'Preset Development', link: '/PRESET_DEVELOPMENT' },
+                        { text: 'Preset Template', link: '/PRESET_TEMPLATE' }
                     ]
                 }
             ],

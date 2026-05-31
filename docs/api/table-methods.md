@@ -9,6 +9,8 @@ Methods available on the `TableResult` object returned by `useTable()`.
 
 Initialize the table by reading headers and setting up the column map.
 
+<details open>
+<summary>Parameters & examples</summary>
 
 <!-- api-signature: init -->
 
@@ -24,6 +26,8 @@ init(options?: { timeout?: number }): Promise<TableResult>
 
 <!-- /api-signature: init -->
 
+</details>
+
 [Back to Top](#table-methods)
 
 ---
@@ -32,6 +36,9 @@ init(options?: { timeout?: number }): Promise<TableResult>
 ## isInitialized()
 
 Check if the table has been initialized.
+
+<details>
+<summary>Parameters & examples</summary>
 
 > [!TIP]
 > This is mostly used internally or for advanced debugging. Async methods like `findRow` call `init()` automatically, so you rarely need to check this manually.
@@ -62,15 +69,18 @@ await table.init();
 console.log(table.isInitialized()); // true
 ```
 
+</details>
+
 [Back to Top](#table-methods)
 
 ---
 
 ## getRow()
 
-Get the first row matching the filter criteria on the current **page**. This is a synchronous-like operation that requires the table to be initialized.
+Get the first row matching the filter criteria on the current **page**. Requires `init()`. For multi-page search use [findRow()](#findrow).
 
-If you need to search across multiple pages, use [findRow()](#findrow) instead.
+<details>
+<summary>Parameters & examples</summary>
 
 Filters support `string`, `RegExp`, `number`, or `(cell: Locator) => Locator` for custom locator logic (e.g. checkbox checked).
 
@@ -105,6 +115,8 @@ const gmailRow = table.getRow({
 });
 ```
 
+</details>
+
 [Back to Top](#table-methods)
 
 ---
@@ -113,6 +125,9 @@ const gmailRow = table.getRow({
 ## getRowByIndex()
 
 Get a row by its 0-based index on the current page.
+
+<details>
+<summary>Parameters & examples</summary>
 
 > [!TIP]
 > Use this when you need stable iteration or access by position, which is faster than filtering by content.
@@ -132,13 +147,18 @@ getRowByIndex(index: number): SmartRow
 
 <!-- /api-signature: getRowByIndex -->
 
+</details>
+
 [Back to Top](#table-methods)
 
 ---
 
 ## findRow()
 
-Find **exactly one** row matching the filter. Throws an `"Ambiguous Row"` error if more than one match is found on a page — use this when your filters should uniquely identify a row. Use [`findRows()`](#findrows) if you expect multiple matches.
+Find **exactly one** row matching the filter. Throws an `"Ambiguous Row"` error if more than one match is found on a page. Use [`findRows()`](#findrows) if you expect multiple matches.
+
+<details>
+<summary>Parameters & examples</summary>
 
 By default this scans one page (`maxPages: 1`); increase `maxPages` to search through pagination.
 
@@ -188,6 +208,8 @@ Step through how `findRow` scans pages, highlights matches, and surfaces the `ma
 
 <LabGetRowTrace />
 
+</details>
+
 [Back to Top](#table-methods)
 
 ---
@@ -196,6 +218,8 @@ Step through how `findRow` scans pages, highlights matches, and surfaces the `ma
 
 Find rows matching the filter. By default this scans one page (`maxPages: 1`); increase `maxPages` to collect rows across pagination.
 
+<details>
+<summary>Parameters & examples</summary>
 
 <!-- api-signature: findRows -->
 
@@ -248,6 +272,8 @@ Walk through a full `findRow` flow end-to-end: table init, header mapping, multi
 
 <LabFindRowPaginationDebug />
 
+</details>
+
 [Back to Top](#table-methods)
 
 ---
@@ -255,6 +281,9 @@ Walk through a full `findRow` flow end-to-end: table init, header mapping, multi
 ## countRows()
 
 Count the rows visible on the current page. Auto-initializes the table if needed.
+
+<details>
+<summary>Parameters & examples</summary>
 
 > [!TIP]
 > `countRows()` counts rows on the **current page only**. To count across all pages, use `findRows({}, { maxPages: N })` and check `.length`.
@@ -280,6 +309,8 @@ await table.reset();
 const firstPageCount = await table.countRows();
 ```
 
+</details>
+
 [Back to Top](#table-methods)
 
 ---
@@ -287,7 +318,12 @@ const firstPageCount = await table.countRows();
 
 ## forEach()
 
-Iterate rows in the configured scan range, calling the callback for side effects. Execution is sequential by default (safe for interactions like clicking/filling). Increase `maxPages` to iterate beyond the first page. Call `stop()` in the callback to end iteration early.
+Iterate rows in the configured scan range, calling the callback for side effects. Sequential by default. Call `stop()` to end early.
+
+<details>
+<summary>Parameters & examples</summary>
+
+Execution is sequential by default (safe for interactions like clicking/filling). Increase `maxPages` to iterate beyond the first page. Call `stop()` in the callback to end iteration early.
 
 <!-- api-signature: forEach -->
 
@@ -319,6 +355,8 @@ await table.forEach(async ({ row, index, stop }) => {
 });
 ```
 
+</details>
+
 [Back to Top](#table-methods)
 
 ---
@@ -326,7 +364,12 @@ await table.forEach(async ({ row, index, stop }) => {
 
 ## map()
 
-Transform rows in the configured scan range into values. Returns a flat array. Execution is parallel within each page by default (safe for reads). Increase `maxPages` to map beyond the first page. Call `stop()` to halt after the current page finishes.
+Transform rows in the configured scan range into values. Returns a flat array. Parallel within each page by default.
+
+<details>
+<summary>Parameters & examples</summary>
+
+Increase `maxPages` to map beyond the first page. Call `stop()` to halt after the current page finishes.
 
 > [!WARNING]
 > `map` defaults to `concurrency: 'parallel'`. If your callback opens popovers, fills inputs, or mutates UI state, pass `{ concurrency: 'sequential' }` or `{ concurrency: 'synchronized' }` as appropriate.
@@ -357,6 +400,8 @@ const assignees = await table.map(async ({ row }) => {
 }, { concurrency: 'sequential' });
 ```
 
+</details>
+
 [Back to Top](#table-methods)
 
 ---
@@ -364,7 +409,12 @@ const assignees = await table.map(async ({ row }) => {
 
 ## filter()
 
-Filter rows in the configured scan range by an async predicate. Returns a [SmartRowArray](/api/smart-row-array). Execution is sequential by default. Increase `maxPages` to filter beyond the first page. Call `bringIntoView()` on each row if you need to interact after pagination.
+Filter rows in the configured scan range by an async predicate. Returns a [SmartRowArray](/api/smart-row-array).
+
+<details>
+<summary>Parameters & examples</summary>
+
+Execution is sequential by default. Increase `maxPages` to filter beyond the first page. Call `bringIntoView()` on each row if you need to interact after pagination.
 
 <!-- api-signature: filter -->
 
@@ -390,6 +440,8 @@ for (const row of active) {
 }
 ```
 
+</details>
+
 [Back to Top](#table-methods)
 
 ---
@@ -399,11 +451,16 @@ for (const row of active) {
 
 The table is async iterable. Use `for await...of` for low-level page-by-page iteration.
 
+<details>
+<summary>Parameters & examples</summary>
+
 ```typescript
 for await (const { row, index } of table) {
   console.log(index, await row.getCell('Name').innerText());
 }
 ```
+
+</details>
 
 [Back to Top](#table-methods)
 
@@ -414,6 +471,8 @@ for await (const { row, index } of table) {
 
 Get all column names.
 
+<details>
+<summary>Parameters & examples</summary>
 
 <!-- api-signature: getHeaders -->
 
@@ -425,6 +484,8 @@ getHeaders(): Promise<string[]>
 
 <!-- /api-signature: getHeaders -->
 
+</details>
+
 [Back to Top](#table-methods)
 
 ---
@@ -433,6 +494,8 @@ getHeaders(): Promise<string[]>
 
 Get the header cell Locator for a specific column.
 
+<details>
+<summary>Parameters & examples</summary>
 
 <!-- api-signature: getHeaderCell -->
 
@@ -444,6 +507,8 @@ getHeaderCell(columnName: string): Promise<Locator>
 
 <!-- /api-signature: getHeaderCell -->
 
+</details>
+
 [Back to Top](#table-methods)
 
 ---
@@ -452,6 +517,9 @@ getHeaderCell(columnName: string): Promise<Locator>
 ## scrollToColumn()
 
 Scrolls the table horizontally to bring the given column's header into view.
+
+<details>
+<summary>Parameters & examples</summary>
 
 <!-- api-signature: scrollToColumn -->
 
@@ -474,6 +542,8 @@ const row = table.getRow({ Name: 'John' });
 await row.getCell('Email').click();
 ```
 
+</details>
+
 ---
 
 [Back to Top](#table-methods)
@@ -483,6 +553,9 @@ await row.getCell('Email').click();
 ## reset()
 
 Reset table state and invoke the `onReset` strategy.
+
+<details>
+<summary>Parameters & examples</summary>
 
 > [!WARNING]
 > `reset()` clears internal row cache and flags (`tableMapper.clear()`), calls `pagination.goToFirst()` (if configured) to scroll or paginate back to page 1, and exits any active filter or sort state applied outside the library. Calling `reset()` around filtered/sorted reads may silently return unfiltered data — re-apply filters and sorts after calling it.
@@ -500,6 +573,8 @@ reset(): Promise<void>
 
 <!-- /api-signature: reset -->
 
+</details>
+
 [Back to Top](#table-methods)
 
 ---
@@ -508,6 +583,9 @@ reset(): Promise<void>
 ## revalidate()
 
 Revalidate the table's structure without resetting pagination or state.
+
+<details>
+<summary>Parameters & examples</summary>
 
 Use this when the DOM has changed (e.g. columns toggled) but you want to keep the current pagination/filter state.
 
@@ -541,6 +619,8 @@ await row.getCell('NewColumn').click();
 - Does not reset pagination state
 - Does not clear row cache
 
+</details>
+
 [Back to Top](#table-methods)
 
 ---
@@ -548,6 +628,9 @@ await row.getCell('NewColumn').click();
 ## sorting
 
 Access sorting methods.
+
+<details>
+<summary>Parameters & examples</summary>
 
 ### apply()
 
@@ -567,19 +650,28 @@ const state = await table.sorting.getState('Name');
 console.log(state); // 'asc' | 'desc' | 'none'
 ```
 
+</details>
+
 [Back to Top](#table-methods)
 
 ---
 
 ## generateConfig()
 
-Generates an AI-friendly configuration prompt for debugging. Outputs table HTML and TypeScript definitions to help AI assistants generate config. **Throws an Error** containing the prompt (does not return).
+Generates an AI-friendly configuration prompt for debugging. **Throws an Error** containing the prompt (does not return).
+
+<details>
+<summary>Parameters & examples</summary>
+
+Outputs table HTML and TypeScript definitions to help AI assistants generate config.
 
 ### Signature
 
 ```typescript
 generateConfig(): Promise<void>
 ```
+
+</details>
 
 [Back to Top](#table-methods)
 
@@ -589,8 +681,13 @@ generateConfig(): Promise<void>
 
 Deprecated alias for `generateConfig()`. Use `generateConfig()` in new code; `generateConfigPrompt()` will be removed in v7.0.0.
 
+<details>
+<summary>Parameters & examples</summary>
+
 ### Signature
 
 ```typescript
 generateConfigPrompt(): Promise<void>
 ```
+
+</details>
