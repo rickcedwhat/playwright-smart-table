@@ -34,7 +34,7 @@ The selector model above keeps your test code stable across layout changes — b
 
 Real tables get reshuffled all the time. A product team adds a "Priority" column to the front. A user drags "Status" to the right. An A/B test swaps two columns for half of your traffic. Any of those changes silently breaks locators that refer to columns by their numeric position (`.nth(2)`, `td:eq(3)`, etc.).
 
-Smart Table resolves cells by **header name**, not position. The column map is built once at `init()` from the live `<th>` elements, so the mapping always reflects the actual layout — even when it changes between test runs.
+Smart Table resolves cells by **header name**, not position. The column map is built lazily on first use from the live header elements resolved by your `headerSelector` (or header strategy), then cached in memory. Subsequent calls return the cached map — it is only rebuilt when `revalidate()` or `remapHeaders()` clears the cache, so the mapping always reflects the layout at the time of the last (re)initialization.
 
 ### See it in action
 
