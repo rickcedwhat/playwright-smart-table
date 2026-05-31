@@ -10,7 +10,7 @@
  * @param {string|null|undefined} body
  */
 export function isSkipOrRateLimitReview(body) {
-  return /skip review|rate.?limit/i.test(body ?? '');
+  return /auto-generated comment: (?:rate limited|skip review) by coderabbit\.ai/i.test(body ?? '');
 }
 
 /**

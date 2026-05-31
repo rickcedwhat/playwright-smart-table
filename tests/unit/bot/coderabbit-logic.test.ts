@@ -19,14 +19,16 @@ describe('isSkipOrRateLimitReview', () => {
     )).toBe(true);
   });
 
-  it('matches "rate limited" body', () => {
+  it('matches "rate limited" CR auto-generated comment', () => {
     expect(isSkipOrRateLimitReview(
-      '## Review limit reached\n`@rickcedwhat-ai`, we couldn\'t start this review because you\'ve reached your PR review rate limit.'
+      '<!-- This is an auto-generated comment: rate limited by coderabbit.ai -->'
     )).toBe(true);
   });
 
-  it('matches "rate-limited" (hyphenated)', () => {
-    expect(isSkipOrRateLimitReview('rate-limited by coderabbit')).toBe(true);
+  it('does not match a real review body with "rate limit" in prose', () => {
+    expect(isSkipOrRateLimitReview(
+      '**Actionable comments posted: 1**\n\nThis function has no rate limit handling.'
+    )).toBe(false);
   });
 
   it('does not match a real review body', () => {
