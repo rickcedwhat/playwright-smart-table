@@ -67,7 +67,7 @@ Edit the filter object below and watch how it maps to the table on the right. Ad
 
 Column names are case-sensitive. When a key does not match any header, Smart Table throws immediately — before any network requests or page navigation — with a message that includes fuzzy suggestions:
 
-```
+```text
 Column 'Nme' not found
 
 Did you mean:
