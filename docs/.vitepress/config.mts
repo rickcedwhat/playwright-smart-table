@@ -52,6 +52,7 @@ export default defineConfig({
                     text: 'Guide',
                     items: [
                         { text: 'Getting Started', link: '/guide/getting-started' },
+                        { text: 'Filtering & Queries', link: '/guide/filtering' },
                         { text: 'Core Concepts', link: '/guide/core-concepts' },
                         { text: 'Configuration', link: '/guide/configuration' },
                         { text: 'Debugging', link: '/guide/debugging' },
