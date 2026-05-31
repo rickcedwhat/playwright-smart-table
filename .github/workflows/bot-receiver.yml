@@ -353,15 +353,12 @@ jobs:
 
                 const nextNum = nextPR.number;
 
-                // Swap queued → waiting
+                // Clear queued label — trigger job owns the queued→waiting transition
                 try {
                   await github.rest.issues.removeLabel({
                     owner, repo: repoName, issue_number: nextNum, name: 'coderabbit: queued'
                   });
                 } catch {}
-                await github.rest.issues.addLabels({
-                  owner, repo: repoName, issue_number: nextNum, labels: ['coderabbit: waiting']
-                });
 
                 // Find HQ comment
                 const nextComments = await github.paginate(github.rest.issues.listComments, {

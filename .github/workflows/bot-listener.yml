@@ -63,7 +63,10 @@ jobs:
               rateLimitedIssues.some(i => i.pull_request && i.number !== prNumber);
 
             if (isBlocked) {
-              // Queue this PR — another review is already running
+              // Clear existing CR labels before setting queued (prevents duplicate labels)
+              for (const l of currentLabels.filter(l => l.name.startsWith('coderabbit:'))) {
+                try { await github.rest.issues.removeLabel({ owner, repo, issue_number, name: l.name }); } catch {}
+              }
               await github.rest.issues.addLabels({ owner, repo, issue_number, labels: ['coderabbit: queued'] });
               const queuedContent = [
                 '### 🔍 CodeRabbit Review',
