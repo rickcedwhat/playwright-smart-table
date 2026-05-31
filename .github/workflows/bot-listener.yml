@@ -50,10 +50,8 @@ jobs:
               return body.replace(new RegExp(`${s}[\\s\\S]*?${e}`), `${s}\n${content}\n${e}`);
             }
 
-            // 1. Capture current CR label for rollback
+            // 1. Fetch current labels — needed for blocking check and pre-flight clear
             const { data: currentLabels } = await github.rest.issues.listLabelsOnIssue({ owner, repo, issue_number });
-            const originalCRLabel = currentLabels.find(l => l.name.startsWith('coderabbit:'))?.name
-              ?? 'coderabbit: not started';
 
             // 2. Check if another PR already has a review in progress (waiting or rate-limited)
             const [{ data: waitingIssues }, { data: rateLimitedIssues }] = await Promise.all([
@@ -63,11 +61,6 @@ jobs:
             const isBlocked =
               waitingIssues.some(i => i.pull_request && i.number !== prNumber) ||
               rateLimitedIssues.some(i => i.pull_request && i.number !== prNumber);
-
-            // 3. Remove existing CR labels
-            for (const l of currentLabels.filter(l => l.name.startsWith('coderabbit:'))) {
-              try { await github.rest.issues.removeLabel({ owner, repo, issue_number, name: l.name }); } catch {}
-            }
 
             if (isBlocked) {
               // Queue this PR — another review is already running
@@ -86,8 +79,12 @@ jobs:
               return;
             }
 
+            // 3. Clear any stale CR label so the trigger job doesn't see a false "waiting"
+            for (const l of currentLabels.filter(l => l.name.startsWith('coderabbit:'))) {
+              try { await github.rest.issues.removeLabel({ owner, repo, issue_number, name: l.name }); } catch {}
+            }
+
             // 4. No review in progress — trigger immediately
-            await github.rest.issues.addLabels({ owner, repo, issue_number, labels: ['coderabbit: waiting'] });
             const triggeredContent = [
               '### 🔍 CodeRabbit Review',
               '- [x] Request review',
@@ -116,12 +113,7 @@ jobs:
               body: payload,
             });
             if (!qRes.ok) {
-              // Rollback: remove waiting label, restore original, reset HQ section
-              const { data: rollbackLabels } = await github.rest.issues.listLabelsOnIssue({ owner, repo, issue_number });
-              for (const l of rollbackLabels.filter(l => l.name.startsWith('coderabbit:'))) {
-                try { await github.rest.issues.removeLabel({ owner, repo, issue_number, name: l.name }); } catch {}
-              }
-              await github.rest.issues.addLabels({ owner, repo, issue_number, labels: [originalCRLabel] });
+              // Rollback: reset HQ section (label was never changed, nothing to restore)
               const rollbackContent = [
                 '### 🔍 CodeRabbit Review',
                 '- [ ] Request review',
@@ -425,7 +417,7 @@ jobs:
       needs.parse.outputs.is_pr == 'true'
     runs-on: ubuntu-latest
     steps:
-      - name: Swap label, update HQ comment, enqueue, and react
+      - name: Update HQ comment, enqueue, and react
         env:
           QSTASH_TOKEN: ${{ secrets.QSTASH_TOKEN }}
           BOT_PAT:      ${{ secrets.BOT_PAT }}
@@ -446,14 +438,11 @@ jobs:
               return body.replace(new RegExp(`${s}[\\s\\S]*?${e}`), `${s}\n${content}\n${e}`);
             }
 
-            // 1. Swap label to waiting (capture original for rollback)
+            // 1. Clear any stale CR label so the trigger job doesn't see a false "waiting"
             const { data: currentLabels } = await github.rest.issues.listLabelsOnIssue({ owner, repo, issue_number });
-            const originalCRLabel = currentLabels.find(l => l.name.startsWith('coderabbit:'))?.name
-              ?? 'coderabbit: not started';
             for (const l of currentLabels.filter(l => l.name.startsWith('coderabbit:'))) {
               try { await github.rest.issues.removeLabel({ owner, repo, issue_number, name: l.name }); } catch {}
             }
-            await github.rest.issues.addLabels({ owner, repo, issue_number, labels: ['coderabbit: waiting'] });
 
             // 2. Find HQ comment via paginated fetch (may not exist on very old PRs)
             const allComments = await github.paginate(github.rest.issues.listComments, {
@@ -499,13 +488,7 @@ jobs:
               body: payload,
             });
             if (!qRes.ok) {
-              // Rollback: remove waiting label, restore original
-              const { data: rbLabels } = await github.rest.issues.listLabelsOnIssue({ owner, repo, issue_number });
-              for (const l of rbLabels.filter(l => l.name.startsWith('coderabbit:'))) {
-                try { await github.rest.issues.removeLabel({ owner, repo, issue_number, name: l.name }); } catch {}
-              }
-              await github.rest.issues.addLabels({ owner, repo, issue_number, labels: [originalCRLabel] });
-              // Rollback HQ section
+              // Rollback: reset HQ section (label was never changed, nothing to restore)
               if (hqComment) {
                 const rollbackContent = [
                   '### 🔍 CodeRabbit Review',

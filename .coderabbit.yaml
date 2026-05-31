@@ -2,6 +2,7 @@
 # https://docs.coderabbit.ai/guides/configure-coderabbit
 
 reviews:
+  request_changes_workflow: true
   auto_review:
     enabled: false
     drafts: false
