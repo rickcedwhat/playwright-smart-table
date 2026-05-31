@@ -459,9 +459,13 @@ jobs:
                 (sMatch ? parseInt(sMatch[1]) * 1000    : 0);
               if (!durationMs) durationMs = 30 * 60 * 1000; // fallback 30 min
 
-              const commentedAt = new Date(rateLimitComment.created_at).getTime();
+              // CR updates the same comment in-place on re-triggers rather than
+              // posting a new one, so created_at can be hours stale. Use updated_at
+              // when available — it reflects when CR wrote the current timing text.
+              const anchorIso = rateLimitComment.updated_at ?? rateLimitComment.created_at;
+              const commentedAt = new Date(anchorIso).getTime();
               if (isNaN(commentedAt)) {
-                core.warning('Rate-limit comment missing valid created_at — falling back to 30 min from now');
+                core.warning('Rate-limit comment missing valid timestamp — falling back to 30 min from now');
                 durationMs = 30 * 60 * 1000;
               }
               const availableAt = (isNaN(commentedAt) ? Date.now() : commentedAt) + durationMs;
