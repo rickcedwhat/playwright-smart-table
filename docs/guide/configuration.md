@@ -42,7 +42,8 @@ const table = useTable(page.locator('.grid-container'), {
 > cellSelector: (row) => row.locator('div.cell').filter({ hasNotText: 'Loading...' })
 > ```
 
-## Header Transformation
+<details>
+<summary>Header Transformation</summary>
 
 Sometimes the text visible in the header isn't what you want to use in your tests.
 
@@ -71,7 +72,10 @@ const row = table.getRow({ 'First Name': 'Ada' });
 row.getCell('First Name');
 ```
 
-## Strategies
+</details>
+
+<details>
+<summary>Strategies</summary>
 
 Configuration is also where you attach behavior strategies.
 
@@ -91,7 +95,10 @@ const table = useTable(loc, {
 
 See [Strategies](/api/strategies) for full details.
 
-## Debugging
+</details>
+
+<details>
+<summary>Debugging Config</summary>
 
 Enable debug mode to see exactly what the library is doing: detecting headers, matching rows, and executing strategies.
 
@@ -104,7 +111,10 @@ const table = useTable(loc, {
 });
 ```
 
-## Dynamic Config
+</details>
+
+<details>
+<summary>Dynamic Config (Reuse Across Tests)</summary>
 
 You can reuse configuration objects across tests.
 
@@ -125,6 +135,8 @@ test('verify grid', async ({ page }) => {
   await table.init();
 });
 ```
+
+</details>
 
 ## Next Steps
 

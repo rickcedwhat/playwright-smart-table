@@ -1,9 +1,10 @@
 <!-- Last Reviewed: 02/06/2026 -->
-# Troubleshooting
+# Troubleshooting & Debugging
 
-Common issues and solutions when using Playwright Smart Table.
+Common issues, solutions, and debugging techniques for Playwright Smart Table.
 
-## Column Not Found Errors
+<details>
+<summary>Column Not Found Errors</summary>
 
 ### Problem
 
@@ -46,9 +47,18 @@ const headers = await table.getHeaders();
 console.log('Available columns:', headers);
 ```
 
----
+Also check for extra text like sort icons or counts — normalize with `headerTransformer`:
 
-## Table Not Initialized
+```typescript
+const table = useTable(page.locator('#table'), {
+  headerTransformer: ({ text }) => text.replace(/Sort$/, '').trim()
+});
+```
+
+</details>
+
+<details>
+<summary>Table Not Initialized</summary>
 
 ### Problem
 
@@ -79,9 +89,19 @@ const row = await table.findRow({ Name: 'John' }); // ✅
 const rows = await table.findRows({}); // ✅
 ```
 
----
+**Check initialization state:**
 
-## Pagination Not Working
+```typescript
+if (table.isInitialized()) {
+    const headers = await table.getHeaders();
+    console.log('Mapped Columns:', headers);
+}
+```
+
+</details>
+
+<details>
+<summary>Pagination Not Working</summary>
 
 ### Problem
 
@@ -118,9 +138,10 @@ const rows = await table.findRows(
 );
 ```
 
----
+</details>
 
-## Flaky Tests
+<details>
+<summary>Flaky Tests</summary>
 
 ### Problem
 
@@ -156,9 +177,18 @@ await page.waitForTimeout(1000);
 await expect(row.getCell('Status')).toHaveText('Active');
 ```
 
----
+**4. Handle stale element references**
 
-## Duplicate Column Names
+If the table re-renders (e.g., React/Vue update) and locators go stale, the library handles this automatically in most cases. If you see "Element is not attached" errors, try:
+
+```typescript
+await table.revalidate();
+```
+
+</details>
+
+<details>
+<summary>Duplicate Column Names</summary>
 
 ### Problem
 
@@ -187,9 +217,10 @@ const table = useTable(page.locator('#table'), {
 const cell = row.locator('td').nth(2);
 ```
 
----
+</details>
 
-## Cells Not Found in Row
+<details>
+<summary>Cells Not Found in Row</summary>
 
 ### Problem
 
@@ -210,7 +241,19 @@ const table = useTable(page.locator('#table'), {
 });
 ```
 
-**2. Use custom resolution strategy**
+**2. Verify selectors against your DOM**
+
+If `getHeaders()` returns an empty list, the table root or selectors are wrong. Start with the smallest config that matches your DOM:
+
+```typescript
+const table = useTable(page.locator('.grid-root'), {
+  headerSelector: '[role="columnheader"]',
+  rowSelector: '[role="row"]',
+  cellSelector: '[role="gridcell"]'
+});
+```
+
+**3. Use custom resolution strategy**
 
 ```typescript
 strategies: {
@@ -220,9 +263,10 @@ strategies: {
 }
 ```
 
----
+</details>
 
-## Performance Issues
+<details>
+<summary>Performance Issues</summary>
 
 ### Problem
 
@@ -230,11 +274,17 @@ Tests are slow when iterating through large tables.
 
 ### Solutions
 
-**1. Use batching**
+**1. Use built-in iteration methods**
 
 ```typescript
+// ❌ Slow: Looping manually
+for (let i = 0; i < 10; i++) {
+   await table.findRows({});
+}
+
+// ✅ Fast: Built-in iteration
 await table.forEach(async ({ row }) => {
-  // Process row
+   // Automation handles pagination seamlessly
 });
 ```
 
@@ -247,7 +297,7 @@ const rows = await table.findRows(
 );
 ```
 
-**3. Use filtering**
+**3. Use filtering in DOM, not in code**
 
 ```typescript
 // ❌ Slow - gets all rows then filters in code
@@ -258,9 +308,31 @@ const filtered = allRows.filter(/* ... */);
 const filtered = await table.findRows({ Office: 'Tokyo' });
 ```
 
----
+**4. Use Locator assertions over text extraction**
 
-## TypeScript Type Errors
+```typescript
+// ❌ Slow: Extracts text (round trip to browser)
+const text = await row.getCell('Status').innerText();
+expect(text).toBe('Active');
+
+// ✅ Fast: Playwright assertion (runs in browser context)
+await expect(row.getCell('Status')).toHaveText('Active');
+```
+
+**5. Avoid `findRow` for simple on-screen checks**
+
+```typescript
+// Slower: async search path
+await table.findRow({ ID: '123' });
+
+// Faster: checks the current page immediately
+table.getRow({ ID: '123' }); 
+```
+
+</details>
+
+<details>
+<summary>TypeScript Type Errors</summary>
 
 ### Problem
 
@@ -292,9 +364,10 @@ const row = await table.findRow({
 const table = useTable<Record<string, string>>(page.locator('#table'));
 ```
 
----
+</details>
 
-## Smart Errors Not Showing
+<details>
+<summary>Smart Errors Not Showing</summary>
 
 ### Problem
 
@@ -320,9 +393,10 @@ Smart errors are automatic for:
 - `init()` — Empty or duplicate column names detected
 - Pagination — Lists available primitives when navigation fails
 
----
+</details>
 
-## Responsive / Mobile Tables
+<details>
+<summary>Responsive / Mobile Tables</summary>
 
 ### Problem
 
@@ -346,6 +420,49 @@ if (isMobile) {
 
 > [!NOTE]
 > `SmartRow` locators are resilient to minor layout shifts, but fundamental structure changes require different selectors.
+
+</details>
+
+<details>
+<summary>Enabling Debug Logging</summary>
+
+The easiest way to see what the library is doing is to enable logging in the table config.
+
+```typescript
+const table = useTable(loc, {
+    debug: {
+        logLevel: 'verbose', // 'none' | 'error' | 'info' | 'verbose'
+        slow: 500            // formatting delay in ms
+    }
+});
+```
+
+**Output:**
+```
+🔍 [SmartTable] Finding row with filters: { Name: 'John' }
+ℹ️ [SmartTable] Scanned 10 rows on page 1
+🔍 [SmartTable] Checking row 1: Name="Alice" (Mismatch)
+🔍 [SmartTable] Checking row 2: Name="John" (Match!)
+```
+
+See [`debug`](/api/table-config#debug) in the API reference for the exact config shape.
+
+</details>
+
+<details>
+<summary>Visual Debugging</summary>
+
+Since `SmartRow` returns standard Playwright Locators, you can use Playwright's built-in visual tools:
+
+```typescript
+// Highlight the specific cell
+await row.getCell('Status').highlight();
+
+// Pause execution to inspect DOM
+await page.pause();
+```
+
+</details>
 
 ---
 
