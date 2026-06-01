@@ -4,7 +4,7 @@ layout: home
 hero:
   name: "Playwright Smart Table"
   text: "Test tables by column name, not DOM position."
-  tagline: "Map headers once, find rows by meaningful values, and keep using normal Playwright locators."
+  tagline: "Reference columns by name, not position. Drop into any Playwright test."
   actions:
     - theme: brand
       text: Get Started
@@ -29,24 +29,34 @@ features:
 
 ## Why not just use Playwright selectors?
 
-Raw selectors break when columns reorder, pages paginate, or the DOM structure changes.
+Table cells have no stable identity — a cell is just "the 4th `<td>` in this row." That index shifts silently the moment a column is added, removed, or reordered.
 
-**Without Smart Table — fragile:**
+**Without Smart Table:**
 ```typescript
-// Breaks if a column is added before "Office"
-const office = row.locator('td:nth-child(4)');
+// Which column is td:nth-child(4)? No one knows without opening the app.
+// Add a "Department" column before "Office" and this reads the wrong data — silently.
+const row = await page.locator('tbody tr')
+  .filter({ has: page.locator('td:nth-child(1)', { hasText: 'Airi Satou' }) })
+  .first();
+
+await expect(row.locator('td:nth-child(4)')).toHaveText('Tokyo');      // Office?
+await expect(row.locator('td:nth-child(3)')).toHaveText('Accountant'); // Position?
 ```
 
-**With Smart Table — stable:**
+**With Smart Table:**
 ```typescript
-// Works regardless of column order
+// Column names, not indexes. Still plain Playwright locators under the hood.
+const table = await useTable(page.locator('#employees')).init();
+const row = table.getRow({ Name: 'Airi Satou' });
+
 await expect(row.getCell('Office')).toHaveText('Tokyo');
+await expect(row.getCell('Position')).toHaveText('Accountant');
 ```
 
 | | Raw Playwright | Smart Table |
 |---|---|---|
-| Column reorder | ❌ breaks `nth-child` | ✅ looks up by name |
-| Paginated search | ❌ manual loop | ✅ built-in `findRow` |
-| Multi-column filter | ❌ chained locators | ✅ `{ Name: 'X', Status: 'Active' }` |
-| Typo in column name | ❌ silent wrong element | ✅ throws with suggestions |
-| Works with div grids | ❌ need custom selectors | ✅ configurable selectors |
+| Column added to the app | ❌ `nth-child` indexes shift silently | ✅ unaffected — looks up by name |
+| Column renamed in the app | ❌ reads wrong cell, no error | ✅ throws immediately with suggestions |
+| Find a row on page 3 of 10 | ❌ write your own pagination loop | ✅ `findRow({ Name: 'X' }, { maxPages: 10 })` |
+| Assert several columns at once | ❌ `td:nth-child(2)`, `(4)`, `(7)`… | ✅ `getCell('Name')`, `getCell('Office')` |
+| Fill an editable cell | ❌ DOM traversal to locate the input | ✅ `row.smartFill({ Status: 'Active' })` |
