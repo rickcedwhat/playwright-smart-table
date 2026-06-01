@@ -18,10 +18,12 @@ import TableAnatomy from './components/TableAnatomy.vue'
 import MethodBadge from './components/MethodBadge.vue'
 import ConfigSwatch from './components/ConfigSwatch.vue'
 import './style.css'
+import { initAnnotator } from './annotator'
 
 export default {
   extends: DefaultTheme,
   enhanceApp({ app }) {
+    if (typeof window !== 'undefined') initAnnotator()
     app.component('LabBeforeAfter', LabBeforeAfter)
     app.component('LabBeforeAfterV2', LabBeforeAfterV2)
     app.component('LabQueryBuilder', LabQueryBuilder)
