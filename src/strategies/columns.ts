@@ -1,3 +1,4 @@
+// fallow-ignore-file circular-dependency
 import type { Locator } from '@playwright/test';
 import { StrategyContext } from '../types';
 
@@ -38,6 +39,7 @@ export interface NavigationPrimitives {
  * @deprecated Use NavigationPrimitives instead. This will be removed in a future version.
  * Defines the contract for a cell navigation strategy.
  */
+// fallow-ignore-next-line unused-type
 export type CellNavigationStrategy = (context: StrategyContext & {
     column: string;
     index: number;

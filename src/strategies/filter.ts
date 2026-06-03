@@ -48,5 +48,6 @@ export const FilterStrategies = {
   }) as FilterStrategy,
 };
 
+// fallow-ignore-next-line unused-type
 export type { FilterStrategy } from '../types';
 
