@@ -83,12 +83,13 @@ html:not(.dark) .vp-doc div[class*='language-'] .shiki span {
 html:not(.dark) .vp-doc div[class*='language-'] button.copy {
   background: transparent !important;
   border-color: transparent !important;
-  color: rgba(235,235,245,.5) !important;
   box-shadow: none !important;
+  /* Invert the dark clipboard SVG so it's visible on dark code block backgrounds */
+  filter: invert(1) opacity(0.5);
 }
 html:not(.dark) .vp-doc div[class*='language-'] button.copy:hover {
   background: rgba(255,255,255,.1) !important;
-  color: rgba(235,235,245,.9) !important;
+  filter: invert(1) opacity(0.9);
 }
 html:not(.dark) .vp-doc div[class*='language-'] span.lang {
   color: rgba(235,235,245,.35);
