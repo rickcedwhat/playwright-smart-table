@@ -81,13 +81,17 @@ html:not(.dark) .vp-doc div[class*='language-'] .shiki span {
   background-color: var(--shiki-dark-bg) !important;
 }
 html:not(.dark) .vp-doc div[class*='language-'] button.copy {
-  color: rgba(235,235,245,.6);
+  background: transparent !important;
+  border-color: transparent !important;
+  color: rgba(235,235,245,.5) !important;
+  box-shadow: none !important;
 }
 html:not(.dark) .vp-doc div[class*='language-'] button.copy:hover {
-  color: rgba(235,235,245,1);
+  background: rgba(255,255,255,.1) !important;
+  color: rgba(235,235,245,.9) !important;
 }
 html:not(.dark) .vp-doc div[class*='language-'] span.lang {
-  color: rgba(235,235,245,.4);
+  color: rgba(235,235,245,.35);
 }
 
 .table-anatomy-doc .content-container {
@@ -108,13 +112,18 @@ html:not(.dark) .vp-doc div[class*='language-'] span.lang {
 
 /* Inline code block labels — use <div class="code-label"> directly above a code fence */
 .code-label {
-  display: block;
-  font-size: 12px;
+  display: inline-block;
+  font-size: 11px;
   font-weight: 600;
-  color: var(--vp-c-text-2);
-  font-family: var(--vp-font-family-mono);
-  margin-bottom: 4px;
-  padding-left: 2px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--vp-c-brand-1);
+  font-family: var(--vp-font-family-base);
+  margin-bottom: 6px;
+  padding: 2px 8px;
+  background: color-mix(in srgb, var(--vp-c-brand-1) 10%, transparent);
+  border-radius: 4px;
+  border: 1px solid color-mix(in srgb, var(--vp-c-brand-1) 20%, transparent);
 }
 div.code-label + div[class*='language-'] {
   margin-top: 0 !important;
