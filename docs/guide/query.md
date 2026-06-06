@@ -1,48 +1,115 @@
 # Query Your Table
 
-Once Playwright Smart Table knows your table, here's what you can ask it.
+Once Playwright Smart Table understands your table, here's what you can ask it to do.
 
-> Each query below only works because of a corresponding config. Where relevant, the config that unlocks it is noted — if something isn't working, that's the first place to look.
+The queries below require your table to be described correctly — specifically the headers, rows, and cells. Pagination and virtualization unlock additional queries or extend existing ones.
+
+---
 
 ## Get a row on the current page
 
-`table.getRow({ ColumnName: 'value' })` — synchronous, current page only. No config beyond selectors required.
+```typescript
+const row = table.getRow({ Name: 'John Doe' })
+await expect(row.getCell('Email')).toHaveText('john@example.com')
+```
 
-_Unlocked by: identifying your [headers, rows, and cells](/guide/describe#how-do-we-identify-your-headers)_
+Synchronous. Returns the first matching row on the current page only. Requires: headers, rows, cells.
+
+---
 
 ## Find a row across pages
 
-`await table.findRow({ ColumnName: 'value' })` — paginates until found or `maxPages` is exhausted.
+```typescript
+const row = await table.findRow({ Name: 'John Doe' }, { maxPages: 10 })
+```
 
-_Unlocked by: [pagination strategy](/guide/describe#how-does-pagination-work)_
+Paginates until it finds a match or hits `maxPages`. Requires: headers, rows, cells. Pagination strategy required if the row might not be on the first page.
 
-## Collect matching rows across pages
+---
 
-`await table.findRows({ Status: 'Active' })` — returns all matches across pages.
+## Collect all matching rows
 
-_Unlocked by: [pagination strategy](/guide/describe#how-does-pagination-work)_
+```typescript
+const activeUsers = await table.findRows({ Status: 'Active' }, { maxPages: 10 })
+```
+
+Returns every match across pages. Requires: headers, rows, cells. Add a pagination strategy to search beyond page one.
+
+---
 
 ## Iterate all rows
 
-`await table.forEach(...)` — walk every row in order. `await table.map(...)` — same but returns an array.
+```typescript
+await table.forEach(async ({ row }) => {
+  const name = await row.getCell('Name').innerText()
+  console.log(name)
+})
+```
 
-_Unlocked by: selectors alone for single-page; add pagination strategy for multi-page_
+Walks every row in order. For concurrent iteration (faster on large tables, but requires the table to support it), see [Concurrency Modes](#concurrency-modes).
 
-## Read a row's data
+```typescript
+// With concurrency
+const table = useTable(locator, { concurrency: 'isolated' })
+await table.forEach(async ({ row }) => { ... })
+```
 
-`await row.toJSON()` — all cells as a plain object. Works on any row.
+### Concurrency modes
 
-_Unlocked by: identifying your [cells](/guide/describe#how-do-we-identify-your-cells)_
+- **`sequential`** (default) — one row at a time, in order. Safe for any table.
+- **`isolated`** — multiple rows processed at once. Faster, but only safe if rows are independent and the table doesn't re-render between interactions.
+- **`synchronized`** — for tables that require interactions to happen in a specific order across rows.
 
-## Read a single cell
+Concurrency deserves its own page. _TBD — more detail coming._
 
-`row.getCell('Column Name')` — returns a plain Playwright Locator.
+---
 
-## Fill a row's cells
+## Map rows to data
 
-`await row.smartFill({ Status: 'Active' })` — write to editable cells.
+```typescript
+const names = await table.map(async ({ row }) => row.getCell('Name').innerText())
+```
 
-_Unlocked by: [fill strategy](/guide/describe#are-any-cells-editable)_
+Like `forEach` but returns an array. For full row data:
+
+```typescript
+const allRows = await table.map(async ({ row }) => row.toJSON())
+```
+
+If your table is virtualized, Playwright Smart Table will scroll each row into view before reading it. This is handled automatically when a viewport strategy is configured.
+
+---
+
+## Read a single row's data
+
+```typescript
+const data = await row.toJSON()
+// { Name: 'John Doe', Email: 'john@example.com', Status: 'Active' }
+```
+
+Returns all cells as a plain object. If the table is virtualized, pair this with `row.bringIntoView()` first.
+
+---
+
+## Get a specific cell
+
+```typescript
+const cell = row.getCell('Status')
+await expect(cell).toHaveText('Active')
+await cell.click()
+```
+
+Returns a plain Playwright locator. Works on any row.
+
+---
+
+## Write to cells
+
+```typescript
+await row.smartFill({ Status: 'Inactive', Note: 'Updated' })
+```
+
+Writes to editable cells by column name. Requires a fill strategy if cells need custom interaction logic.
 
 ---
 

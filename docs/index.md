@@ -2,7 +2,9 @@
 
 Dealing with tables sucks. The locators involved are often ugly, brittle, and difficult to wrap your head around.
 
-Column moved? Your `nth-child` is wrong. Grid rerenders? Your locator is stale. Table paginates? Now you're writing a loop. Virtualized? Half the rows aren't even in the DOM.
+You might figure something out that works for today but what about tomorrow? What will you do when a column moves? Or even worse, when the data that was on the first page is now on the second or third page? Or if your data is on the page but it's not in the DOM because the rows or columns or both are virtualized.
+
+Your hardcoded solution is just waiting to bite you — but it doesn't have to be that way.
 
 And that's before you factor in that every table is different — semantic `<table>` elements are the exception, not the rule. You're more likely to be dealing with a full `<div>`-based grid where the library author made all their own decisions about structure, attributes, and behavior.
 

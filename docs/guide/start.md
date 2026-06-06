@@ -1,24 +1,35 @@
-# Getting Started
+# Quick Start
 
-Install, initialize, write your first test.
+> **Heads up:** This page will get you running fast but it skips a lot. If your table is anything beyond a basic HTML `<table>`, you'll hit a wall quickly. Read [Describe Your Table](/guide/describe) and [Query Your Table](/guide/query) before assuming something is broken.
 
 ## Install
 
-_TBD_
-
-## Initialize
-
-_How to call useTable() and .init()_
+```bash
+npm install @rickcedwhat/playwright-smart-table
+```
 
 ## Your first test
 
-_Simple getRow + getCell example_
+```typescript
+import { useTable } from '@rickcedwhat/playwright-smart-table';
+import { test, expect } from '@playwright/test';
 
-## What next?
+test('find a row by value', async ({ page }) => {
+  await page.goto('https://your-app.com/table-page');
 
-- If you need to configure your table → [Describe your table](/guide/describe)
-- If you want to know what you can do → [Query your table](/guide/query)
+  const table = await useTable(page.locator('#my-table')).init();
+  const row = table.getRow({ Name: 'John Doe' });
 
----
+  await expect(row.getCell('Email')).toHaveText('john@example.com');
+});
+```
 
-_Outline — content TBD_
+## What just happened
+
+`useTable()` takes a root locator and an optional config. `.init()` reads the headers and builds an internal column map. After that, `getRow()` translates `{ Name: 'John Doe' }` into a Playwright locator that matches the right row — regardless of what column index `Name` happens to be at.
+
+`getCell('Email')` returns a plain Playwright locator for that cell. Pass it directly to `expect()`, `click()`, `fill()`, or anything else Playwright supports.
+
+## That's the basics
+
+If it works, great. If not — or when your table gets more complex — head to [Describe Your Table](/guide/describe).
