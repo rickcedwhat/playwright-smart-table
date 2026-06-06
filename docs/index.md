@@ -16,7 +16,7 @@ const row = table.getRow({ firstName: 'John', lastName: 'Doe' })
 const email = await row.getCell('Email').innerText()
 ```
 
-Playwright Smart Table gives you a way to describe how your specific table works — and then lets you ask questions against it in plain terms. Works for standard HTML tables, div-based grids, paginated tables, and virtualized ones.
+You tell it how your table is built. After that, it's just asking questions.
 
 **You describe your table. Playwright Smart Table does the rest.**
 

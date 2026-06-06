@@ -4,6 +4,8 @@
 
 The full pagination interface. Every property is optional — implement only what your table has. Each navigation function returns `true` on success, `false` when the action isn't available (e.g. Next is disabled on the last page).
 
+If a navigation function throws an error, it bubbles up — the library doesn't catch it for you. Use `return false` to signal "not available" (e.g. the Next button is disabled); let real errors throw.
+
 ```typescript
 strategies: {
   pagination: {
@@ -85,6 +87,8 @@ strategies: {
 ## Built-in strategies <Badge type="tip" text="Shortcut" />
 
 `Strategies.Pagination.click()` is a convenience wrapper around `PaginationPrimitives` — pass selectors instead of writing click handlers. It covers all primitives except `detectCurrentPage` ([#212](https://github.com/rickcedwhat/playwright-smart-table/issues/212)).
+
+Without `detectCurrentPage`, the library always starts at page index 0. If your table can load on a page other than the first (e.g. a deep-linked URL on page 5), you'll need to implement `detectCurrentPage` via a custom strategy for now.
 
 :::tabs
 == Buttons

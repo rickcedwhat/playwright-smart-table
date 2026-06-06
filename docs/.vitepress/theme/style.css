@@ -86,3 +86,28 @@
 .vp-doc div[class*="language-"] code {
   padding-right: 3rem;
 }
+
+/* Code block filename/label — ensure visible in both light and dark mode */
+.vp-doc div[class*="language-"] + div[class*="language-"],
+.vp-doc div[class*="language-"] {
+  margin-top: 0;
+}
+
+.vp-code-block-title {
+  background: var(--vp-code-block-bg);
+  border-radius: 8px 8px 0 0;
+  padding: 8px 16px 6px;
+  margin-bottom: -8px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+
+.vp-code-block-title + div[class*="language-"] pre {
+  border-radius: 0 0 8px 8px;
+}
+
+.vp-code-block-title-text {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--vp-c-text-2);
+  font-family: var(--vp-font-family-mono);
+}
