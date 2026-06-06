@@ -6,7 +6,7 @@
 const row = table.getRow({ firstName: 'John', lastName: 'Doe' })
 ```
 
-Synchronous. Returns a locator for the first row on the current page that matches all filters. If more than one row matches, the first is returned — no error is thrown. If you need an exact unique match, use `findRow` instead.
+Synchronous. Returns a locator for the row on the current page matching all filters. If more than one row matches, Playwright throws a strict mode error on evaluation — same as any ambiguous locator. For a more descriptive error that shows you which rows matched, use `findRow`.
 
 ---
 
