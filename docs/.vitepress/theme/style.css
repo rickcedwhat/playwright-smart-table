@@ -106,17 +106,17 @@ html:not(.dark) .vp-doc div[class*='language-'] span.lang {
   padding-right: 3rem;
 }
 
-/* Inline code block labels — use <span class="code-label"> above a code fence */
+/* Inline code block labels — use <div class="code-label"> directly above a code fence */
 .code-label {
   display: block;
   font-size: 12px;
   font-weight: 600;
   color: var(--vp-c-text-2);
   font-family: var(--vp-font-family-mono);
-  margin-bottom: 2px;
+  margin-bottom: 4px;
   padding-left: 2px;
 }
-.code-label + div[class*='language-'] {
+div.code-label + div[class*='language-'] {
   margin-top: 0 !important;
 }
 

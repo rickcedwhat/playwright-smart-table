@@ -4,7 +4,7 @@ Dealing with tables sucks. The locators involved are often ugly, brittle, and di
 
 Which of these is easier to read?
 
-<span class="code-label">Without Playwright Smart Table</span>
+<div class="code-label">Without Playwright Smart Table</div>
 
 ```typescript
 const row = page.locator('tbody tr')
@@ -13,7 +13,7 @@ const row = page.locator('tbody tr')
 const email = await row.locator('td:nth-child(3)').innerText()
 ```
 
-<span class="code-label">With Playwright Smart Table</span>
+<div class="code-label">With Playwright Smart Table</div>
 
 ```typescript
 const row = table.getRow({ firstName: 'John', lastName: 'Doe' })
