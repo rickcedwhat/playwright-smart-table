@@ -2,7 +2,8 @@
 
 Real app headers often include noise: sort arrows, counts, badges. `headerTransformer` runs on each header before it's stored — the cleaned name is what you use everywhere else in `getRow`, `getCell`, etc.
 
-**Sort arrows:**
+:::tabs
+== Sort arrows
 
 | Name ↑ | Department ↓ | Salary |
 |--------|-------------|--------|
@@ -12,38 +13,38 @@ Real app headers often include noise: sort arrows, counts, badges. `headerTransf
 
 ```typescript
 headerTransformer: async ({ text }) => text.replace(/[↑↓▲▼]/g, '').trim()
-// Resulting columns: 'Name', 'Department', 'Salary'
+// Result: 'Name', 'Department', 'Salary'
 ```
 
----
+== Unlabeled checkbox column
 
-**Checkbox column with no label:**
-
-| _(checkbox)_ | Name  | Status |
-|-------------|-------|--------|
-| ☐           | Ada   | Active |
-| ☐           | Bob   | Inactive |
-| ☐           | Carol | Active |
+| _(no label)_ | Name  | Status   |
+|:---:|-------|----------|
+| ☐  | Ada   | Active   |
+| ☐  | Bob   | Inactive |
+| ☐  | Carol | Active   |
 
 ```typescript
 headerTransformer: async ({ text, index }) => {
   if (!text.trim()) return 'Select'
   return text.trim()
 }
-// Resulting columns: 'Select', 'Name', 'Status'
+// Result: 'Select', 'Name', 'Status'
 ```
 
----
+== All-caps headers
 
-**All-caps headers:**
-
-| FIRST NAME | LAST NAME | EMAIL ADDRESS |
-|-----------|-----------|---------------|
+| FIRST NAME | LAST NAME | EMAIL ADDRESS   |
+|-----------|-----------|-----------------|
 | Ada       | Lovelace  | ada@example.com |
+| Bob       | Builder   | bob@example.com |
+| Carol     | Danvers   | carol@example.com |
 
 ```typescript
 headerTransformer: async ({ text }) => text.toLowerCase().replace(/_/g, ' ').trim()
-// Resulting columns: 'first name', 'last name', 'email address'
+// Result: 'first name', 'last name', 'email address'
 ```
+
+:::
 
 _Config: `headerTransformer`_

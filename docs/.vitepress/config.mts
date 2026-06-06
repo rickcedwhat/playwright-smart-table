@@ -1,6 +1,12 @@
 import { defineConfig } from 'vitepress'
+import { tabsMarkdownPlugin } from 'vitepress-plugin-tabs'
 
 export default defineConfig({
+  markdown: {
+    config(md) {
+      md.use(tabsMarkdownPlugin)
+    }
+  },
     title: "Playwright Smart Table",
     description: "Production-ready table testing for Playwright",
     base: '/playwright-smart-table/',
@@ -32,7 +38,7 @@ export default defineConfig({
               ]
             },
             {
-              text: 'Query Your Table',
+              text: 'Interact with Your Table',
               link: '/guide/query/',
               collapsed: false,
               items: [

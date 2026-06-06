@@ -8,7 +8,9 @@ await table.forEach(async ({ row }) => {
 })
 ```
 
-Processes rows one at a time, in order.
+Processes rows one at a time, in order. Default for `forEach`.
+
+---
 
 ## Map rows to data
 
@@ -17,18 +19,34 @@ const emails = await table.map(async ({ row }) => row.getCell('Email').innerText
 const allRows = await table.map(async ({ row }) => row.toJSON())
 ```
 
-Like `forEach` but returns an array.
+Like `forEach` but returns an array. Default concurrency for `map` is `parallel`.
+
+---
+
+## Filter rows by a condition
+
+```typescript
+const highEarners = await table.filter(
+  async ({ row }) => {
+    const salary = await row.getCell('Salary').innerText()
+    return parseInt(salary.replace(/[^0-9]/g, '')) > 50000
+  },
+  { maxPages: 5 }
+)
+```
+
+Returns a `SmartRowArray` of all rows where the predicate returns `true`. Default concurrency for `filter` is `sequential`.
+
+---
 
 ## Concurrency
 
-By default both `forEach` and `map` run sequentially. You can change this with the `concurrency` option:
+`forEach`, `map`, and `filter` all accept a `concurrency` option:
 
 ```typescript
-const table = useTable(locator, { concurrency: 'parallel' })
+await table.map(async ({ row }) => row.toJSON(), { concurrency: 'sequential' })
 ```
 
-- **`sequential`** (default) — one row at a time, in order
-- **`parallel`** — all rows processed concurrently; fastest, but only use if your callbacks are independent and don't interact with the table
-- **`synchronized`** — rows processed concurrently but coordinated; use when callbacks interact with the table and need to stay in sync
-
-_TBD — concurrency deserves its own page with more detail._
+- **`parallel`** — all row callbacks run concurrently. Fastest. Default for `map`.
+- **`sequential`** — one row at a time, in order. Default for `forEach` and `filter`.
+- **`synchronized`** — row callbacks run in parallel, but the library waits for all rows on the current page to finish before advancing to the next page. Use when your callbacks interact with the table and page navigation needs to be coordinated.

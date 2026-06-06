@@ -1,4 +1,4 @@
-# Query Your Table
+# Interact with Your Table
 
 Once Playwright Smart Table understands your table, here's what you can ask it to do.
 

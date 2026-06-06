@@ -6,9 +6,9 @@
 const row = table.getRow({ firstName: 'John', lastName: 'Doe' })
 ```
 
-Synchronous. Returns the first matching row visible right now. If no row matches, you get an empty locator — Playwright will surface the error when you try to interact with it.
+Synchronous. Returns a locator for the first row on the current page that matches all filters. If more than one row matches, the first is returned — no error is thrown. If you need an exact unique match, use `findRow` instead.
 
-If more than one row matches on the same page, `getRow` returns the first. For `findRow`, multiple matches on the same page throw an `Ambiguous Row` error — add more filters to narrow it down.
+---
 
 ## Find a row across pages
 
@@ -16,7 +16,9 @@ If more than one row matches on the same page, `getRow` returns the first. For `
 const row = await table.findRow({ firstName: 'John', lastName: 'Doe' }, { maxPages: 10 })
 ```
 
-Paginates until it finds exactly one match or hits `maxPages`. Requires a pagination strategy if the row might not be on the first page.
+Paginates until it finds exactly one match or hits `maxPages`. If more than one row matches on the same page, it throws an `Ambiguous Row` error with details about the conflicting rows — add more filters to narrow it down. Requires a pagination strategy if the row might not be on the first page.
+
+---
 
 ## Collect all matching rows
 
