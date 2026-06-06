@@ -122,7 +122,9 @@ strategies: {
 }
 ```
 
-The page number strategy is **windowed** — if the target page isn't visible in the current set of buttons, the library steps toward it using next/prev and retries. <button onclick="alert('Deep dive into windowed pagination — this page needs building.')" style="font-size:12px;padding:2px 8px;border:1px solid var(--vp-c-border);border-radius:4px;cursor:pointer;background:var(--vp-c-bg-soft);color:var(--vp-c-text-2)">Learn more</button>
+The page number strategy is **windowed** — if the target page isn't visible in the current set of buttons, the library steps toward it using next/prev and retries.
+
+> _Deep dive into windowed pagination coming soon._
 
 == Infinite scroll
 
