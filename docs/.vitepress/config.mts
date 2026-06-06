@@ -28,6 +28,7 @@ export default defineConfig({
                 { text: 'Virtualization', link: '/guide/describe/virtualization' },
                 { text: 'Header text', link: '/guide/describe/header-text' },
                 { text: 'Editing cells', link: '/guide/describe/editing' },
+                { text: 'Column overrides', link: '/guide/describe/column-overrides' },
               ]
             },
             {

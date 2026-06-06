@@ -8,3 +8,4 @@ Before Playwright Smart Table can do anything, it needs to understand your table
 - [What's virtualized?](/guide/describe/virtualization)
 - [What does your header text actually say?](/guide/describe/header-text)
 - [How do we write to cells?](/guide/describe/editing)
+- [Do any columns need special treatment?](/guide/describe/column-overrides)
