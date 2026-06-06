@@ -1,9 +1,95 @@
 # How does pagination work?
 
+## PaginationPrimitives
+
+The full pagination interface. Every property is optional — implement only what your table has. Each navigation function returns `true` on success, `false` when the action isn't available (e.g. Next is disabled on the last page).
+
+```typescript
+strategies: {
+  pagination: {
+    // Move forward/backward one page
+    goNext: async ({ root }) => {
+      const btn = root.page().getByRole('button', { name: 'Next' })
+      if (await btn.isDisabled()) return false
+      await btn.click()
+      return true
+    },
+    goPrevious: async ({ root }) => {
+      const btn = root.page().getByRole('button', { name: 'Previous' })
+      if (await btn.isDisabled()) return false
+      await btn.click()
+      return true
+    },
+
+    // Jump multiple pages at once
+    goNextBulk: async ({ root }) => {
+      const btn = root.page().getByRole('button', { name: 'Next 10' })
+      if (await btn.isDisabled()) return false
+      await btn.click()
+      return true
+    },
+    goPreviousBulk: async ({ root }) => {
+      const btn = root.page().getByRole('button', { name: 'Prev 10' })
+      if (await btn.isDisabled()) return false
+      await btn.click()
+      return true
+    },
+
+    // Jump to first/last page
+    goToFirst: async ({ root }) => {
+      const btn = root.page().getByRole('button', { name: 'First' })
+      if (await btn.isDisabled()) return false
+      await btn.click()
+      return true
+    },
+    goToLast: async ({ root }) => {
+      const btn = root.page().getByRole('button', { name: 'Last' })
+      if (await btn.isDisabled()) return false
+      await btn.click()
+      return true
+    },
+
+    // Jump to a specific page index (0-based)
+    // Return false if that page number isn't visible in the current UI — the
+    // library will step toward it with goNext/goPrevious and retry
+    goToPage: async (pageIndex, { root }) => {
+      const btn = root.page().locator(`.page-btn:text-is("${pageIndex + 1}")`)
+      if (!await btn.isVisible()) return false
+      await btn.click()
+      return true
+    },
+
+    // Tell the library how many pages exist (optional — enables path optimization)
+    getTotalPages: async ({ root }) => {
+      const text = await root.page().locator('.page-count').textContent()
+      return text ? parseInt(text) : null
+    },
+
+    // Called once at init() — sync the library's page counter if the table
+    // loads on a page other than the first (e.g. a deep-linked URL on page 5)
+    detectCurrentPage: async (root) => {
+      const text = await root.locator('[aria-current="page"]').textContent()
+      return parseInt(text ?? '1') - 1
+    },
+
+    // Tell the library how many pages goNextBulk/goPreviousBulk jump
+    // Used for navigation path planning
+    nextBulkPages: 10,
+    previousBulkPages: 10,
+  }
+}
+```
+
+---
+
+## Built-in strategies <Badge type="tip" text="Shortcut" />
+
+`Strategies.Pagination.click()` is a convenience wrapper around `PaginationPrimitives` — pass selectors instead of writing click handlers. It covers all primitives except `detectCurrentPage` ([#212](https://github.com/rickcedwhat/playwright-smart-table/issues/212)).
+
 :::tabs
 == Buttons
 
-Most paginated tables use buttons to move between pages. Pass whichever buttons your table has — all are optional.
+Pass whichever buttons your table has — all are optional.
 
 ```typescript
 strategies: {
@@ -20,7 +106,7 @@ strategies: {
 
 == Page numbers
 
-Some tables show numbered buttons (1 2 3 4 5) that jump directly to that page. Pass `pageNumbers` with a locator that matches all the number buttons — the library will click the one matching the target page.
+Some tables show numbered buttons (1 2 3 4 5) that jump directly to that page. Pass `pageNumbers` with a locator matching all the number buttons.
 
 ```typescript
 strategies: {
@@ -32,7 +118,7 @@ strategies: {
 }
 ```
 
-The page number strategy is windowed — if the target page isn't visible in the current set of buttons, the library steps toward it using next/prev and retries.
+The page number strategy is **windowed** — if the target page isn't visible in the current set of buttons, the library steps toward it using next/prev and retries. <button onclick="alert('Deep dive into windowed pagination — this page needs building.')" style="font-size:12px;padding:2px 8px;border:1px solid var(--vp-c-border);border-radius:4px;cursor:pointer;background:var(--vp-c-bg-soft);color:var(--vp-c-text-2)">Learn more</button>
 
 == Infinite scroll
 
@@ -52,42 +138,5 @@ strategies: {
 Don't set a pagination strategy. All queries stay on the current page.
 
 :::
-
----
-
-## Custom pagination strategy
-
-If the built-in strategies don't fit, pass a plain object that implements the `PaginationPrimitives` interface. Every property is optional — implement only what your table has. Each function returns `true` on success, `false` when the action isn't available (e.g. Next is disabled on the last page).
-
-```typescript
-strategies: {
-  pagination: {
-    goNext: async ({ root }) => {
-      const btn = root.page().getByRole('button', { name: 'Next' })
-      if (await btn.isDisabled()) return false
-      await btn.click()
-      return true
-    },
-    goPrevious: async ({ root }) => {
-      const btn = root.page().getByRole('button', { name: 'Previous' })
-      if (await btn.isDisabled()) return false
-      await btn.click()
-      return true
-    },
-    goToPage: async (pageIndex, { root }) => {
-      const btn = root.page().locator(`.page-btn:text-is("${pageIndex + 1}")`)
-      if (!await btn.isVisible()) return false
-      await btn.click()
-      return true
-    },
-    getTotalPages: async ({ root }) => {
-      const text = await root.page().locator('.page-count').textContent()
-      return text ? parseInt(text) : null
-    },
-  }
-}
-```
-
-`Strategies.Pagination.click()` is a convenience wrapper around this interface — it covers all primitives except `detectCurrentPage`, which is only available via a custom strategy object today ([#212](https://github.com/rickcedwhat/playwright-smart-table/issues/212)).
 
 _Config: `strategies.pagination`_

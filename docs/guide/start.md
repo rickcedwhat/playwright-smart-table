@@ -32,4 +32,4 @@ test('find a row by value', async ({ page }) => {
 
 ## That's the basics
 
-If it works, great. If not — or when your table gets more complex — head to [Describe Your Table](/guide/describe).
+If your use case is more complicated — and it likely is — head to [Describe Your Table](/guide/describe/).

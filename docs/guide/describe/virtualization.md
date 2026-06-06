@@ -2,10 +2,57 @@
 
 Virtualized tables only render what's visible — rows and columns outside the viewport are removed from the DOM entirely. Trying to read a cell that isn't rendered will give you nothing.
 
-Playwright Smart Table handles this with a viewport strategy. The most common approach: your grid already stamps each rendered row and cell with a DOM attribute that indicates its position — like `aria-rowindex` or `data-index`. Playwright Smart Table reads those to know what's currently in the DOM and scrolls automatically before reading.
+Playwright Smart Table handles this with a viewport strategy. You describe what's currently in the DOM, and the library scrolls before it reads.
+
+## ViewportStrategy
+
+Implement whichever of these four functions your grid exposes — all are optional:
 
 ```typescript
-// aria-rowindex / aria-colindex (MUI DataGrid, ARIA grids — 1-based)
+strategies: {
+  viewport: {
+    // Return the 0-based index range of rows currently rendered in the DOM
+    getVisibleRowRange: async ({ root }) => {
+      return root.evaluate(el => {
+        const rows = [...el.querySelectorAll('[role="row"]')]
+        const indices = rows
+          .map(r => Number(r.getAttribute('aria-rowindex')) - 1)
+          .filter(n => !isNaN(n))
+        return { first: Math.min(...indices), last: Math.max(...indices) }
+      })
+    },
+
+    // Return the 0-based index range of columns currently rendered in the DOM
+    getVisibleColumnRange: async ({ root }) => {
+      return root.evaluate(el => {
+        const cells = [...el.querySelectorAll('[role="gridcell"]')]
+        const indices = cells
+          .map(c => Number(c.getAttribute('aria-colindex')) - 1)
+          .filter(n => !isNaN(n))
+        return { first: Math.min(...indices), last: Math.max(...indices) }
+      })
+    },
+
+    // Scroll to make a specific row visible
+    scrollToRow: async ({ root }, rowIndex) => {
+      await root.locator(`[aria-rowindex="${rowIndex + 1}"]`).scrollIntoViewIfNeeded()
+    },
+
+    // Scroll to make a specific column visible
+    scrollToColumn: async ({ root }, colIndex) => {
+      await root.locator(`[aria-colindex="${colIndex + 1}"]`).first().scrollIntoViewIfNeeded()
+    },
+  }
+}
+```
+
+---
+
+## Built-in strategies <Badge type="tip" text="Shortcut" />
+
+If your grid stamps rows and cells with a DOM attribute containing their index (like `aria-rowindex`, `data-index`, or similar), `Strategies.Viewport.dataAttribute()` implements all four functions for you:
+
+```typescript [MUI DataGrid / ARIA grids — aria-rowindex (1-based)]
 strategies: {
   viewport: Strategies.Viewport.dataAttribute({
     scrollContainer: '.MuiDataGrid-virtualScroller',
@@ -15,35 +62,14 @@ strategies: {
     columnOffset: 1,
   })
 }
+```
 
-// data-index (TanStack and similar — 0-based, the default)
+```typescript [TanStack and similar — data-index (0-based, the default)]
 strategies: {
   viewport: Strategies.Viewport.dataAttribute({
     scrollContainer: '#table-scroller',
   })
 }
 ```
-
-If your grid doesn't expose index attributes, you can implement the `ViewportStrategy` interface directly:
-
-```typescript
-strategies: {
-  viewport: {
-    getVisibleRowRange: async ({ root }) => {
-      // return the 0-based index range of rows currently in the DOM
-      return root.evaluate(el => {
-        const rows = [...el.querySelectorAll('[role="row"]')]
-        const indices = rows.map(r => Number(r.getAttribute('aria-rowindex')) - 1).filter(n => !isNaN(n))
-        return { first: Math.min(...indices), last: Math.max(...indices) }
-      })
-    },
-    scrollToRow: async ({ root }, rowIndex) => {
-      await root.locator(`[aria-rowindex="${rowIndex + 1}"]`).scrollIntoViewIfNeeded()
-    },
-  }
-}
-```
-
-All four properties (`getVisibleRowRange`, `getVisibleColumnRange`, `scrollToRow`, `scrollToColumn`) are optional — supply whichever the grid exposes.
 
 _Config: `strategies.viewport`_
