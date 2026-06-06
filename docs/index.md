@@ -6,27 +6,20 @@ What works today might not work tomorrow. What will you do when a column moves? 
 
 And that's before you factor in that every table is different — semantic `<table>` elements are the exception, not the rule. You're more likely to be dealing with a `<div>`-based grid where the library author made all their own decisions about structure, attributes, and behavior.
 
-Which of these would you rather write?
+Which of these is easier to read?
 
 ```typescript
 // Without Playwright Smart Table
-const rows = page.locator('tbody tr')
-const rowCount = await rows.count()
-for (let i = 0; i < rowCount; i++) {
-  const row = rows.nth(i)
-  if (
-    await row.locator('td:nth-child(1)').innerText() === 'John' &&
-    await row.locator('td:nth-child(2)').innerText() === 'Doe'
-  ) {
-    email = await row.locator('td:nth-child(3)').innerText()
-    break
-  }
-}
+const row = page.locator('tbody tr')
+  .filter({ has: page.locator('td:nth-child(1)', { hasText: 'John' }) })
+  .filter({ has: page.locator('td:nth-child(2)', { hasText: 'Doe' }) })
+const email = await row.locator('td:nth-child(3)').innerText()
 ```
 
 ```typescript
 // With Playwright Smart Table
-table.getRow({ firstName: 'John', lastName: 'Doe' }).getCell('Email')
+const row = table.getRow({ firstName: 'John', lastName: 'Doe' })
+const email = await row.getCell('Email').innerText()
 ```
 
 Playwright Smart Table doesn't try to solve all of that automatically. Instead it gives you a way to describe how your specific table works — and then lets you ask questions against it in plain terms.

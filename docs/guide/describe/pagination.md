@@ -1,25 +1,41 @@
 # How does pagination work?
 
-**All button types (next, prev, bulk jump, first, last):**
+:::tabs
+== Buttons
+
+Most paginated tables use buttons to move between pages. Pass whichever buttons your table has — all are optional.
+
 ```typescript
 strategies: {
-  pagination: Strategies.Pagination.click(
-    {
-      next: page.getByRole('button', { name: 'Next' }),
-      previous: page.getByRole('button', { name: 'Previous' }),
-      nextBulk: page.getByRole('button', { name: 'Next 10' }),
-      previousBulk: page.getByRole('button', { name: 'Prev 10' }),
-      first: page.getByRole('button', { name: 'First' }),
-      last: page.getByRole('button', { name: 'Last' }),
-    },
-    { nextBulkPages: 10, previousBulkPages: 10 }
-  )
+  pagination: Strategies.Pagination.click({
+    next: page.getByRole('button', { name: 'Next' }),
+    previous: page.getByRole('button', { name: 'Previous' }),
+    nextBulk: page.getByRole('button', { name: 'Next 10' }),
+    previousBulk: page.getByRole('button', { name: 'Prev 10' }),
+    first: page.getByRole('button', { name: 'First' }),
+    last: page.getByRole('button', { name: 'Last' }),
+  }, { nextBulkPages: 10, previousBulkPages: 10 })
 }
 ```
 
-Not every table has all of these — only pass the ones that exist. A table with just Next and Previous only needs those two keys.
+== Page numbers
 
-**Infinite scroll:**
+Some tables show numbered buttons (1 2 3 4 5) that jump directly to that page. Pass `pageNumbers` with a locator that matches all the number buttons — the library will click the one matching the target page.
+
+```typescript
+strategies: {
+  pagination: Strategies.Pagination.click({
+    next: page.getByRole('button', { name: 'Next' }),
+    previous: page.getByRole('button', { name: 'Previous' }),
+    pageNumbers: page.locator('.pagination-number'),
+  })
+}
+```
+
+The page number strategy is windowed — if the target page isn't visible in the current set of buttons, the library steps toward it using next/prev and retries.
+
+== Infinite scroll
+
 ```typescript
 strategies: {
   pagination: Strategies.Pagination.infiniteScroll({
@@ -31,14 +47,17 @@ strategies: {
 }
 ```
 
-**No pagination:** Don't set a pagination strategy. All queries stay on the current page.
+== None
 
+Don't set a pagination strategy. All queries stay on the current page.
+
+:::
 
 ---
 
 ## Custom pagination strategy
 
-If none of the built-in strategies fit your table, you can pass a plain object that implements the `PaginationPrimitives` interface. All properties are optional — only implement the ones your table UI actually has.
+If the built-in strategies don't fit, pass a plain object that implements the `PaginationPrimitives` interface. Every property is optional — implement only what your table has. Each function returns `true` on success, `false` when the action isn't available (e.g. Next is disabled on the last page).
 
 ```typescript
 strategies: {
@@ -56,17 +75,19 @@ strategies: {
       return true
     },
     goToPage: async (pageIndex, { root }) => {
-      const btn = root.page().getByRole('button', { name: String(pageIndex + 1) })
+      const btn = root.page().locator(`.page-btn:text-is("${pageIndex + 1}")`)
       if (!await btn.isVisible()) return false
       await btn.click()
       return true
+    },
+    getTotalPages: async ({ root }) => {
+      const text = await root.page().locator('.page-count').textContent()
+      return text ? parseInt(text) : null
     },
   }
 }
 ```
 
-Each function returns `true` on success and `false` when the action isn't available (e.g. Next is disabled on the last page). The library uses these return values to know when to stop paginating.
-
-_See [API Reference](/api/) for the full `PaginationPrimitives` shape._
+`Strategies.Pagination.click()` is a convenience wrapper around this interface — it covers all primitives except `detectCurrentPage`, which is only available via a custom strategy object today ([#212](https://github.com/rickcedwhat/playwright-smart-table/issues/212)).
 
 _Config: `strategies.pagination`_

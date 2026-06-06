@@ -74,3 +74,15 @@
 .table-anatomy-doc .content-container {
   max-width: 1040px;
 }
+
+/* Give copy button enough room so it doesn't overlap code content in tab panels */
+.vp-doc .tabs .vp-code-group .vp-copy-btn,
+.vp-doc [class*="vp-adaptive-theme"] .copy,
+.vp-doc div[class*="language-"] button.copy {
+  top: 8px;
+  right: 8px;
+}
+
+.vp-doc div[class*="language-"] code {
+  padding-right: 3rem;
+}

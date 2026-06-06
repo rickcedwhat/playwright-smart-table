@@ -24,6 +24,26 @@ strategies: {
 }
 ```
 
-If your grid doesn't use index attributes, you can implement the `ViewportStrategy` interface directly — provide `getVisibleRowRange`, `getVisibleColumnRange`, `scrollToRow`, and `scrollToColumn` as needed.
+If your grid doesn't expose index attributes, you can implement the `ViewportStrategy` interface directly:
+
+```typescript
+strategies: {
+  viewport: {
+    getVisibleRowRange: async ({ root }) => {
+      // return the 0-based index range of rows currently in the DOM
+      return root.evaluate(el => {
+        const rows = [...el.querySelectorAll('[role="row"]')]
+        const indices = rows.map(r => Number(r.getAttribute('aria-rowindex')) - 1).filter(n => !isNaN(n))
+        return { first: Math.min(...indices), last: Math.max(...indices) }
+      })
+    },
+    scrollToRow: async ({ root }, rowIndex) => {
+      await root.locator(`[aria-rowindex="${rowIndex + 1}"]`).scrollIntoViewIfNeeded()
+    },
+  }
+}
+```
+
+All four properties (`getVisibleRowRange`, `getVisibleColumnRange`, `scrollToRow`, `scrollToColumn`) are optional — supply whichever the grid exposes.
 
 _Config: `strategies.viewport`_

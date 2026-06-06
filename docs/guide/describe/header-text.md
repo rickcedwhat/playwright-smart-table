@@ -18,7 +18,7 @@ headerTransformer: async ({ text }) => text.replace(/[↑↓▲▼]/g, '').trim(
 
 == Unlabeled checkbox column
 
-| _(no label)_ | Name  | Status   |
+|  | Name  | Status   |
 |:---:|-------|----------|
 | ☐  | Ada   | Active   |
 | ☐  | Bob   | Inactive |
