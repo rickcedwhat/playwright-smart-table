@@ -4,14 +4,18 @@ Dealing with tables sucks. The locators involved are often ugly, brittle, and di
 
 Which of these is easier to read?
 
-```typescript [Without Playwright Smart Table]
+<span class="code-label">Without Playwright Smart Table</span>
+
+```typescript
 const row = page.locator('tbody tr')
   .filter({ has: page.locator('td:nth-child(1)', { hasText: 'John' }) })
   .filter({ has: page.locator('td:nth-child(2)', { hasText: 'Doe' }) })
 const email = await row.locator('td:nth-child(3)').innerText()
 ```
 
-```typescript [With Playwright Smart Table]
+<span class="code-label">With Playwright Smart Table</span>
+
+```typescript
 const row = table.getRow({ firstName: 'John', lastName: 'Doe' })
 const email = await row.getCell('Email').innerText()
 ```

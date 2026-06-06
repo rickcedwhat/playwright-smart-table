@@ -71,6 +71,25 @@
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.34);
 }
 
+/* Always-dark code blocks — consistent in light and dark mode */
+html:not(.dark) .vp-doc div[class*='language-'] .shiki,
+html:not(.dark) .vp-doc div[class*='language-'] .shiki code {
+  background-color: #0f172a !important;
+}
+html:not(.dark) .vp-doc div[class*='language-'] .shiki span {
+  color: var(--shiki-dark) !important;
+  background-color: var(--shiki-dark-bg) !important;
+}
+html:not(.dark) .vp-doc div[class*='language-'] button.copy {
+  color: rgba(235,235,245,.6);
+}
+html:not(.dark) .vp-doc div[class*='language-'] button.copy:hover {
+  color: rgba(235,235,245,1);
+}
+html:not(.dark) .vp-doc div[class*='language-'] span.lang {
+  color: rgba(235,235,245,.4);
+}
+
 .table-anatomy-doc .content-container {
   max-width: 1040px;
 }
@@ -87,27 +106,29 @@
   padding-right: 3rem;
 }
 
-/* Code block filename/label — ensure visible in both light and dark mode */
-.vp-doc div[class*="language-"] + div[class*="language-"],
-.vp-doc div[class*="language-"] {
-  margin-top: 0;
-}
-
-.vp-code-block-title {
-  background: var(--vp-code-block-bg);
-  border-radius: 8px 8px 0 0;
-  padding: 8px 16px 6px;
-  margin-bottom: -8px;
-  border-bottom: 1px solid rgba(255,255,255,0.08);
-}
-
-.vp-code-block-title + div[class*="language-"] pre {
-  border-radius: 0 0 8px 8px;
-}
-
-.vp-code-block-title-text {
+/* Inline code block labels — use <span class="code-label"> above a code fence */
+.code-label {
+  display: block;
   font-size: 12px;
   font-weight: 600;
   color: var(--vp-c-text-2);
   font-family: var(--vp-font-family-mono);
+  margin-bottom: 6px;
+  padding-left: 2px;
+}
+
+/* Dark mode table contrast */
+.dark .vp-doc table {
+  border-color: rgba(148, 163, 184, 0.25) !important;
+}
+.dark .vp-doc table th,
+.dark .vp-doc table td {
+  border-color: rgba(148, 163, 184, 0.15) !important;
+}
+.dark .vp-doc table thead th {
+  background-color: rgba(148, 163, 184, 0.07);
+  color: var(--vp-c-text-1);
+}
+.dark .vp-doc table tr:nth-child(even) {
+  background-color: rgba(148, 163, 184, 0.03);
 }
