@@ -382,8 +382,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
         rootLocator.page(),
         rootLocator
       );
-      const rowLocator = matchedRows.first();
-      return _makeSmart(rowLocator, map, undefined); // sync path cannot compute real index
+      return _makeSmart(matchedRows, map, undefined); // sync path cannot compute real index
     },
 
     getRowByIndex: (index: number): SmartRowType<T> => {
