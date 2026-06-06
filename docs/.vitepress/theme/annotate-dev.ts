@@ -1,6 +1,6 @@
 // docs/.vitepress/theme/annotate-dev.ts
 // Dev-only section annotation system.
-// Shows ⊕ buttons on h2/h3 headings. Click to add a note. Notes saved to localStorage.
+// Shows ⊕ buttons on h1/h2/h3 headings. Click to add a note. Notes saved to localStorage.
 // Speed dial bottom-right: copy all notes or clear all.
 // Only active when import.meta.env.DEV === true.
 
@@ -146,7 +146,7 @@ export function initDevAnnotations() {
   }
 
   function injectButtons() {
-    document.querySelectorAll('h2[id], h3[id]').forEach(h => {
+    document.querySelectorAll('h1[id], h2[id], h3[id]').forEach(h => {
       const id = h.id
       if (h.querySelector('.__da-btn')) return // already injected
       const btn = document.createElement('button')
