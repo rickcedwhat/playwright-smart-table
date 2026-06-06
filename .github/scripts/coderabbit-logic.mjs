@@ -1,6 +1,6 @@
 /**
  * Pure functions for CodeRabbit bot logic.
- * Imported by bot-coderabbit-gate.yml and bot-receiver.yml via dynamic import,
+ * Imported by bot-cr-*.yml workflows via dynamic import,
  * and tested by tests/unit/bot/coderabbit-logic.test.ts.
  */
 
@@ -14,10 +14,50 @@ export function isSkipOrRateLimitReview(body) {
 }
 
 /**
+ * Returns true if the comment body contains the CR skip marker.
+ * Used by bot-cr-watch.yml to detect "no files to review" responses.
+ * @param {string|null|undefined} body
+ */
+export function isSkipComment(body) {
+  return (body ?? '').includes('<!-- skip review by coderabbit.ai -->');
+}
+
+/**
+ * Returns true if the comment body contains rate-limit language from CodeRabbit.
+ * Used by bot-cr-watch.yml to detect rate-limit responses.
+ * @param {string|null|undefined} body
+ */
+export function isRateLimitComment(body) {
+  return /exceeded|try again in/i.test(body ?? '');
+}
+
+/**
+ * Maps the current label set to a commit status to post.
+ * Updated for new label set (no queued label).
+ * @param {string[]} labelNames
+ * @returns {{ state: string, description: string }}
+ */
+export function labelToStatus(labelNames) {
+  if (labelNames.includes('coderabbit: complete'))
+    return { state: 'success', description: 'CodeRabbit review passed' };
+  if (labelNames.includes('coderabbit: unresolved'))
+    return { state: 'failure', description: 'CodeRabbit review has open comments' };
+  if (labelNames.includes('coderabbit: rate-limited'))
+    return { state: 'pending', description: 'CodeRabbit rate-limited · retry scheduled' };
+  if (labelNames.includes('coderabbit: waiting'))
+    return { state: 'pending', description: 'CodeRabbit review in progress' };
+  // not started or no label
+  return { state: 'pending', description: 'CodeRabbit review not yet requested' };
+}
+
+// ── Retired functions kept for backward compatibility with existing tests ──────
+
+/**
  * Given the current label names and the count of unresolved CR threads,
  * decides what label transition the gate should perform.
  *
- * Returns { newLabel, state, description } or null if no transition is needed.
+ * @deprecated Replaced by per-workflow logic in bot-cr-gate.yml.
+ * Kept so existing unit tests continue passing.
  *
  * @param {string[]} labelNames
  * @param {number} unresolved
@@ -36,23 +76,6 @@ export function computeGateTransition(labelNames, unresolved) {
     return { newLabel: 'coderabbit: unresolved', state: 'failure', description: 'CodeRabbit has unresolved comments' };
 
   return null;
-}
-
-/**
- * Maps the current label set to a commit status to post.
- * @param {string[]} labelNames
- * @returns {{ state: string, description: string }}
- */
-export function labelToStatus(labelNames) {
-  if (labelNames.includes('coderabbit: complete'))
-    return { state: 'success', description: 'CodeRabbit review complete' };
-  if (labelNames.includes('coderabbit: unresolved'))
-    return { state: 'failure', description: 'CodeRabbit has unresolved comments' };
-  if (labelNames.includes('coderabbit: rate-limited'))
-    return { state: 'pending', description: 'CodeRabbit rate-limited — retry queued' };
-  if (labelNames.includes('coderabbit: waiting'))
-    return { state: 'pending', description: 'CodeRabbit review in progress' };
-  return { state: 'pending', description: 'CodeRabbit review not started — comment @rickcedwhat-ai coderabbit review' };
 }
 
 /**
@@ -104,6 +127,7 @@ export function computeRateLimitDelay(body, createdAtIso, nowMs) {
 /**
  * Returns true if the coderabbit-retry job should skip because the PR is
  * no longer rate-limited (duplicate QStash messages in flight).
+ * @deprecated Replaced by label guard in bot-cr-retry.yml.
  * @param {string[]} labelNames
  */
 export function shouldSkipRetry(labelNames) {
@@ -112,12 +136,7 @@ export function shouldSkipRetry(labelNames) {
 
 /**
  * Returns true if the coderabbit-trigger job should skip.
- *
- * Skips when the PR is already in a terminal state (complete/unresolved),
- * or when a review is already in-progress (waiting) and this is a first-attempt
- * trigger — which means it's a duplicate. Retries from bot-coderabbit-check
- * arrive with attempt > 1 and must proceed even when waiting.
- *
+ * @deprecated Replaced by label guard in bot-cr-trigger.yml.
  * @param {string[]} labelNames
  * @param {number} attempt - 1-based attempt number
  */
