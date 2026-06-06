@@ -1,6 +1,6 @@
 # Quick Start
 
-> **Heads up:** This page will get you running fast but it skips a lot. If your table is anything beyond a basic HTML `<table>`, you'll hit a wall quickly. Read [Describe Your Table](/guide/describe) and [Query Your Table](/guide/query) before assuming something is broken.
+> **Fair warning:** This will get you running fast, but it skips a lot. If your table is anything beyond a basic HTML `<table>`, you'll hit a wall quickly — and you'll come crawling back to [Describe Your Table](/guide/describe/) anyway. This page is for the DIY-ers who don't have time for manuals.
 
 ## Install
 

@@ -1,0 +1,36 @@
+# How does pagination work?
+
+**All button types (next, prev, bulk jump, first, last):**
+```typescript
+strategies: {
+  pagination: Strategies.Pagination.click(
+    {
+      next: page.getByRole('button', { name: 'Next' }),
+      previous: page.getByRole('button', { name: 'Previous' }),
+      nextBulk: page.getByRole('button', { name: 'Next 10' }),
+      previousBulk: page.getByRole('button', { name: 'Prev 10' }),
+      first: page.getByRole('button', { name: 'First' }),
+      last: page.getByRole('button', { name: 'Last' }),
+    },
+    { nextBulkPages: 10, previousBulkPages: 10 }
+  )
+}
+```
+
+Not every table has all of these — only pass the ones that exist. A table with just Next and Previous only needs those two keys.
+
+**Infinite scroll:**
+```typescript
+strategies: {
+  pagination: Strategies.Pagination.infiniteScroll({
+    action: 'js-scroll',
+    scrollTarget: (root) => root,
+    scrollAmount: 200,
+    stabilization: Strategies.Stabilization.rowCountIncreased({ timeout: 1000 }),
+  })
+}
+```
+
+**No pagination:** Don't set a pagination strategy. All queries stay on the current page.
+
+_Config: `strategies.pagination`_
