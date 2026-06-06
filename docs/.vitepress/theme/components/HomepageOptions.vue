@@ -179,13 +179,10 @@ const email = await row.getCell('Email').innerText()</code></pre>
   margin-top: 1.5rem !important;
 }
 .hp-code-pair {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
+  flex-direction: column;
   gap: 12px;
   margin: 1rem 0 1.5rem;
-}
-@media (max-width: 640px) {
-  .hp-code-pair { grid-template-columns: 1fr; }
 }
 .hp-code-block {
   background: var(--vp-code-block-bg);
