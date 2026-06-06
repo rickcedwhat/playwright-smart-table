@@ -304,8 +304,9 @@ test.describe('Edge cases and missing coverage', () => {
     await table.init();
     const exactRow = table.getRow({ Name: 'John' }, { exact: true });
     await expect(exactRow).toHaveText('John');
+    // exact: false matches both "John" and "John Doe" — count confirms ambiguity
     const partialRow = table.getRow({ Name: 'John' }, { exact: false });
-    await expect(partialRow).toBeVisible();
+    await expect(partialRow).toHaveCount(2);
   });
 
   test('findRow with maxPages: 1 returns sentinel when row is on later page', async ({ page }) => {
