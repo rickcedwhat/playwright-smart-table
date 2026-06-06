@@ -113,8 +113,11 @@ html:not(.dark) .vp-doc div[class*='language-'] span.lang {
   font-weight: 600;
   color: var(--vp-c-text-2);
   font-family: var(--vp-font-family-mono);
-  margin-bottom: 6px;
+  margin-bottom: 2px;
   padding-left: 2px;
+}
+.code-label + div[class*='language-'] {
+  margin-top: 0 !important;
 }
 
 /* Dark mode table contrast */
