@@ -1,28 +1,27 @@
----
-layout: home
+# Playwright Smart Table
 
-hero:
-  name: "Playwright Smart Table"
-  text: "Test tables by column name, not DOM position."
-  tagline: "Map headers once, find rows by meaningful values, and keep using normal Playwright locators."
-  actions:
-    - theme: brand
-      text: Get Started
-      link: /guide/getting-started
-    - theme: alt
-      text: View Examples
-      link: /examples/
-    - theme: alt
-      text: API Reference
-      link: /api/
+Dealing with tables sucks. The locators involved are often ugly, brittle, and difficult to wrap your head around.
 
-features:
-  - title: Find visible rows
-    details: "Target a row already on screen by matching meaningful cell values."
-  - title: Search across pages
-    details: "Look beyond the current page without hand-rolling pagination loops."
-  - title: Collect matching rows
-    details: "Gather every row that matches a filter across paginated or virtualized tables."
-  - title: Validate full tables
-    details: "Read, assert, or transform each row while keeping tests table-aware."
----
+Which of these is easier to read?
+
+<div class="code-label">Without Playwright Smart Table</div>
+
+```typescript
+const row = page.locator('tbody tr')
+  .filter({ has: page.locator('td:nth-child(1)', { hasText: 'John' }) })
+  .filter({ has: page.locator('td:nth-child(2)', { hasText: 'Doe' }) })
+const email = await row.locator('td:nth-child(3)').innerText()
+```
+
+<div class="code-label">With Playwright Smart Table</div>
+
+```typescript
+const row = table.getRow({ firstName: 'John', lastName: 'Doe' })
+const email = await row.getCell('Email').innerText()
+```
+
+You tell it how your table is built. After that, it's just asking questions.
+
+**You describe your table. Playwright Smart Table does the rest.**
+
+[Get started](/guide/start) · [See examples](/examples/)

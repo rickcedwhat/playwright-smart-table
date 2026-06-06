@@ -20,10 +20,14 @@ import HeaderMapping from './components/HeaderMapping.vue'
 import PaginationStrategies from './components/PaginationStrategies.vue'
 import TableAnatomy from './components/TableAnatomy.vue'
 import './style.css'
+import { initDevAnnotations } from './annotate-dev'
+import { enhanceAppWithTabs } from 'vitepress-plugin-tabs/client'
 
 export default {
   extends: DefaultTheme,
   enhanceApp({ app }) {
+    if (typeof window !== 'undefined') initDevAnnotations()
+    enhanceAppWithTabs(app)
     app.component('LabBeforeAfter', LabBeforeAfter)
     app.component('LabBeforeAfterV2', LabBeforeAfterV2)
     app.component('LabQueryBuilder', LabQueryBuilder)
