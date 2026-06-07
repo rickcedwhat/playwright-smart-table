@@ -202,10 +202,6 @@ export function parseReviewSection(body, sectionTitle) {
   // We need to find the right <details> tag and extract everything within it.
   // Use a pattern that captures from the opening tag through nested content.
   const escapedTitle = sectionTitle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const sectionPattern = new RegExp(
-    `<details>[\\s\\S]*?<summary>${escapedTitle}[\\s\\S]*?</details>(?:\\s*</blockquote></details>)?`,
-    'i'
-  );
 
   // Find the section by locating the summary line first, then extracting the enclosing details block
   const summaryPattern = new RegExp(`<summary>${escapedTitle}`, 'i');

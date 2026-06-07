@@ -114,9 +114,22 @@ jobs:
               return;
             }
 
-            // ── unresolved → keep label, add new-commits note to HQ ──────────
+            // ── unresolved → keep label, stamp new SHA status, update HQ note ─
             // Threads are still open. User can reply to threads and resolve them,
             // or request an incremental review. Either path reaches "complete".
+
+            // New commits push a new SHA — stamp it with the current failure status
+            // so the merge gate reflects the review state on the latest commit.
+            try {
+              await github.rest.repos.createCommitStatus({
+                owner, repo, sha,
+                state: 'failure',
+                context: 'coderabbit-review',
+                description: 'CodeRabbit review has open comments',
+              });
+            } catch (err) {
+              core.warning(`Could not stamp commit status on new SHA: ${err.message}`);
+            }
 
             const existingSection = hqComment?.body.match(
               /<!-- cr-section-start -->[\s\S]*?<!-- cr-section-end -->/

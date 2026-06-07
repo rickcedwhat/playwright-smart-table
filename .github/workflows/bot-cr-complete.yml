@@ -72,9 +72,12 @@ jobs:
             const allComments = await github.paginate(github.rest.issues.listComments, {
               owner, repo, issue_number: pr_number, per_page: 100,
             });
-            const hqComment = allComments.find(
+            const hqCandidates = allComments.filter(
               c => c.user.login === 'rickcedwhat-ai' && c.body.includes('<!-- bot-hq -->')
             );
+            const hqComment = hqCandidates.sort((a, b) =>
+              new Date(b.updated_at) - new Date(a.updated_at)
+            )[0] ?? null;
 
             let triggerTime = null;
             if (hqComment) {
@@ -279,7 +282,7 @@ jobs:
                 '### 🔍 CodeRabbit Review',
                 checkedLabel,
                 '',
-                '> ❌ Review complete · CHANGES_REQUESTED · resolve comments to unblock merge',
+                `> ❌ Review complete · ${reviewState} · resolve comments to unblock merge`,
               ];
               if (smokeTable) {
                 crSectionLines.push('');

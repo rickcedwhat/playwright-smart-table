@@ -130,20 +130,14 @@ jobs:
             core.info('All nitpicks checked + all threads resolved → coderabbit: complete');
 
             // ── Update HQ cr-section to "complete · no issues" ───────────────
-            const allComments = await github.paginate(github.rest.issues.listComments, {
-              owner, repo, issue_number: pr_number, per_page: 100,
-            });
-            const hqComment = allComments.find(
-              c => c.user.login === 'rickcedwhat-ai' && c.body.includes('<!-- bot-hq -->')
-            );
+            // The event payload IS the HQ comment — no need to re-fetch.
+            const hqComment = context.payload.comment;
 
             if (hqComment) {
               try {
-                // Extract trigger time and checked label from existing body
                 const triggerMatch = hqComment.body.match(/<!-- cr-trigger-time: ([^>]*) -->/);
                 const triggerTime = triggerMatch?.[1]?.trim() ?? '';
 
-                // Determine which checkbox was checked
                 const { getCheckedLabel } = await import(
                   `file://${path.join(process.env.GITHUB_WORKSPACE, '.github/scripts/coderabbit-logic.mjs')}`
                 );
