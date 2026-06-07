@@ -1,9 +1,13 @@
 name: Bot — CR Watch
 
-# Fires on every issue_comment from coderabbitai[bot].
-# Guards: PR must have "coderabbit: waiting" label AND comment must be
-# after the trigger_time stored in the HQ comment (prevents stale skip comments
-# posted at PR open from being misinterpreted as responses to review requests).
+# Fires on every issue_comment from coderabbitai[bot], created OR edited.
+# CR communicates rate-limit state by EDITING its existing summary comment
+# (not by posting a new one), so we must listen for `edited` too.
+#
+# Guards: PR must have "coderabbit: waiting" label AND the comment's effective
+# timestamp (updated_at) must be after the trigger_time stored in the HQ comment
+# (prevents stale comments posted at PR open from being misinterpreted as
+# responses to the current review request).
 #
 # Branches:
 #   - Skip detected → complete
@@ -12,7 +16,7 @@ name: Bot — CR Watch
 
 on:
   issue_comment:
-    types: [created]
+    types: [created, edited]
 
 jobs:
   watch:
@@ -49,7 +53,10 @@ jobs:
             const pr_number = context.issue.number;
             const comment = context.payload.comment;
             const commentBody = comment.body || '';
-            const commentCreatedAt = comment.created_at;
+            // Effective timestamp: for an edit, updated_at is when CR changed the
+            // comment (e.g. flipped it to rate-limited). For a fresh create,
+            // updated_at === created_at. Either way this is the moment that matters.
+            const commentEffectiveAt = comment.updated_at ?? comment.created_at;
 
             // ── TEST GUARD: only act on PRs targeting the coderabbit branch ───
             // Remove this block when promoting to main.
@@ -87,8 +94,8 @@ jobs:
               triggerTime = m?.[1]?.trim() || null;
             }
 
-            if (triggerTime && new Date(commentCreatedAt) < new Date(triggerTime)) {
-              core.info(`Comment at ${commentCreatedAt} is before trigger_time ${triggerTime} — ignoring stale comment.`);
+            if (triggerTime && new Date(commentEffectiveAt) < new Date(triggerTime)) {
+              core.info(`Comment effective at ${commentEffectiveAt} is before trigger_time ${triggerTime} — ignoring stale comment.`);
               return;
             }
 
@@ -158,9 +165,10 @@ jobs:
             if (isRateLimitComment(commentBody)) {
               core.info('Rate-limit comment detected — scheduling retry.');
 
-              // Parse delay anchored to when CR posted the comment.
-              // We only fire on `created` events so created_at is the right anchor.
-              const anchorIso = comment.created_at;
+              // Parse delay anchored to when CR last touched the comment. For an
+              // edit (CR flipping its summary to rate-limited), updated_at is when
+              // the limit was actually issued — created_at would be stale.
+              const anchorIso = commentEffectiveAt;
               const delaySecs = computeRateLimitDelay(commentBody, anchorIso, Date.now());
 
               // Determine review_type from HQ comment checkbox state
