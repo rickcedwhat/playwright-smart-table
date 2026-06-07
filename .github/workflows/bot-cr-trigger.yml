@@ -34,7 +34,9 @@ jobs:
 
             // ── determine trigger type ────────────────────────────────────────
 
-            let reviewType = null; // 'full' | 'incremental' | null
+            // Only one trigger type: full review. Incremental (@coderabbitai review)
+            // is a no-op when auto_review is disabled — CR ignores already-reviewed commits.
+            let reviewType = null; // 'full' | null
 
             // Checkbox toggle in the HQ comment (edited event, human unchecked → checked)
             if (action === 'edited' &&
@@ -42,20 +44,14 @@ jobs:
                 context.payload.sender?.login !== 'rickcedwhat-ai' &&
                 commentBody.includes('<!-- bot-hq -->')) {
               const oldBody = context.payload.changes?.body?.from ?? '';
-              const wasFullUnchecked   = /- \[ \] Full review/i.test(oldBody);
-              const wasIncrUnchecked   = /- \[ \] Incremental review/i.test(oldBody);
-              const isFullChecked      = /- \[x\] Full review/i.test(commentBody);
-              const isIncrChecked      = /- \[x\] Incremental review/i.test(commentBody);
-
-              if (wasFullUnchecked && isFullChecked)   reviewType = 'full';
-              else if (wasIncrUnchecked && isIncrChecked) reviewType = 'incremental';
+              const wasFullUnchecked = /- \[ \] Full review/i.test(oldBody);
+              const isFullChecked    = /- \[x\] Full review/i.test(commentBody);
+              if (wasFullUnchecked && isFullChecked) reviewType = 'full';
             }
 
-            // Text command: @rickcedwhat-ai review / @rickcedwhat-ai review incremental
+            // Text command: @rickcedwhat-ai review
             if (action === 'created' && commentAuthor !== 'rickcedwhat-ai') {
-              if (/^@rickcedwhat-ai\s+review\s+incremental\b/i.test(commentBody.trim()))
-                reviewType = 'incremental';
-              else if (/^@rickcedwhat-ai\s+review\b/i.test(commentBody.trim()))
+              if (/^@rickcedwhat-ai\s+review\b/i.test(commentBody.trim()))
                 reviewType = 'full';
             }
 
@@ -89,9 +85,7 @@ jobs:
 
             const triggerTime = new Date().toISOString();
             const triggerHHMM = triggerTime.slice(11, 16); // "HH:MM"
-            const checkedLabel = reviewType === 'full'
-              ? '- [x] Full review &nbsp;&nbsp; - [ ] Incremental review'
-              : '- [ ] Full review &nbsp;&nbsp; - [x] Incremental review';
+            const checkedLabel = '- [x] Full review';
 
             const newCRSection = [
               '<!-- cr-section-start -->',
@@ -148,9 +142,7 @@ jobs:
 
             // ── post @coderabbitai command ────────────────────────────────────
 
-            const crCommand = reviewType === 'full'
-              ? '@coderabbitai full review'
-              : '@coderabbitai review';
+            const crCommand = '@coderabbitai full review';
 
             await github.rest.issues.createComment({
               owner, repo, issue_number: pr_number, body: crCommand,

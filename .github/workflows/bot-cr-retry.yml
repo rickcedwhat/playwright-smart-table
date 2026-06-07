@@ -33,7 +33,7 @@ jobs:
               `file://${path.join(process.env.GITHUB_WORKSPACE, '.github/scripts/coderabbit-logic.mjs')}`
             );
 
-            const { pr_number, repo, review_type } = context.payload.client_payload;
+            const { pr_number, repo } = context.payload.client_payload;
             const [owner, repoName] = repo.split('/');
 
             // ── TEST GUARD: only act on PRs targeting the coderabbit branch ───
@@ -81,9 +81,7 @@ jobs:
 
             // ── post @coderabbitai command ────────────────────────────────────
 
-            const crCommand = review_type === 'full'
-              ? '@coderabbitai full review'
-              : '@coderabbitai review';
+            const crCommand = '@coderabbitai full review';
 
             await github.rest.issues.createComment({
               owner, repo: repoName, issue_number: pr_number, body: crCommand,

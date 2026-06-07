@@ -90,7 +90,7 @@ jobs:
                 '',
                 '> ℹ️ New commits pushed since last review.',
                 '',
-                '- [ ] Full review &nbsp;&nbsp; - [x] Incremental review _(recommended — reviews new commits only)_',
+                '- [ ] Full review',
                 '',
                 '> _Not yet requested_',
                 '<!-- cr-section-end -->',
@@ -125,8 +125,8 @@ jobs:
             // Preserve trigger_time and checkbox state from the existing section
             const triggerTime = existingSection.match(/<!-- cr-trigger-time: ([^>]*) -->/)?.[1]?.trim() ?? '';
             const checkedLine = /- \[x\] Full review/i.test(existingSection)
-              ? '- [x] Full review &nbsp;&nbsp; - [ ] Incremental review'
-              : '- [ ] Full review &nbsp;&nbsp; - [x] Incremental review _(recommended — reviews new commits only)_';
+              ? '- [x] Full review'
+              : '- [ ] Full review';
 
             const newCRSection = [
               '<!-- cr-section-start -->',
@@ -137,7 +137,7 @@ jobs:
               '',
               '> ❌ Review complete · CHANGES_REQUESTED · resolve comments to unblock merge',
               '',
-              '> ℹ️ New commits pushed · reply to open threads to address comments, or request an incremental review to re-scan the new diff',
+              '> ℹ️ New commits pushed · reply to open threads to address comments, or trigger a full review to re-scan the new diff',
               '<!-- cr-section-end -->',
             ].join('\n');
 
