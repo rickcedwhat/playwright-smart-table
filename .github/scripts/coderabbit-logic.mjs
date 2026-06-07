@@ -28,7 +28,11 @@ export function isSkipComment(body) {
  * @param {string|null|undefined} body
  */
 export function isRateLimitComment(body) {
-  return /exceeded|try again in/i.test(body ?? '');
+  const b = body ?? '';
+  // Match both the auto-triggered rate-limit (HTML marker + "available in N minutes")
+  // and the manually-triggered rate-limit ("exceeded" / "try again in")
+  return /exceeded|try again in|available in \d+/i.test(b) ||
+         b.includes('rate limited by coderabbit.ai');
 }
 
 /**
@@ -57,10 +61,10 @@ export function labelToStatus(labelNames) {
  */
 export function getCheckedLabel(hqBody) {
   if (/- \[x\] Full review/i.test(hqBody ?? ''))
-    return '- [x] Full review &nbsp;&nbsp; - [ ] Incremental review';
+    return '- [x] Full review\n- [ ] Incremental review';
   if (/- \[x\] Incremental review/i.test(hqBody ?? ''))
-    return '- [ ] Full review &nbsp;&nbsp; - [x] Incremental review';
-  return '- [ ] Full review &nbsp;&nbsp; - [ ] Incremental review';
+    return '- [ ] Full review\n- [x] Incremental review';
+  return '- [ ] Full review\n- [ ] Incremental review';
 }
 
 // ── Retired functions kept for backward compatibility with existing tests ──────
