@@ -11,6 +11,12 @@ name: Bot — CR Gate
 on:
   pull_request_review_thread:
     types: [resolved, unresolved]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number to run gate check on'
+        required: true
+        type: string
 
 jobs:
   gate:
@@ -34,13 +40,31 @@ jobs:
             );
 
             const { owner, repo } = context.repo;
-            const pr_number = context.payload.pull_request.number;
-            const sha = context.payload.pull_request.head.sha;
-            const threadAction = context.payload.action; // 'resolved' | 'unresolved'
+
+            // Support manual workflow_dispatch for testing gate logic
+            const isManualDispatch = context.eventName === 'workflow_dispatch';
+            core.info(`[debug] eventName=${context.eventName}, isManualDispatch=${isManualDispatch}`);
+            core.info(`[debug] payload keys: ${Object.keys(context.payload).join(', ')}`);
+
+            let pr_number, sha, threadAction, baseBranch;
+
+            if (isManualDispatch) {
+              pr_number = parseInt(context.payload.inputs.pr_number);
+              threadAction = 'resolved'; // assume resolved when manually dispatched
+              const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: pr_number });
+              sha = pr.head.sha;
+              baseBranch = pr.base.ref;
+              core.info(`[debug] Manual dispatch for PR #${pr_number}, base=${baseBranch}`);
+            } else {
+              pr_number = context.payload.pull_request.number;
+              sha = context.payload.pull_request.head.sha;
+              threadAction = context.payload.action; // 'resolved' | 'unresolved'
+              baseBranch = context.payload.pull_request.base.ref;
+              core.info(`[debug] pull_request_review_thread event fired! action=${threadAction}, PR #${pr_number}`);
+            }
 
             // ── TEST GUARD: only act on PRs targeting the coderabbit branch ───
             // Remove this block when promoting to main.
-            const baseBranch = context.payload.pull_request.base.ref;
             if (baseBranch !== 'coderabbit') {
               core.info(`PR #${pr_number} targets "${baseBranch}", not "coderabbit" — skipping (test guard).`);
               return;
