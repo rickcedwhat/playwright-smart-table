@@ -130,7 +130,7 @@ jobs:
 
             // ── branch on review state ────────────────────────────────────────
 
-            if (reviewState === 'APPROVED') {
+            if (reviewState.toLowerCase() === 'approved') {
               await swapLabel('coderabbit: complete');
               await setStatus('success', 'CodeRabbit review passed');
               if (hqComment) {

@@ -90,7 +90,8 @@ jobs:
                 '',
                 '> ℹ️ New commits pushed since last review.',
                 '',
-                '- [ ] Full review &nbsp;&nbsp; - [x] Incremental review _(recommended — reviews new commits only)_',
+                '- [ ] Full review',
+                '- [x] Incremental review _(recommended — reviews new commits only)_',
                 '',
                 '> _Not yet requested_',
                 '<!-- cr-section-end -->',
@@ -138,8 +139,8 @@ jobs:
             // Preserve trigger_time and checkbox state from the existing section
             const triggerTime = existingSection.match(/<!-- cr-trigger-time: ([^>]*) -->/)?.[1]?.trim() ?? '';
             const checkedLine = /- \[x\] Full review/i.test(existingSection)
-              ? '- [x] Full review &nbsp;&nbsp; - [ ] Incremental review'
-              : '- [ ] Full review &nbsp;&nbsp; - [x] Incremental review _(recommended — reviews new commits only)_';
+              ? '- [x] Full review\n- [ ] Incremental review'
+              : '- [ ] Full review\n- [x] Incremental review _(recommended — reviews new commits only)_';
 
             const newCRSection = [
               '<!-- cr-section-start -->',
