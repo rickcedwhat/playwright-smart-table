@@ -7,6 +7,7 @@ name: Bot — CR Init
 on:
   pull_request:
     types: [opened]
+    branches: [coderabbit]  # TEST GUARD — remove when promoting to main
 
 jobs:
   init:

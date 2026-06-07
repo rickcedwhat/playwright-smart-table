@@ -66,6 +66,16 @@ jobs:
 
             core.info(`Review type: ${reviewType}`);
 
+            // ── TEST GUARD: only act on PRs targeting the coderabbit branch ───
+            // Remove this block when promoting to main.
+            const { data: prData } = await github.rest.pulls.get({
+              owner, repo, pull_number: pr_number,
+            });
+            if (prData.base.ref !== 'coderabbit') {
+              core.info(`PR #${pr_number} targets "${prData.base.ref}", not "coderabbit" — skipping (test guard).`);
+              return;
+            }
+
             // ── find HQ comment ───────────────────────────────────────────────
 
             const allComments = await github.paginate(github.rest.issues.listComments, {

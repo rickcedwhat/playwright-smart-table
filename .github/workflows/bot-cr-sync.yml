@@ -12,6 +12,7 @@ name: Bot — CR Sync
 on:
   pull_request:
     types: [synchronize]
+    branches: [coderabbit]  # TEST GUARD — remove when promoting to main
 
 jobs:
   sync:

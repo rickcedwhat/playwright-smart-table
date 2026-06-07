@@ -28,6 +28,16 @@ jobs:
             const { pr_number, repo, review_type } = context.payload.client_payload;
             const [owner, repoName] = repo.split('/');
 
+            // ── TEST GUARD: only act on PRs targeting the coderabbit branch ───
+            // Remove this block when promoting to main.
+            const { data: prCheck } = await github.rest.pulls.get({
+              owner, repo: repoName, pull_number: pr_number,
+            });
+            if (prCheck.base.ref !== 'coderabbit') {
+              core.info(`PR #${pr_number} targets "${prCheck.base.ref}", not "coderabbit" — skipping (test guard).`);
+              return;
+            }
+
             // ── guard: must still be rate-limited ─────────────────────────────
 
             const { data: labels } = await github.rest.issues.listLabelsOnIssue({
