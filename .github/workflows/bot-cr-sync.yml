@@ -10,7 +10,7 @@ name: Bot — CR Sync
 #   unresolved  → keep "unresolved" (threads are still open). Just add a note to
 #                 the HQ showing new commits landed. User can either:
 #                   a) reply to each open CR thread and resolve it manually
-#                      (bot-cr-gate will flip to complete when all threads close)
+#                      then trigger an incremental review for CR to approve
 #                   b) request an incremental review to re-scan the new diff
 #
 #   not started / waiting / rate-limited → no action.
