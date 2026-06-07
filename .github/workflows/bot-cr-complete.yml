@@ -227,16 +227,42 @@ jobs:
               ].join('\n');
             }
 
-            // ── 1D. Build nitpick checklist ───────────────────────────────────
+            // ── 1D. Build nitpick checklist with carry-forward ───────────────
+            // When a second review arrives (e.g. an incremental re-review), CR only
+            // comments on changed code — it won't repeat nitpicks on unchanged lines.
+            // We carry forward any unchecked items from the previous checklist so
+            // nothing silently vanishes. Items already checked stay gone.
+
+            const carriedItems = [];
+            if (hqComment) {
+              const existingNitpickSection = hqComment.body.match(
+                /<!-- nitpick-section-start -->[\s\S]*?<!-- nitpick-section-end -->/
+              )?.[0] ?? '';
+              const uncheckedRe = /- \[ \] <!-- cr-id:([a-f0-9]+) --> (.+)/g;
+              let m;
+              while ((m = uncheckedRe.exec(existingNitpickSection)) !== null) {
+                carriedItems.push({ hash: m[1], text: m[2].trim() });
+              }
+            }
+
+            // Dedup: don't carry forward items that appear in the new review
+            const newHashes = new Set(nitpicks.map(c => c.hash));
+            const carryForward = carriedItems.filter(c => !newHashes.has(c.hash));
+            if (carryForward.length > 0)
+              core.info(`Carrying forward ${carryForward.length} unaddressed nitpick(s) from previous review`);
+
             let nitpickSection = '';
-            if (nitpicks.length > 0) {
-              const items = nitpicks.map(c =>
+            if (nitpicks.length > 0 || carryForward.length > 0) {
+              const newItems = nitpicks.map(c =>
                 `- [ ] <!-- cr-id:${c.hash} --> \`${c.file}:${c.lines}\` — ${c.title}`
-              ).join('\n');
+              );
+              const oldItems = carryForward.map(c =>
+                `- [ ] <!-- cr-id:${c.hash} --> ⚠️ ${c.text} _(from previous review)_`
+              );
               nitpickSection = [
                 '<!-- nitpick-section-start -->',
                 '### 🧹 Nitpicks — must address before merging',
-                items,
+                [...newItems, ...oldItems].join('\n'),
                 '<!-- nitpick-section-end -->',
               ].join('\n');
             }
