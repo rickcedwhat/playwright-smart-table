@@ -134,15 +134,27 @@ jobs:
             // straight to rate-limited + QStash. If the window has already passed,
             // proceed normally — the quota should have refreshed.
 
+            // DEBUG: log all CR comments found and rate-limit detection results
+            const crComments = allComments.filter(c => c.user.login === 'coderabbitai[bot]');
+            core.info(`[debug] Total comments: ${allComments.length}, CR comments: ${crComments.length}`);
+            for (const c of crComments) {
+              const matches = isRateLimitComment(c.body);
+              core.info(`[debug] CR comment at ${c.created_at}: isRateLimitComment=${matches}, body[:120]="${c.body.slice(0, 120).replace(/\n/g, '\\n')}"`);
+            }
+
             const crRateLimitComment = allComments.find(
               c => c.user.login === 'coderabbitai[bot]' && isRateLimitComment(c.body)
             );
+
+            core.info(`[debug] crRateLimitComment found: ${!!crRateLimitComment}`);
 
             if (crRateLimitComment) {
               const durationMs = parseRateLimitDuration(crRateLimitComment.body);
               const commentedAt = new Date(crRateLimitComment.created_at).getTime();
               const availableAt = commentedAt + durationMs;
               const remainingSecs = Math.ceil((availableAt - Date.now()) / 1000);
+
+              core.info(`[debug] durationMs=${durationMs}, commentedAt=${crRateLimitComment.created_at}, remainingSecs=${remainingSecs}`);
 
               if (remainingSecs > 60) {
                 // Still rate-limited — go straight to rate-limited + QStash
