@@ -28,7 +28,6 @@ jobs:
         uses: actions/github-script@v7
         env:
           QSTASH_TOKEN: ${{ secrets.QSTASH_TOKEN }}
-          QSTASH_URL:   ${{ secrets.QSTASH_URL }}
         with:
           github-token: ${{ secrets.BOT_PAT }}
           script: |
@@ -168,7 +167,8 @@ jobs:
                 });
                 let qstashId = null;
                 try {
-                  const qRes = await fetch(process.env.QSTASH_URL, {
+                  const qstashUrl = `https://qstash.upstash.io/v2/publish/https://api.github.com/repos/${owner}/${repo}/dispatches`;
+                  const qRes = await fetch(qstashUrl, {
                     method: 'POST',
                     headers: {
                       'Authorization': `Bearer ${process.env.QSTASH_TOKEN}`,
