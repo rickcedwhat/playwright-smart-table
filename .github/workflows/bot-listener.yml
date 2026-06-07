@@ -396,6 +396,7 @@ jobs:
                 '| Command | Description |',
                 '|---|---|',
                 '| `@rickcedwhat-ai review` | Trigger full CodeRabbit review (rate-limit retries are automatic) |',
+                '| `@rickcedwhat-ai review incremental` | Trigger incremental review (new commits only) |',
                 '',
                 '**Anywhere:**',
                 '| Command | Description |',

@@ -57,8 +57,10 @@ export function labelToStatus(labelNames) {
  */
 export function getCheckedLabel(hqBody) {
   if (/- \[x\] Full review/i.test(hqBody ?? ''))
-    return '- [x] Full review';
-  return '- [ ] Full review';
+    return '- [x] Full review &nbsp;&nbsp; - [ ] Incremental review';
+  if (/- \[x\] Incremental review/i.test(hqBody ?? ''))
+    return '- [ ] Full review &nbsp;&nbsp; - [x] Incremental review';
+  return '- [ ] Full review &nbsp;&nbsp; - [ ] Incremental review';
 }
 
 // ── Retired functions kept for backward compatibility with existing tests ──────

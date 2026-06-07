@@ -164,12 +164,17 @@ jobs:
               const anchorIso = comment.created_at;
               const delaySecs = computeRateLimitDelay(commentBody, anchorIso, Date.now());
 
+              // Determine review_type from HQ comment checkbox state
+              const reviewType = /- \[x\] Full review/i.test(hqComment?.body ?? '')
+                ? 'full' : 'incremental';
+
               // Publish to QStash
               const payload = JSON.stringify({
                 event_type: 'bot-coderabbit-retry',
                 client_payload: {
                   pr_number,
                   repo: `${owner}/${repo}`,
+                  review_type: reviewType,
                 },
               });
               let qstashId = null;
