@@ -13,6 +13,7 @@ name: Bot — CR Complete
 # Branches:
 #   - APPROVED → complete + success
 #   - CHANGES_REQUESTED or COMMENTED → unresolved + failure
+#     (also builds smoke test table + nitpick checklist in HQ comment)
 
 on:
   pull_request_review:
@@ -36,7 +37,7 @@ jobs:
           github-token: ${{ secrets.BOT_PAT }}
           script: |
             const path = require('path');
-            const { getCheckedLabel } = await import(
+            const { getCheckedLabel, parseReviewSection, hasUncheckedNitpicks } = await import(
               `file://${path.join(process.env.GITHUB_WORKSPACE, '.github/scripts/coderabbit-logic.mjs')}`
             );
 
@@ -45,6 +46,7 @@ jobs:
             const pr_number = context.payload.pull_request.number;
             const reviewState = review.state;           // APPROVED | CHANGES_REQUESTED | COMMENTED
             const submittedAt = review.submitted_at;
+            const reviewBody = review.body ?? '';
 
             // ── TEST GUARD: only act on PRs targeting the coderabbit branch ───
             // Remove this block when promoting to main.
@@ -110,15 +112,11 @@ jobs:
               });
             }
 
-            async function updateHQCRSection(newCRSection) {
+            async function updateHQComment(newBody) {
               if (!hqComment) return;
               try {
-                const updatedBody = hqComment.body.replace(
-                  /<!-- cr-section-start -->[\s\S]*?<!-- cr-section-end -->/,
-                  newCRSection
-                );
                 await github.rest.issues.updateComment({
-                  owner, repo, comment_id: hqComment.id, body: updatedBody,
+                  owner, repo, comment_id: hqComment.id, body: newBody,
                 });
               } catch (err) {
                 core.warning(`Could not update HQ comment: ${err.message}`);
@@ -132,22 +130,123 @@ jobs:
             if (reviewState === 'APPROVED') {
               await swapLabel('coderabbit: complete');
               await setStatus('success', 'CodeRabbit review passed');
-              await updateHQCRSection([
-                '<!-- cr-section-start -->',
-                `<!-- cr-trigger-time: ${triggerTime ?? ''} -->`,
-                '',
-                '### 🔍 CodeRabbit Review',
-                checkedLabel,
-                '',
-                '> ✅ Review complete · no issues',
-                '<!-- cr-section-end -->',
-              ].join('\n'));
+              if (hqComment) {
+                const newCRSection = [
+                  '<!-- cr-section-start -->',
+                  `<!-- cr-trigger-time: ${triggerTime ?? ''} -->`,
+                  '',
+                  '### 🔍 CodeRabbit Review',
+                  checkedLabel,
+                  '',
+                  '> ✅ Review complete · no issues',
+                  '<!-- cr-section-end -->',
+                ].join('\n');
+                // Remove any existing nitpick section on approval
+                let newBody = hqComment.body.replace(
+                  /<!-- cr-section-start -->[\s\S]*?<!-- cr-section-end -->/,
+                  newCRSection
+                );
+                newBody = newBody.replace(
+                  /\n?<!-- nitpick-section-start -->[\s\S]*?<!-- nitpick-section-end -->/,
+                  ''
+                );
+                await updateHQComment(newBody);
+              }
               core.info('CR review APPROVED → coderabbit: complete');
-            } else {
-              // CHANGES_REQUESTED or COMMENTED (nitpicks)
-              await swapLabel('coderabbit: unresolved');
-              await setStatus('failure', 'CodeRabbit review has open comments');
-              await updateHQCRSection([
+              return;
+            }
+
+            // CHANGES_REQUESTED or COMMENTED (nitpicks / actionable comments)
+
+            // ── 1A. Parse review body for nitpicks and outside-diff comments ──
+            const nitpicks = parseReviewSection(reviewBody, '🧹 Nitpick comments');
+            const outsideDiff = parseReviewSection(reviewBody, '⚠️ Outside diff range comments');
+            core.info(`Parsed ${nitpicks.length} nitpick(s), ${outsideDiff.length} outside-diff comment(s)`);
+
+            // ── 1B. Fetch inline threads via GraphQL ──────────────────────────
+            let inlineThreads = [];
+            try {
+              const threadResult = await github.graphql(`
+                query($owner: String!, $repo: String!, $number: Int!) {
+                  repository(owner: $owner, name: $repo) {
+                    pullRequest(number: $number) {
+                      reviewThreads(first: 100) {
+                        nodes {
+                          isResolved
+                          path
+                          line
+                          originalLine
+                          comments(first: 1) {
+                            nodes {
+                              author { login }
+                              body
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              `, { owner, repo, number: pr_number });
+
+              inlineThreads = threadResult.repository.pullRequest.reviewThreads.nodes
+                .filter(t => !t.isResolved && t.comments.nodes[0]?.author?.login === 'coderabbitai[bot]')
+                .map(t => ({
+                  type: '🔴 Thread',
+                  file: t.path,
+                  lines: String(t.line ?? t.originalLine ?? ''),
+                  title: (t.comments.nodes[0]?.body ?? '').split('\n')[0].slice(0, 80),
+                }));
+              core.info(`Found ${inlineThreads.length} open inline CR thread(s)`);
+            } catch (err) {
+              core.warning(`Could not fetch review threads via GraphQL: ${err.message}`);
+            }
+
+            // ── 1C. Build smoke test table ────────────────────────────────────
+            const allRows = [
+              ...inlineThreads,
+              ...outsideDiff.map(c => ({ type: '⚠️ Outside diff', file: c.file, lines: c.lines, title: c.title })),
+              ...nitpicks.map(c => ({ type: '🟡 Nitpick', file: c.file, lines: c.lines, title: c.title })),
+            ];
+
+            let smokeTable = '';
+            if (allRows.length > 0) {
+              const threadCount = inlineThreads.length;
+              const nitpickCount = nitpicks.length + outsideDiff.length;
+              const tableRows = allRows.map(r =>
+                `| ${r.type} | \`${r.file}\` | ${r.lines} | ${r.title} |`
+              ).join('\n');
+              smokeTable = [
+                `<details><summary>📊 Scraped comments — ${threadCount} thread(s) · ${nitpickCount} nitpick(s)</summary>`,
+                '',
+                '| Type | File | Lines | Summary |',
+                '|---|---|---|---|',
+                tableRows,
+                '',
+                '</details>',
+              ].join('\n');
+            }
+
+            // ── 1D. Build nitpick checklist ───────────────────────────────────
+            let nitpickSection = '';
+            if (nitpicks.length > 0) {
+              const items = nitpicks.map(c =>
+                `- [ ] <!-- cr-id:${c.hash} --> \`${c.file}:${c.lines}\` — ${c.title}`
+              ).join('\n');
+              nitpickSection = [
+                '<!-- nitpick-section-start -->',
+                '### 🧹 Nitpicks — must address before merging',
+                items,
+                '<!-- nitpick-section-end -->',
+              ].join('\n');
+            }
+
+            // ── 1E. Build new CR section and update HQ comment ────────────────
+            await swapLabel('coderabbit: unresolved');
+            await setStatus('failure', 'CodeRabbit review has open comments');
+
+            if (hqComment) {
+              const crSectionLines = [
                 '<!-- cr-section-start -->',
                 `<!-- cr-trigger-time: ${triggerTime ?? ''} -->`,
                 '',
@@ -155,7 +254,39 @@ jobs:
                 checkedLabel,
                 '',
                 '> ❌ Review complete · CHANGES_REQUESTED · resolve comments to unblock merge',
-                '<!-- cr-section-end -->',
-              ].join('\n'));
-              core.info(`CR review ${reviewState} → coderabbit: unresolved`);
+              ];
+              if (smokeTable) {
+                crSectionLines.push('');
+                crSectionLines.push(smokeTable);
+              }
+              crSectionLines.push('<!-- cr-section-end -->');
+              const newCRSection = crSectionLines.join('\n');
+
+              // Replace cr-section
+              let newBody = hqComment.body.replace(
+                /<!-- cr-section-start -->[\s\S]*?<!-- cr-section-end -->/,
+                newCRSection
+              );
+
+              // Replace or append nitpick section
+              if (nitpickSection) {
+                if (newBody.includes('<!-- nitpick-section-start -->')) {
+                  newBody = newBody.replace(
+                    /<!-- nitpick-section-start -->[\s\S]*?<!-- nitpick-section-end -->/,
+                    nitpickSection
+                  );
+                } else {
+                  newBody = newBody + '\n\n' + nitpickSection;
+                }
+              } else {
+                // Remove any existing nitpick section if no nitpicks
+                newBody = newBody.replace(
+                  /\n?<!-- nitpick-section-start -->[\s\S]*?<!-- nitpick-section-end -->/,
+                  ''
+                );
+              }
+
+              await updateHQComment(newBody);
             }
+
+            core.info(`CR review ${reviewState} → coderabbit: unresolved`);

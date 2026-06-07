@@ -20,11 +20,19 @@ jobs:
       pull-requests: write
       statuses: write
     steps:
+      - name: Checkout (for coderabbit-logic.mjs import)
+        uses: actions/checkout@v4
+
       - name: Update label based on thread state
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.BOT_PAT }}
           script: |
+            const path = require('path');
+            const { hasUncheckedNitpicks } = await import(
+              `file://${path.join(process.env.GITHUB_WORKSPACE, '.github/scripts/coderabbit-logic.mjs')}`
+            );
+
             const { owner, repo } = context.repo;
             const pr_number = context.payload.pull_request.number;
             const sha = context.payload.pull_request.head.sha;
@@ -64,6 +72,36 @@ jobs:
               });
             }
 
+            // Fetch the HQ comment (needed for nitpick check)
+            async function getHQComment() {
+              const allComments = await github.paginate(github.rest.issues.listComments, {
+                owner, repo, issue_number: pr_number, per_page: 100,
+              });
+              return allComments.find(
+                c => c.user.login === 'rickcedwhat-ai' && c.body.includes('<!-- bot-hq -->')
+              ) ?? null;
+            }
+
+            async function updateHQCRNote(hqComment, note) {
+              if (!hqComment) return;
+              try {
+                // Append a note after the cr-section-end marker or replace existing note
+                let body = hqComment.body;
+                const noteMarker = '<!-- cr-gate-note -->';
+                const newNote = `${noteMarker}\n> ${note}`;
+                if (body.includes(noteMarker)) {
+                  body = body.replace(/<!-- cr-gate-note -->[\s\S]*?(?=\n\n|$)/, newNote);
+                } else {
+                  body = body.replace('<!-- cr-section-end -->', `<!-- cr-section-end -->\n\n${newNote}`);
+                }
+                await github.rest.issues.updateComment({
+                  owner, repo, comment_id: hqComment.id, body,
+                });
+              } catch (err) {
+                core.warning(`Could not update HQ comment note: ${err.message}`);
+              }
+            }
+
             if (threadAction === 'resolved') {
               // Only act if currently unresolved
               if (!labelNames.includes('coderabbit: unresolved')) {
@@ -97,6 +135,13 @@ jobs:
               core.info(`Open CR threads after resolve: ${openCRThreads}`);
 
               if (openCRThreads === 0) {
+                // Before flipping to complete, check for unchecked nitpick checkboxes
+                const hqComment = await getHQComment();
+                if (hasUncheckedNitpicks(hqComment?.body)) {
+                  core.info('All threads resolved but unchecked nitpicks remain — staying unresolved.');
+                  await updateHQCRNote(hqComment, 'All threads resolved · address remaining nitpicks to merge');
+                  return;
+                }
                 await swapLabel('coderabbit: complete');
                 await setStatus('success', 'CodeRabbit review passed');
                 core.info('All CR threads resolved → coderabbit: complete');
