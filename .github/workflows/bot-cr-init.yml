@@ -1,0 +1,103 @@
+name: Bot — CR Init
+
+# Fires when a PR is opened (not from Dependabot).
+# Adds the initial "not started" label, sets a pending commit status,
+# and creates the Bot HQ comment with CR section in "not started" state.
+
+on:
+  pull_request:
+    types: [opened]
+    branches: [coderabbit]  # TEST GUARD — remove when promoting to main
+
+jobs:
+  init:
+    name: Init CodeRabbit state
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.user.login != 'dependabot[bot]'
+    permissions:
+      pull-requests: write
+      statuses: write
+    steps:
+      - name: Add label, set status, create HQ comment
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.BOT_PAT }}
+          script: |
+            const { owner, repo } = context.repo;
+            const pr_number = context.payload.pull_request.number;
+            const sha = context.payload.pull_request.head.sha;
+            const prBody = context.payload.pull_request.body || '';
+
+            // ── helpers ──────────────────────────────────────────────────────
+
+            function hasIssueLink(body) {
+              return /(close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+#\d+/i.test(body);
+            }
+
+            function extractIssueRefs(body) {
+              const refs = [...body.matchAll(/(close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+(#\d+)/gi)]
+                .map(m => m[2]);
+              return refs.length > 0 ? refs.join(', ') : null;
+            }
+
+            function buildIssueLinkContent(body) {
+              if (hasIssueLink(body)) {
+                const refs = extractIssueRefs(body) ?? 'an issue';
+                return `### 🔗 Issue Link\n✅ Linked to ${refs}`;
+              }
+              return '### 🔗 Issue Link\n⚠️ No `Closes #N` found — add one to the PR description to auto-close on merge.';
+            }
+
+            // CR section initial state — both checkboxes unchecked, no trigger time
+            const crSection = [
+              '<!-- cr-section-start -->',
+              '<!-- cr-trigger-time: -->',
+              '',
+              '### 🔍 CodeRabbit Review',
+              '- [ ] Full review &nbsp;&nbsp; - [ ] Incremental review',
+              '',
+              '> _Not yet requested_',
+              '<!-- cr-section-end -->',
+            ].join('\n');
+
+            const hqBody = [
+              '<!-- bot-hq -->',
+              '## 🤖 Bot HQ',
+              '',
+              '<!-- bot-hq:issue-link -->',
+              buildIssueLinkContent(prBody),
+              '<!-- /bot-hq:issue-link -->',
+              '',
+              '---',
+              '',
+              crSection,
+              '',
+              '---',
+              '<sub>This comment is managed by the bot — do not edit directly.</sub>',
+            ].join('\n');
+
+            // Add label
+            await github.rest.issues.addLabels({
+              owner,
+              repo,
+              issue_number: pr_number,
+              labels: ['coderabbit: not started'],
+            });
+
+            // Set pending commit status
+            await github.rest.repos.createCommitStatus({
+              owner,
+              repo,
+              sha,
+              state: 'pending',
+              context: 'coderabbit-review',
+              description: 'CodeRabbit review not yet requested',
+            });
+
+            // Create the HQ comment
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: pr_number,
+              body: hqBody,
+            });

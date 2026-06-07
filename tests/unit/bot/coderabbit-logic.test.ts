@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   isSkipOrRateLimitReview,
+  isSkipComment,
+  isRateLimitComment,
   computeGateTransition,
   labelToStatus,
   countUnresolvedCRThreads,
@@ -42,6 +44,53 @@ describe('isSkipOrRateLimitReview', () => {
   it('handles null/undefined gracefully', () => {
     expect(isSkipOrRateLimitReview(null)).toBe(false);
     expect(isSkipOrRateLimitReview(undefined)).toBe(false);
+  });
+});
+
+// ─── isSkipComment ───────────────────────────────────────────────────────────
+
+describe('isSkipComment', () => {
+  it('detects the skip marker', () => {
+    expect(isSkipComment('<!-- skip review by coderabbit.ai -->')).toBe(true);
+  });
+
+  it('detects skip marker embedded in longer body', () => {
+    expect(isSkipComment('Some text\n<!-- skip review by coderabbit.ai -->\nMore text')).toBe(true);
+  });
+
+  it('returns false for regular comments', () => {
+    expect(isSkipComment('## Walkthrough\nThis PR changes...')).toBe(false);
+  });
+
+  it('handles null/undefined gracefully', () => {
+    expect(isSkipComment(null as unknown as string)).toBe(false);
+    expect(isSkipComment(undefined as unknown as string)).toBe(false);
+  });
+});
+
+// ─── isRateLimitComment ───────────────────────────────────────────────────────
+
+describe('isRateLimitComment', () => {
+  it('detects "exceeded" keyword', () => {
+    expect(isRateLimitComment('you have exceeded the number of reviews')).toBe(true);
+  });
+
+  it('detects "try again in" keyword', () => {
+    expect(isRateLimitComment('try again in 41 minutes and 59 seconds')).toBe(true);
+  });
+
+  it('is case-insensitive', () => {
+    expect(isRateLimitComment('You Have Exceeded your quota')).toBe(true);
+    expect(isRateLimitComment('Try Again In 30 minutes')).toBe(true);
+  });
+
+  it('returns false for regular review comments', () => {
+    expect(isRateLimitComment('## Walkthrough\nNo issues found.')).toBe(false);
+  });
+
+  it('handles null/undefined gracefully', () => {
+    expect(isRateLimitComment(null as unknown as string)).toBe(false);
+    expect(isRateLimitComment(undefined as unknown as string)).toBe(false);
   });
 });
 
@@ -106,17 +155,15 @@ describe('computeGateTransition', () => {
 
 describe('labelToStatus', () => {
   it('complete → success', () => {
-    expect(labelToStatus(['coderabbit: complete'])).toEqual({
-      state: 'success',
-      description: 'CodeRabbit review complete',
-    });
+    const result = labelToStatus(['coderabbit: complete']);
+    expect(result.state).toBe('success');
+    expect(result.description).toMatch(/passed/i);
   });
 
   it('unresolved → failure', () => {
-    expect(labelToStatus(['coderabbit: unresolved'])).toEqual({
-      state: 'failure',
-      description: 'CodeRabbit has unresolved comments',
-    });
+    const result = labelToStatus(['coderabbit: unresolved']);
+    expect(result.state).toBe('failure');
+    expect(result.description).toMatch(/open comments/i);
   });
 
   it('rate-limited → pending with retry message', () => {

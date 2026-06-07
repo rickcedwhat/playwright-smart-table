@@ -1,0 +1,159 @@
+name: Bot — CR Trigger
+
+# Fires when a user requests a CodeRabbit review via:
+#   - Checking one of the checkboxes in the Bot HQ comment
+#   - Posting @rickcedwhat-ai review (full) or @rickcedwhat-ai review incremental
+#
+# Determines review type, posts the @coderabbitai command, updates labels,
+# commit status, and HQ comment with trigger timestamp.
+
+on:
+  issue_comment:
+    types: [created, edited]
+
+jobs:
+  trigger:
+    name: Trigger CodeRabbit review
+    runs-on: ubuntu-latest
+    # Must be on a PR, not an issue
+    if: github.event.issue.pull_request != null
+    permissions:
+      pull-requests: write
+      statuses: write
+    steps:
+      - name: Detect trigger and act
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.BOT_PAT }}
+          script: |
+            const { owner, repo } = context.repo;
+            const commentBody = context.payload.comment.body || '';
+            const commentAuthor = context.payload.comment.user.login;
+            const pr_number = context.issue.number;
+            const action = context.payload.action;
+
+            // ── determine trigger type ────────────────────────────────────────
+
+            let reviewType = null; // 'full' | 'incremental' | null
+
+            // Checkbox toggle in the HQ comment (edited event, human unchecked → checked)
+            if (action === 'edited' &&
+                commentAuthor === 'rickcedwhat-ai' &&
+                context.payload.sender?.login !== 'rickcedwhat-ai' &&
+                commentBody.includes('<!-- bot-hq -->')) {
+              const oldBody = context.payload.changes?.body?.from ?? '';
+              const wasFullUnchecked   = /- \[ \] Full review/i.test(oldBody);
+              const wasIncrUnchecked   = /- \[ \] Incremental review/i.test(oldBody);
+              const isFullChecked      = /- \[x\] Full review/i.test(commentBody);
+              const isIncrChecked      = /- \[x\] Incremental review/i.test(commentBody);
+
+              if (wasFullUnchecked && isFullChecked)   reviewType = 'full';
+              else if (wasIncrUnchecked && isIncrChecked) reviewType = 'incremental';
+            }
+
+            // Text command: @rickcedwhat-ai review / @rickcedwhat-ai review incremental
+            if (action === 'created' && commentAuthor !== 'rickcedwhat-ai') {
+              if (/^@rickcedwhat-ai\s+review\s+incremental\b/i.test(commentBody.trim()))
+                reviewType = 'incremental';
+              else if (/^@rickcedwhat-ai\s+review\b/i.test(commentBody.trim()))
+                reviewType = 'full';
+            }
+
+            if (!reviewType) {
+              core.info('No CR trigger detected — skipping.');
+              return;
+            }
+
+            core.info(`Review type: ${reviewType}`);
+
+            // ── TEST GUARD: only act on PRs targeting the coderabbit branch ───
+            // Remove this block when promoting to main.
+            const { data: prData } = await github.rest.pulls.get({
+              owner, repo, pull_number: pr_number,
+            });
+            if (prData.base.ref !== 'coderabbit') {
+              core.info(`PR #${pr_number} targets "${prData.base.ref}", not "coderabbit" — skipping (test guard).`);
+              return;
+            }
+
+            // ── find HQ comment ───────────────────────────────────────────────
+
+            const allComments = await github.paginate(github.rest.issues.listComments, {
+              owner, repo, issue_number: pr_number, per_page: 100,
+            });
+            const hqComment = allComments.find(
+              c => c.user.login === 'rickcedwhat-ai' && c.body.includes('<!-- bot-hq -->')
+            );
+
+            // ── update trigger_time in HQ comment ────────────────────────────
+
+            const triggerTime = new Date().toISOString();
+            const triggerHHMM = triggerTime.slice(11, 16); // "HH:MM"
+            const checkedLabel = reviewType === 'full'
+              ? '- [x] Full review &nbsp;&nbsp; - [ ] Incremental review'
+              : '- [ ] Full review &nbsp;&nbsp; - [x] Incremental review';
+
+            const newCRSection = [
+              '<!-- cr-section-start -->',
+              `<!-- cr-trigger-time: ${triggerTime} -->`,
+              '',
+              '### 🔍 CodeRabbit Review',
+              checkedLabel,
+              '',
+              `> ⏳ Waiting for CodeRabbit… _(triggered at ${triggerHHMM} UTC)_`,
+              '<!-- cr-section-end -->',
+            ].join('\n');
+
+            if (hqComment) {
+              const updatedBody = hqComment.body.replace(
+                /<!-- cr-section-start -->[\s\S]*?<!-- cr-section-end -->/,
+                newCRSection
+              );
+              try {
+                await github.rest.issues.updateComment({
+                  owner, repo, comment_id: hqComment.id, body: updatedBody,
+                });
+              } catch (err) {
+                core.warning(`Could not update HQ comment: ${err.message}`);
+              }
+            }
+
+            // ── swap label to waiting ─────────────────────────────────────────
+
+            const { data: labels } = await github.rest.issues.listLabelsOnIssue({
+              owner, repo, issue_number: pr_number,
+            });
+            for (const l of labels.filter(l => l.name.startsWith('coderabbit:'))) {
+              try {
+                await github.rest.issues.removeLabel({
+                  owner, repo, issue_number: pr_number, name: l.name,
+                });
+              } catch {}
+            }
+            await github.rest.issues.addLabels({
+              owner, repo, issue_number: pr_number, labels: ['coderabbit: waiting'],
+            });
+
+            // ── set commit status pending ─────────────────────────────────────
+
+            const { data: pr } = await github.rest.pulls.get({
+              owner, repo, pull_number: pr_number,
+            });
+            await github.rest.repos.createCommitStatus({
+              owner, repo, sha: pr.head.sha,
+              state: 'pending',
+              context: 'coderabbit-review',
+              description: 'CodeRabbit review in progress',
+            });
+
+            // ── post @coderabbitai command ────────────────────────────────────
+
+            const crCommand = reviewType === 'full'
+              ? '@coderabbitai full review'
+              : '@coderabbitai review';
+
+            await github.rest.issues.createComment({
+              owner, repo, issue_number: pr_number, body: crCommand,
+            });
+
+            core.info(`Posted "${crCommand}" for PR #${pr_number} (trigger time: ${triggerTime})`);
