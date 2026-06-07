@@ -1,13 +1,19 @@
 name: Bot — CR Sync
 
 # Fires when new commits are pushed to a PR (synchronize event).
-# Resets the CR state when the PR was in a terminal state (unresolved or complete)
-# so a fresh review can be requested for the new commits.
 #
-# Not-started, waiting, and rate-limited states are left unchanged:
-#   - not-started: no review was requested, nothing to reset
-#   - waiting: CR will review the latest commit when it finishes
-#   - rate-limited: retry will pick up the latest commit automatically
+# Behavior differs by current CR state:
+#
+#   complete    → reset to "not started". New commits need a fresh review since
+#                 the previous one is stale.
+#
+#   unresolved  → keep "unresolved" (threads are still open). Just add a note to
+#                 the HQ showing new commits landed. User can either:
+#                   a) reply to each open CR thread and resolve it manually
+#                      (bot-cr-gate will flip to complete when all threads close)
+#                   b) request an incremental review to re-scan the new diff
+#
+#   not started / waiting / rate-limited → no action.
 
 on:
   pull_request:
@@ -16,14 +22,14 @@ on:
 
 jobs:
   sync:
-    name: Reset CR state on new commits
+    name: Sync CR state on new commits
     runs-on: ubuntu-latest
     if: github.event.pull_request.user.login != 'dependabot[bot]'
     permissions:
       pull-requests: write
       statuses: write
     steps:
-      - name: Reset if needed
+      - name: Update CR state
         uses: actions/github-script@v7
         with:
           github-token: ${{ secrets.BOT_PAT }}
@@ -32,25 +38,18 @@ jobs:
             const pr_number = context.payload.pull_request.number;
             const sha = context.payload.pull_request.head.sha;
 
-            // Get current labels
             const { data: labelData } = await github.rest.issues.listLabelsOnIssue({
               owner, repo, issue_number: pr_number,
             });
             const labelNames = labelData.map(l => l.name);
 
-            const shouldReset =
-              labelNames.includes('coderabbit: unresolved') ||
-              labelNames.includes('coderabbit: complete');
+            const isUnresolved = labelNames.includes('coderabbit: unresolved');
+            const isComplete   = labelNames.includes('coderabbit: complete');
 
-            if (!shouldReset) {
-              core.info(`Labels (${labelNames.join(', ')}) do not require reset — skipping.`);
+            if (!isUnresolved && !isComplete) {
+              core.info(`Labels (${labelNames.join(', ')}) — no action needed.`);
               return;
             }
-
-            // Determine what the last review found (for the HQ note)
-            const lastReviewOutcome = labelNames.includes('coderabbit: unresolved')
-              ? 'CHANGES_REQUESTED'
-              : 'APPROVED';
 
             // ── find HQ comment ───────────────────────────────────────────────
 
@@ -61,58 +60,99 @@ jobs:
               c => c.user.login === 'rickcedwhat-ai' && c.body.includes('<!-- bot-hq -->')
             );
 
-            // ── swap label to not started ─────────────────────────────────────
+            // ── complete → reset to not started ──────────────────────────────
+            // Previous review is stale; new commits need a fresh review.
 
-            for (const l of labelNames.filter(n => n.startsWith('coderabbit:'))) {
-              try {
-                await github.rest.issues.removeLabel({
-                  owner, repo, issue_number: pr_number, name: l,
-                });
-              } catch {}
+            if (isComplete) {
+              for (const l of labelNames.filter(n => n.startsWith('coderabbit:'))) {
+                try {
+                  await github.rest.issues.removeLabel({
+                    owner, repo, issue_number: pr_number, name: l,
+                  });
+                } catch {}
+              }
+              await github.rest.issues.addLabels({
+                owner, repo, issue_number: pr_number, labels: ['coderabbit: not started'],
+              });
+
+              await github.rest.repos.createCommitStatus({
+                owner, repo, sha,
+                state: 'pending',
+                context: 'coderabbit-review',
+                description: 'CodeRabbit review not yet requested',
+              });
+
+              const newCRSection = [
+                '<!-- cr-section-start -->',
+                '<!-- cr-trigger-time: -->',
+                '',
+                '### 🔍 CodeRabbit Review',
+                '',
+                '> ℹ️ New commits pushed since last review.',
+                '',
+                '- [ ] Full review &nbsp;&nbsp; - [x] Incremental review _(recommended — reviews new commits only)_',
+                '',
+                '> _Not yet requested_',
+                '<!-- cr-section-end -->',
+              ].join('\n');
+
+              if (hqComment) {
+                try {
+                  await github.rest.issues.updateComment({
+                    owner, repo, comment_id: hqComment.id,
+                    body: hqComment.body.replace(
+                      /<!-- cr-section-start -->[\s\S]*?<!-- cr-section-end -->/,
+                      newCRSection
+                    ),
+                  });
+                } catch (err) {
+                  core.warning(`Could not update HQ comment: ${err.message}`);
+                }
+              }
+
+              core.info('complete → not started (new commits pushed)');
+              return;
             }
-            await github.rest.issues.addLabels({
-              owner, repo, issue_number: pr_number, labels: ['coderabbit: not started'],
-            });
 
-            // ── set commit status pending ─────────────────────────────────────
+            // ── unresolved → keep label, add new-commits note to HQ ──────────
+            // Threads are still open. User can reply to threads and resolve them,
+            // or request an incremental review. Either path reaches "complete".
 
-            await github.rest.repos.createCommitStatus({
-              owner, repo, sha,
-              state: 'pending',
-              context: 'coderabbit-review',
-              description: 'CodeRabbit review not yet requested',
-            });
+            const existingSection = hqComment?.body.match(
+              /<!-- cr-section-start -->[\s\S]*?<!-- cr-section-end -->/
+            )?.[0] ?? '';
 
-            // ── update HQ CR section ──────────────────────────────────────────
-            // Clear trigger_time (no longer valid), show reset notice.
-            // Default to incremental checkbox pre-checked (reviews new commits only).
+            // Preserve trigger_time and checkbox state from the existing section
+            const triggerTime = existingSection.match(/<!-- cr-trigger-time: ([^>]*) -->/)?.[1]?.trim() ?? '';
+            const checkedLine = /- \[x\] Full review/i.test(existingSection)
+              ? '- [x] Full review &nbsp;&nbsp; - [ ] Incremental review'
+              : '- [ ] Full review &nbsp;&nbsp; - [x] Incremental review _(recommended — reviews new commits only)_';
 
             const newCRSection = [
               '<!-- cr-section-start -->',
-              '<!-- cr-trigger-time: -->',
+              `<!-- cr-trigger-time: ${triggerTime} -->`,
               '',
               '### 🔍 CodeRabbit Review',
+              checkedLine,
               '',
-              `> ℹ️ New commits pushed since last review. Last review: **${lastReviewOutcome}**`,
+              '> ❌ Review complete · CHANGES_REQUESTED · resolve comments to unblock merge',
               '',
-              '- [ ] Full review &nbsp;&nbsp; - [x] Incremental review _(recommended — reviews new commits only)_',
-              '',
-              '> _Not yet requested_',
+              '> ℹ️ New commits pushed · reply to open threads to address comments, or request an incremental review to re-scan the new diff',
               '<!-- cr-section-end -->',
             ].join('\n');
 
             if (hqComment) {
               try {
-                const updatedBody = hqComment.body.replace(
-                  /<!-- cr-section-start -->[\s\S]*?<!-- cr-section-end -->/,
-                  newCRSection
-                );
                 await github.rest.issues.updateComment({
-                  owner, repo, comment_id: hqComment.id, body: updatedBody,
+                  owner, repo, comment_id: hqComment.id,
+                  body: hqComment.body.replace(
+                    /<!-- cr-section-start -->[\s\S]*?<!-- cr-section-end -->/,
+                    newCRSection
+                  ),
                 });
               } catch (err) {
                 core.warning(`Could not update HQ comment: ${err.message}`);
               }
             }
 
-            core.info(`Reset from "${labelNames.find(n => n.startsWith('coderabbit:'))}" to "coderabbit: not started" (last review: ${lastReviewOutcome})`);
+            core.info('unresolved + new commits — kept label, updated HQ note');
