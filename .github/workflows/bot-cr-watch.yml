@@ -41,6 +41,7 @@ jobs:
               isSkipComment,
               isRateLimitComment,
               computeRateLimitDelay,
+              getCheckedLabel,
             } = await import(
               `file://${path.join(process.env.GITHUB_WORKSPACE, '.github/scripts/coderabbit-logic.mjs')}`
             );
@@ -132,15 +133,6 @@ jobs:
               }
             }
 
-            // Preserve the checked checkbox state from the HQ comment
-            function getCheckedLabel(hqBody) {
-              if (/- \[x\] Full review/i.test(hqBody ?? ''))
-                return '- [x] Full review &nbsp;&nbsp; - [ ] Incremental review';
-              if (/- \[x\] Incremental review/i.test(hqBody ?? ''))
-                return '- [ ] Full review &nbsp;&nbsp; - [x] Incremental review';
-              return '- [ ] Full review &nbsp;&nbsp; - [ ] Incremental review';
-            }
-
             const checkedLabel = getCheckedLabel(hqComment?.body ?? '');
 
             // ── branch: skip detected ─────────────────────────────────────────
@@ -167,8 +159,9 @@ jobs:
             if (isRateLimitComment(commentBody)) {
               core.info('Rate-limit comment detected — scheduling retry.');
 
-              // Parse delay anchored to when CR posted the comment
-              const anchorIso = comment.updated_at ?? comment.created_at;
+              // Parse delay anchored to when CR posted the comment.
+              // We only fire on `created` events so created_at is the right anchor.
+              const anchorIso = comment.created_at;
               const delaySecs = computeRateLimitDelay(commentBody, anchorIso, Date.now());
 
               // Determine review_type from HQ comment checkbox state

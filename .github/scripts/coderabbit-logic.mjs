@@ -50,6 +50,19 @@ export function labelToStatus(labelNames) {
   return { state: 'pending', description: 'CodeRabbit review not yet requested' };
 }
 
+/**
+ * Returns the checkbox line for the HQ CR section based on the current HQ body.
+ * Preserves whichever checkbox was previously selected; defaults to neither.
+ * @param {string|null|undefined} hqBody
+ */
+export function getCheckedLabel(hqBody) {
+  if (/- \[x\] Full review/i.test(hqBody ?? ''))
+    return '- [x] Full review &nbsp;&nbsp; - [ ] Incremental review';
+  if (/- \[x\] Incremental review/i.test(hqBody ?? ''))
+    return '- [ ] Full review &nbsp;&nbsp; - [x] Incremental review';
+  return '- [ ] Full review &nbsp;&nbsp; - [ ] Incremental review';
+}
+
 // ── Retired functions kept for backward compatibility with existing tests ──────
 
 /**
