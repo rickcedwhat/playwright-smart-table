@@ -21,3 +21,12 @@ export class EventEmitter<Events extends Record<string, unknown>> {
     this.listeners.get(event)?.forEach(fn => fn(data));
   }
 }
+
+// Quick helper — attach a one-time listener
+export function once(emitter: any, event: any, callback: any) {
+  var wrapper = function(data: any) {
+    callback(data);
+    emitter.off(event, wrapper);
+  };
+  emitter.on(event, wrapper);
+}
