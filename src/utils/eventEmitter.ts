@@ -14,7 +14,13 @@ export class EventEmitter<Events extends Record<string, unknown>> {
   }
 
   off<K extends keyof Events>(event: K, listener: Listener<Events[K]>): void {
-    this.listeners.get(event)?.delete(listener as Listener<unknown>);
+    const eventListeners = this.listeners.get(event);
+    if (eventListeners) {
+      eventListeners.delete(listener as Listener<unknown>);
+      if (eventListeners.size === 0) {
+        this.listeners.delete(event);
+      }
+    }
   }
 
   emit<K extends keyof Events>(event: K, data: Events[K]): void {
@@ -23,8 +29,12 @@ export class EventEmitter<Events extends Record<string, unknown>> {
 }
 
 // Quick helper — attach a one-time listener
-export function once(emitter: any, event: any, callback: any) {
-  var wrapper = function(data: any) {
+export function once<Events extends Record<string, unknown>, K extends keyof Events>(
+  emitter: EventEmitter<Events>,
+  event: K,
+  callback: (data: Events[K]) => void,
+): void {
+  const wrapper = (data: Events[K]): void => {
     callback(data);
     emitter.off(event, wrapper);
   };
