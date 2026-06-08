@@ -10,6 +10,8 @@ import {
   computeRateLimitDelay,
   shouldSkipRetry,
   shouldSkipTrigger,
+  parseActionableCount,
+  parseNitpickCount,
 } from '../../../.github/scripts/coderabbit-logic.mjs';
 
 // ─── isSkipOrRateLimitReview ─────────────────────────────────────────────────
@@ -364,5 +366,44 @@ describe('shouldSkipTrigger', () => {
 
   it('does NOT skip when no label', () => {
     expect(shouldSkipTrigger([], 1)).toBe(false);
+  });
+});
+
+// ─── parseActionableCount ────────────────────────────────────────────────────
+
+describe('parseActionableCount', () => {
+  it('parses the actionable count from a CR review body', () => {
+    expect(parseActionableCount('**Actionable comments posted: 5**\n\n...')).toBe(5);
+  });
+  it('returns 0 when CR posted zero actionable comments', () => {
+    expect(parseActionableCount('**Actionable comments posted: 0**')).toBe(0);
+  });
+  it('is case-insensitive and tolerant of spacing', () => {
+    expect(parseActionableCount('actionable comments posted:  12 ')).toBe(12);
+  });
+  it('returns 0 for a body without the line', () => {
+    expect(parseActionableCount('Some other review text')).toBe(0);
+  });
+  it('handles null/undefined', () => {
+    expect(parseActionableCount(null)).toBe(0);
+    expect(parseActionableCount(undefined)).toBe(0);
+  });
+});
+
+// ─── parseNitpickCount ───────────────────────────────────────────────────────
+
+describe('parseNitpickCount', () => {
+  it('parses the nitpick count from the summary header', () => {
+    expect(parseNitpickCount('<summary>🧹 Nitpick comments (3)</summary>')).toBe(3);
+  });
+  it('returns 0 when there is no nitpick section', () => {
+    expect(parseNitpickCount('**Actionable comments posted: 2**')).toBe(0);
+  });
+  it('handles a single nitpick', () => {
+    expect(parseNitpickCount('🧹 Nitpick comments (1)')).toBe(1);
+  });
+  it('handles null/undefined', () => {
+    expect(parseNitpickCount(null)).toBe(0);
+    expect(parseNitpickCount(undefined)).toBe(0);
   });
 });
