@@ -28,6 +28,7 @@
     "docs:build:all": "vitepress build docs",
     "docs:verify-links": "node scripts/verify-vitepress-links.mjs",
     "embed-version": "node scripts/embed-version.mjs",
+    "generate-og": "node scripts/generate-og.mjs",
     "build": "pnpm run embed-version && pnpm run generate-types && pnpm run generate-config-types && pnpm run generate-docs && pnpm run generate-all-api-docs && pnpm run update-all-api-signatures && tsc",
     "prepublishOnly": "pnpm run build",
     "clean-port": "lsof -ti:3000 | xargs kill -9 || true",
