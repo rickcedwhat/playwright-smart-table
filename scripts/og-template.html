@@ -1,0 +1,101 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1280px; height: 640px; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background:
+      radial-gradient(circle at 1px 1px, rgba(148,163,184,0.10) 1px, transparent 0) 0 0 / 26px 26px,
+      #080b12;
+    color: #e8edf8;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 56px 72px;
+  }
+  .title {
+    font-size: 64px;
+    font-weight: 800;
+    letter-spacing: -0.035em;
+    line-height: 1.02;
+    color: #49de80;
+  }
+  .pkg {
+    font-family: 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+    font-size: 22px;
+    color: #64748b;
+    margin-top: 14px;
+  }
+  .tagline {
+    font-size: 30px;
+    font-weight: 600;
+    color: #cbd5e1;
+    margin-top: 16px;
+  }
+  .cards {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    margin-top: 24px;
+  }
+  .card {
+    border-radius: 18px;
+    padding: 18px 30px;
+    position: relative;
+  }
+  .card.bad {
+    border: 1px solid rgba(239,68,68,0.4);
+    background: linear-gradient(180deg, rgba(239,68,68,0.10), rgba(239,68,68,0.02)), #020617;
+  }
+  .card.good {
+    border: 1px solid rgba(34,197,94,0.45);
+    background: linear-gradient(180deg, rgba(34,197,94,0.12), rgba(34,197,94,0.02)), #020617;
+  }
+  .label {
+    display: inline-block;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 4px 12px;
+    border-radius: 7px;
+    margin-bottom: 18px;
+  }
+  .label.bad { color: #f87171; background: rgba(239,68,68,0.14); }
+  .label.good { color: #49de80; background: rgba(34,197,94,0.14); }
+  pre {
+    font-family: 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+    font-size: 16px;
+    line-height: 1.65;
+    color: #cdd6f4;
+    white-space: pre;
+  }
+  .kw { color: #f38ba8; }
+  .fn { color: #89b4fa; }
+  .str { color: #a6e3a1; }
+  .pn { color: #cba6f7; }
+</style>
+</head>
+<body>
+  <div class="title">Playwright Smart Table</div>
+  <div class="pkg">@rickcedwhat/playwright-smart-table</div>
+  <div class="tagline">You describe your table. It does the rest.</div>
+  <div class="cards">
+    <div class="card bad">
+      <span class="label bad">✕ Before</span>
+<pre><span class="kw">const</span> row = page.<span class="fn">locator</span>(<span class="str">'tbody tr'</span>)
+  .<span class="fn">filter</span>({ has: page.<span class="fn">locator</span>(<span class="str">'td:nth-child(1)'</span>, { hasText: <span class="str">'John'</span> }) })
+  .<span class="fn">filter</span>({ has: page.<span class="fn">locator</span>(<span class="str">'td:nth-child(2)'</span>, { hasText: <span class="str">'Doe'</span> }) })
+<span class="kw">const</span> email = <span class="kw">await</span> row.<span class="fn">locator</span>(<span class="str">'td:nth-child(3)'</span>).<span class="fn">innerText</span>()</pre>
+    </div>
+    <div class="card good">
+      <span class="label good">✓ After</span>
+<pre><span class="kw">const</span> row = table.<span class="fn">getRow</span>({ firstName: <span class="str">'John'</span>, lastName: <span class="str">'Doe'</span> })
+<span class="kw">const</span> email = <span class="kw">await</span> row.<span class="fn">getCell</span>(<span class="str">'Email'</span>).<span class="fn">innerText</span>()</pre>
+    </div>
+  </div>
+</body>
+</html>

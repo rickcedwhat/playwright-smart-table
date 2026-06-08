@@ -10,6 +10,16 @@ export default defineConfig({
     title: "Playwright Smart Table",
     description: "Production-ready table testing for Playwright",
     base: '/playwright-smart-table/',
+    head: [
+      ['meta', { property: 'og:type', content: 'website' }],
+      ['meta', { property: 'og:title', content: 'Playwright Smart Table' }],
+      ['meta', { property: 'og:description', content: 'You describe your table. It does the rest.' }],
+      ['meta', { property: 'og:image', content: 'https://rickcedwhat.github.io/playwright-smart-table/og.png' }],
+      ['meta', { name: 'twitter:card', content: 'summary_large_image' }],
+      ['meta', { name: 'twitter:title', content: 'Playwright Smart Table' }],
+      ['meta', { name: 'twitter:description', content: 'You describe your table. It does the rest.' }],
+      ['meta', { name: 'twitter:image', content: 'https://rickcedwhat.github.io/playwright-smart-table/og.png' }],
+    ],
     themeConfig: {
     nav: [
       { text: 'Guide', link: '/guide/start' },

@@ -19,6 +19,7 @@ import LabPaginationSandbox from './components/lab/LabPaginationSandbox.vue'
 import HeaderMapping from './components/HeaderMapping.vue'
 import PaginationStrategies from './components/PaginationStrategies.vue'
 import TableAnatomy from './components/TableAnatomy.vue'
+import HomepageHero from './components/HomepageHero.vue'
 import './style.css'
 import { initDevAnnotations } from './annotate-dev'
 import { enhanceAppWithTabs } from 'vitepress-plugin-tabs/client'
@@ -45,5 +46,6 @@ export default {
     app.component('HeaderMapping', HeaderMapping)
     app.component('PaginationStrategies', PaginationStrategies)
     app.component('TableAnatomy', TableAnatomy)
+    app.component('HomepageHero', HomepageHero)
   }
 } satisfies Theme
