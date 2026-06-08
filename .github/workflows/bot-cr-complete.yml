@@ -172,7 +172,11 @@ jobs:
             }
 
             // Block only on actionable comments / open threads. Nitpicks are advisory.
-            const hasBlocking = !isApproved && (actionableCount > 0 || inlineThreads.length > 0);
+            // CHANGES_REQUESTED is an explicit "not approved" signal — always block on it,
+            // even if the actionable-count parse missed or threads haven't materialized yet.
+            const isChangesRequested = reviewState.toLowerCase() === 'changes_requested';
+            const hasBlocking = !isApproved &&
+              (isChangesRequested || actionableCount > 0 || inlineThreads.length > 0);
 
             // ── build count-only smoke table (+ thread rows when available) ───
             let smokeTable = '';
