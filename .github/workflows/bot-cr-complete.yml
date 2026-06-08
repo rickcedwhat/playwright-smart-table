@@ -237,5 +237,11 @@ jobs:
 
             await swapLabel('coderabbit: unresolved');
             await setStatus('failure', 'CodeRabbit review has actionable comments');
-            await writeCRSection('> ❌ Review complete · actionable comments to resolve before merge', true);
+            await writeCRSection(
+              '> ❌ Review complete · actionable comments to resolve\n' +
+              '>\n' +
+              "> ℹ️ After addressing them, re-trigger a review (re-check **Full review** above). " +
+              "Resolving threads alone won't unblock the merge — CodeRabbit must re-review and approve.",
+              true,
+            );
             core.info(`${actionableCount} actionable / ${inlineThreads.length} open thread(s) → coderabbit: unresolved`);
