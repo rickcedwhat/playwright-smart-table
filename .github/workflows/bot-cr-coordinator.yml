@@ -194,9 +194,16 @@ jobs:
               owner, repo, issue_number: next.pr, labels: ['coderabbit: waiting'],
             });
 
-            // Update live counts to reflect the label change just made
-            // (the PR moved from queued → waiting, so increment waitingCount)
+            // Update live counts and live table to reflect the label change.
+            // The triggered PR moved from queue → waiting, so it now belongs
+            // in the live table rather than the queue table.
             waitingCount++;
+            liveItems.push({
+              pr: next.pr,
+              title: next.title,
+              status: 'coderabbit: waiting',
+              updated: nowIso,
+            });
 
             // Decrement tokens
             state.tokens = Math.max(0, state.tokens - 1);
