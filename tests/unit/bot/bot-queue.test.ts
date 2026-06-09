@@ -86,8 +86,8 @@ describe('parseQueueState', () => {
   });
 
   it('returns safe defaults for null/undefined', () => {
-    expect(parseQueueState(null as unknown as string).tokens).toBe(3);
-    expect(parseQueueState(undefined as unknown as string).tokens).toBe(3);
+    expect(parseQueueState(null).tokens).toBe(3);
+    expect(parseQueueState(undefined).tokens).toBe(3);
   });
 
   it('returns safe defaults for malformed JSON in arrays', () => {
@@ -233,40 +233,40 @@ describe('pickNextPR', () => {
       normal: [makePR(2)],
       backburner: [makePR(3)],
     };
-    const result = pickNextPR(state as any);
+    const result = pickNextPR(state);
     expect(result?.pr).toBe(1);
     expect(result?.level).toBe('priority');
   });
 
   it('normal wins when priority empty', () => {
     const state = { tokens: 3, priority: [], normal: [makePR(2)], backburner: [makePR(3)] };
-    const result = pickNextPR(state as any);
+    const result = pickNextPR(state);
     expect(result?.pr).toBe(2);
     expect(result?.level).toBe('normal');
   });
 
   it('backburner triggers only when tokens===3', () => {
     const state = { tokens: 3, priority: [], normal: [], backburner: [makePR(3)] };
-    const result = pickNextPR(state as any);
+    const result = pickNextPR(state);
     expect(result?.pr).toBe(3);
     expect(result?.level).toBe('backburner');
   });
 
   it('backburner does NOT trigger when tokens < 3', () => {
     const state = { tokens: 2, priority: [], normal: [], backburner: [makePR(3)] };
-    expect(pickNextPR(state as any)).toBeNull();
+    expect(pickNextPR(state)).toBeNull();
   });
 
   it('returns null when all queues empty', () => {
     const state = { tokens: 3, priority: [], normal: [], backburner: [] };
-    expect(pickNextPR(state as any)).toBeNull();
+    expect(pickNextPR(state)).toBeNull();
   });
 
   it('selects normal PR regardless of token count (coordinator gates on tokens, not pickNextPR)', () => {
     // pickNextPR only gates on tokens===3 for backburner; priority/normal are
     // always selectable — the coordinator is responsible for checking tokens first.
     const state = { tokens: 0, priority: [], normal: [makePR(1)], backburner: [] };
-    const result = pickNextPR(state as any);
+    const result = pickNextPR(state);
     expect(result?.pr).toBe(1);
   });
 });
@@ -277,34 +277,34 @@ describe('enqueue', () => {
   const emptyState = { tokens: 3, priority: [] as any[], normal: [] as any[], backburner: [] as any[] };
 
   it('inserts priority PR at the front', () => {
-    let state = enqueue(emptyState, makePR(1), 'priority') as any;
+    let state = enqueue(emptyState, makePR(1), 'priority');
     state = enqueue(state, makePR(2), 'priority');
     expect(state.priority[0].pr).toBe(2); // newest at front
     expect(state.priority[1].pr).toBe(1);
   });
 
   it('appends normal PR at the back', () => {
-    let state = enqueue(emptyState, makePR(1), 'normal') as any;
+    let state = enqueue(emptyState, makePR(1), 'normal');
     state = enqueue(state, makePR(2), 'normal');
     expect(state.normal[0].pr).toBe(1); // oldest first
     expect(state.normal[1].pr).toBe(2);
   });
 
   it('appends backburner PR at the back', () => {
-    let state = enqueue(emptyState, makePR(1), 'backburner') as any;
+    let state = enqueue(emptyState, makePR(1), 'backburner');
     state = enqueue(state, makePR(2), 'backburner');
     expect(state.backburner[0].pr).toBe(1);
     expect(state.backburner[1].pr).toBe(2);
   });
 
   it('is idempotent — does not add duplicate if PR already in queue', () => {
-    let state = enqueue(emptyState, makePR(1), 'normal') as any;
+    let state = enqueue(emptyState, makePR(1), 'normal');
     state = enqueue(state, makePR(1), 'normal');
     expect(state.normal).toHaveLength(1);
   });
 
   it('does not add if PR already in a different queue', () => {
-    let state = enqueue(emptyState, makePR(1), 'priority') as any;
+    let state = enqueue(emptyState, makePR(1), 'priority');
     state = enqueue(state, makePR(1), 'normal');
     expect(state.priority).toHaveLength(1);
     expect(state.normal).toHaveLength(0);
@@ -322,32 +322,32 @@ describe('enqueue', () => {
 describe('dequeue', () => {
   it('removes PR from priority queue', () => {
     const state = { tokens: 3, priority: [makePR(1)], normal: [], backburner: [] };
-    const result = dequeue(state as any, 1);
+    const result = dequeue(state, 1);
     expect(result.priority).toHaveLength(0);
   });
 
   it('removes PR from normal queue', () => {
     const state = { tokens: 3, priority: [], normal: [makePR(2)], backburner: [] };
-    const result = dequeue(state as any, 2);
+    const result = dequeue(state, 2);
     expect(result.normal).toHaveLength(0);
   });
 
   it('removes PR from backburner queue', () => {
     const state = { tokens: 3, priority: [], normal: [], backburner: [makePR(3)] };
-    const result = dequeue(state as any, 3);
+    const result = dequeue(state, 3);
     expect(result.backburner).toHaveLength(0);
   });
 
   it('no-op when PR not found', () => {
     const state = { tokens: 3, priority: [makePR(1)], normal: [makePR(2)], backburner: [] };
-    const result = dequeue(state as any, 999);
+    const result = dequeue(state, 999);
     expect(result.priority).toHaveLength(1);
     expect(result.normal).toHaveLength(1);
   });
 
   it('does not mutate input', () => {
     const state = { tokens: 3, priority: [makePR(1)], normal: [], backburner: [] };
-    dequeue(state as any, 1);
+    dequeue(state, 1);
     expect(state.priority).toHaveLength(1);
   });
 });
@@ -357,30 +357,30 @@ describe('dequeue', () => {
 describe('findPRInQueues', () => {
   it('finds PR in priority queue', () => {
     const state = { priority: [makePR(1), makePR(2)], normal: [], backburner: [] };
-    const result = findPRInQueues(state as any, 1);
+    const result = findPRInQueues(state, 1);
     expect(result).toEqual({ level: 'priority', position: 1, total: 2 });
   });
 
   it('finds PR at position 2 in normal queue', () => {
     const state = { priority: [], normal: [makePR(1), makePR(2)], backburner: [] };
-    const result = findPRInQueues(state as any, 2);
+    const result = findPRInQueues(state, 2);
     expect(result).toEqual({ level: 'normal', position: 2, total: 2 });
   });
 
   it('finds PR in backburner queue', () => {
     const state = { priority: [], normal: [], backburner: [makePR(5)] };
-    const result = findPRInQueues(state as any, 5);
+    const result = findPRInQueues(state, 5);
     expect(result).toEqual({ level: 'backburner', position: 1, total: 1 });
   });
 
   it('returns null when PR not in any queue', () => {
     const state = { priority: [makePR(1)], normal: [], backburner: [] };
-    expect(findPRInQueues(state as any, 999)).toBeNull();
+    expect(findPRInQueues(state, 999)).toBeNull();
   });
 
   it('returns null for empty queues', () => {
     const state = { priority: [], normal: [], backburner: [] };
-    expect(findPRInQueues(state as any, 1)).toBeNull();
+    expect(findPRInQueues(state, 1)).toBeNull();
   });
 });
 
@@ -451,8 +451,8 @@ describe('getPriorityFromCheckbox', () => {
   });
 
   it('handles null/undefined gracefully', () => {
-    expect(getPriorityFromCheckbox(null as unknown as string)).toBeNull();
-    expect(getPriorityFromCheckbox(undefined as unknown as string)).toBeNull();
+    expect(getPriorityFromCheckbox(null)).toBeNull();
+    expect(getPriorityFromCheckbox(undefined)).toBeNull();
   });
 
   it('ignores unchecked emoji boxes even with checked Incremental review', () => {

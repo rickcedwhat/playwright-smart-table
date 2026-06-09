@@ -113,8 +113,12 @@ export function serializeQueueState(state) {
       lines.push('| PR | Title | Queued |');
       lines.push('|---|---|---|');
       for (const item of items) {
-        // Escape pipe characters and strip newlines so titles don't break the table
-        const safeTitle = String(item.title ?? '').replace(/\r?\n/g, ' ').replace(/\|/g, '\\|');
+        // Escape backslashes first, then pipes, and strip newlines so titles
+        // don't break the markdown table (CodeQL: complete the escape sequence).
+        const safeTitle = String(item.title ?? '')
+          .replace(/\r?\n/g, ' ')
+          .replace(/\\/g, '\\\\')
+          .replace(/\|/g, '\\|');
         lines.push(`| #${item.pr} | ${safeTitle} | ${formatRelativeTime(item.queued_at, nowMs)} |`);
       }
     }
