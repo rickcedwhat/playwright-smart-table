@@ -59,16 +59,6 @@ jobs:
             // updated_at === created_at. Either way this is the moment that matters.
             const commentEffectiveAt = comment.updated_at ?? comment.created_at;
 
-            // ── TEST GUARD: only act on PRs targeting the coderabbit branch ───
-            // Remove this block when promoting to main.
-            const { data: prData } = await github.rest.pulls.get({
-              owner, repo, pull_number: pr_number,
-            });
-            if (prData.base.ref !== 'coderabbit') {
-              core.info(`PR #${pr_number} targets "${prData.base.ref}", not "coderabbit" — skipping (test guard).`);
-              return;
-            }
-
             // ── guard: PR must have "coderabbit: waiting" label ───────────────
 
             const { data: labels } = await github.rest.issues.listLabelsOnIssue({
