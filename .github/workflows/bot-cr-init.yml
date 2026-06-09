@@ -1,14 +1,37 @@
 name: Bot — CR Init
 
-# Fires when a PR is opened (not from Dependabot).
-# Adds the initial "not started" label, sets a pending commit status,
-# and creates the Bot HQ comment with CR section in "not started" state.
+# Fires when a PR is opened.
+# For Dependabot PRs: immediately posts coderabbit-review: success so the
+# required check doesn't block auto-approve/auto-merge.
+# For human PRs: adds "not started" label, pending status, and HQ comment.
 
 on:
   pull_request:
     types: [opened]
 
 jobs:
+  dependabot-passthrough:
+    name: Auto-pass coderabbit-review for Dependabot
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    permissions:
+      statuses: write
+    steps:
+      - name: Post coderabbit-review success
+        uses: actions/github-script@v9
+        with:
+          github-token: ${{ secrets.BOT_PAT }}
+          script: |
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: context.payload.pull_request.head.sha,
+              state: 'success',
+              context: 'coderabbit-review',
+              description: 'Dependabot PR — CR review not required',
+            });
+            core.info('Posted coderabbit-review: success for Dependabot PR.');
+
   init:
     name: Init CodeRabbit state
     runs-on: ubuntu-latest
