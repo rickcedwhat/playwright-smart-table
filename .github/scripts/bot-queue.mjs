@@ -73,12 +73,15 @@ export function parseQueueState(issueBody) {
 export function serializeQueueState(state) {
   const nowMs = Date.now();
 
+  // Pad empty values with a space so GitHub doesn't strip trailing whitespace
+  // and corrupt the next-line key when the issue body is round-tripped via API.
+  const pad = (v) => (v === '' || v == null) ? ' ' : String(v);
   const stateBlock = [
     '<!-- cr-queue-state',
     `tokens: ${state.tokens}`,
-    `last_decremented_at: ${state.last_decremented_at}`,
-    `refill_qstash_id: ${state.refill_qstash_id}`,
-    `refill_at: ${state.refill_at}`,
+    `last_decremented_at: ${pad(state.last_decremented_at)}`,
+    `refill_qstash_id: ${pad(state.refill_qstash_id)}`,
+    `refill_at: ${pad(state.refill_at)}`,
     `priority: ${JSON.stringify(state.priority)}`,
     `normal: ${JSON.stringify(state.normal)}`,
     `backburner: ${JSON.stringify(state.backburner)}`,
