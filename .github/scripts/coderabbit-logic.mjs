@@ -57,14 +57,24 @@ export function labelToStatus(labelNames) {
 /**
  * Returns the checkbox line for the HQ CR section based on the current HQ body.
  * Preserves whichever checkbox was previously selected; defaults to neither.
+ * Supports new-style emoji checkboxes (🔴/🟡/⬜) and old-style Full/Incremental.
  * @param {string|null|undefined} hqBody
  */
 export function getCheckedLabel(hqBody) {
-  if (/- \[x\] Full review/i.test(hqBody ?? ''))
+  const body = hqBody ?? '';
+  // New-style emoji checkboxes
+  if (/- \[x\] 🔴/u.test(body))
+    return '- [x] 🔴 Priority review _(skips to front)_\n- [ ] 🟡 Normal review _(standard queue)_\n- [ ] ⬜ Backburner review _(triggers only when bucket is full)_';
+  if (/- \[x\] 🟡/u.test(body))
+    return '- [ ] 🔴 Priority review _(skips to front)_\n- [x] 🟡 Normal review _(standard queue)_\n- [ ] ⬜ Backburner review _(triggers only when bucket is full)_';
+  if (/- \[x\] ⬜/u.test(body))
+    return '- [ ] 🔴 Priority review _(skips to front)_\n- [ ] 🟡 Normal review _(standard queue)_\n- [x] ⬜ Backburner review _(triggers only when bucket is full)_';
+  // Old-style backward compat
+  if (/- \[x\] Full review/i.test(body))
     return '- [x] Full review\n- [ ] Incremental review';
-  if (/- \[x\] Incremental review/i.test(hqBody ?? ''))
+  if (/- \[x\] Incremental review/i.test(body))
     return '- [ ] Full review\n- [x] Incremental review';
-  return '- [ ] Full review\n- [ ] Incremental review';
+  return '- [ ] 🔴 Priority review _(skips to front)_\n- [ ] 🟡 Normal review _(standard queue)_\n- [ ] ⬜ Backburner review _(triggers only when bucket is full)_';
 }
 
 // ── Retired functions kept for backward compatibility with existing tests ──────

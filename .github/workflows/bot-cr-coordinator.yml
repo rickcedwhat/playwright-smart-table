@@ -1,0 +1,268 @@
+name: Bot — CR Coordinator
+
+# Central coordinator for the CodeRabbit review queue.
+# Triggered by repository_dispatch (from QStash or trigger workflow).
+#
+# Flow:
+#   1. Parse Queue Issue state
+#   2. Apply lazy token refill
+#   3. Migrate any `coderabbit: rate-limited` PRs not already queued
+#   4. If tokens=0 and queues non-empty → reschedule QStash, exit
+#   5. Pick next PR → trigger review, decrement token, dequeue
+#   6. If queues still non-empty → schedule next QStash dispatch
+
+on:
+  repository_dispatch:
+    types: [bot-cr-coordinator]
+
+jobs:
+  coordinate:
+    name: Process review queue
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      issues: write
+      statuses: write
+    steps:
+      - name: Checkout (for bot-queue.mjs import)
+        uses: actions/checkout@v4
+
+      - name: Run coordinator
+        uses: actions/github-script@v7
+        env:
+          QSTASH_TOKEN: ${{ secrets.QSTASH_TOKEN }}
+          BOT_PAT: ${{ secrets.BOT_PAT }}
+        with:
+          github-token: ${{ secrets.BOT_PAT }}
+          script: |
+            const path = require('path');
+            const {
+              parseQueueState,
+              serializeQueueState,
+              computeActualTokens,
+              enqueue,
+              dequeue,
+              pickNextPR,
+            } = await import(
+              `file://${path.join(process.env.GITHUB_WORKSPACE, '.github/scripts/bot-queue.mjs')}`
+            );
+            const { getCheckedLabel } = await import(
+              `file://${path.join(process.env.GITHUB_WORKSPACE, '.github/scripts/coderabbit-logic.mjs')}`
+            );
+
+            const { owner, repo } = context.repo;
+            const nowMs = Date.now();
+            const nowIso = new Date(nowMs).toISOString();
+
+            // ── Find Queue Issue ──────────────────────────────────────────────
+
+            const allIssues = await github.paginate(github.rest.issues.listForRepo, {
+              owner, repo, state: 'open', per_page: 100,
+            });
+            const queueIssue = allIssues.find(i => i.title === '🐰 CodeRabbit Review Queue');
+            if (!queueIssue) {
+              core.warning('Queue Issue not found — run bot-cr-queue-init.yml first.');
+              return;
+            }
+
+            // ── Parse and refill state ────────────────────────────────────────
+
+            let state = parseQueueState(queueIssue.body);
+            state = computeActualTokens(state, nowMs);
+
+            // ── Migration: import rate-limited PRs not already in any queue ───
+
+            const allPRs = await github.paginate(github.rest.pulls.list, {
+              owner, repo, state: 'open', per_page: 100,
+            });
+            for (const pr of allPRs) {
+              const { data: labelData } = await github.rest.issues.listLabelsOnIssue({
+                owner, repo, issue_number: pr.number,
+              });
+              const labelNames = labelData.map(l => l.name);
+              if (!labelNames.includes('coderabbit: rate-limited')) continue;
+
+              const inQueue = [...state.priority, ...state.normal, ...state.backburner]
+                .some(item => item.pr === pr.number);
+              if (inQueue) continue;
+
+              core.info(`Migration: enqueuing rate-limited PR #${pr.number} to normal queue.`);
+              state = enqueue(state, {
+                pr: pr.number,
+                title: pr.title,
+                queued_at: nowIso,
+              }, 'normal');
+            }
+
+            // ── Check if anything to do ───────────────────────────────────────
+
+            const hasQueued = state.priority.length > 0 || state.normal.length > 0 || state.backburner.length > 0;
+
+            if (state.tokens === 0 && !hasQueued) {
+              core.info('No tokens and no queued PRs — nothing to do.');
+              // Clear stale QStash metadata so future enqueues can schedule fresh
+              state.refill_qstash_id = '';
+              state.refill_at = '';
+              await writeState(state);
+              return;
+            }
+
+            if (state.tokens === 0 && hasQueued) {
+              core.info('No tokens available — rescheduling QStash for 60 min.');
+              const { messageId, refillAt } = await scheduleQStash(3600);
+              state.refill_qstash_id = messageId ?? '';
+              state.refill_at = refillAt;
+              await writeState(state);
+              return;
+            }
+
+            // ── Pick next PR ──────────────────────────────────────────────────
+
+            const next = pickNextPR(state);
+            if (!next) {
+              core.info('No PR to trigger — all queues empty.');
+              state.refill_qstash_id = '';
+              state.refill_at = '';
+              await writeState(state);
+              return;
+            }
+
+            // ── TEST GUARD: only act on PRs targeting the coderabbit branch ───
+            // Remove this block when promoting to main.
+            try {
+              const { data: prData } = await github.rest.pulls.get({
+                owner, repo, pull_number: next.pr,
+              });
+              if (prData.base.ref !== 'coderabbit') {
+                core.info(`PR #${next.pr} targets "${prData.base.ref}", not "coderabbit" — skipping (test guard).`);
+                // Remove from queue to avoid infinite loop
+                state = dequeue(state, next.pr);
+                await writeState(state);
+                return;
+              }
+            } catch (err) {
+              core.warning(`Could not check PR #${next.pr} base branch: ${err.message}`);
+            }
+
+            // ── Trigger review ────────────────────────────────────────────────
+
+            const triggerTime = nowIso;
+            const triggerHHMM = triggerTime.slice(11, 16);
+
+            core.info(`Triggering review for PR #${next.pr} (${next.level})`);
+
+            // Post @coderabbitai full review
+            await github.rest.issues.createComment({
+              owner, repo, issue_number: next.pr,
+              body: '@coderabbitai full review',
+            });
+
+            // Swap label: remove all coderabbit: labels, add coderabbit: waiting
+            const { data: labels } = await github.rest.issues.listLabelsOnIssue({
+              owner, repo, issue_number: next.pr,
+            });
+            for (const l of labels.filter(l => l.name.startsWith('coderabbit:'))) {
+              try {
+                await github.rest.issues.removeLabel({
+                  owner, repo, issue_number: next.pr, name: l.name,
+                });
+              } catch {}
+            }
+            await github.rest.issues.addLabels({
+              owner, repo, issue_number: next.pr, labels: ['coderabbit: waiting'],
+            });
+
+            // Decrement tokens
+            state.tokens = Math.max(0, state.tokens - 1);
+            state.last_decremented_at = triggerTime;
+
+            // Remove from queue
+            state = dequeue(state, next.pr);
+
+            // Update HQ comment on the PR
+            try {
+              const allComments = await github.paginate(github.rest.issues.listComments, {
+                owner, repo, issue_number: next.pr, per_page: 100,
+              });
+              const hqComment = allComments.find(
+                c => c.user.login === 'rickcedwhat-ai' && c.body.includes('<!-- bot-hq -->')
+              );
+              if (hqComment) {
+                const checkedLabel = getCheckedLabel(hqComment.body);
+                const newCRSection = [
+                  '<!-- cr-section-start -->',
+                  `<!-- cr-trigger-time: ${triggerTime} -->`,
+                  '',
+                  '### 🔍 CodeRabbit Review',
+                  checkedLabel,
+                  '',
+                  `> ⏳ Waiting for CodeRabbit… _(triggered by coordinator at ${triggerHHMM} UTC)_`,
+                  '<!-- cr-section-end -->',
+                ].join('\n');
+                const updatedBody = hqComment.body.replace(
+                  /<!-- cr-section-start -->[\s\S]*?<!-- cr-section-end -->/,
+                  newCRSection
+                );
+                await github.rest.issues.updateComment({
+                  owner, repo, comment_id: hqComment.id, body: updatedBody,
+                });
+              }
+            } catch (err) {
+              core.warning(`Could not update HQ comment for PR #${next.pr}: ${err.message}`);
+            }
+
+            // ── Schedule QStash if more PRs queued ────────────────────────────
+
+            const stillQueued = state.priority.length > 0 || state.normal.length > 0 || state.backburner.length > 0;
+            if (stillQueued) {
+              const { messageId, refillAt } = await scheduleQStash(3600);
+              state.refill_qstash_id = messageId ?? '';
+              state.refill_at = refillAt;
+            } else {
+              state.refill_qstash_id = '';
+              state.refill_at = '';
+            }
+
+            // ── Write state back ──────────────────────────────────────────────
+
+            await writeState(state);
+
+            core.info(`Coordinator done — triggered PR #${next.pr}, tokens remaining: ${state.tokens}`);
+
+            // ── Helpers ───────────────────────────────────────────────────────
+
+            async function scheduleQStash(delaySecs) {
+              const refillAt = new Date(nowMs + delaySecs * 1_000).toISOString();
+              let messageId = null;
+              try {
+                const qstashUrl = `https://qstash.upstash.io/v2/publish/https://api.github.com/repos/${owner}/${repo}/dispatches`;
+                const qRes = await fetch(qstashUrl, {
+                  method: 'POST',
+                  headers: {
+                    'Authorization': `Bearer ${process.env.QSTASH_TOKEN}`,
+                    'Upstash-Delay': `${delaySecs}s`,
+                    'Upstash-Forward-Authorization': `Bearer ${process.env.BOT_PAT}`,
+                    'Upstash-Forward-Content-Type': 'application/json',
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({ event_type: 'bot-cr-coordinator' }),
+                });
+                const qBody = await qRes.json();
+                messageId = qBody.messageId ?? null;
+                if (!qRes.ok) core.warning(`QStash returned HTTP ${qRes.status}: ${JSON.stringify(qBody)}`);
+                else core.info(`QStash scheduled in ${delaySecs}s: ${messageId}`);
+              } catch (err) {
+                core.warning(`QStash publish failed: ${err.message}`);
+              }
+              return { messageId, refillAt };
+            }
+
+            async function writeState(s) {
+              const { serializeQueueState: ser } = await import(
+                `file://${path.join(process.env.GITHUB_WORKSPACE, '.github/scripts/bot-queue.mjs')}`
+              );
+              const newBody = ser(s);
+              await github.rest.issues.update({
+                owner, repo, issue_number: queueIssue.number, body: newBody,
+              });
+            }
