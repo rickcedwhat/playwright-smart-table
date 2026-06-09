@@ -31,7 +31,11 @@ export function parseQueueState(issueBody) {
   try {
     const get = (key) => {
       const line = block.match(new RegExp(`^${key}:\\s*(.*)$`, 'm'));
-      return line ? line[1].trim() : null;
+      if (!line) return null;
+      const val = line[1].trim();
+      // '-' is the empty placeholder used by serializeQueueState to prevent
+      // GitHub from stripping trailing whitespace and corrupting the next line.
+      return val === '-' ? '' : val;
     };
 
     const tokensRaw = get('tokens');
@@ -52,7 +56,9 @@ export function parseQueueState(issueBody) {
       tokens: isNaN(tokens) ? 3 : Math.min(3, Math.max(0, tokens)),
       last_decremented_at: get('last_decremented_at') ?? '',
       refill_qstash_id: get('refill_qstash_id') ?? '',
-      refill_at: get('refill_at') ?? '',
+      // Validate refill_at is a real ISO string — discard garbage values that
+      // would cause new Date(refill_at).toISOString() to throw RangeError.
+      refill_at: (() => { const v = get('refill_at') ?? ''; try { if (v) new Date(v).toISOString(); return v; } catch { return ''; } })(),
       priority: parseArr('priority'),
       normal: parseArr('normal'),
       backburner: parseArr('backburner'),
@@ -73,9 +79,11 @@ export function parseQueueState(issueBody) {
 export function serializeQueueState(state) {
   const nowMs = Date.now();
 
-  // Pad empty values with a space so GitHub doesn't strip trailing whitespace
-  // and corrupt the next-line key when the issue body is round-tripped via API.
-  const pad = (v) => (v === '' || v == null) ? ' ' : String(v);
+  // Use '-' for empty string values. GitHub strips trailing whitespace from
+  // issue body lines on save, which causes empty values to merge with the next
+  // line's key. A non-whitespace placeholder survives the round-trip.
+  // The parser treats '-' as empty when reading back.
+  const pad = (v) => (v === '' || v == null || v === '-' || (typeof v === 'string' && v.trim() === '')) ? '-' : String(v);
   const stateBlock = [
     '<!-- cr-queue-state',
     `tokens: ${state.tokens}`,
