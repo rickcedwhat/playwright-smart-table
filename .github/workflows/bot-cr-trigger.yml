@@ -46,19 +46,34 @@ jobs:
 
             let reviewType = null; // 'full' | 'incremental' | null
 
-            // Checkbox toggle in the HQ comment (edited event, human unchecked → checked)
+            // Checkbox toggle in the HQ comment (edited event, human checked a box)
             if (action === 'edited' &&
                 commentAuthor === 'rickcedwhat-ai' &&
                 context.payload.sender?.login !== 'rickcedwhat-ai' &&
                 commentBody.includes('<!-- bot-hq -->')) {
               const oldBody = context.payload.changes?.body?.from ?? '';
-              const wasFullUnchecked   = /- \[ \] Full review/i.test(oldBody);
-              const wasIncrUnchecked   = /- \[ \] Incremental review/i.test(oldBody);
-              const isFullChecked      = /- \[x\] Full review/i.test(commentBody);
-              const isIncrChecked      = /- \[x\] Incremental review/i.test(commentBody);
+              // GitHub's task-list checkbox click often omits changes.body.from
+              // (empty string). When that happens we can't check "was it unchecked
+              // before" — so fall back to "is it checked now?" as the signal.
+              // The sender guard above already ensures only humans trigger this.
+              const oldBodyAvailable = oldBody.length > 0;
+              const wasRedUnchecked    = !oldBodyAvailable || /- \[ \] 🔴/u.test(oldBody);
+              const wasYellowUnchecked = !oldBodyAvailable || /- \[ \] 🟡/u.test(oldBody);
+              const wasWhiteUnchecked  = !oldBodyAvailable || /- \[ \] ⬜/u.test(oldBody);
+              const wasFullUnchecked   = !oldBodyAvailable || /- \[ \] Full review/i.test(oldBody);
+              const wasIncrUnchecked   = !oldBodyAvailable || /- \[ \] Incremental review/i.test(oldBody);
 
-              if (wasFullUnchecked && isFullChecked)   reviewType = 'full';
-              else if (wasIncrUnchecked && isIncrChecked) reviewType = 'incremental';
+              const isRedChecked    = /- \[x\] 🔴/u.test(commentBody);
+              const isYellowChecked = /- \[x\] 🟡/u.test(commentBody);
+              const isWhiteChecked  = /- \[x\] ⬜/u.test(commentBody);
+              const isFullChecked   = /- \[x\] Full review/i.test(commentBody);
+              const isIncrChecked   = /- \[x\] Incremental review/i.test(commentBody);
+
+              if      (wasRedUnchecked    && isRedChecked)    reviewType = 'full'; // priority
+              else if (wasYellowUnchecked && isYellowChecked) reviewType = 'full'; // normal
+              else if (wasWhiteUnchecked  && isWhiteChecked)  reviewType = 'full'; // backburner
+              else if (wasFullUnchecked   && isFullChecked)   reviewType = 'full'; // legacy
+              else if (wasIncrUnchecked   && isIncrChecked)   reviewType = 'incremental'; // legacy
             }
 
             // Text command: @rickcedwhat-ai review / @rickcedwhat-ai review incremental
@@ -75,16 +90,6 @@ jobs:
             }
 
             core.info(`Review type: ${reviewType}`);
-
-            // ── TEST GUARD: only act on PRs targeting the coderabbit branch ───
-            // Remove this block when promoting to main.
-            const { data: prData } = await github.rest.pulls.get({
-              owner, repo, pull_number: pr_number,
-            });
-            if (prData.base.ref !== 'coderabbit') {
-              core.info(`PR #${pr_number} targets "${prData.base.ref}", not "coderabbit" — skipping (test guard).`);
-              return;
-            }
 
             // ── find HQ comment ───────────────────────────────────────────────
 
