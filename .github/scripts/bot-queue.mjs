@@ -113,7 +113,9 @@ export function serializeQueueState(state) {
       lines.push('| PR | Title | Queued |');
       lines.push('|---|---|---|');
       for (const item of items) {
-        lines.push(`| #${item.pr} | ${item.title} | ${formatRelativeTime(item.queued_at, nowMs)} |`);
+        // Escape pipe characters and strip newlines so titles don't break the table
+        const safeTitle = String(item.title ?? '').replace(/\r?\n/g, ' ').replace(/\|/g, '\\|');
+        lines.push(`| #${item.pr} | ${safeTitle} | ${formatRelativeTime(item.queued_at, nowMs)} |`);
       }
     }
     return lines.join('\n');
@@ -147,7 +149,7 @@ export function computeActualTokens(state, nowMs) {
   if (!state.last_decremented_at) return { ...state };
   const lastDecrMs = new Date(state.last_decremented_at).getTime();
   if (isNaN(lastDecrMs)) return { ...state };
-  const hoursElapsed = Math.floor((nowMs - lastDecrMs) / 3_600_000);
+  const hoursElapsed = Math.max(0, Math.floor((nowMs - lastDecrMs) / 3_600_000));
   const actualTokens = Math.min(3, state.tokens + hoursElapsed);
   return { ...state, tokens: actualTokens };
 }

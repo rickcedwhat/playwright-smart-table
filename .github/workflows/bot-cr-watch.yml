@@ -264,7 +264,11 @@ jobs:
               state.refill_qstash_id = qstashId ?? '';
               state.refill_at = refillAt ?? '';
 
-              const retryAt = new Date(nowMs + delaySecs * 1_000).toISOString().slice(11, 16);
+              // Use actual scheduled fire time (refillAt) rather than nowMs+delaySecs
+              // so the HQ comment shows the real coordinator wake time.
+              const retryAt = refillAt
+                ? new Date(refillAt).toISOString().slice(11, 16)
+                : new Date(nowMs + delaySecs * 1_000).toISOString().slice(11, 16);
               const posStr = posInfo ? `position ${posInfo.position}` : 'queued';
 
               await updateHQCRSection([

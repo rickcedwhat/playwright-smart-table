@@ -91,7 +91,7 @@ jobs:
                 '> ℹ️ New commits pushed since last review.',
                 '',
                 '- [ ] 🔴 Priority review _(skips to front)_',
-                '- [x] 🟡 Normal review _(standard queue — recommended)_',
+                '- [x] 🟡 Normal review _(standard queue)_',
                 '- [ ] ⬜ Backburner review _(triggers only when bucket is full)_',
                 '',
                 '> _Not yet requested_',
@@ -146,7 +146,7 @@ jobs:
             else if (/- \[x\] ⬜/u.test(existingSection))
               checkedLine = '- [ ] 🔴 Priority review _(skips to front)_\n- [ ] 🟡 Normal review _(standard queue)_\n- [x] ⬜ Backburner review _(triggers only when bucket is full)_';
             else
-              checkedLine = '- [ ] 🔴 Priority review _(skips to front)_\n- [x] 🟡 Normal review _(standard queue — recommended)_\n- [ ] ⬜ Backburner review _(triggers only when bucket is full)_';
+              checkedLine = '- [ ] 🔴 Priority review _(skips to front)_\n- [x] 🟡 Normal review _(standard queue)_\n- [ ] ⬜ Backburner review _(triggers only when bucket is full)_';
 
             const newCRSection = [
               '<!-- cr-section-start -->',

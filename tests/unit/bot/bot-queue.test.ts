@@ -262,11 +262,10 @@ describe('pickNextPR', () => {
     expect(pickNextPR(state as any)).toBeNull();
   });
 
-  it('returns null when tokens 0 and only normal queued', () => {
+  it('selects normal PR regardless of token count (coordinator gates on tokens, not pickNextPR)', () => {
+    // pickNextPR only gates on tokens===3 for backburner; priority/normal are
+    // always selectable — the coordinator is responsible for checking tokens first.
     const state = { tokens: 0, priority: [], normal: [makePR(1)], backburner: [] };
-    // tokens=0 means no trigger — pickNextPR doesn't check tokens for priority/normal
-    // Actually per spec, pickNextPR doesn't gate on tokens for priority/normal
-    // The coordinator checks tokens before calling pickNextPR
     const result = pickNextPR(state as any);
     expect(result?.pr).toBe(1);
   });

@@ -74,7 +74,7 @@ export function getCheckedLabel(hqBody) {
     return '- [x] Full review\n- [ ] Incremental review';
   if (/- \[x\] Incremental review/i.test(body))
     return '- [ ] Full review\n- [x] Incremental review';
-  return '- [ ] Full review\n- [ ] Incremental review';
+  return '- [ ] 🔴 Priority review _(skips to front)_\n- [ ] 🟡 Normal review _(standard queue)_\n- [ ] ⬜ Backburner review _(triggers only when bucket is full)_';
 }
 
 // ── Retired functions kept for backward compatibility with existing tests ──────
