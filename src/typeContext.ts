@@ -445,6 +445,7 @@ export type { HeaderStrategy } from './strategies/headers';
 /**
  * Strategy to resolve column names (string or regex) to their index.
  */
+// fallow-ignore-next-line unused-type
 export type { ColumnResolutionStrategy } from './strategies/resolution';
 
 /**

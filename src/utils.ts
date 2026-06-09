@@ -6,6 +6,7 @@ import { Page } from '@playwright/test';
  * Replaces the dependency on 'expect(...).toPass()' to ensure compatibility
  * with environments where 'expect' is not globally available.
  */
+// fallow-ignore-next-line unused-export
 export const waitForCondition = async (
   predicate: () => Promise<boolean>, 
   timeout: number, 

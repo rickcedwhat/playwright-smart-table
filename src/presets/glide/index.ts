@@ -105,6 +105,7 @@ const GlideDefaultStrategies = {
 };
 
 /** Strategies only for Glide Data Grid. Includes fillSimple; use when you want to supply your own selectors or override fill. */
+// fallow-ignore-next-line unused-export
 export const GlideStrategies = {
     ...GlideDefaultStrategies,
     fillSimple: glideFillSimple

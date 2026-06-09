@@ -1,4 +1,5 @@
-import { StrategyContext, Selector } from '../types';
+// fallow-ignore-next-line circular-dependency
+import type { StrategyContext, Selector } from '../types';
 
 /**
  * Defines the contract for a header retrieval strategy.
