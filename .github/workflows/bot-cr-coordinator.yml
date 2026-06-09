@@ -166,12 +166,12 @@ jobs:
               body: '@coderabbitai full review',
             });
 
-            // Post re-trigger notification
+            // Post re-trigger notification (fire-and-forget — don't block state write on failure)
             if (posInfoBeforeDequeue) {
-              await github.rest.issues.createComment({
+              github.rest.issues.createComment({
                 owner, repo, issue_number: next.pr,
                 body: `🔄 Re-triggered by coordinator — picked from the ${next.level} queue (position was #${posInfoBeforeDequeue.position}).`,
-              });
+              }).catch(err => core.warning(`Re-trigger notification failed: ${err.message}`));
             }
 
             // Swap label: remove all coderabbit: labels, add coderabbit: waiting
@@ -188,6 +188,10 @@ jobs:
             await github.rest.issues.addLabels({
               owner, repo, issue_number: next.pr, labels: ['coderabbit: waiting'],
             });
+
+            // Update live counts to reflect the label change just made
+            // (the PR moved from queued → waiting, so increment waitingCount)
+            waitingCount++;
 
             // Decrement tokens
             state.tokens = Math.max(0, state.tokens - 1);

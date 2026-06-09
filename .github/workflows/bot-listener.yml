@@ -375,10 +375,12 @@ jobs:
       pull-requests: write
     steps:
       - name: Checkout (for bot-queue.mjs import)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - name: Promote PR
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         env:
           BOT_PAT: ${{ secrets.BOT_PAT }}
         with:

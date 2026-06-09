@@ -583,7 +583,7 @@ describe('incrementReviewsThisSession', () => {
   });
 
   it('treats missing reviews_this_session as 0', () => {
-    const state = {} as any;
+    const state = {};
     const result = incrementReviewsThisSession(state);
     expect(result.reviews_this_session).toBe(1);
   });
