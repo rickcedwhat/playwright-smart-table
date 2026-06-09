@@ -41,7 +41,7 @@ jobs:
       statuses: write
     steps:
       - name: Add label, set status, create HQ comment
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           github-token: ${{ secrets.BOT_PAT }}
           script: |
