@@ -157,12 +157,59 @@ jobs:
             let state = queueIssue ? parseQueueState(queueIssue.body) : { tokens: 3, last_decremented_at: '', refill_qstash_id: '', refill_at: '', priority: [], normal: [], backburner: [] };
             state = computeActualTokens(state, nowMs);
 
-            // ── Decide: immediate trigger or enqueue ──────────────────────────
+            // ── Rate-limit pre-check (only when immediate trigger would fire) ─
 
-            const canTriggerImmediately =
+            const wouldTriggerImmediately =
               (priorityLevel === 'priority' && state.tokens > 0) ||
               (priorityLevel === 'normal' && state.tokens > 0 && state.priority.length === 0) ||
               (priorityLevel === 'backburner' && state.tokens === 3 && state.priority.length === 0 && state.normal.length === 0);
+
+            let forcedEnqueue = false;
+            if (wouldTriggerImmediately && priorityLevel !== 'backburner') {
+              core.info('Rate-limit pre-check: posting @coderabbitai rate limit');
+              const rateLimitCheckComment = await github.rest.issues.createComment({
+                owner, repo, issue_number: pr_number,
+                body: '@coderabbitai rate limit',
+              });
+              const checkTimestamp = rateLimitCheckComment.data.created_at;
+
+              // Poll up to 30s for a CR response after our comment
+              const { isRateLimitComment: isRLC } = await import(
+                `file://${path.join(process.env.GITHUB_WORKSPACE, '.github/scripts/coderabbit-logic.mjs')}`
+              );
+              let crRateLimited = false;
+              for (let attempt = 0; attempt < 6; attempt++) {
+                await new Promise(r => setTimeout(r, 5000));
+                const { data: freshComments } = await github.rest.issues.listComments({
+                  owner, repo, issue_number: pr_number, per_page: 20,
+                });
+                const crResponses = freshComments.filter(c =>
+                  c.user.login === 'coderabbitai[bot]' &&
+                  c.created_at > checkTimestamp
+                );
+                if (crResponses.length > 0) {
+                  if (crResponses.some(c => isRLC(c.body))) {
+                    core.info('Rate-limit pre-check: CR responded with rate-limit — forcing enqueue');
+                    crRateLimited = true;
+                  } else {
+                    core.info('Rate-limit pre-check: CR responded without rate-limit — proceeding normally');
+                  }
+                  break;
+                }
+                core.info(`Rate-limit pre-check: no CR response yet (attempt ${attempt + 1}/6)`);
+              }
+              if (crRateLimited) {
+                forcedEnqueue = true;
+                core.info('Rate-limit pre-check: treating tokens as 0 — will enqueue instead of trigger');
+              }
+            }
+
+            // ── Decide: immediate trigger or enqueue ──────────────────────────
+
+            const canTriggerImmediately = !forcedEnqueue && (
+              (priorityLevel === 'priority' && state.tokens > 0) ||
+              (priorityLevel === 'normal' && state.tokens > 0 && state.priority.length === 0) ||
+              (priorityLevel === 'backburner' && state.tokens === 3 && state.priority.length === 0 && state.normal.length === 0));
 
             const triggerTime = nowIso;
             const triggerHHMM = triggerTime.slice(11, 16);
