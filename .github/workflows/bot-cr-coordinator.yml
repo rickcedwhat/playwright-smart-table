@@ -79,11 +79,14 @@ jobs:
             });
             let waitingCount = 0;
             let unresolvedCount = 0;
+            // Collect label data for all PRs (used for migration and liveItems)
+            const prLabelMap = new Map();
             for (const pr of allPRs) {
               const { data: labelData } = await github.rest.issues.listLabelsOnIssue({
                 owner, repo, issue_number: pr.number,
               });
               const labelNames = labelData.map(l => l.name);
+              prLabelMap.set(pr.number, labelNames);
               if (labelNames.includes('coderabbit: waiting')) waitingCount++;
               if (labelNames.includes('coderabbit: unresolved')) unresolvedCount++;
               if (!labelNames.includes('coderabbit: rate-limited')) continue;
@@ -98,6 +101,25 @@ jobs:
                 title: pr.title,
                 queued_at: nowIso,
               }, 'normal');
+            }
+
+            // Build liveItems after migration so queue membership is final
+            const liveItems = [];
+            for (const pr of allPRs) {
+              const inQueue = [...state.priority, ...state.normal, ...state.backburner]
+                .some(item => item.pr === pr.number);
+              if (!inQueue) {
+                const labelNames = prLabelMap.get(pr.number) ?? [];
+                const crStatus = labelNames.find(n => n.startsWith('coderabbit:'));
+                if (crStatus) {
+                  liveItems.push({
+                    pr: pr.number,
+                    title: pr.title,
+                    status: crStatus,
+                    updated: pr.updated_at,
+                  });
+                }
+              }
             }
 
             // ── Check if anything to do ───────────────────────────────────────
@@ -131,23 +153,6 @@ jobs:
               state.refill_at = '';
               await writeState(state);
               return;
-            }
-
-            // ── TEST GUARD: only act on PRs targeting the coderabbit branch ───
-            // Remove this block when promoting to main.
-            try {
-              const { data: prData } = await github.rest.pulls.get({
-                owner, repo, pull_number: next.pr,
-              });
-              if (prData.base.ref !== 'coderabbit') {
-                core.info(`PR #${next.pr} targets "${prData.base.ref}", not "coderabbit" — skipping (test guard).`);
-                // Remove from queue to avoid infinite loop
-                state = dequeue(state, next.pr);
-                await writeState(state);
-                return;
-              }
-            } catch (err) {
-              core.warning(`Could not check PR #${next.pr} base branch: ${err.message}`);
             }
 
             // ── Trigger review ────────────────────────────────────────────────
@@ -285,7 +290,7 @@ jobs:
               const { serializeQueueState: ser } = await import(
                 `file://${path.join(process.env.GITHUB_WORKSPACE, '.github/scripts/bot-queue.mjs')}`
               );
-              const newBody = ser(s, { inReview: waitingCount, unresolved: unresolvedCount });
+              const newBody = ser(s, { inReview: waitingCount, unresolved: unresolvedCount }, liveItems);
               await github.rest.issues.update({
                 owner, repo, issue_number: queueIssue.number, body: newBody,
               });

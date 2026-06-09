@@ -82,9 +82,10 @@ export function parseQueueState(issueBody) {
  *           refill_at: string, priority: Array, normal: Array, backburner: Array,
  *           reviews_this_session: number }} state
  * @param {{ inReview?: number, unresolved?: number }} [counts]
+ * @param {Array<{ pr: number, title: string, status: string, updated: string }>} [liveItems]
  * @returns {string}
  */
-export function serializeQueueState(state, { inReview = 0, unresolved = 0 } = {}) {
+export function serializeQueueState(state, { inReview = 0, unresolved = 0 } = {}, liveItems = []) {
   const nowMs = Date.now();
 
   // Use '-' for empty string values. GitHub strips trailing whitespace from
@@ -125,44 +126,94 @@ export function serializeQueueState(state, { inReview = 0, unresolved = 0 } = {}
   const queuedCount = state.priority.length + state.normal.length + state.backburner.length;
   const statsLine = `📊 ${queuedCount} queued · ${inReview} in review · ${unresolved} unresolved · ${state.reviews_this_session || 0} reviews this session`;
 
-  const buildTable = (items, label) => {
-    const lines = [];
-    lines.push(`### ${label}`);
-    if (items.length === 0) {
-      lines.push('| PR | Title | Queued |');
-      lines.push('|---|---|---|');
-      lines.push('| — | _empty_ | — |');
+  // ── Queue table: all queued PRs in trigger order with Level column ────────
+
+  const safeTitle = (t) => String(t ?? '')
+    .replace(/\r?\n/g, ' ')
+    .replace(/\\/g, '\\\\')
+    .replace(/\|/g, '\\|');
+
+  const LEVEL_ICON = { priority: '🔴 Priority', normal: '🟡 Normal', backburner: '⬜ Backburner' };
+
+  const buildQueueTable = () => {
+    const lines = ['### 📋 Review Queue'];
+    lines.push('| Level | PR | Title | Queued |');
+    lines.push('|---|---|---|---|');
+    const allQueued = [
+      ...state.priority.map(item => ({ ...item, level: 'priority' })),
+      ...state.normal.map(item => ({ ...item, level: 'normal' })),
+      ...state.backburner.map(item => ({ ...item, level: 'backburner' })),
+    ];
+    if (allQueued.length === 0) {
+      lines.push('| — | _empty_ | — | — |');
     } else {
-      lines.push('| PR | Title | Queued |');
-      lines.push('|---|---|---|');
-      for (const item of items) {
-        // Escape backslashes first, then pipes, and strip newlines so titles
-        // don't break the markdown table (CodeQL: complete the escape sequence).
-        const safeTitle = String(item.title ?? '')
-          .replace(/\r?\n/g, ' ')
-          .replace(/\\/g, '\\\\')
-          .replace(/\|/g, '\\|');
-        lines.push(`| #${item.pr} | ${safeTitle} | ${formatRelativeTime(item.queued_at, nowMs)} |`);
+      for (const item of allQueued) {
+        lines.push(`| ${LEVEL_ICON[item.level]} | #${item.pr} | ${safeTitle(item.title)} | ${formatRelativeTime(item.queued_at, nowMs)} |`);
       }
     }
     return lines.join('\n');
   };
 
-  const body = [
+  // ── Live table: open PRs not in queue, sorted by status urgency ──────────
+
+  const STATUS_ICON = {
+    'coderabbit: waiting':     '⏳ Waiting',
+    'coderabbit: unresolved':  '❌ Unresolved',
+    'coderabbit: complete':    '✅ Complete',
+    'coderabbit: not started': '🔲 Not started',
+  };
+
+  // Status sort order: waiting → unresolved → complete → not started
+  const STATUS_ORDER = {
+    'coderabbit: waiting':     0,
+    'coderabbit: unresolved':  1,
+    'coderabbit: complete':    2,
+    'coderabbit: not started': 3,
+  };
+
+  const THREE_DAYS_MS = 3 * 86_400_000;
+
+  const buildLiveTable = (items) => {
+    if (!items || items.length === 0) return null;
+    const sorted = [...items].sort((a, b) => {
+      const ao = STATUS_ORDER[a.status] ?? 99;
+      const bo = STATUS_ORDER[b.status] ?? 99;
+      return ao - bo;
+    });
+    const lines = ['### 🔍 Active PRs'];
+    lines.push('| Status | PR | Title | Updated |');
+    lines.push('|---|---|---|---|');
+    for (const item of sorted) {
+      let icon = STATUS_ICON[item.status] ?? item.status;
+      // Aging warning: unresolved + updated_at > 3 days ago
+      if (item.status === 'coderabbit: unresolved' && item.updated) {
+        const updMs = new Date(item.updated).getTime();
+        if (!isNaN(updMs) && (nowMs - updMs) > THREE_DAYS_MS) {
+          icon = `⚠️ Unresolved`;
+        }
+      }
+      lines.push(`| ${icon} | #${item.pr} | ${safeTitle(item.title)} | ${formatRelativeTime(item.updated, nowMs)} |`);
+    }
+    return lines.join('\n');
+  };
+
+  const liveTable = buildLiveTable(liveItems);
+
+  const parts = [
     stateBlock,
     '',
     '## 🐰 CodeRabbit Review Queue',
     bucketLine,
     statsLine,
     '',
-    buildTable(state.priority, '🔴 Priority'),
-    '',
-    buildTable(state.normal, '🟡 Normal'),
-    '',
-    buildTable(state.backburner, '⬜ Backburner _(triggers only when bucket is full)_'),
-  ].join('\n');
+    buildQueueTable(),
+  ];
 
-  return body;
+  if (liveTable) {
+    parts.push('', liveTable);
+  }
+
+  return parts.join('\n');
 }
 
 /**
