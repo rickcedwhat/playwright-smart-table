@@ -97,16 +97,12 @@ const EXAMPLES = '/playwright-smart-table/examples/'
 
 /* The card — border / glow / background live here so equal-height is controllable */
 .hp-card {
-  flex: 1 1 auto;
-  min-height: 0;
   min-width: 0;
-  display: flex;
   border-radius: 14px;
   overflow: hidden;
 }
 .hp-card :deep(div[class*='language-']) {
-  width: 100%;
-  display: flex;
+  min-width: 0;
   margin: 0 !important;
   padding: 0 !important;
   background: transparent !important;
@@ -114,10 +110,6 @@ const EXAMPLES = '/playwright-smart-table/examples/'
   box-shadow: none !important;
 }
 .hp-card :deep(div[class*='language-'] pre) {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
   padding: 22px 0 !important;
   margin: 0 !important;
   background: transparent !important;
