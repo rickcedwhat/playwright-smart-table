@@ -51,14 +51,6 @@ jobs:
             const submittedAt = review.submitted_at;
             const reviewBody = review.body ?? '';
 
-            // ── TEST GUARD: only act on PRs targeting the coderabbit branch ───
-            // Remove this block when promoting to main.
-            const baseBranch = context.payload.pull_request.base.ref;
-            if (baseBranch !== 'coderabbit') {
-              core.info(`PR #${pr_number} targets "${baseBranch}", not "coderabbit" — skipping (test guard).`);
-              return;
-            }
-
             // ── guard: PR must have "coderabbit: waiting" label ───────────────
 
             const { data: labels } = await github.rest.issues.listLabelsOnIssue({

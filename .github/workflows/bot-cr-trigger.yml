@@ -2,10 +2,15 @@ name: Bot — CR Trigger
 
 # Fires when a user requests a CodeRabbit review via:
 #   - Checking one of the checkboxes in the Bot HQ comment
-#   - Posting @rickcedwhat-ai review (full) or @rickcedwhat-ai review incremental
+#   - Posting @rickcedwhat-ai review [priority|backburner] or @rickcedwhat-ai review
 #
-# Determines review type, posts the @coderabbitai command, updates labels,
-# commit status, and HQ comment with trigger timestamp.
+# Three priority levels: 🔴 priority, 🟡 normal, ⬜ backburner
+#
+# Immediate trigger logic:
+#   priority  → if tokens > 0 (always try for priority)
+#   normal    → if tokens > 0 AND priority queue empty
+#   backburner→ if tokens === 3 AND priority queue empty AND normal queue empty
+# Otherwise → enqueue and set coderabbit: queued label.
 
 on:
   issue_comment:
@@ -19,9 +24,10 @@ jobs:
     if: github.event.issue.pull_request != null
     permissions:
       pull-requests: write
+      issues: write
       statuses: write
     steps:
-      - name: Checkout (for coderabbit-logic.mjs import)
+      - name: Checkout (for coderabbit-logic.mjs and bot-queue.mjs import)
         uses: actions/checkout@v4
 
       - name: Detect trigger and act
@@ -33,18 +39,32 @@ jobs:
           github-token: ${{ secrets.BOT_PAT }}
           script: |
             const path = require('path');
-            const { isRateLimitComment, parseRateLimitDuration } = await import(
+            const { isRateLimitComment } = await import(
               `file://${path.join(process.env.GITHUB_WORKSPACE, '.github/scripts/coderabbit-logic.mjs')}`
             );
+            const {
+              parseQueueState,
+              computeActualTokens,
+              enqueue,
+              findPRInQueues,
+              serializeQueueState,
+              getPriorityFromCheckbox,
+            } = await import(
+              `file://${path.join(process.env.GITHUB_WORKSPACE, '.github/scripts/bot-queue.mjs')}`
+            );
+
             const { owner, repo } = context.repo;
             const commentBody = context.payload.comment.body || '';
             const commentAuthor = context.payload.comment.user.login;
             const pr_number = context.issue.number;
             const action = context.payload.action;
+            const nowMs = Date.now();
+            const nowIso = new Date(nowMs).toISOString();
 
-            // ── determine trigger type ────────────────────────────────────────
+            // ── determine review type and priority level ───────────────────────
 
             let reviewType = null; // 'full' | 'incremental' | null
+            let priorityLevel = 'normal'; // 'priority' | 'normal' | 'backburner'
 
             // Checkbox toggle in the HQ comment (edited event, human unchecked → checked)
             if (action === 'edited' &&
@@ -52,21 +72,53 @@ jobs:
                 context.payload.sender?.login !== 'rickcedwhat-ai' &&
                 commentBody.includes('<!-- bot-hq -->')) {
               const oldBody = context.payload.changes?.body?.from ?? '';
-              const wasFullUnchecked   = /- \[ \] Full review/i.test(oldBody);
-              const wasIncrUnchecked   = /- \[ \] Incremental review/i.test(oldBody);
-              const isFullChecked      = /- \[x\] Full review/i.test(commentBody);
-              const isIncrChecked      = /- \[x\] Incremental review/i.test(commentBody);
 
-              if (wasFullUnchecked && isFullChecked)   reviewType = 'full';
-              else if (wasIncrUnchecked && isIncrChecked) reviewType = 'incremental';
+              // New-style emoji checkboxes
+              const wasRedUnchecked   = /- \[ \] 🔴/u.test(oldBody);
+              const wasYellowUnchecked = /- \[ \] 🟡/u.test(oldBody);
+              const wasWhiteUnchecked  = /- \[ \] ⬜/u.test(oldBody);
+              const isRedChecked      = /- \[x\] 🔴/u.test(commentBody);
+              const isYellowChecked   = /- \[x\] 🟡/u.test(commentBody);
+              const isWhiteChecked    = /- \[x\] ⬜/u.test(commentBody);
+
+              if (wasRedUnchecked && isRedChecked) {
+                reviewType = 'full';
+                priorityLevel = 'priority';
+              } else if (wasYellowUnchecked && isYellowChecked) {
+                reviewType = 'full';
+                priorityLevel = 'normal';
+              } else if (wasWhiteUnchecked && isWhiteChecked) {
+                reviewType = 'full';
+                priorityLevel = 'backburner';
+              }
+
+              // Backward compat: old-style Full review checkbox
+              if (!reviewType) {
+                const wasFullUnchecked = /- \[ \] Full review/i.test(oldBody);
+                const isFullChecked    = /- \[x\] Full review/i.test(commentBody);
+                if (wasFullUnchecked && isFullChecked) {
+                  reviewType = 'full';
+                  priorityLevel = 'normal';
+                }
+              }
             }
 
-            // Text command: @rickcedwhat-ai review / @rickcedwhat-ai review incremental
+            // Text command: @rickcedwhat-ai review [priority|backburner|incremental]
             if (action === 'created' && commentAuthor !== 'rickcedwhat-ai') {
-              if (/^@rickcedwhat-ai\s+review\s+incremental\b/i.test(commentBody.trim()))
+              const trimmed = commentBody.trim();
+              if (/^@rickcedwhat-ai\s+review\s+incremental\b/i.test(trimmed)) {
                 reviewType = 'incremental';
-              else if (/^@rickcedwhat-ai\s+review\b/i.test(commentBody.trim()))
+                priorityLevel = 'normal';
+              } else if (/^@rickcedwhat-ai\s+review\s+priority\b/i.test(trimmed)) {
                 reviewType = 'full';
+                priorityLevel = 'priority';
+              } else if (/^@rickcedwhat-ai\s+review\s+backburner\b/i.test(trimmed)) {
+                reviewType = 'full';
+                priorityLevel = 'backburner';
+              } else if (/^@rickcedwhat-ai\s+review\b/i.test(trimmed)) {
+                reviewType = 'full';
+                priorityLevel = 'normal';
+              }
             }
 
             if (!reviewType) {
@@ -74,17 +126,13 @@ jobs:
               return;
             }
 
-            core.info(`Review type: ${reviewType}`);
+            core.info(`Review type: ${reviewType}, priority level: ${priorityLevel}`);
 
-            // ── TEST GUARD: only act on PRs targeting the coderabbit branch ───
-            // Remove this block when promoting to main.
+            // ── fetch PR data ─────────────────────────────────────────────────
+
             const { data: prData } = await github.rest.pulls.get({
               owner, repo, pull_number: pr_number,
             });
-            if (prData.base.ref !== 'coderabbit') {
-              core.info(`PR #${pr_number} targets "${prData.base.ref}", not "coderabbit" — skipping (test guard).`);
-              return;
-            }
 
             // ── find HQ comment ───────────────────────────────────────────────
 
@@ -95,176 +143,179 @@ jobs:
               c => c.user.login === 'rickcedwhat-ai' && c.body.includes('<!-- bot-hq -->')
             );
 
-            // ── update trigger_time in HQ comment ────────────────────────────
+            // ── Find Queue Issue and parse state ──────────────────────────────
 
-            const triggerTime = new Date().toISOString();
-            const triggerHHMM = triggerTime.slice(11, 16); // "HH:MM"
-            const checkedLabel = reviewType === 'full'
-              ? '- [x] Full review\n- [ ] Incremental review'
-              : '- [ ] Full review\n- [x] Incremental review';
+            const allIssues = await github.paginate(github.rest.issues.listForRepo, {
+              owner, repo, state: 'open', per_page: 100,
+            });
+            const queueIssue = allIssues.find(i => i.title === '🐰 CodeRabbit Review Queue');
 
-            const newCRSection = [
-              '<!-- cr-section-start -->',
-              `<!-- cr-trigger-time: ${triggerTime} -->`,
-              '',
-              '### 🔍 CodeRabbit Review',
-              checkedLabel,
-              '',
-              `> ⏳ Waiting for CodeRabbit… _(triggered at ${triggerHHMM} UTC)_`,
-              '<!-- cr-section-end -->',
-            ].join('\n');
+            let state = queueIssue ? parseQueueState(queueIssue.body) : { tokens: 3, last_decremented_at: '', refill_qstash_id: '', refill_at: '', priority: [], normal: [], backburner: [] };
+            state = computeActualTokens(state, nowMs);
 
-            if (hqComment) {
-              const updatedBody = hqComment.body.replace(
-                /<!-- cr-section-start -->[\s\S]*?<!-- cr-section-end -->/,
-                newCRSection
-              );
-              try {
-                await github.rest.issues.updateComment({
-                  owner, repo, comment_id: hqComment.id, body: updatedBody,
-                });
-              } catch (err) {
-                core.warning(`Could not update HQ comment: ${err.message}`);
+            // ── Decide: immediate trigger or enqueue ──────────────────────────
+
+            const canTriggerImmediately =
+              (priorityLevel === 'priority' && state.tokens > 0) ||
+              (priorityLevel === 'normal' && state.tokens > 0 && state.priority.length === 0) ||
+              (priorityLevel === 'backburner' && state.tokens === 3 && state.priority.length === 0 && state.normal.length === 0);
+
+            const triggerTime = nowIso;
+            const triggerHHMM = triggerTime.slice(11, 16);
+
+            // Build checkbox line for HQ update
+            let checkedLabelLine;
+            if (priorityLevel === 'priority') {
+              checkedLabelLine = '- [x] 🔴 Priority review _(skips to front)_\n- [ ] 🟡 Normal review _(standard queue)_\n- [ ] ⬜ Backburner review _(triggers only when bucket is full)_';
+            } else if (priorityLevel === 'backburner') {
+              checkedLabelLine = '- [ ] 🔴 Priority review _(skips to front)_\n- [ ] 🟡 Normal review _(standard queue)_\n- [x] ⬜ Backburner review _(triggers only when bucket is full)_';
+            } else {
+              checkedLabelLine = '- [ ] 🔴 Priority review _(skips to front)_\n- [x] 🟡 Normal review _(standard queue)_\n- [ ] ⬜ Backburner review _(triggers only when bucket is full)_';
+            }
+
+            if (canTriggerImmediately) {
+              core.info(`Triggering immediately (level=${priorityLevel}, tokens=${state.tokens})`);
+
+              // Update HQ comment — waiting state
+              const newCRSection = [
+                '<!-- cr-section-start -->',
+                `<!-- cr-trigger-time: ${triggerTime} -->`,
+                '',
+                '### 🔍 CodeRabbit Review',
+                checkedLabelLine,
+                '',
+                `> ⏳ Waiting for CodeRabbit… _(triggered at ${triggerHHMM} UTC)_`,
+                '<!-- cr-section-end -->',
+              ].join('\n');
+
+              if (hqComment) {
+                try {
+                  await github.rest.issues.updateComment({
+                    owner, repo, comment_id: hqComment.id,
+                    body: hqComment.body.replace(
+                      /<!-- cr-section-start -->[\s\S]*?<!-- cr-section-end -->/,
+                      newCRSection
+                    ),
+                  });
+                } catch (err) {
+                  core.warning(`Could not update HQ comment: ${err.message}`);
+                }
               }
-            }
 
-            // ── check for pre-existing rate-limit comment ─────────────────────
-            // CR can hit the rate limit automatically on PR open (before the user
-            // even triggers). If that comment is still within its window, skip
-            // straight to rate-limited + QStash. If the window has already passed,
-            // proceed normally — the quota should have refreshed.
+              // Swap label to waiting
+              const { data: labels } = await github.rest.issues.listLabelsOnIssue({
+                owner, repo, issue_number: pr_number,
+              });
+              for (const l of labels.filter(l => l.name.startsWith('coderabbit:'))) {
+                try { await github.rest.issues.removeLabel({ owner, repo, issue_number: pr_number, name: l.name }); } catch {}
+              }
+              await github.rest.issues.addLabels({ owner, repo, issue_number: pr_number, labels: ['coderabbit: waiting'] });
 
-            // DEBUG: log all CR comments found and rate-limit detection results
-            const crComments = allComments.filter(c => c.user.login === 'coderabbitai[bot]');
-            core.info(`[debug] Total comments: ${allComments.length}, CR comments: ${crComments.length}`);
-            for (const c of crComments) {
-              const matches = isRateLimitComment(c.body);
-              core.info(`[debug] CR comment at ${c.created_at}: isRateLimitComment=${matches}, body[:120]="${c.body.slice(0, 120).replace(/\n/g, '\\n')}"`);
-            }
+              // Set commit status pending
+              await github.rest.repos.createCommitStatus({
+                owner, repo, sha: prData.head.sha,
+                state: 'pending', context: 'coderabbit-review',
+                description: 'CodeRabbit review in progress',
+              });
 
-            const crRateLimitComment = allComments.find(
-              c => c.user.login === 'coderabbitai[bot]' && isRateLimitComment(c.body)
-            );
+              // Post @coderabbitai command
+              const crCommand = reviewType === 'full' ? '@coderabbitai full review' : '@coderabbitai review';
+              await github.rest.issues.createComment({ owner, repo, issue_number: pr_number, body: crCommand });
 
-            core.info(`[debug] crRateLimitComment found: ${!!crRateLimitComment}`);
+              // Decrement tokens and write state
+              state.tokens = Math.max(0, state.tokens - 1);
+              state.last_decremented_at = triggerTime;
 
-            if (crRateLimitComment) {
-              const durationMs = parseRateLimitDuration(crRateLimitComment.body);
-              const commentedAt = new Date(crRateLimitComment.created_at).getTime();
-              const availableAt = commentedAt + durationMs;
-              const remainingSecs = Math.ceil((availableAt - Date.now()) / 1000);
-
-              core.info(`[debug] durationMs=${durationMs}, commentedAt=${crRateLimitComment.created_at}, remainingSecs=${remainingSecs}`);
-
-              if (remainingSecs > 60) {
-                // Still rate-limited — go straight to rate-limited + QStash
-                core.info(`Pre-existing CR rate-limit found (~${remainingSecs}s remaining) — scheduling retry instead of triggering.`);
-
-                const retryAt = new Date(availableAt + 60_000).toISOString().slice(11, 16);
-
-                const payload = JSON.stringify({
-                  event_type: 'bot-coderabbit-retry',
-                  client_payload: { pr_number, repo: `${owner}/${repo}` },
+              if (queueIssue) {
+                await github.rest.issues.update({
+                  owner, repo, issue_number: queueIssue.number,
+                  body: serializeQueueState(state),
                 });
-                let qstashId = null;
+              }
+
+              core.info(`Posted "${crCommand}" for PR #${pr_number} (trigger time: ${triggerTime})`);
+
+            } else {
+              core.info(`Queueing PR #${pr_number} at level="${priorityLevel}" (tokens=${state.tokens})`);
+
+              // Enqueue the PR
+              state = enqueue(state, {
+                pr: pr_number,
+                title: prData.title,
+                queued_at: nowIso,
+              }, priorityLevel);
+
+              // Find position
+              const posInfo = findPRInQueues(state, pr_number);
+              const posStr = posInfo ? `position ${posInfo.position}` : 'queued';
+
+              // Update HQ comment — queued state
+              const queuedCRSection = [
+                '<!-- cr-section-start -->',
+                `<!-- cr-trigger-time: -->`,
+                '',
+                '### 🔍 CodeRabbit Review',
+                checkedLabelLine,
+                '',
+                `> ⏱ Queued · ${posStr} · est. ~${Math.ceil((posInfo?.position ?? 1))}h`,
+                '<!-- cr-section-end -->',
+              ].join('\n');
+
+              if (hqComment) {
+                try {
+                  await github.rest.issues.updateComment({
+                    owner, repo, comment_id: hqComment.id,
+                    body: hqComment.body.replace(
+                      /<!-- cr-section-start -->[\s\S]*?<!-- cr-section-end -->/,
+                      queuedCRSection
+                    ),
+                  });
+                } catch (err) {
+                  core.warning(`Could not update HQ comment: ${err.message}`);
+                }
+              }
+
+              // Set label to queued
+              const { data: labels } = await github.rest.issues.listLabelsOnIssue({
+                owner, repo, issue_number: pr_number,
+              });
+              for (const l of labels.filter(l => l.name.startsWith('coderabbit:'))) {
+                try { await github.rest.issues.removeLabel({ owner, repo, issue_number: pr_number, name: l.name }); } catch {}
+              }
+              await github.rest.issues.addLabels({ owner, repo, issue_number: pr_number, labels: ['coderabbit: queued'] });
+
+              // Schedule QStash coordinator dispatch if no active one
+              if (!state.refill_qstash_id) {
                 try {
                   const qstashUrl = `https://qstash.upstash.io/v2/publish/https://api.github.com/repos/${owner}/${repo}/dispatches`;
                   const qRes = await fetch(qstashUrl, {
                     method: 'POST',
                     headers: {
                       'Authorization': `Bearer ${process.env.QSTASH_TOKEN}`,
-                      'Upstash-Delay': `${remainingSecs}s`,
+                      'Upstash-Delay': '3600s',
                       'Upstash-Forward-Authorization': `Bearer ${process.env.BOT_PAT}`,
                       'Upstash-Forward-Content-Type': 'application/json',
                       'Content-Type': 'application/json',
                     },
-                    body: payload,
+                    body: JSON.stringify({ event_type: 'bot-cr-coordinator' }),
                   });
                   const qBody = await qRes.json();
-                  qstashId = qBody.messageId ?? null;
+                  state.refill_qstash_id = qBody.messageId ?? '';
+                  state.refill_at = new Date(nowMs + 3_600_000).toISOString();
+                  if (!qRes.ok) core.warning(`QStash returned HTTP ${qRes.status}: ${JSON.stringify(qBody)}`);
+                  else core.info(`QStash coordinator scheduled: ${state.refill_qstash_id}`);
                 } catch (err) {
                   core.warning(`QStash publish failed: ${err.message}`);
                 }
-
-                // Swap label and update HQ
-                const { data: labels } = await github.rest.issues.listLabelsOnIssue({ owner, repo, issue_number: pr_number });
-                for (const l of labels.filter(l => l.name.startsWith('coderabbit:'))) {
-                  try { await github.rest.issues.removeLabel({ owner, repo, issue_number: pr_number, name: l.name }); } catch {}
-                }
-                await github.rest.issues.addLabels({ owner, repo, issue_number: pr_number, labels: ['coderabbit: rate-limited'] });
-
-                const { data: pr } = await github.rest.pulls.get({ owner, repo, pull_number: pr_number });
-                await github.rest.repos.createCommitStatus({
-                  owner, repo, sha: pr.head.sha, state: 'pending',
-                  context: 'coderabbit-review', description: 'CodeRabbit rate-limited · retry scheduled',
-                });
-
-                if (hqComment) {
-                  const rateLimitedSection = [
-                    '<!-- cr-section-start -->',
-                    `<!-- cr-trigger-time: ${triggerTime} -->`,
-                    '',
-                    '### 🔍 CodeRabbit Review',
-                    checkedLabel,
-                    '',
-                    [
-                      '> ⏱ Rate-limited · retry scheduled',
-                      qstashId ? `· QStash ID: \`${qstashId}\`` : '',
-                      `· fires ~${retryAt} UTC`,
-                    ].filter(Boolean).join(' '),
-                    '<!-- cr-section-end -->',
-                  ].join('\n');
-                  try {
-                    await github.rest.issues.updateComment({
-                      owner, repo, comment_id: hqComment.id,
-                      body: hqComment.body.replace(
-                        /<!-- cr-section-start -->[\s\S]*?<!-- cr-section-end -->/,
-                        rateLimitedSection
-                      ),
-                    });
-                  } catch (err) { core.warning(`Could not update HQ comment: ${err.message}`); }
-                }
-                return;
               }
-              core.info(`Pre-existing CR rate-limit found but window has expired (${remainingSecs}s remaining) — proceeding normally.`);
-            }
 
-            // ── swap label to waiting ─────────────────────────────────────────
-
-            const { data: labels } = await github.rest.issues.listLabelsOnIssue({
-              owner, repo, issue_number: pr_number,
-            });
-            for (const l of labels.filter(l => l.name.startsWith('coderabbit:'))) {
-              try {
-                await github.rest.issues.removeLabel({
-                  owner, repo, issue_number: pr_number, name: l.name,
+              // Write state back
+              if (queueIssue) {
+                await github.rest.issues.update({
+                  owner, repo, issue_number: queueIssue.number,
+                  body: serializeQueueState(state),
                 });
-              } catch {}
+              }
+
+              core.info(`PR #${pr_number} enqueued at ${priorityLevel}, ${posStr}`);
             }
-            await github.rest.issues.addLabels({
-              owner, repo, issue_number: pr_number, labels: ['coderabbit: waiting'],
-            });
-
-            // ── set commit status pending ─────────────────────────────────────
-
-            const { data: pr } = await github.rest.pulls.get({
-              owner, repo, pull_number: pr_number,
-            });
-            await github.rest.repos.createCommitStatus({
-              owner, repo, sha: pr.head.sha,
-              state: 'pending',
-              context: 'coderabbit-review',
-              description: 'CodeRabbit review in progress',
-            });
-
-            // ── post @coderabbitai command ────────────────────────────────────
-
-            const crCommand = reviewType === 'full'
-              ? '@coderabbitai full review'
-              : '@coderabbitai review';
-
-            await github.rest.issues.createComment({
-              owner, repo, issue_number: pr_number, body: crCommand,
-            });
-
-            core.info(`Posted "${crCommand}" for PR #${pr_number} (trigger time: ${triggerTime})`);

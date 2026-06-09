@@ -11,7 +11,7 @@ name: Bot — CR Watch
 #
 # Branches:
 #   - Skip detected → complete
-#   - Rate-limit detected → rate-limited + schedule QStash retry
+#   - Rate-limit detected → re-queued via coordinator (no per-PR retry)
 #   - Any other CR comment → no action
 
 on:
@@ -27,9 +27,10 @@ jobs:
       github.event.issue.pull_request != null
     permissions:
       pull-requests: write
+      issues: write
       statuses: write
     steps:
-      - name: Checkout (for coderabbit-logic.mjs import)
+      - name: Checkout (for coderabbit-logic.mjs and bot-queue.mjs import)
         uses: actions/checkout@v4
 
       - name: Evaluate CR comment
@@ -49,6 +50,16 @@ jobs:
             } = await import(
               `file://${path.join(process.env.GITHUB_WORKSPACE, '.github/scripts/coderabbit-logic.mjs')}`
             );
+            const {
+              parseQueueState,
+              computeActualTokens,
+              enqueue,
+              findPRInQueues,
+              serializeQueueState,
+              getPriorityFromCheckbox,
+            } = await import(
+              `file://${path.join(process.env.GITHUB_WORKSPACE, '.github/scripts/bot-queue.mjs')}`
+            );
 
             const { owner, repo } = context.repo;
             const pr_number = context.issue.number;
@@ -58,16 +69,14 @@ jobs:
             // comment (e.g. flipped it to rate-limited). For a fresh create,
             // updated_at === created_at. Either way this is the moment that matters.
             const commentEffectiveAt = comment.updated_at ?? comment.created_at;
+            const nowMs = Date.now();
+            const nowIso = new Date(nowMs).toISOString();
 
-            // ── TEST GUARD: only act on PRs targeting the coderabbit branch ───
-            // Remove this block when promoting to main.
+            // ── fetch PR data ─────────────────────────────────────────────────
+
             const { data: prData } = await github.rest.pulls.get({
               owner, repo, pull_number: pr_number,
             });
-            if (prData.base.ref !== 'coderabbit') {
-              core.info(`PR #${pr_number} targets "${prData.base.ref}", not "coderabbit" — skipping (test guard).`);
-              return;
-            }
 
             // ── guard: PR must have "coderabbit: waiting" label ───────────────
 
@@ -164,52 +173,100 @@ jobs:
             // ── branch: rate-limit detected ───────────────────────────────────
 
             if (isRateLimitComment(commentBody)) {
-              core.info('Rate-limit comment detected — scheduling retry.');
+              core.info('Rate-limit comment detected — re-queuing PR via coordinator.');
 
-              // Parse delay anchored to when CR last touched the comment. For an
-              // edit (CR flipping its summary to rate-limited), updated_at is when
-              // the limit was actually issued — created_at would be stale.
+              // Parse delay for QStash scheduling
               const anchorIso = commentEffectiveAt;
-              const delaySecs = computeRateLimitDelay(commentBody, anchorIso, Date.now());
+              const delaySecs = computeRateLimitDelay(commentBody, anchorIso, nowMs);
 
-              // Determine review_type from HQ comment checkbox state
-              const reviewType = /- \[x\] Full review/i.test(hqComment?.body ?? '')
-                ? 'full' : 'incremental';
+              // Determine priority level from HQ checkbox state
+              const hqPriority = getPriorityFromCheckbox(hqComment?.body ?? '');
+              const requeueLevel = hqPriority ?? 'normal';
 
-              // Publish to QStash
-              const payload = JSON.stringify({
-                event_type: 'bot-coderabbit-retry',
-                client_payload: {
-                  pr_number,
-                  repo: `${owner}/${repo}`,
-                  review_type: reviewType,
-                },
+              // Find Queue Issue and update state
+              const allIssues = await github.paginate(github.rest.issues.listForRepo, {
+                owner, repo, state: 'open', per_page: 100,
               });
-              let qstashId = null;
-              try {
-                const qstashUrl = `https://qstash.upstash.io/v2/publish/https://api.github.com/repos/${owner}/${repo}/dispatches`;
-                const qRes = await fetch(qstashUrl, {
-                  method: 'POST',
-                  headers: {
-                    'Authorization': `Bearer ${process.env.QSTASH_TOKEN}`,
-                    'Upstash-Delay': `${delaySecs}s`,
-                    'Upstash-Forward-Authorization': `Bearer ${process.env.BOT_PAT}`,
-                    'Upstash-Forward-Content-Type': 'application/json',
-                    'Content-Type': 'application/json',
-                  },
-                  body: payload,
-                });
-                const qBody = await qRes.json();
-                qstashId = qBody.messageId ?? null;
-                if (!qRes.ok) core.warning(`QStash returned HTTP ${qRes.status}: ${JSON.stringify(qBody)}`);
-              } catch (err) {
-                core.warning(`QStash publish failed: ${err.message}`);
+              const queueIssue = allIssues.find(i => i.title === '🐰 CodeRabbit Review Queue');
+
+              let state = queueIssue ? parseQueueState(queueIssue.body) : {
+                tokens: 3, last_decremented_at: '', refill_qstash_id: '', refill_at: '',
+                priority: [], normal: [], backburner: [],
+              };
+              state = computeActualTokens(state, nowMs);
+
+              // Note: rate-limit = no token burn — don't decrement
+              // Re-queue at front of its tier (unshift equivalent — use priority which unshifts)
+              // For re-queuing we use a special approach: remove from queue first then re-add at front
+              state = {
+                ...state,
+                priority: state.priority.filter(item => item.pr !== pr_number),
+                normal: state.normal.filter(item => item.pr !== pr_number),
+                backburner: state.backburner.filter(item => item.pr !== pr_number),
+              };
+
+              // Re-add at front of its level queue
+              const requeueItem = {
+                pr: pr_number,
+                title: prData.title,
+                queued_at: nowIso,
+              };
+              if (requeueLevel === 'priority') {
+                state = { ...state, priority: [requeueItem, ...state.priority] };
+              } else if (requeueLevel === 'backburner') {
+                state = { ...state, backburner: [requeueItem, ...state.backburner] };
+              } else {
+                state = { ...state, normal: [requeueItem, ...state.normal] };
               }
 
-              const retryAt = new Date(Date.now() + delaySecs * 1000).toISOString().slice(11, 16);
+              const posInfo = findPRInQueues(state, pr_number);
 
-              await swapLabel('coderabbit: rate-limited');
-              await setStatus('pending', 'CodeRabbit rate-limited · retry scheduled');
+              // Set label to queued
+              await swapLabel('coderabbit: queued');
+              await setStatus('pending', 'CodeRabbit rate-limited · re-queued');
+
+              // Schedule QStash coordinator if no active one or refill_at is past
+              const refillIsPast = state.refill_at
+                ? new Date(state.refill_at).getTime() <= nowMs
+                : true;
+
+              let qstashId = state.refill_qstash_id;
+              let refillAt = state.refill_at;
+
+              if (!state.refill_qstash_id || refillIsPast) {
+                try {
+                  const qstashUrl = `https://qstash.upstash.io/v2/publish/https://api.github.com/repos/${owner}/${repo}/dispatches`;
+                  const qRes = await fetch(qstashUrl, {
+                    method: 'POST',
+                    headers: {
+                      'Authorization': `Bearer ${process.env.QSTASH_TOKEN}`,
+                      'Upstash-Delay': `${delaySecs}s`,
+                      'Upstash-Forward-Authorization': `Bearer ${process.env.BOT_PAT}`,
+                      'Upstash-Forward-Content-Type': 'application/json',
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ event_type: 'bot-cr-coordinator' }),
+                  });
+                  const qBody = await qRes.json();
+                  qstashId = qBody.messageId ?? '';
+                  refillAt = new Date(nowMs + delaySecs * 1_000).toISOString();
+                  if (!qRes.ok) core.warning(`QStash returned HTTP ${qRes.status}: ${JSON.stringify(qBody)}`);
+                  else core.info(`QStash coordinator scheduled in ${delaySecs}s: ${qstashId}`);
+                } catch (err) {
+                  core.warning(`QStash publish failed: ${err.message}`);
+                }
+              }
+
+              state.refill_qstash_id = qstashId ?? '';
+              state.refill_at = refillAt ?? '';
+
+              // Use actual scheduled fire time (refillAt) rather than nowMs+delaySecs
+              // so the HQ comment shows the real coordinator wake time.
+              const retryAt = refillAt
+                ? new Date(refillAt).toISOString().slice(11, 16)
+                : new Date(nowMs + delaySecs * 1_000).toISOString().slice(11, 16);
+              const posStr = posInfo ? `position ${posInfo.position}` : 'queued';
+
               await updateHQCRSection([
                 '<!-- cr-section-start -->',
                 `<!-- cr-trigger-time: ${triggerTime ?? ''} -->`,
@@ -217,13 +274,18 @@ jobs:
                 '### 🔍 CodeRabbit Review',
                 checkedLabel,
                 '',
-                [
-                  `> ⏱ Rate-limited · retry scheduled`,
-                  qstashId ? `· QStash ID: \`${qstashId}\`` : '',
-                  `· fires ~${retryAt} UTC`,
-                ].filter(Boolean).join(' '),
+                `> ⏱ Rate-limited · re-queued at ${posStr} · coordinator fires ~${retryAt} UTC`,
                 '<!-- cr-section-end -->',
               ].join('\n'));
+
+              // Write state back
+              if (queueIssue) {
+                await github.rest.issues.update({
+                  owner, repo, issue_number: queueIssue.number,
+                  body: serializeQueueState(state),
+                });
+              }
+
               return;
             }
 

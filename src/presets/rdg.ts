@@ -117,6 +117,7 @@ const RDGDefaultStrategies = {
 };
 
 /** Full strategies for React Data Grid. Use when you want to supply your own selectors: strategies: Plugins.RDG.Strategies */
+// fallow-ignore-next-line unused-export
 export const RDGStrategies = RDGDefaultStrategies;
 
 /**

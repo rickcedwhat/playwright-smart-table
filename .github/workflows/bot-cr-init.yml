@@ -7,7 +7,6 @@ name: Bot — CR Init
 on:
   pull_request:
     types: [opened]
-    branches: [coderabbit]  # TEST GUARD — remove when promoting to main
 
 jobs:
   init:
@@ -48,14 +47,15 @@ jobs:
               return '### 🔗 Issue Link\n⚠️ No `Closes #N` found — add one to the PR description to auto-close on merge.';
             }
 
-            // CR section initial state — both checkboxes unchecked, no trigger time
+            // CR section initial state — all checkboxes unchecked, no trigger time
             const crSection = [
               '<!-- cr-section-start -->',
               '<!-- cr-trigger-time: -->',
               '',
               '### 🔍 CodeRabbit Review',
-              '- [ ] Full review',
-              '- [ ] Incremental review',
+              '- [ ] 🔴 Priority review _(skips to front)_',
+              '- [ ] 🟡 Normal review _(standard queue)_',
+              '- [ ] ⬜ Backburner review _(triggers only when bucket is full)_',
               '',
               '> _Not yet requested_',
               '<!-- cr-section-end -->',

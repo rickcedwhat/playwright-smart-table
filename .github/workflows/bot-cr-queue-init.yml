@@ -1,0 +1,85 @@
+name: Bot — CR Queue Init
+
+# One-time setup: creates the CodeRabbit Review Queue issue if it doesn't exist.
+# Run manually via workflow_dispatch to bootstrap the queue.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  init-queue:
+    name: Initialize Queue Issue
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - name: Create Queue Issue if missing
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.BOT_PAT }}
+          script: |
+            const { owner, repo } = context.repo;
+
+            // Search for existing Queue Issue
+            const issues = await github.paginate(github.rest.issues.listForRepo, {
+              owner, repo, state: 'open', per_page: 100,
+            });
+            const existing = issues.find(i => i.title === '🐰 CodeRabbit Review Queue');
+
+            if (existing) {
+              core.info(`Queue Issue already exists: #${existing.number} — skipping (no reset in v1).`);
+              return;
+            }
+
+            // Build initial state body
+            const initialBody = [
+              '<!-- cr-queue-state',
+              'tokens: 3',
+              'last_decremented_at: ',
+              'refill_qstash_id: ',
+              'refill_at: ',
+              'priority: []',
+              'normal: []',
+              'backburner: []',
+              '-->',
+              '',
+              '## 🐰 CodeRabbit Review Queue',
+              '🪣 **Token bucket: 3 / 3**',
+              '',
+              '### 🔴 Priority',
+              '| PR | Title | Queued |',
+              '|---|---|---|',
+              '| — | _empty_ | — |',
+              '',
+              '### 🟡 Normal',
+              '| PR | Title | Queued |',
+              '|---|---|---|',
+              '| — | _empty_ | — |',
+              '',
+              '### ⬜ Backburner _(triggers only when bucket is full)_',
+              '| PR | Title | Queued |',
+              '|---|---|---|',
+              '| — | _empty_ | — |',
+            ].join('\n');
+
+            // Create the issue
+            const { data: newIssue } = await github.rest.issues.create({
+              owner, repo,
+              title: '🐰 CodeRabbit Review Queue',
+              body: initialBody,
+              labels: ['bot-managed'],
+            });
+
+            core.info(`Created Queue Issue #${newIssue.number}`);
+
+            // Pin the issue
+            try {
+              await github.graphql(`
+                mutation($issueId: ID!) {
+                  pinIssue(input: { issueId: $issueId }) { issue { number } }
+                }
+              `, { issueId: newIssue.node_id });
+              core.info('Pinned Queue Issue.');
+            } catch (err) {
+              core.warning(`Could not pin issue: ${err.message}`);
+            }

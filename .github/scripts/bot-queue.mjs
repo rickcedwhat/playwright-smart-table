@@ -1,0 +1,375 @@
+/**
+ * Pure functions for CodeRabbit review queue management.
+ * Imported by coordinator/trigger/watch workflows via dynamic import,
+ * and tested by tests/unit/bot/bot-queue.test.ts.
+ */
+
+const DEFAULT_STATE = {
+  tokens: 3,
+  last_decremented_at: '',
+  refill_qstash_id: '',
+  refill_at: '',
+  priority: [],
+  normal: [],
+  backburner: [],
+  reviews_this_session: 0,
+};
+
+/**
+ * Parses the <!-- cr-queue-state ... --> block from the Queue Issue body.
+ * Returns safe default state if block is missing or malformed.
+ *
+ * @param {string|null|undefined} issueBody
+ * @returns {{ tokens: number, last_decremented_at: string, refill_qstash_id: string,
+ *             refill_at: string, priority: Array, normal: Array, backburner: Array,
+ *             reviews_this_session: number }}
+ */
+export function parseQueueState(issueBody) {
+  const body = issueBody ?? '';
+  const m = body.match(/<!-- cr-queue-state\n([\s\S]*?)\n-->/);
+  if (!m) return { ...DEFAULT_STATE };
+
+  const block = m[1];
+  try {
+    const get = (key) => {
+      const line = block.match(new RegExp(`^${key}:\\s*(.*)$`, 'm'));
+      if (!line) return null;
+      const val = line[1].trim();
+      // '-' is the empty placeholder used by serializeQueueState to prevent
+      // GitHub from stripping trailing whitespace and corrupting the next line.
+      return val === '-' ? '' : val;
+    };
+
+    const tokensRaw = get('tokens');
+    const tokens = tokensRaw !== null ? parseInt(tokensRaw, 10) : 3;
+
+    const parseArr = (key) => {
+      const raw = get(key);
+      if (!raw) return [];
+      try {
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    };
+
+    const reviewsRaw = get('reviews_this_session');
+    const reviews_this_session = reviewsRaw !== null ? parseInt(reviewsRaw, 10) : 0;
+
+    return {
+      tokens: isNaN(tokens) ? 3 : Math.min(3, Math.max(0, tokens)),
+      last_decremented_at: get('last_decremented_at') ?? '',
+      refill_qstash_id: get('refill_qstash_id') ?? '',
+      // Validate refill_at is a real ISO string — discard garbage values that
+      // would cause new Date(refill_at).toISOString() to throw RangeError.
+      refill_at: (() => { const v = get('refill_at') ?? ''; try { if (v) new Date(v).toISOString(); return v; } catch { return ''; } })(),
+      priority: parseArr('priority'),
+      normal: parseArr('normal'),
+      backburner: parseArr('backburner'),
+      reviews_this_session: isNaN(reviews_this_session) ? 0 : Math.max(0, reviews_this_session),
+    };
+  } catch {
+    return { ...DEFAULT_STATE };
+  }
+}
+
+/**
+ * Regenerates the full Queue Issue body with machine-readable state block
+ * AND human-readable markdown tables.
+ *
+ * @param {{ tokens: number, last_decremented_at: string, refill_qstash_id: string,
+ *           refill_at: string, priority: Array, normal: Array, backburner: Array,
+ *           reviews_this_session: number }} state
+ * @param {{ inReview?: number, unresolved?: number }} [counts]
+ * @param {Array<{ pr: number, title: string, status: string, updated: string }>} [liveItems]
+ * @returns {string}
+ */
+export function serializeQueueState(state, { inReview = 0, unresolved = 0 } = {}, liveItems = []) {
+  const nowMs = Date.now();
+
+  // Use '-' for empty string values. GitHub strips trailing whitespace from
+  // issue body lines on save, which causes empty values to merge with the next
+  // line's key. A non-whitespace placeholder survives the round-trip.
+  // The parser treats '-' as empty when reading back.
+  const pad = (v) => (v === '' || v == null || v === '-' || (typeof v === 'string' && v.trim() === '')) ? '-' : String(v);
+  const stateBlock = [
+    '<!-- cr-queue-state',
+    `tokens: ${state.tokens}`,
+    `last_decremented_at: ${pad(state.last_decremented_at)}`,
+    `refill_qstash_id: ${pad(state.refill_qstash_id)}`,
+    `refill_at: ${pad(state.refill_at)}`,
+    `priority: ${JSON.stringify(state.priority)}`,
+    `normal: ${JSON.stringify(state.normal)}`,
+    `backburner: ${JSON.stringify(state.backburner)}`,
+    `reviews_this_session: ${state.reviews_this_session || 0}`,
+    '-->',
+  ].join('\n');
+
+  // Bucket line
+  let nextRefillStr = '';
+  if (state.refill_at) {
+    try {
+      const refillMs = new Date(state.refill_at).getTime();
+      const diffMs = refillMs - nowMs;
+      if (diffMs > 0) {
+        const refillHHMM = new Date(refillMs).toISOString().slice(11, 16);
+        nextRefillStr = `· Next refill: ~${refillHHMM} UTC`;
+      }
+    } catch { /* ignore */ }
+  }
+  const qstashStr = state.refill_qstash_id
+    ? `· QStash: \`${state.refill_qstash_id}\``
+    : '';
+  const bucketLine = `🪣 **Token bucket: ${state.tokens} / 3** ${nextRefillStr} ${qstashStr}`.trim();
+
+  const queuedCount = state.priority.length + state.normal.length + state.backburner.length;
+  const statsLine = `📊 ${queuedCount} queued · ${inReview} in review · ${unresolved} unresolved · ${state.reviews_this_session || 0} reviews this session`;
+
+  // ── Queue table: all queued PRs in trigger order with Level column ────────
+
+  const safeTitle = (t) => String(t ?? '')
+    .replace(/\r?\n/g, ' ')
+    .replace(/\\/g, '\\\\')
+    .replace(/\|/g, '\\|');
+
+  const LEVEL_ICON = { priority: '🔴 Priority', normal: '🟡 Normal', backburner: '⬜ Backburner' };
+
+  const buildQueueTable = () => {
+    const lines = ['### 📋 Review Queue'];
+    lines.push('| Level | PR | Title | Queued |');
+    lines.push('|---|---|---|---|');
+    const allQueued = [
+      ...state.priority.map(item => ({ ...item, level: 'priority' })),
+      ...state.normal.map(item => ({ ...item, level: 'normal' })),
+      ...state.backburner.map(item => ({ ...item, level: 'backburner' })),
+    ];
+    if (allQueued.length === 0) {
+      lines.push('| — | _empty_ | — | — |');
+    } else {
+      for (const item of allQueued) {
+        lines.push(`| ${LEVEL_ICON[item.level]} | #${item.pr} | ${safeTitle(item.title)} | ${formatRelativeTime(item.queued_at, nowMs)} |`);
+      }
+    }
+    return lines.join('\n');
+  };
+
+  // ── Live table: open PRs not in queue, sorted by status urgency ──────────
+
+  const STATUS_ICON = {
+    'coderabbit: waiting':     '⏳ Waiting',
+    'coderabbit: unresolved':  '❌ Unresolved',
+    'coderabbit: complete':    '✅ Complete',
+    'coderabbit: not started': '🔲 Not started',
+  };
+
+  // Status sort order: waiting → unresolved → complete → not started
+  const STATUS_ORDER = {
+    'coderabbit: waiting':     0,
+    'coderabbit: unresolved':  1,
+    'coderabbit: complete':    2,
+    'coderabbit: not started': 3,
+  };
+
+  const THREE_DAYS_MS = 3 * 86_400_000;
+
+  const buildLiveTable = (items) => {
+    if (!items || items.length === 0) return null;
+    const sorted = [...items].sort((a, b) => {
+      const ao = STATUS_ORDER[a.status] ?? 99;
+      const bo = STATUS_ORDER[b.status] ?? 99;
+      return ao - bo;
+    });
+    const lines = ['### 🔍 Active PRs'];
+    lines.push('| Status | PR | Title | Updated |');
+    lines.push('|---|---|---|---|');
+    for (const item of sorted) {
+      let icon = STATUS_ICON[item.status] ?? item.status;
+      // Aging warning: unresolved + updated_at > 3 days ago
+      if (item.status === 'coderabbit: unresolved' && item.updated) {
+        const updMs = new Date(item.updated).getTime();
+        if (!isNaN(updMs) && (nowMs - updMs) > THREE_DAYS_MS) {
+          icon = `⚠️ Unresolved`;
+        }
+      }
+      lines.push(`| ${icon} | #${item.pr} | ${safeTitle(item.title)} | ${formatRelativeTime(item.updated, nowMs)} |`);
+    }
+    return lines.join('\n');
+  };
+
+  const liveTable = buildLiveTable(liveItems);
+
+  const parts = [
+    stateBlock,
+    '',
+    '## 🐰 CodeRabbit Review Queue',
+    bucketLine,
+    statsLine,
+    '',
+    buildQueueTable(),
+  ];
+
+  if (liveTable) {
+    parts.push('', liveTable);
+  }
+
+  return parts.join('\n');
+}
+
+/**
+ * Lazy bucket refill: min(3, stored_tokens + floor((nowMs - lastDecrMs) / 3600000))
+ * Returns updated state with recalculated tokens. Does NOT mutate input.
+ *
+ * @param {{ tokens: number, last_decremented_at: string }} state
+ * @param {number} nowMs
+ * @returns {typeof state}
+ */
+export function computeActualTokens(state, nowMs) {
+  if (!state.last_decremented_at) return { ...state };
+  const lastDecrMs = new Date(state.last_decremented_at).getTime();
+  if (isNaN(lastDecrMs)) return { ...state };
+  const hoursElapsed = Math.max(0, Math.floor((nowMs - lastDecrMs) / 3_600_000));
+  const actualTokens = Math.min(3, state.tokens + hoursElapsed);
+  return { ...state, tokens: actualTokens };
+}
+
+/**
+ * Priority selection:
+ *   1. First item in priority[]
+ *   2. First item in normal[]
+ *   3. First item in backburner[] — ONLY if state.tokens === 3
+ *   4. null (nothing to trigger)
+ *
+ * @param {{ tokens: number, priority: Array, normal: Array, backburner: Array }} state
+ * @returns {{ pr: number, title: string, queued_at: string, level: string }|null}
+ */
+export function pickNextPR(state) {
+  if (state.priority.length > 0)
+    return { ...state.priority[0], level: 'priority' };
+  if (state.normal.length > 0)
+    return { ...state.normal[0], level: 'normal' };
+  if (state.backburner.length > 0 && state.tokens === 3)
+    return { ...state.backburner[0], level: 'backburner' };
+  return null;
+}
+
+/**
+ * Add a PR to the appropriate queue.
+ * priority → unshift (front); normal/backburner → push (back)
+ * Idempotent: does not add if PR is already in ANY queue.
+ *
+ * @param {{ priority: Array, normal: Array, backburner: Array }} state
+ * @param {{ pr: number, title: string, queued_at: string }} prInfo
+ * @param {'priority'|'normal'|'backburner'} level
+ * @returns {typeof state}
+ */
+export function enqueue(state, prInfo, level) {
+  // Check all queues for duplicate
+  const inAny = [...state.priority, ...state.normal, ...state.backburner]
+    .some(item => item.pr === prInfo.pr);
+  if (inAny) return { ...state };
+
+  const newState = {
+    ...state,
+    priority: [...state.priority],
+    normal: [...state.normal],
+    backburner: [...state.backburner],
+  };
+
+  if (level === 'priority') {
+    newState.priority.unshift(prInfo);
+  } else if (level === 'normal') {
+    newState.normal.push(prInfo);
+  } else {
+    newState.backburner.push(prInfo);
+  }
+
+  return newState;
+}
+
+/**
+ * Remove a PR from all queues by pr number. Returns updated state.
+ *
+ * @param {{ priority: Array, normal: Array, backburner: Array }} state
+ * @param {number} prNumber
+ * @returns {typeof state}
+ */
+export function dequeue(state, prNumber) {
+  return {
+    ...state,
+    priority: state.priority.filter(item => item.pr !== prNumber),
+    normal: state.normal.filter(item => item.pr !== prNumber),
+    backburner: state.backburner.filter(item => item.pr !== prNumber),
+  };
+}
+
+/**
+ * Returns position info for a PR in the queues, or null if not found.
+ *
+ * @param {{ priority: Array, normal: Array, backburner: Array }} state
+ * @param {number} prNumber
+ * @returns {{ level: string, position: number, total: number }|null}
+ */
+export function findPRInQueues(state, prNumber) {
+  const queues = [
+    { level: 'priority', items: state.priority },
+    { level: 'normal', items: state.normal },
+    { level: 'backburner', items: state.backburner },
+  ];
+  for (const { level, items } of queues) {
+    const idx = items.findIndex(item => item.pr === prNumber);
+    if (idx !== -1) {
+      return { level, position: idx + 1, total: items.length };
+    }
+  }
+  return null;
+}
+
+/**
+ * Returns human-readable relative time.
+ *
+ * @param {string} isoString
+ * @param {number} nowMs
+ * @returns {string}
+ */
+export function formatRelativeTime(isoString, nowMs) {
+  if (!isoString) return '';
+  const ms = new Date(isoString).getTime();
+  if (isNaN(ms)) return '';
+  const diffMs = nowMs - ms;
+  if (diffMs < 60_000) return 'just now';
+  const diffMins = Math.floor(diffMs / 60_000);
+  if (diffMins < 60) return `${diffMins}m ago`;
+  const diffHours = Math.floor(diffMs / 3_600_000);
+  if (diffHours < 24) return `${diffHours}h ago`;
+  const diffDays = Math.floor(diffMs / 86_400_000);
+  return `${diffDays}d ago`;
+}
+
+/**
+ * Increments reviews_this_session by 1. Does NOT mutate input.
+ *
+ * @param {{ reviews_this_session?: number }} state
+ * @returns {typeof state}
+ */
+export function incrementReviewsThisSession(state) {
+  return { ...state, reviews_this_session: (state.reviews_this_session || 0) + 1 };
+}
+
+/**
+ * Extract priority level from HQ comment body checkbox state.
+ * Checks for: '- [x] 🔴', '- [x] 🟡', '- [x] ⬜' (new style)
+ * Falls back to '- [x] Full review' → 'normal' (backward compat)
+ * Returns 'priority' | 'normal' | 'backburner' | null
+ *
+ * @param {string|null|undefined} hqBody
+ * @returns {'priority'|'normal'|'backburner'|null}
+ */
+export function getPriorityFromCheckbox(hqBody) {
+  const body = hqBody ?? '';
+  if (/- \[x\] 🔴/u.test(body)) return 'priority';
+  if (/- \[x\] 🟡/u.test(body)) return 'normal';
+  if (/- \[x\] ⬜/u.test(body)) return 'backburner';
+  if (/- \[x\] Full review/i.test(body)) return 'normal'; // backward compat
+  return null;
+}

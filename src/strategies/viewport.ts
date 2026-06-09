@@ -1,5 +1,6 @@
 import { ViewportStrategy } from '../types';
 
+// fallow-ignore-next-line unused-type
 export type DataAttributeViewportOptions = {
     /**
      * CSS selector for the scroll container (the element with overflow: auto/scroll).

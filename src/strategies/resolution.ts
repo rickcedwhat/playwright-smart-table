@@ -1,6 +1,8 @@
+// fallow-ignore-file circular-dependency
 import { Locator, Page } from '@playwright/test';
 import { StrategyContext } from '../types';
 
+// fallow-ignore-next-line unused-type
 export interface ColumnResolutionStrategy {
     /**
      * Resolves a column name (string or Regex) to a column index.

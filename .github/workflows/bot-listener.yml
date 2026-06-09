@@ -362,6 +362,111 @@ jobs:
               content: '+1'
             });
 
+  # ── promote ────────────────────────────────────────────────────────────────
+  promote-pr:
+    name: promote PR to priority queue
+    runs-on: ubuntu-latest
+    if: |
+      github.event.action == 'created' &&
+      startsWith(github.event.comment.body, '@rickcedwhat-ai promote') &&
+      github.event.comment.user.login != 'rickcedwhat-ai'
+    permissions:
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Checkout (for bot-queue.mjs import)
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - name: Promote PR
+        uses: actions/github-script@v9
+        env:
+          BOT_PAT: ${{ secrets.BOT_PAT }}
+        with:
+          github-token: ${{ secrets.BOT_PAT }}
+          script: |
+            const path = require('path');
+            const {
+              parseQueueState,
+              serializeQueueState,
+              dequeue,
+              enqueue,
+              findPRInQueues,
+            } = await import(
+              `file://${path.join(process.env.GITHUB_WORKSPACE, '.github/scripts/bot-queue.mjs')}`
+            );
+
+            const { owner, repo } = context.repo;
+            const commentBody = context.payload.comment.body || '';
+
+            // Parse #N from comment
+            const prMatch = commentBody.match(/#(\d+)/);
+            if (!prMatch) {
+              await github.rest.issues.createComment({
+                owner, repo, issue_number: context.issue.number,
+                body: '❌ Could not parse PR number. Usage: `@rickcedwhat-ai promote #N`',
+              });
+              return;
+            }
+            const prNumber = parseInt(prMatch[1], 10);
+
+            // Find Queue Issue
+            const allIssues = await github.paginate(github.rest.issues.listForRepo, {
+              owner, repo, state: 'open', per_page: 100,
+            });
+            const queueIssue = allIssues.find(i => i.title === '🐰 CodeRabbit Review Queue');
+            if (!queueIssue) {
+              await github.rest.issues.createComment({
+                owner, repo, issue_number: context.issue.number,
+                body: '❌ Queue Issue not found.',
+              });
+              return;
+            }
+
+            let state = parseQueueState(queueIssue.body);
+
+            // Check if PR is in normal or backburner queue
+            const posInfo = findPRInQueues(state, prNumber);
+            if (!posInfo || posInfo.level === 'priority') {
+              const msg = posInfo?.level === 'priority'
+                ? `PR #${prNumber} is already in the 🔴 Priority queue.`
+                : `PR #${prNumber} is not in the queue.`;
+              await github.rest.issues.createComment({
+                owner, repo, issue_number: context.issue.number, body: msg,
+              });
+              return;
+            }
+
+            // Get PR title from the queue entry
+            const queueEntry = [...state.normal, ...state.backburner]
+              .find(item => item.pr === prNumber);
+
+            // Dequeue then enqueue at front of priority
+            state = dequeue(state, prNumber);
+            state = enqueue(state, {
+              pr: prNumber,
+              title: queueEntry?.title ?? `PR #${prNumber}`,
+              queued_at: queueEntry?.queued_at ?? new Date().toISOString(),
+            }, 'priority');
+
+            // Write updated state
+            await github.rest.issues.update({
+              owner, repo, issue_number: queueIssue.number,
+              body: serializeQueueState(state),
+            });
+
+            // Post confirmation
+            await github.rest.issues.createComment({
+              owner, repo, issue_number: context.issue.number,
+              body: `✅ PR #${prNumber} promoted to 🔴 Priority queue.`,
+            });
+
+            // React with thumbs up on command comment
+            await github.rest.reactions.createForIssueComment({
+              owner, repo, comment_id: context.payload.comment.id, content: '+1',
+            });
+
   # ── help / unknown ─────────────────────────────────────────────────────────
   help:
     name: help
@@ -397,6 +502,7 @@ jobs:
                 '|---|---|',
                 '| `@rickcedwhat-ai review` | Trigger full CodeRabbit review (rate-limit retries are automatic) |',
                 '| `@rickcedwhat-ai review incremental` | Trigger incremental review (new commits only) |',
+                '| `@rickcedwhat-ai promote #N` | Move PR #N to the front of the priority queue |',
                 '',
                 '**Anywhere:**',
                 '| Command | Description |',
