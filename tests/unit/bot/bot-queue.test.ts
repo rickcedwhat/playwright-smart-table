@@ -9,6 +9,7 @@ import {
   findPRInQueues,
   formatRelativeTime,
   getPriorityFromCheckbox,
+  incrementReviewsThisSession,
 } from '../../../.github/scripts/bot-queue.mjs';
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -28,6 +29,7 @@ function makeFullBody(overrides: Partial<{
   priority: object[];
   normal: object[];
   backburner: object[];
+  reviews_this_session: number;
 }> = {}) {
   const s = {
     tokens: 2,
@@ -37,6 +39,7 @@ function makeFullBody(overrides: Partial<{
     priority: [makePR(261, 'feat: auth')],
     normal: [makePR(262, 'fix: typo')],
     backburner: [],
+    reviews_this_session: 0,
     ...overrides,
   };
   return [
@@ -48,6 +51,7 @@ function makeFullBody(overrides: Partial<{
     `priority: ${JSON.stringify(s.priority)}`,
     `normal: ${JSON.stringify(s.normal)}`,
     `backburner: ${JSON.stringify(s.backburner)}`,
+    `reviews_this_session: ${s.reviews_this_session}`,
     '-->',
     'Some body content',
   ].join('\n');
@@ -459,5 +463,134 @@ describe('getPriorityFromCheckbox', () => {
     const body = '- [ ] 🔴 Priority review\n- [ ] 🟡 Normal review\n- [ ] ⬜ Backburner review\n- [x] Incremental review';
     // Incremental review is not a priority checkbox, so returns null (no priority/normal/backburner checkbox checked)
     expect(getPriorityFromCheckbox(body)).toBeNull();
+  });
+});
+
+// ── parseQueueState — reviews_this_session ────────────────────────────────────
+
+describe('parseQueueState — reviews_this_session', () => {
+  it('reads reviews_this_session correctly when present', () => {
+    const body = makeFullBody({ reviews_this_session: 7 });
+    const state = parseQueueState(body);
+    expect(state.reviews_this_session).toBe(7);
+  });
+
+  it('defaults to 0 when reviews_this_session is missing from block', () => {
+    // Build a body without reviews_this_session line
+    const body = [
+      '<!-- cr-queue-state',
+      'tokens: 2',
+      'last_decremented_at: -',
+      'refill_qstash_id: -',
+      'refill_at: -',
+      'priority: []',
+      'normal: []',
+      'backburner: []',
+      '-->',
+    ].join('\n');
+    const state = parseQueueState(body);
+    expect(state.reviews_this_session).toBe(0);
+  });
+
+  it('defaults to 0 when block is missing entirely', () => {
+    const state = parseQueueState('no state block');
+    expect(state.reviews_this_session).toBe(0);
+  });
+});
+
+// ── serializeQueueState — stats line ─────────────────────────────────────────
+
+describe('serializeQueueState — stats line', () => {
+  it('includes stats line with correct queued count', () => {
+    const state = {
+      tokens: 2,
+      last_decremented_at: '',
+      refill_qstash_id: '',
+      refill_at: '',
+      priority: [makePR(1)],
+      normal: [makePR(2), makePR(3)],
+      backburner: [],
+      reviews_this_session: 5,
+    };
+    const body = serializeQueueState(state);
+    // 3 queued total (1 priority + 2 normal + 0 backburner)
+    expect(body).toContain('3 queued');
+    expect(body).toContain('5 reviews this session');
+  });
+
+  it('includes inReview and unresolved counts when passed', () => {
+    const state = {
+      tokens: 1,
+      last_decremented_at: '',
+      refill_qstash_id: '',
+      refill_at: '',
+      priority: [],
+      normal: [],
+      backburner: [],
+      reviews_this_session: 0,
+    };
+    const body = serializeQueueState(state, { inReview: 2, unresolved: 3 });
+    expect(body).toContain('2 in review');
+    expect(body).toContain('3 unresolved');
+  });
+
+  it('defaults inReview and unresolved to 0 when second arg omitted', () => {
+    const state = {
+      tokens: 3,
+      last_decremented_at: '',
+      refill_qstash_id: '',
+      refill_at: '',
+      priority: [],
+      normal: [],
+      backburner: [],
+      reviews_this_session: 0,
+    };
+    const body = serializeQueueState(state);
+    expect(body).toContain('0 in review');
+    expect(body).toContain('0 unresolved');
+  });
+
+  it('round-trips reviews_this_session through parse→serialize→parse', () => {
+    const state = {
+      tokens: 2,
+      last_decremented_at: ISO,
+      refill_qstash_id: 'msg_x',
+      refill_at: new Date(NOW + 3_600_000).toISOString(),
+      priority: [makePR(1)],
+      normal: [],
+      backburner: [],
+      reviews_this_session: 12,
+    };
+    const serialized = serializeQueueState(state);
+    const parsed = parseQueueState(serialized);
+    expect(parsed.reviews_this_session).toBe(12);
+  });
+});
+
+// ── incrementReviewsThisSession ───────────────────────────────────────────────
+
+describe('incrementReviewsThisSession', () => {
+  it('increments from 0 to 1', () => {
+    const state = { reviews_this_session: 0 };
+    const result = incrementReviewsThisSession(state);
+    expect(result.reviews_this_session).toBe(1);
+  });
+
+  it('increments from N to N+1', () => {
+    const state = { reviews_this_session: 5 };
+    const result = incrementReviewsThisSession(state);
+    expect(result.reviews_this_session).toBe(6);
+  });
+
+  it('treats missing reviews_this_session as 0', () => {
+    const state = {};
+    const result = incrementReviewsThisSession(state);
+    expect(result.reviews_this_session).toBe(1);
+  });
+
+  it('does not mutate input state', () => {
+    const state = { reviews_this_session: 3 };
+    incrementReviewsThisSession(state);
+    expect(state.reviews_this_session).toBe(3);
   });
 });

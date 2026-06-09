@@ -43,6 +43,8 @@ jobs:
               enqueue,
               dequeue,
               pickNextPR,
+              findPRInQueues,
+              incrementReviewsThisSession,
             } = await import(
               `file://${path.join(process.env.GITHUB_WORKSPACE, '.github/scripts/bot-queue.mjs')}`
             );
@@ -75,11 +77,15 @@ jobs:
             const allPRs = await github.paginate(github.rest.pulls.list, {
               owner, repo, state: 'open', per_page: 100,
             });
+            let waitingCount = 0;
+            let unresolvedCount = 0;
             for (const pr of allPRs) {
               const { data: labelData } = await github.rest.issues.listLabelsOnIssue({
                 owner, repo, issue_number: pr.number,
               });
               const labelNames = labelData.map(l => l.name);
+              if (labelNames.includes('coderabbit: waiting')) waitingCount++;
+              if (labelNames.includes('coderabbit: unresolved')) unresolvedCount++;
               if (!labelNames.includes('coderabbit: rate-limited')) continue;
 
               const inQueue = [...state.priority, ...state.normal, ...state.backburner]
@@ -151,11 +157,22 @@ jobs:
 
             core.info(`Triggering review for PR #${next.pr} (${next.level})`);
 
+            // Capture position before dequeue (for re-trigger notification)
+            const posInfoBeforeDequeue = findPRInQueues(state, next.pr);
+
             // Post @coderabbitai full review
             await github.rest.issues.createComment({
               owner, repo, issue_number: next.pr,
               body: '@coderabbitai full review',
             });
+
+            // Post re-trigger notification (fire-and-forget — don't block state write on failure)
+            if (posInfoBeforeDequeue) {
+              github.rest.issues.createComment({
+                owner, repo, issue_number: next.pr,
+                body: `🔄 Re-triggered by coordinator — picked from the ${next.level} queue (position was #${posInfoBeforeDequeue.position}).`,
+              }).catch(err => core.warning(`Re-trigger notification failed: ${err.message}`));
+            }
 
             // Swap label: remove all coderabbit: labels, add coderabbit: waiting
             const { data: labels } = await github.rest.issues.listLabelsOnIssue({
@@ -172,9 +189,16 @@ jobs:
               owner, repo, issue_number: next.pr, labels: ['coderabbit: waiting'],
             });
 
+            // Update live counts to reflect the label change just made
+            // (the PR moved from queued → waiting, so increment waitingCount)
+            waitingCount++;
+
             // Decrement tokens
             state.tokens = Math.max(0, state.tokens - 1);
             state.last_decremented_at = triggerTime;
+
+            // Increment session review counter
+            state = incrementReviewsThisSession(state);
 
             // Remove from queue
             state = dequeue(state, next.pr);
@@ -261,7 +285,7 @@ jobs:
               const { serializeQueueState: ser } = await import(
                 `file://${path.join(process.env.GITHUB_WORKSPACE, '.github/scripts/bot-queue.mjs')}`
               );
-              const newBody = ser(s);
+              const newBody = ser(s, { inReview: waitingCount, unresolved: unresolvedCount });
               await github.rest.issues.update({
                 owner, repo, issue_number: queueIssue.number, body: newBody,
               });

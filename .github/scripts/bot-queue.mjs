@@ -12,6 +12,7 @@ const DEFAULT_STATE = {
   priority: [],
   normal: [],
   backburner: [],
+  reviews_this_session: 0,
 };
 
 /**
@@ -20,7 +21,8 @@ const DEFAULT_STATE = {
  *
  * @param {string|null|undefined} issueBody
  * @returns {{ tokens: number, last_decremented_at: string, refill_qstash_id: string,
- *             refill_at: string, priority: Array, normal: Array, backburner: Array }}
+ *             refill_at: string, priority: Array, normal: Array, backburner: Array,
+ *             reviews_this_session: number }}
  */
 export function parseQueueState(issueBody) {
   const body = issueBody ?? '';
@@ -52,6 +54,9 @@ export function parseQueueState(issueBody) {
       }
     };
 
+    const reviewsRaw = get('reviews_this_session');
+    const reviews_this_session = reviewsRaw !== null ? parseInt(reviewsRaw, 10) : 0;
+
     return {
       tokens: isNaN(tokens) ? 3 : Math.min(3, Math.max(0, tokens)),
       last_decremented_at: get('last_decremented_at') ?? '',
@@ -62,6 +67,7 @@ export function parseQueueState(issueBody) {
       priority: parseArr('priority'),
       normal: parseArr('normal'),
       backburner: parseArr('backburner'),
+      reviews_this_session: isNaN(reviews_this_session) ? 0 : Math.max(0, reviews_this_session),
     };
   } catch {
     return { ...DEFAULT_STATE };
@@ -73,10 +79,12 @@ export function parseQueueState(issueBody) {
  * AND human-readable markdown tables.
  *
  * @param {{ tokens: number, last_decremented_at: string, refill_qstash_id: string,
- *           refill_at: string, priority: Array, normal: Array, backburner: Array }} state
+ *           refill_at: string, priority: Array, normal: Array, backburner: Array,
+ *           reviews_this_session: number }} state
+ * @param {{ inReview?: number, unresolved?: number }} [counts]
  * @returns {string}
  */
-export function serializeQueueState(state) {
+export function serializeQueueState(state, { inReview = 0, unresolved = 0 } = {}) {
   const nowMs = Date.now();
 
   // Use '-' for empty string values. GitHub strips trailing whitespace from
@@ -93,6 +101,7 @@ export function serializeQueueState(state) {
     `priority: ${JSON.stringify(state.priority)}`,
     `normal: ${JSON.stringify(state.normal)}`,
     `backburner: ${JSON.stringify(state.backburner)}`,
+    `reviews_this_session: ${state.reviews_this_session || 0}`,
     '-->',
   ].join('\n');
 
@@ -112,6 +121,9 @@ export function serializeQueueState(state) {
     ? `· QStash: \`${state.refill_qstash_id}\``
     : '';
   const bucketLine = `🪣 **Token bucket: ${state.tokens} / 3** ${nextRefillStr} ${qstashStr}`.trim();
+
+  const queuedCount = state.priority.length + state.normal.length + state.backburner.length;
+  const statsLine = `📊 ${queuedCount} queued · ${inReview} in review · ${unresolved} unresolved · ${state.reviews_this_session || 0} reviews this session`;
 
   const buildTable = (items, label) => {
     const lines = [];
@@ -141,6 +153,7 @@ export function serializeQueueState(state) {
     '',
     '## 🐰 CodeRabbit Review Queue',
     bucketLine,
+    statsLine,
     '',
     buildTable(state.priority, '🔴 Priority'),
     '',
@@ -280,6 +293,16 @@ export function formatRelativeTime(isoString, nowMs) {
   if (diffHours < 24) return `${diffHours}h ago`;
   const diffDays = Math.floor(diffMs / 86_400_000);
   return `${diffDays}d ago`;
+}
+
+/**
+ * Increments reviews_this_session by 1. Does NOT mutate input.
+ *
+ * @param {{ reviews_this_session?: number }} state
+ * @returns {typeof state}
+ */
+export function incrementReviewsThisSession(state) {
+  return { ...state, reviews_this_session: (state.reviews_this_session || 0) + 1 };
 }
 
 /**
