@@ -567,6 +567,203 @@ describe('serializeQueueState — stats line', () => {
   });
 });
 
+// ── serializeQueueState — two-table dashboard ────────────────────────────────
+
+describe('serializeQueueState — two-table dashboard', () => {
+  it('queue table shows all three tiers in order with Level column', () => {
+    const state = {
+      tokens: 2,
+      last_decremented_at: '',
+      refill_qstash_id: '',
+      refill_at: '',
+      priority: [makePR(261, 'feat: auth')],
+      normal: [makePR(258, 'fix: bug')],
+      backburner: [makePR(214, 'chore: deps')],
+      reviews_this_session: 0,
+    };
+    const body = serializeQueueState(state);
+    // Queue table header
+    expect(body).toContain('### 📋 Review Queue');
+    expect(body).toContain('| Level | PR | Title | Queued |');
+    // All three entries present with level icons
+    expect(body).toContain('🔴 Priority');
+    expect(body).toContain('#261');
+    expect(body).toContain('🟡 Normal');
+    expect(body).toContain('#258');
+    expect(body).toContain('⬜ Backburner');
+    expect(body).toContain('#214');
+    // Priority appears before normal, normal before backburner
+    const priorityIdx = body.indexOf('#261');
+    const normalIdx = body.indexOf('#258');
+    const backburnerIdx = body.indexOf('#214');
+    expect(priorityIdx).toBeLessThan(normalIdx);
+    expect(normalIdx).toBeLessThan(backburnerIdx);
+  });
+
+  it('queue table shows empty row when all queues empty', () => {
+    const state = {
+      tokens: 3,
+      last_decremented_at: '',
+      refill_qstash_id: '',
+      refill_at: '',
+      priority: [],
+      normal: [],
+      backburner: [],
+      reviews_this_session: 0,
+    };
+    const body = serializeQueueState(state);
+    expect(body).toContain('### 📋 Review Queue');
+    expect(body).toContain('| — | _empty_ | — | — |');
+  });
+
+  it('live table appears when liveItems provided', () => {
+    const state = {
+      tokens: 3,
+      last_decremented_at: '',
+      refill_qstash_id: '',
+      refill_at: '',
+      priority: [],
+      normal: [],
+      backburner: [],
+      reviews_this_session: 0,
+    };
+    const liveItems = [
+      { pr: 264, title: 'test: parseNumber', status: 'coderabbit: waiting', updated: ISO },
+    ];
+    const body = serializeQueueState(state, {}, liveItems);
+    expect(body).toContain('### 🔍 Active PRs');
+    expect(body).toContain('#264');
+    expect(body).toContain('⏳ Waiting');
+  });
+
+  it('live table omitted when liveItems is empty', () => {
+    const state = {
+      tokens: 3,
+      last_decremented_at: '',
+      refill_qstash_id: '',
+      refill_at: '',
+      priority: [],
+      normal: [],
+      backburner: [],
+      reviews_this_session: 0,
+    };
+    const body = serializeQueueState(state, {}, []);
+    expect(body).not.toContain('### 🔍 Active PRs');
+  });
+
+  it('live table omitted when liveItems not passed', () => {
+    const state = {
+      tokens: 3,
+      last_decremented_at: '',
+      refill_qstash_id: '',
+      refill_at: '',
+      priority: [],
+      normal: [],
+      backburner: [],
+      reviews_this_session: 0,
+    };
+    const body = serializeQueueState(state);
+    expect(body).not.toContain('### 🔍 Active PRs');
+  });
+
+  it('status icons map correctly for all four statuses', () => {
+    const state = {
+      tokens: 3,
+      last_decremented_at: '',
+      refill_qstash_id: '',
+      refill_at: '',
+      priority: [],
+      normal: [],
+      backburner: [],
+      reviews_this_session: 0,
+    };
+    const liveItems = [
+      { pr: 1, title: 'waiting PR',     status: 'coderabbit: waiting',     updated: ISO },
+      { pr: 2, title: 'unresolved PR',  status: 'coderabbit: unresolved',  updated: ISO },
+      { pr: 3, title: 'complete PR',    status: 'coderabbit: complete',    updated: ISO },
+      { pr: 4, title: 'not started PR', status: 'coderabbit: not started', updated: ISO },
+    ];
+    const body = serializeQueueState(state, {}, liveItems);
+    expect(body).toContain('⏳ Waiting');
+    expect(body).toContain('❌ Unresolved');
+    expect(body).toContain('✅ Complete');
+    expect(body).toContain('🔲 Not started');
+  });
+
+  it('live table sorted by status urgency: waiting → unresolved → complete → not started', () => {
+    const state = {
+      tokens: 3,
+      last_decremented_at: '',
+      refill_qstash_id: '',
+      refill_at: '',
+      priority: [],
+      normal: [],
+      backburner: [],
+      reviews_this_session: 0,
+    };
+    const liveItems = [
+      { pr: 10, title: 'not started PR', status: 'coderabbit: not started', updated: ISO },
+      { pr: 11, title: 'complete PR',    status: 'coderabbit: complete',    updated: ISO },
+      { pr: 12, title: 'unresolved PR',  status: 'coderabbit: unresolved',  updated: ISO },
+      { pr: 13, title: 'waiting PR',     status: 'coderabbit: waiting',     updated: ISO },
+    ];
+    const body = serializeQueueState(state, {}, liveItems);
+    const waitingIdx    = body.indexOf('#13');
+    const unresolvedIdx = body.indexOf('#12');
+    const completeIdx   = body.indexOf('#11');
+    const notStartedIdx = body.indexOf('#10');
+    expect(waitingIdx).toBeLessThan(unresolvedIdx);
+    expect(unresolvedIdx).toBeLessThan(completeIdx);
+    expect(completeIdx).toBeLessThan(notStartedIdx);
+  });
+
+  it('aging warning (⚠️) appears for unresolved PRs older than 3 days', () => {
+    const state = {
+      tokens: 3,
+      last_decremented_at: '',
+      refill_qstash_id: '',
+      refill_at: '',
+      priority: [],
+      normal: [],
+      backburner: [],
+      reviews_this_session: 0,
+    };
+    const oldIso = new Date(NOW - 4 * 86_400_000).toISOString(); // 4 days ago
+    const recentIso = new Date(NOW - 1 * 86_400_000).toISOString(); // 1 day ago
+    const liveItems = [
+      { pr: 20, title: 'old unresolved', status: 'coderabbit: unresolved', updated: oldIso },
+      { pr: 21, title: 'new unresolved', status: 'coderabbit: unresolved', updated: recentIso },
+    ];
+    const body = serializeQueueState(state, {}, liveItems);
+    // Old one should have warning prefix
+    expect(body).toContain('⚠️ Unresolved');
+    // New one should have regular icon (but ❌ Unresolved)
+    expect(body).toContain('❌ Unresolved');
+  });
+
+  it('no aging warning for unresolved PRs less than 3 days old', () => {
+    const state = {
+      tokens: 3,
+      last_decremented_at: '',
+      refill_qstash_id: '',
+      refill_at: '',
+      priority: [],
+      normal: [],
+      backburner: [],
+      reviews_this_session: 0,
+    };
+    // 1 day ago — well under the 3-day threshold
+    const recentIso = new Date(NOW - 1 * 86_400_000).toISOString();
+    const liveItems = [
+      { pr: 30, title: 'recent unresolved', status: 'coderabbit: unresolved', updated: recentIso },
+    ];
+    const body = serializeQueueState(state, {}, liveItems);
+    // Less than 3 days: no aging warning
+    expect(body).not.toContain('⚠️ Unresolved');
+    expect(body).toContain('❌ Unresolved');
+  });
+});
+
 // ── incrementReviewsThisSession ───────────────────────────────────────────────
 
 describe('incrementReviewsThisSession', () => {
