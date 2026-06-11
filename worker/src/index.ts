@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { Receiver } from '@upstash/qstash';
 import { GitHubClient } from './lib/github.js';
 import { StateManager } from './lib/state.js';
 import { handlePullRequest, handleIssueComment, handlePullRequestReview } from './handlers/webhook.js';
@@ -39,25 +40,15 @@ async function verifyQStashSignature(
   signatureHeader: string | null,
 ): Promise<boolean> {
   if (!signatureHeader) return false;
-
-  const encoder = new TextEncoder();
-
-  const verify = async (key: string): Promise<boolean> => {
-    const cryptoKey = await crypto.subtle.importKey(
-      'raw',
-      encoder.encode(key),
-      { name: 'HMAC', hash: 'SHA-256' },
-      false,
-      ['sign'],
-    );
-    const sig = await crypto.subtle.sign('HMAC', cryptoKey, encoder.encode(body));
-    const expected = Array.from(new Uint8Array(sig))
-      .map(b => b.toString(16).padStart(2, '0'))
-      .join('');
-    return signatureHeader === expected;
-  };
-
-  return (await verify(currentKey)) || (await verify(nextKey));
+  // Upstash-Signature is a JWT — use the official Receiver which validates
+  // the JWT signature, iss/sub/exp/nbf claims, and body hash correctly.
+  const receiver = new Receiver({ currentSigningKey: currentKey, nextSigningKey: nextKey });
+  try {
+    await receiver.verify({ signature: signatureHeader, body });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 const app = new Hono<{ Bindings: Env }>();
