@@ -1,0 +1,22 @@
+name = "cr-bot"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+account_id = "d9827daf3c416e4c825e1af18e5e408a"
+
+[vars]
+GITHUB_REPO = "rickcedwhat/playwright-smart-table"
+QUEUE_ISSUE_NUMBER = "262"
+
+# Secrets (set via: wrangler secret put SECRET_NAME)
+# BOT_PAT
+# WEBHOOK_SECRET
+# QSTASH_TOKEN
+# QSTASH_CURRENT_SIGNING_KEY
+# QSTASH_NEXT_SIGNING_KEY
+# UPSTASH_REDIS_REST_URL
+# UPSTASH_REDIS_REST_TOKEN
+
+[env.staging]
+name = "cr-bot-staging"
+vars = { GITHUB_REPO = "rickcedwhat/playwright-smart-table", QUEUE_ISSUE_NUMBER = "262" }
