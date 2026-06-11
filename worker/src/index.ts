@@ -126,4 +126,40 @@ app.post('/coordinator', async (c) => {
   }
 });
 
+app.post('/reminder', async (c) => {
+  const body = await c.req.text();
+  const signatureHeader = c.req.header('Upstash-Signature');
+
+  const valid = await verifyQStashSignature(
+    c.env.QSTASH_CURRENT_SIGNING_KEY,
+    c.env.QSTASH_NEXT_SIGNING_KEY,
+    body,
+    signatureHeader ?? null,
+  );
+  if (!valid) {
+    return c.json({ error: 'Invalid QStash signature' }, 401);
+  }
+
+  let payload: { pr_number?: number; repo?: string };
+  try {
+    payload = JSON.parse(body);
+  } catch {
+    return c.json({ error: 'Invalid JSON' }, 400);
+  }
+
+  const prNumber = payload.pr_number;
+  if (!prNumber) {
+    return c.json({ error: 'Missing pr_number' }, 400);
+  }
+
+  const github = new GitHubClient(c.env.BOT_PAT, c.env.GITHUB_REPO);
+  try {
+    await github.createComment(prNumber, '👋 Reminder: this PR is still open.');
+    return c.json({ ok: true });
+  } catch (err) {
+    console.error('Reminder handler error:', err);
+    return c.json({ error: 'Internal error' }, 500);
+  }
+});
+
 export default app;

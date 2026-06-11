@@ -164,7 +164,7 @@ export async function handleCoordinator(ctx: CoordinatorContext): Promise<void> 
   await updateQueueIssueDashboard(github, env, queueState);
 }
 
-async function updateQueueIssueDashboard(
+export async function updateQueueIssueDashboard(
   github: GitHubClient,
   env: Env,
   queueState: QueueState,
