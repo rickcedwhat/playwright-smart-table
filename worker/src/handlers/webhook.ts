@@ -207,10 +207,18 @@ async function triggerOrEnqueue(
       await github.updateComment(hq.id, updatedBody);
     }
 
-    // Schedule coordinator if not already scheduled
+    // Schedule coordinator if not already scheduled, and persist the messageId
     if (!newQueueState.refill_qstash_id) {
       const workerUrl = `https://cr-bot.${env.GITHUB_REPO.split('/')[0]}.workers.dev`;
-      await scheduleCoordinator(env.QSTASH_TOKEN, 60, workerUrl);
+      const msgId = await scheduleCoordinator(env.QSTASH_TOKEN, 60, workerUrl);
+      if (msgId) {
+        const withSchedule = {
+          ...newQueueState,
+          refill_qstash_id: msgId,
+          refill_at: new Date(Date.now() + 60_000).toISOString(),
+        };
+        await state.saveState(withSchedule);
+      }
     }
   }
 }
@@ -241,9 +249,17 @@ export async function handlePullRequest(ctx: HandlerContext): Promise<void> {
 
   if (action === 'synchronize') {
     const labels = await github.getLabels(prNumber);
-    const isTerminal = labels.includes('coderabbit: complete') || labels.includes('coderabbit: unresolved');
+    // Reset on any non-trivial CR state — terminal (complete/unresolved) AND
+    // in-flight (waiting/queued/rate-limited). Only leave not-started alone.
+    const shouldReset = labels.some(l =>
+      l === 'coderabbit: complete' ||
+      l === 'coderabbit: unresolved' ||
+      l === 'coderabbit: waiting' ||
+      l === 'coderabbit: queued' ||
+      l === 'coderabbit: rate-limited',
+    );
 
-    if (isTerminal) {
+    if (shouldReset) {
       // Remove all CR labels, add not started
       await setExclusiveCRLabel(github, prNumber, 'coderabbit: not started', labels);
       await github.setCommitStatus(sha, 'pending', CR_CONTEXT, 'CodeRabbit review not yet requested');

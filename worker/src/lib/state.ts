@@ -90,9 +90,13 @@ export class StateManager {
   }
 
   async decrementToken(): Promise<number> {
-    const newVal = await this.redis.decr(KEYS.tokens);
-    await this.redis.set(KEYS.lastDecremented, new Date().toISOString());
-    return newVal;
+    // Pipeline both ops so decr and timestamp update succeed or fail together
+    const now = new Date().toISOString();
+    const pipeline = this.redis.pipeline();
+    pipeline.decr(KEYS.tokens);
+    pipeline.set(KEYS.lastDecremented, now);
+    const results = await pipeline.exec();
+    return (results[0] as number) ?? 0;
   }
 
   async incrementToken(): Promise<number> {

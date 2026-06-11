@@ -1,6 +1,6 @@
 name = "cr-bot"
 main = "src/index.ts"
-compatibility_date = "2025-01-01"
+compatibility_date = "2026-06-11"
 compatibility_flags = ["nodejs_compat"]
 account_id = "d9827daf3c416e4c825e1af18e5e408a"
 

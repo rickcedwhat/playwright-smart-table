@@ -57,7 +57,17 @@ export class GitHubClient {
     created_at: string;
     updated_at: string;
   }>> {
-    return this.request(`/repos/${this.repo}/issues/${issueNumber}/comments?per_page=100`);
+    const all: Array<{ id: number; user: { login: string }; body: string; created_at: string; updated_at: string }> = [];
+    let page = 1;
+    while (true) {
+      const batch: typeof all = await this.request(
+        `/repos/${this.repo}/issues/${issueNumber}/comments?per_page=100&page=${page}`,
+      );
+      all.push(...batch);
+      if (batch.length < 100) break;
+      page++;
+    }
+    return all;
   }
 
   async addLabels(issueNumber: number, labels: string[]): Promise<void> {

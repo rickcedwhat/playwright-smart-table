@@ -3,7 +3,7 @@ import type { StateManager } from '../lib/state.js';
 import type { Env } from '../index.js';
 import type { QueueState } from '../lib/types.js';
 import { pickNextPR, dequeue, serializeQueueState, incrementReviewsThisSession } from '../lib/queue.js';
-import { isRateLimitComment } from '../lib/coderabbit.js';
+import { isRateLimitComment, computeRateLimitDelay } from '../lib/coderabbit.js';
 
 export interface CoordinatorContext {
   github: GitHubClient;
@@ -68,9 +68,14 @@ export async function handleCoordinator(ctx: CoordinatorContext): Promise<void> 
         .find(c => c.user.login === 'coderabbitai[bot]' && isRateLimitComment(c.body));
 
       if (rateLimitComment) {
-        const delaySecs = 0; // Already expired (coordinator was scheduled for after the delay)
+        // Compute actual remaining delay — only migrate if window has expired
+        const delaySecs = computeRateLimitDelay(
+          rateLimitComment.body,
+          rateLimitComment.created_at,
+          Date.now(),
+        );
         if (delaySecs <= 0) {
-          // Migrate to normal queue
+          // Rate-limit window has passed — migrate to normal queue
           const { enqueue: enqueueItem } = await import('../lib/queue.js');
           queueState = enqueueItem(
             queueState,
@@ -78,6 +83,7 @@ export async function handleCoordinator(ctx: CoordinatorContext): Promise<void> 
             'normal',
           );
         }
+        // else: still rate-limited — leave it; coordinator was fired too early
       }
     }
   } catch (err) {
@@ -121,8 +127,13 @@ export async function handleCoordinator(ctx: CoordinatorContext): Promise<void> 
     console.error(`Failed to update labels for PR #${next.pr}:`, err);
   }
 
-  // 7. Decrement token
-  await state.decrementToken();
+  // 7. Decrement token — refresh in-memory state to reflect the authoritative Redis value
+  const newTokens = await state.decrementToken();
+  queueState = {
+    ...queueState,
+    tokens: newTokens,
+    last_decremented_at: new Date().toISOString(),
+  };
 
   // 8. Dequeue PR from state
   queueState = dequeue(queueState, next.pr);
