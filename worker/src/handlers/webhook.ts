@@ -11,8 +11,8 @@ import {
   getPriorityFromCheckbox,
   labelToStatus,
 } from '../lib/coderabbit.js';
-import { enqueue, dequeue, pickNextPR } from '../lib/queue.js';
-import { scheduleCoordinator } from './coordinator.js';
+import { enqueue, dequeue, pickNextPR, findPRInQueues } from '../lib/queue.js';
+import { scheduleCoordinator, updateQueueIssueDashboard } from './coordinator.js';
 
 export interface HandlerContext {
   github: GitHubClient;
@@ -138,6 +138,19 @@ function buildCRSectionUnresolved(actionableCount: number): string {
 - [ ] ⬜ Backburner review _(triggers only when bucket is full)_
 
 > ❌ Review complete — **${actionableCount} actionable comment(s)** require attention.
+<!-- cr-section-end -->`;
+}
+
+function buildCRSectionRateLimited(retryAt: string): string {
+  return `<!-- cr-section-start -->
+<!-- cr-trigger-time: -->
+
+### 🔍 CodeRabbit Review
+- [ ] 🔴 Priority review _(skips to front)_
+- [ ] 🟡 Normal review _(standard queue)_
+- [ ] ⬜ Backburner review _(triggers only when bucket is full)_
+
+> ⏱ Rate-limited · retry scheduled · fires ~${retryAt} UTC
 <!-- cr-section-end -->`;
 }
 
@@ -318,9 +331,24 @@ export async function handleIssueComment(ctx: HandlerContext): Promise<void> {
       );
       await state.saveState(newQueueState);
 
-      // Schedule coordinator
+      // Schedule coordinator — only update HQ if scheduling actually succeeded
       const workerUrl = `https://cr-bot.${env.GITHUB_REPO.split('/')[0]}.workers.dev`;
-      await scheduleCoordinator(env.QSTASH_TOKEN, delaySecs, workerUrl);
+      const msgId = await scheduleCoordinator(env.QSTASH_TOKEN, delaySecs, workerUrl);
+      if (msgId) {
+        const retryAt = new Date(Date.now() + delaySecs * 1000).toISOString().slice(11, 16);
+        const updatedState = {
+          ...newQueueState,
+          refill_qstash_id: msgId,
+          refill_at: new Date(Date.now() + delaySecs * 1000).toISOString(),
+        };
+        await state.saveState(updatedState);
+
+        // Update HQ to show retry time only when retry is actually scheduled
+        const hq = await findHQComment(github, prNumber);
+        if (hq) {
+          await github.updateComment(hq.id, replaceCRSection(hq.body, buildCRSectionRateLimited(retryAt)));
+        }
+      }
       return;
     }
 
@@ -338,6 +366,72 @@ export async function handleIssueComment(ctx: HandlerContext): Promise<void> {
     const pr = await github.getPR(prNumber);
     await triggerOrEnqueue(ctx, prNumber, pr.title, pr.head.sha, level);
     return;
+  }
+
+  // @rickcedwhat-ai promote #N command
+  if (commentAuthor !== BOT_LOGIN && action === 'created') {
+    const promoteMatch = commentBody.match(/^@rickcedwhat-ai\s+promote\s+#(\d+)/i);
+    if (promoteMatch) {
+      const targetPR = parseInt(promoteMatch[1], 10);
+      const queueState = await state.getState();
+      const found = findPRInQueues(queueState, targetPR);
+
+      if (!found) {
+        await github.createComment(prNumber, `❌ PR #${targetPR} is not in the queue.`);
+      } else if (found.level === 'priority') {
+        await github.createComment(prNumber, `PR #${targetPR} is already in the 🔴 Priority queue.`);
+      } else {
+        // Dequeue then re-enqueue at priority
+        const pr = await github.getPR(targetPR);
+        const afterDequeue = dequeue(queueState, targetPR);
+        const afterEnqueue = enqueue(
+          afterDequeue,
+          { pr: targetPR, title: pr.title, queued_at: new Date().toISOString() },
+          'priority',
+        );
+        await state.saveState(afterEnqueue);
+        await github.createComment(prNumber, `✅ PR #${targetPR} promoted to 🔴 Priority queue.`);
+
+        // Update Queue Issue dashboard
+        await updateQueueIssueDashboard(github, env, afterEnqueue);
+      }
+      return;
+    }
+  }
+
+  // @rickcedwhat-ai reminder <delay> command
+  if (commentAuthor !== BOT_LOGIN && action === 'created') {
+    const reminderMatch = commentBody.match(/^@rickcedwhat-ai\s+reminder\s+(\d+)([mhd])/i);
+    if (reminderMatch) {
+      const amount = parseInt(reminderMatch[1], 10);
+      const unit = reminderMatch[2].toLowerCase();
+      const multiplier: Record<string, number> = { m: 60, h: 3600, d: 86400 };
+      const delaySecs = amount * (multiplier[unit] ?? 60);
+
+      const workerUrl = `https://cr-bot.${env.GITHUB_REPO.split('/')[0]}.workers.dev`;
+      const reminderUrl = `https://qstash.upstash.io/v2/publish/${workerUrl}/reminder`;
+      try {
+        const res = await fetch(reminderUrl, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${env.QSTASH_TOKEN}`,
+            'Content-Type': 'application/json',
+            'Upstash-Delay': `${delaySecs}s`,
+          },
+          body: JSON.stringify({ pr_number: prNumber, repo: env.GITHUB_REPO }),
+        });
+        if (!res.ok) {
+          console.error(`Failed to schedule reminder: QStash returned ${res.status}`);
+          return;
+        }
+        // Only confirm to the user when scheduling actually succeeded
+        const unitLabel = unit === 'm' ? `${amount}m` : unit === 'h' ? `${amount}h` : `${amount}d`;
+        await github.createComment(prNumber, `⏱ Reminder scheduled for ${unitLabel}.`);
+      } catch (err) {
+        console.error('Failed to schedule reminder:', err);
+      }
+      return;
+    }
   }
 
   // HQ comment checkbox edit detection
