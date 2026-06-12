@@ -331,23 +331,23 @@ export async function handleIssueComment(ctx: HandlerContext): Promise<void> {
       );
       await state.saveState(newQueueState);
 
-      // Schedule coordinator and persist the messageId + refill_at
+      // Schedule coordinator — only update HQ if scheduling actually succeeded
       const workerUrl = `https://cr-bot.${env.GITHUB_REPO.split('/')[0]}.workers.dev`;
       const msgId = await scheduleCoordinator(env.QSTASH_TOKEN, delaySecs, workerUrl);
       if (msgId) {
+        const retryAt = new Date(Date.now() + delaySecs * 1000).toISOString().slice(11, 16);
         const updatedState = {
           ...newQueueState,
           refill_qstash_id: msgId,
           refill_at: new Date(Date.now() + delaySecs * 1000).toISOString(),
         };
         await state.saveState(updatedState);
-      }
 
-      // Update HQ comment to show rate-limited status with retry time
-      const hq = await findHQComment(github, prNumber);
-      if (hq) {
-        const retryAt = new Date(Date.now() + delaySecs * 1000).toISOString().slice(11, 16);
-        await github.updateComment(hq.id, replaceCRSection(hq.body, buildCRSectionRateLimited(retryAt)));
+        // Update HQ to show retry time only when retry is actually scheduled
+        const hq = await findHQComment(github, prNumber);
+        if (hq) {
+          await github.updateComment(hq.id, replaceCRSection(hq.body, buildCRSectionRateLimited(retryAt)));
+        }
       }
       return;
     }
@@ -411,7 +411,7 @@ export async function handleIssueComment(ctx: HandlerContext): Promise<void> {
       const workerUrl = `https://cr-bot.${env.GITHUB_REPO.split('/')[0]}.workers.dev`;
       const reminderUrl = `https://qstash.upstash.io/v2/publish/${workerUrl}/reminder`;
       try {
-        await fetch(reminderUrl, {
+        const res = await fetch(reminderUrl, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${env.QSTASH_TOKEN}`,
@@ -420,12 +420,16 @@ export async function handleIssueComment(ctx: HandlerContext): Promise<void> {
           },
           body: JSON.stringify({ pr_number: prNumber, repo: env.GITHUB_REPO }),
         });
+        if (!res.ok) {
+          console.error(`Failed to schedule reminder: QStash returned ${res.status}`);
+          return;
+        }
+        // Only confirm to the user when scheduling actually succeeded
+        const unitLabel = unit === 'm' ? `${amount}m` : unit === 'h' ? `${amount}h` : `${amount}d`;
+        await github.createComment(prNumber, `⏱ Reminder scheduled for ${unitLabel}.`);
       } catch (err) {
         console.error('Failed to schedule reminder:', err);
       }
-
-      const unitLabel = unit === 'm' ? `${amount}m` : unit === 'h' ? `${amount}h` : `${amount}d`;
-      await github.createComment(prNumber, `⏱ Reminder scheduled for ${unitLabel}.`);
       return;
     }
   }
