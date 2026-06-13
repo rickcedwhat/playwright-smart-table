@@ -540,20 +540,21 @@ const createSmartRow = <T = any>(
 
             // Cell loading wait (if configured)
             const isCellLoading = config.strategies.loading?.isCellLoading;
-            const cellLoadingTimeout = config.strategies.loading?.cellLoadingTimeout;
+            const rawCellTimeout = config.strategies.loading?.cellLoadingTimeout;
+            // undefined = unset (read as-is immediately); 0 = no wait (immediate check); >0 = wait up to N ms
+            const cellLoadingTimeout = rawCellTimeout !== undefined && Number.isFinite(rawCellTimeout) && rawCellTimeout >= 0
+                ? rawCellTimeout
+                : undefined;
             const onCellLoadingTimeout = config.strategies.loading?.onCellLoadingTimeout ?? 'read-as-is';
 
             if (isCellLoading && await isCellLoading(targetCell, col, smart)) {
-                if (cellLoadingTimeout) {
+                if (cellLoadingTimeout !== undefined) {
                     logDebug(config, 'verbose', `toJSON: cell "${col}" — waiting up to ${cellLoadingTimeout}ms`);
                     const deadline = Date.now() + cellLoadingTimeout;
-                    let cellResolved = false;
-                    while (Date.now() < deadline) {
+                    let cellResolved = !(await isCellLoading(targetCell, col, smart)); // immediate check (handles timeout=0)
+                    while (!cellResolved && Date.now() < deadline) {
                         await page.waitForTimeout(100);
-                        if (!(await isCellLoading(targetCell, col, smart))) {
-                            cellResolved = true;
-                            break;
-                        }
+                        cellResolved = !(await isCellLoading(targetCell, col, smart));
                     }
                     if (!cellResolved) {
                         logDebug(config, 'verbose', `toJSON: cell "${col}" — still loading after ${cellLoadingTimeout}ms, action: ${onCellLoadingTimeout}`);

@@ -425,11 +425,13 @@ test.describe('Loading Strategy: row and cell timeout', () => {
 
         expect(rows.length).toBe(10);
         for (const row of rows) {
-            const data = await row.toJSON() as any;
+            const data = await row.toJSON() as Record<string, unknown>;
             // All cells should have real non-empty string values
             for (const value of Object.values(data)) {
                 expect(typeof value).toBe('string');
-                expect((value as string).length).toBeGreaterThan(0);
+                if (typeof value === 'string') {
+                    expect(value.length).toBeGreaterThan(0);
+                }
             }
         }
     });
