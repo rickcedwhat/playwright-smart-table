@@ -538,6 +538,38 @@ const createSmartRow = <T = any>(
                 });
             }
 
+            // Cell loading wait (if configured)
+            const isCellLoading = config.strategies.loading?.isCellLoading;
+            const cellLoadingTimeout = config.strategies.loading?.cellLoadingTimeout;
+            const onCellLoadingTimeout = config.strategies.loading?.onCellLoadingTimeout ?? 'read-as-is';
+
+            if (isCellLoading && await isCellLoading(targetCell, col, smart)) {
+                if (cellLoadingTimeout) {
+                    logDebug(config, 'verbose', `toJSON: cell "${col}" — waiting up to ${cellLoadingTimeout}ms`);
+                    const deadline = Date.now() + cellLoadingTimeout;
+                    let cellResolved = false;
+                    while (Date.now() < deadline) {
+                        await page.waitForTimeout(100);
+                        if (!(await isCellLoading(targetCell, col, smart))) {
+                            cellResolved = true;
+                            break;
+                        }
+                    }
+                    if (!cellResolved) {
+                        logDebug(config, 'verbose', `toJSON: cell "${col}" — still loading after ${cellLoadingTimeout}ms, action: ${onCellLoadingTimeout}`);
+                        if (onCellLoadingTimeout === 'skip') {
+                            result[col] = '' as any;
+                            continue;
+                        }
+                        if (onCellLoadingTimeout === 'throw') {
+                            throw new Error(`[SmartTable] Cell "${col}" (row ${rowIndex}) did not finish loading within ${cellLoadingTimeout}ms`);
+                        }
+                        // 'read-as-is': fall through to normal read
+                    }
+                }
+                // If no timeout or resolved: fall through to normal read
+            }
+
             if (mapper) {
                 // Apply mapper
                 const mappedValue = await mapper(targetCell);

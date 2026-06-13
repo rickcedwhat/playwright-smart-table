@@ -469,6 +469,43 @@ export interface LoadingStrategy {
   isTableLoading?: (context: TableContext) => Promise<boolean>;
   isRowLoading?: (row: SmartRow) => Promise<boolean>;
   isHeaderLoading?: (context: TableContext) => Promise<boolean>;
+
+  /**
+   * How long (ms) to wait for a loading row to resolve before applying onRowLoadingTimeout.
+   * When not set, loading rows are immediately skipped (backward-compatible behavior).
+   */
+  rowLoadingTimeout?: number;
+
+  /**
+   * What to do when a row is still loading after rowLoadingTimeout ms.
+   * - 'skip': drop the row from results (matches legacy skip behavior)
+   * - 'read-as-is': include the row even though it's still loading (default)
+   * - 'throw': throw an error with row index and timeout info
+   * Defaults to 'read-as-is' when rowLoadingTimeout is set.
+   */
+  onRowLoadingTimeout?: 'skip' | 'read-as-is' | 'throw';
+
+  /**
+   * Predicate called before reading each cell. Return true if the cell is still loading.
+   * When cellLoadingTimeout is also set, the engine waits up to that many ms for the
+   * cell to resolve before applying onCellLoadingTimeout.
+   */
+  isCellLoading?: (cell: import('@playwright/test').Locator, columnName: string, row: SmartRow) => Promise<boolean>;
+
+  /**
+   * How long (ms) to wait for a loading cell to resolve before applying onCellLoadingTimeout.
+   * When not set and isCellLoading returns true, the cell is read as-is immediately.
+   */
+  cellLoadingTimeout?: number;
+
+  /**
+   * What to do when a cell is still loading after cellLoadingTimeout ms.
+   * - 'skip': use empty string for this cell value
+   * - 'read-as-is': read the cell content even though it's still loading (default)
+   * - 'throw': throw an error with column name, row index and timeout info
+   * Defaults to 'read-as-is' when cellLoadingTimeout is set.
+   */
+  onCellLoadingTimeout?: 'skip' | 'read-as-is' | 'throw';
 }
 
 /**
