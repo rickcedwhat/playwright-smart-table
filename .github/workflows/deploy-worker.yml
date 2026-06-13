@@ -26,10 +26,11 @@ jobs:
         with:
           node-version: 20
           cache: pnpm
-          cache-dependency-path: worker/pnpm-lock.yaml
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Install
         run: pnpm install --frozen-lockfile
+        working-directory: .
 
       - name: Test
         run: pnpm test
@@ -52,10 +53,11 @@ jobs:
         with:
           node-version: 20
           cache: pnpm
-          cache-dependency-path: worker/pnpm-lock.yaml
+          cache-dependency-path: pnpm-lock.yaml
 
       - name: Install
         run: pnpm install --frozen-lockfile
+        working-directory: .
 
       - name: Deploy to Cloudflare Workers
         run: pnpm deploy
