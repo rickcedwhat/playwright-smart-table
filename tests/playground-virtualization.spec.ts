@@ -283,8 +283,11 @@ test.describe('Loading Strategy: row and cell timeout', () => {
     test('rowLoadingTimeout — rows load within timeout → all collected', async ({ page }) => {
         test.setTimeout(30000);
 
+        // Use 10 rows so all fit in the virtualized viewport (500px container,
+        // 48px rows ≈ 10 visible). rowCount: 20 was flaky because Virtuoso only
+        // renders visible rows + overscan, so the DOM row count varied.
         await setPlaygroundConfig(page, {
-            rowCount: 20,
+            rowCount: 10,
             defaults: {
                 tableInitDelay: 0,
                 rowDelay: 800,
@@ -311,7 +314,7 @@ test.describe('Loading Strategy: row and cell timeout', () => {
         await table.init();
         const rows = await table.findRows({}, { maxPages: 1 });
 
-        expect(rows.length).toBe(20);
+        expect(rows.length).toBe(10);
         // No skeleton rows — they should have resolved
         for (const row of rows) {
             const skeletonCount = await row.locator('.skeleton-row').count();
