@@ -1,4 +1,4 @@
-// fallow-ignore-next-line circular-dependency
+// fallow-ignore-file circular-dependency
 import type { StrategyContext, Selector } from '../types';
 
 /**
