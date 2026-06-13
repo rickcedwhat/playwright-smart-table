@@ -677,11 +677,12 @@ describe('serializeQueueState — two-table dashboard', () => {
       backburner: [],
       reviews_this_session: 0,
     };
+    const recentIso = new Date(Date.now() - 60_000).toISOString(); // 1 min ago — never triggers aging
     const liveItems = [
-      { pr: 1, title: 'waiting PR',     status: 'coderabbit: waiting',     updated: ISO },
-      { pr: 2, title: 'unresolved PR',  status: 'coderabbit: unresolved',  updated: ISO },
-      { pr: 3, title: 'complete PR',    status: 'coderabbit: complete',    updated: ISO },
-      { pr: 4, title: 'not started PR', status: 'coderabbit: not started', updated: ISO },
+      { pr: 1, title: 'waiting PR',     status: 'coderabbit: waiting',     updated: recentIso },
+      { pr: 2, title: 'unresolved PR',  status: 'coderabbit: unresolved',  updated: recentIso },
+      { pr: 3, title: 'complete PR',    status: 'coderabbit: complete',    updated: recentIso },
+      { pr: 4, title: 'not started PR', status: 'coderabbit: not started', updated: recentIso },
     ];
     const body = serializeQueueState(state, {}, liveItems);
     expect(body).toContain('⏳ Waiting');
@@ -728,8 +729,8 @@ describe('serializeQueueState — two-table dashboard', () => {
       backburner: [],
       reviews_this_session: 0,
     };
-    const oldIso = new Date(NOW - 4 * 86_400_000).toISOString(); // 4 days ago
-    const recentIso = new Date(NOW - 1 * 86_400_000).toISOString(); // 1 day ago
+    const oldIso = new Date(Date.now() - 4 * 86_400_000).toISOString(); // 4 days ago
+    const recentIso = new Date(Date.now() - 1 * 86_400_000).toISOString(); // 1 day ago
     const liveItems = [
       { pr: 20, title: 'old unresolved', status: 'coderabbit: unresolved', updated: oldIso },
       { pr: 21, title: 'new unresolved', status: 'coderabbit: unresolved', updated: recentIso },
@@ -753,7 +754,7 @@ describe('serializeQueueState — two-table dashboard', () => {
       reviews_this_session: 0,
     };
     // 1 day ago — well under the 3-day threshold
-    const recentIso = new Date(NOW - 1 * 86_400_000).toISOString();
+    const recentIso = new Date(Date.now() - 1 * 86_400_000).toISOString();
     const liveItems = [
       { pr: 30, title: 'recent unresolved', status: 'coderabbit: unresolved', updated: recentIso },
     ];
