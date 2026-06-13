@@ -8,6 +8,9 @@ on:
 
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
   test:
     name: Test
@@ -17,6 +20,8 @@ jobs:
         working-directory: worker
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - uses: pnpm/action-setup@v4
         with:
@@ -39,11 +44,16 @@ jobs:
     name: Deploy
     needs: test
     runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-worker-${{ github.ref }}
+      cancel-in-progress: true
     defaults:
       run:
         working-directory: worker
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - uses: pnpm/action-setup@v4
         with:
