@@ -1,5 +1,6 @@
 import { Redis } from '@upstash/redis/cloudflare';
 import type { QueueState, QueuedPR } from './types.js';
+import { MAX_TOKENS } from './queue.js';
 
 const KEYS = {
   tokens: 'cr:tokens',
@@ -12,7 +13,6 @@ const KEYS = {
   reviewsSession: 'cr:reviews_session',
 } as const;
 
-const MAX_TOKENS = 3;
 
 export class StateManager {
   private redis: Redis;

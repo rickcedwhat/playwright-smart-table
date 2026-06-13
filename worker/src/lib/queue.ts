@@ -1,7 +1,9 @@
 import type { QueueState, QueuedPR, QueueLevel } from './types.js';
 
+export const MAX_TOKENS = 1;
+
 const DEFAULT_STATE: QueueState = {
-  tokens: 3,
+  tokens: MAX_TOKENS,
   last_decremented_at: '',
   refill_qstash_id: '',
   refill_at: '',
@@ -48,7 +50,7 @@ export function parseQueueState(issueBody: string | null | undefined): QueueStat
     const reviews_this_session = reviewsRaw !== null ? parseInt(reviewsRaw, 10) : 0;
 
     return {
-      tokens: isNaN(tokens) ? 3 : Math.min(3, Math.max(0, tokens)),
+      tokens: isNaN(tokens) ? MAX_TOKENS : Math.min(MAX_TOKENS, Math.max(0, tokens)),
       last_decremented_at: get('last_decremented_at') ?? '',
       refill_qstash_id: get('refill_qstash_id') ?? '',
       refill_at: (() => {
@@ -211,7 +213,7 @@ export function computeActualTokens(
   const lastDecrMs = new Date(state.last_decremented_at).getTime();
   if (isNaN(lastDecrMs)) return { ...DEFAULT_STATE, ...state } as QueueState;
   const hoursElapsed = Math.max(0, Math.floor((nowMs - lastDecrMs) / 3_600_000));
-  const actualTokens = Math.min(3, state.tokens + hoursElapsed);
+  const actualTokens = Math.min(MAX_TOKENS, state.tokens + hoursElapsed);
   return { ...DEFAULT_STATE, ...state, tokens: actualTokens } as QueueState;
 }
 
@@ -229,7 +231,7 @@ export function pickNextPR(
     return { ...state.priority[0], level: 'priority' };
   if (state.normal.length > 0)
     return { ...state.normal[0], level: 'normal' };
-  if (state.backburner.length > 0 && state.tokens === 3)
+  if (state.backburner.length > 0 && state.tokens === MAX_TOKENS)
     return { ...state.backburner[0], level: 'backburner' };
   return null;
 }
