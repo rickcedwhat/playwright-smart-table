@@ -101,6 +101,11 @@ function reset() {
   started.value = false
 }
 
+function replay() {
+  reset()
+  onStart()
+}
+
 function setScenario(s: Scenario) {
   if (scenario.value === s) return
   scenario.value = s
@@ -180,7 +185,7 @@ function setScenario(s: Scenario) {
             @click="onNext"
           >Next →</button>
         </template>
-        <button v-else class="grt-btn" :class="phase === 'exhausted' ? 'grt-btn--replay-err' : 'grt-btn--replay'" @click="reset">↺ Replay</button>
+        <button v-else class="grt-btn" :class="phase === 'exhausted' ? 'grt-btn--replay-err' : 'grt-btn--replay'" @click="replay">↺ Replay</button>
       </div>
 
       <div class="grt-table-shell" :class="{ 'grt-table-shell--err': phase === 'exhausted' }">

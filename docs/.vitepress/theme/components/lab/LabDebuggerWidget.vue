@@ -161,7 +161,7 @@ const advanceIcon = computed(() => !hasStarted.value ? 'â–¶' : isDone.value ? 'â
 const advanceLabel = computed(() => !hasStarted.value ? 'Play' : isDone.value ? 'Replay' : `Run line ${nextLine.value + 1}`)
 
 function stepLine() {
-  if (isDone.value) { resetDebugger(); return }
+  if (isDone.value) resetDebugger()
   if (!executedSet.value.has(nextLine.value)) executed.value = [...executed.value, nextLine.value]
   nextLine.value += 1
 }

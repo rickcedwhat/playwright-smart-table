@@ -268,7 +268,7 @@ const exactRows = await table.findRows(
 
 ### See it in action
 
-Walk through a full `findRow` flow end-to-end: table init, header mapping, multi-page scan, match highlight, and the final `getCell` + checkbox interaction — all animated step by step.
+Walk through a full `findRows` flow end-to-end: table init, header mapping, multi-page scan, match highlight, and the final `getCell` + checkbox interaction — all animated step by step.
 
 <LabFindRowPaginationDebug />
 
