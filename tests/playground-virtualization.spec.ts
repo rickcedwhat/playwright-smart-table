@@ -266,3 +266,212 @@ test.describe('Playground: Virtualized Table', () => {
         expect(duration2).toBeLessThan(1500);
     });
 });
+
+test.describe('Loading Strategy: row and cell timeout', () => {
+    test.beforeEach(async ({ page }) => {
+        try {
+            const response = await page.request.get('http://localhost:3000/virtualized');
+            if (!response.ok()) throw new Error('Local server not running');
+        } catch (e) {
+            test.skip(true, 'Skipping: Local playground server not running at localhost:3000');
+        }
+
+        await page.goto('http://localhost:3000/virtualized');
+        await expect(page.getByRole('heading', { name: 'Virtualized Table Scenario' })).toBeVisible();
+    });
+
+    test('rowLoadingTimeout — rows load within timeout → all collected', async ({ page }) => {
+        test.setTimeout(30000);
+
+        // Use 10 rows so all fit in the virtualized viewport (500px container,
+        // 48px rows ≈ 10 visible). rowCount: 20 was flaky because Virtuoso only
+        // renders visible rows + overscan, so the DOM row count varied.
+        await setPlaygroundConfig(page, {
+            rowCount: 10,
+            defaults: {
+                tableInitDelay: 0,
+                rowDelay: 800,
+                generator: 'simple'
+            }
+        });
+
+        const table = useTable(page.locator('.virtual-table-container'), {
+            rowSelector: '.virtual-row',
+            headerSelector: '.header [role="columnheader"]',
+            cellSelector: '[role="cell"]',
+            strategies: {
+                loading: {
+                    isRowLoading: async (row) => {
+                        return (await row.locator('.skeleton-row').count()) > 0;
+                    },
+                    rowLoadingTimeout: 5000,
+                    onRowLoadingTimeout: 'read-as-is'
+                }
+            },
+            maxPages: 1
+        });
+
+        await table.init();
+        const rows = await table.findRows({}, { maxPages: 1 });
+
+        expect(rows.length).toBe(10);
+        // No skeleton rows — they should have resolved
+        for (const row of rows) {
+            const skeletonCount = await row.locator('.skeleton-row').count();
+            expect(skeletonCount).toBe(0);
+        }
+    });
+
+    test('rowLoadingTimeout: skip — rows that never load are skipped', async ({ page }) => {
+        test.setTimeout(15000);
+
+        await setPlaygroundConfig(page, {
+            rowCount: 20,
+            defaults: {
+                tableInitDelay: 0,
+                rowDelay: { base: 999999, stutter: 0 },
+                generator: 'simple'
+            }
+        });
+
+        // Wait a moment so rows are rendered (as skeletons)
+        await page.waitForTimeout(500);
+
+        const table = useTable(page.locator('.virtual-table-container'), {
+            rowSelector: '.virtual-row',
+            headerSelector: '.header [role="columnheader"]',
+            cellSelector: '[role="cell"]',
+            strategies: {
+                loading: {
+                    isRowLoading: async (row) => {
+                        return (await row.locator('.skeleton-row').count()) > 0;
+                    },
+                    rowLoadingTimeout: 500,
+                    onRowLoadingTimeout: 'skip'
+                }
+            },
+            maxPages: 1
+        });
+
+        await table.init();
+        const rows = await table.findRows({}, { maxPages: 1 });
+
+        // All rows are still loading and skipped
+        expect(rows.length).toBe(0);
+    });
+
+    test('rowLoadingTimeout: throw — throws when row never loads', async ({ page }) => {
+        test.setTimeout(15000);
+
+        await setPlaygroundConfig(page, {
+            rowCount: 5,
+            defaults: {
+                tableInitDelay: 0,
+                rowDelay: { base: 999999, stutter: 0 },
+                generator: 'simple'
+            }
+        });
+
+        await page.waitForTimeout(500);
+
+        const table = useTable(page.locator('.virtual-table-container'), {
+            rowSelector: '.virtual-row',
+            headerSelector: '.header [role="columnheader"]',
+            cellSelector: '[role="cell"]',
+            strategies: {
+                loading: {
+                    isRowLoading: async (row) => {
+                        return (await row.locator('.skeleton-row').count()) > 0;
+                    },
+                    rowLoadingTimeout: 300,
+                    onRowLoadingTimeout: 'throw'
+                }
+            },
+            maxPages: 1
+        });
+
+        await table.init();
+        await expect(table.findRows({}, { maxPages: 1 })).rejects.toThrow('did not finish loading');
+    });
+
+    test('cellLoadingTimeout — cells load within timeout → real values read', async ({ page }) => {
+        test.setTimeout(30000);
+
+        await setPlaygroundConfig(page, {
+            rowCount: 10,
+            defaults: {
+                tableInitDelay: 0,
+                rowDelay: 0,
+                cellDelay: 600,
+                generator: 'simple'
+            }
+        });
+
+        const table = useTable(page.locator('.virtual-table-container'), {
+            rowSelector: '.virtual-row',
+            headerSelector: '.header [role="columnheader"]',
+            cellSelector: '[role="cell"]',
+            strategies: {
+                loading: {
+                    isCellLoading: async (cell) => {
+                        return (await cell.locator('[data-testid="cell-loading"]').count()) > 0;
+                    },
+                    cellLoadingTimeout: 5000,
+                    onCellLoadingTimeout: 'read-as-is'
+                }
+            },
+            maxPages: 1
+        });
+
+        await table.init();
+        const rows = await table.findRows({}, { maxPages: 1 });
+
+        expect(rows.length).toBe(10);
+        for (const row of rows) {
+            const data = await row.toJSON() as Record<string, unknown>;
+            // All cells should have real non-empty string values
+            for (const value of Object.values(data)) {
+                expect(typeof value).toBe('string');
+                if (typeof value === 'string') {
+                    expect(value.length).toBeGreaterThan(0);
+                }
+            }
+        }
+    });
+
+    test('backward compat — no timeout set, isRowLoading skips immediately', async ({ page }) => {
+        test.setTimeout(15000);
+
+        await setPlaygroundConfig(page, {
+            rowCount: 20,
+            defaults: {
+                tableInitDelay: 0,
+                rowDelay: { base: 999999, stutter: 0 },
+                generator: 'simple'
+            }
+        });
+
+        await page.waitForTimeout(500);
+
+        const table = useTable(page.locator('.virtual-table-container'), {
+            rowSelector: '.virtual-row',
+            headerSelector: '.header [role="columnheader"]',
+            cellSelector: '[role="cell"]',
+            strategies: {
+                loading: {
+                    isRowLoading: async (row) => {
+                        return (await row.locator('.skeleton-row').count()) > 0;
+                    }
+                    // No rowLoadingTimeout — legacy behavior: skip immediately
+                }
+            },
+            maxPages: 1
+        });
+
+        await table.init();
+        const rows = await table.findRows({}, { maxPages: 1 });
+
+        // All rows are still loading and immediately skipped (legacy behavior)
+        expect(rows.length).toBe(0);
+    });
+});

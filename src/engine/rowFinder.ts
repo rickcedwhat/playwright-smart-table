@@ -84,14 +84,46 @@ export class RowFinder<T = any> {
                 const newIndices = await tracker.getUnseenIndices(rowLocators);
                 const currentRows = await rowLocators.all();
                 const isRowLoading = this.config.strategies.loading?.isRowLoading;
+                const rawRowTimeout = this.config.strategies.loading?.rowLoadingTimeout;
+                // undefined = unset (legacy skip); 0 = no wait (immediate check); >0 = wait up to N ms
+                // Non-finite values are treated as unset (defensive guard against Infinity/NaN)
+                const rowLoadingTimeout = rawRowTimeout !== undefined && Number.isFinite(rawRowTimeout) && rawRowTimeout >= 0
+                    ? rawRowTimeout
+                    : undefined;
+                const onRowLoadingTimeout = this.config.strategies.loading?.onRowLoadingTimeout ?? 'read-as-is';
                 let added = 0;
 
                 for (const idx of newIndices) {
                     const smartRow = this.makeSmartRow(currentRows[idx], map, allRows.length, this.tableState.currentPageIndex);
+
                     if (isRowLoading && await isRowLoading(smartRow)) {
-                        logDebug(this.config, 'verbose',`findRows: page ${this.tableState.currentPageIndex} — row skipped (isRowLoading=true)`);
-                        continue;
+                        if (rowLoadingTimeout === undefined) {
+                            // No timeout configured (or invalid value) — legacy skip behavior
+                            logDebug(this.config, 'verbose', `findRows: page ${this.tableState.currentPageIndex} — row skipped (isRowLoading=true, no timeout)`);
+                            continue;
+                        }
+
+                        // Wait up to rowLoadingTimeout ms (0 = one immediate re-check, no polling)
+                        logDebug(this.config, 'verbose', `findRows: row ${allRows.length} — waiting up to ${rowLoadingTimeout}ms for row to load`);
+                        const deadline = Date.now() + rowLoadingTimeout;
+                        let resolved = !(await isRowLoading(smartRow)); // immediate check (handles timeout=0)
+                        while (!resolved && Date.now() < deadline) {
+                            await currentRows[idx].page().waitForTimeout(100);
+                            resolved = !(await isRowLoading(smartRow));
+                        }
+
+                        if (!resolved) {
+                            logDebug(this.config, 'verbose', `findRows: row ${allRows.length} — still loading after ${rowLoadingTimeout}ms, action: ${onRowLoadingTimeout}`);
+                            if (onRowLoadingTimeout === 'skip') continue;
+                            if (onRowLoadingTimeout === 'throw') {
+                                throw new Error(`[SmartTable] Row ${allRows.length} did not finish loading within ${rowLoadingTimeout}ms`);
+                            }
+                            // 'read-as-is': fall through and add the row
+                        } else {
+                            logDebug(this.config, 'verbose', `findRows: row ${allRows.length} — finished loading`);
+                        }
                     }
+
                     allRows.push(smartRow);
                     added++;
                 }

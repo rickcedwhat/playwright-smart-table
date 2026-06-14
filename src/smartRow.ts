@@ -538,6 +538,39 @@ const createSmartRow = <T = any>(
                 });
             }
 
+            // Cell loading wait (if configured)
+            const isCellLoading = config.strategies.loading?.isCellLoading;
+            const rawCellTimeout = config.strategies.loading?.cellLoadingTimeout;
+            // undefined = unset (read as-is immediately); 0 = no wait (immediate check); >0 = wait up to N ms
+            const cellLoadingTimeout = rawCellTimeout !== undefined && Number.isFinite(rawCellTimeout) && rawCellTimeout >= 0
+                ? rawCellTimeout
+                : undefined;
+            const onCellLoadingTimeout = config.strategies.loading?.onCellLoadingTimeout ?? 'read-as-is';
+
+            if (isCellLoading && await isCellLoading(targetCell, col, smart)) {
+                if (cellLoadingTimeout !== undefined) {
+                    logDebug(config, 'verbose', `toJSON: cell "${col}" — waiting up to ${cellLoadingTimeout}ms`);
+                    const deadline = Date.now() + cellLoadingTimeout;
+                    let cellResolved = !(await isCellLoading(targetCell, col, smart)); // immediate check (handles timeout=0)
+                    while (!cellResolved && Date.now() < deadline) {
+                        await page.waitForTimeout(100);
+                        cellResolved = !(await isCellLoading(targetCell, col, smart));
+                    }
+                    if (!cellResolved) {
+                        logDebug(config, 'verbose', `toJSON: cell "${col}" — still loading after ${cellLoadingTimeout}ms, action: ${onCellLoadingTimeout}`);
+                        if (onCellLoadingTimeout === 'skip') {
+                            result[col] = '' as any;
+                            continue;
+                        }
+                        if (onCellLoadingTimeout === 'throw') {
+                            throw new Error(`[SmartTable] Cell "${col}" (row ${rowIndex}) did not finish loading within ${cellLoadingTimeout}ms`);
+                        }
+                        // 'read-as-is': fall through to normal read
+                    }
+                }
+                // If no timeout or resolved: fall through to normal read
+            }
+
             if (mapper) {
                 // Apply mapper
                 const mappedValue = await mapper(targetCell);

@@ -9,13 +9,14 @@ import {
   findPRInQueues,
   formatRelativeTime,
   incrementReviewsThisSession,
+  MAX_TOKENS,
 } from '../src/lib/queue.js';
 import type { QueueState } from '../src/lib/types.js';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
 const EMPTY_STATE: QueueState = {
-  tokens: 3,
+  tokens: MAX_TOKENS,
   last_decremented_at: '',
   refill_qstash_id: '',
   refill_at: '',
@@ -34,18 +35,18 @@ function qpr(pr: number, title = `PR ${pr}`, queued_at = '2026-06-01T00:00:00.00
 describe('parseQueueState', () => {
   it('returns default state when body is null', () => {
     const s = parseQueueState(null);
-    expect(s.tokens).toBe(3);
+    expect(s.tokens).toBe(MAX_TOKENS);
     expect(s.priority).toEqual([]);
     expect(s.normal).toEqual([]);
     expect(s.backburner).toEqual([]);
   });
 
   it('returns default state when body is undefined', () => {
-    expect(parseQueueState(undefined).tokens).toBe(3);
+    expect(parseQueueState(undefined).tokens).toBe(MAX_TOKENS);
   });
 
   it('returns default state when no state block present', () => {
-    expect(parseQueueState('## Some issue body\nno block here').tokens).toBe(3);
+    expect(parseQueueState('## Some issue body\nno block here').tokens).toBe(MAX_TOKENS);
   });
 
   it('parses tokens correctly', () => {
@@ -53,10 +54,10 @@ describe('parseQueueState', () => {
     expect(parseQueueState(body).tokens).toBe(1);
   });
 
-  it('clamps tokens to [0, 3]', () => {
+  it('clamps tokens to [0, MAX_TOKENS]', () => {
     const make = (t: number) =>
       `<!-- cr-queue-state\ntokens: ${t}\nlast_decremented_at: -\nrefill_qstash_id: -\nrefill_at: -\npriority: []\nnormal: []\nbackburner: []\nreviews_this_session: 0\n-->`;
-    expect(parseQueueState(make(99)).tokens).toBe(3);
+    expect(parseQueueState(make(99)).tokens).toBe(MAX_TOKENS);
     expect(parseQueueState(make(-1)).tokens).toBe(0);
   });
 
@@ -97,10 +98,10 @@ describe('parseQueueState', () => {
   });
 
   it('returns default state on malformed priority JSON', () => {
-    const body = `<!-- cr-queue-state\ntokens: 2\nlast_decremented_at: -\nrefill_qstash_id: -\nrefill_at: -\npriority: not-json\nnormal: []\nbackburner: []\nreviews_this_session: 0\n-->`;
+    const body = `<!-- cr-queue-state\ntokens: 1\nlast_decremented_at: -\nrefill_qstash_id: -\nrefill_at: -\npriority: not-json\nnormal: []\nbackburner: []\nreviews_this_session: 0\n-->`;
     const s = parseQueueState(body);
     expect(s.priority).toEqual([]);
-    expect(s.tokens).toBe(2);
+    expect(s.tokens).toBe(1);
   });
 
   it('ignores invalid refill_at and returns empty string', () => {
@@ -115,7 +116,7 @@ describe('serializeQueueState', () => {
   it('includes the machine-readable state block', () => {
     const body = serializeQueueState(EMPTY_STATE);
     expect(body).toContain('<!-- cr-queue-state');
-    expect(body).toContain('tokens: 3');
+    expect(body).toContain(`tokens: ${MAX_TOKENS}`);
     expect(body).toContain('-->');
   });
 
@@ -214,15 +215,15 @@ describe('computeActualTokens', () => {
   });
 
   it('refills 1 token per hour', () => {
-    const lastDecr = new Date(Date.now() - 2 * 3_600_000).toISOString(); // 2 hours ago
+    const lastDecr = new Date(Date.now() - 1 * 3_600_000).toISOString(); // 1 hour ago
     const s = computeActualTokens({ tokens: 0, last_decremented_at: lastDecr }, Date.now());
-    expect(s.tokens).toBe(2);
+    expect(s.tokens).toBe(1);
   });
 
-  it('caps tokens at 3', () => {
+  it('caps tokens at MAX_TOKENS', () => {
     const lastDecr = new Date(Date.now() - 5 * 3_600_000).toISOString(); // 5 hours ago
-    const s = computeActualTokens({ tokens: 1, last_decremented_at: lastDecr }, Date.now());
-    expect(s.tokens).toBe(3);
+    const s = computeActualTokens({ tokens: 0, last_decremented_at: lastDecr }, Date.now());
+    expect(s.tokens).toBe(MAX_TOKENS);
   });
 
   it('returns stored tokens unchanged on invalid date', () => {
@@ -252,12 +253,9 @@ describe('pickNextPR', () => {
     expect(result?.level).toBe('normal');
   });
 
-  it('picks backburner only when tokens === 3', () => {
-    const full: QueueState = { ...EMPTY_STATE, tokens: 3, backburner: [qpr(9)] };
+  it('picks backburner only when tokens === MAX_TOKENS (bucket full)', () => {
+    const full: QueueState = { ...EMPTY_STATE, tokens: MAX_TOKENS, backburner: [qpr(9)] };
     expect(pickNextPR(full)?.pr).toBe(9);
-
-    const partial: QueueState = { ...EMPTY_STATE, tokens: 2, backburner: [qpr(9)] };
-    expect(pickNextPR(partial)).toBeNull();
 
     const empty_tokens: QueueState = { ...EMPTY_STATE, tokens: 0, backburner: [qpr(9)] };
     expect(pickNextPR(empty_tokens)).toBeNull();
