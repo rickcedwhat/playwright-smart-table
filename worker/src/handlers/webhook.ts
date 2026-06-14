@@ -11,7 +11,7 @@ import {
   getPriorityFromCheckbox,
   labelToStatus,
 } from '../lib/coderabbit.js';
-import { enqueue, dequeue, pickNextPR, findPRInQueues } from '../lib/queue.js';
+import { enqueue, dequeue, pickNextPR, findPRInQueues, MAX_TOKENS } from '../lib/queue.js';
 import { scheduleCoordinator, updateQueueIssueDashboard } from './coordinator.js';
 
 export interface HandlerContext {
@@ -182,7 +182,7 @@ async function triggerOrEnqueue(
 
   const hasTokens = queueState.tokens > 0;
   const noPriorityInQueue = queueState.priority.length === 0;
-  const bucketFull = queueState.tokens === 3;
+  const bucketFull = queueState.tokens === MAX_TOKENS;
 
   const shouldTriggerNow =
     hasTokens && (
