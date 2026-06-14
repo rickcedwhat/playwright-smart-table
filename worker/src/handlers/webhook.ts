@@ -11,7 +11,7 @@ import {
   getPriorityFromCheckbox,
   labelToStatus,
 } from '../lib/coderabbit.js';
-import { enqueue, dequeue, pickNextPR, findPRInQueues } from '../lib/queue.js';
+import { enqueue, dequeue, pickNextPR, findPRInQueues, MAX_TOKENS } from '../lib/queue.js';
 import { scheduleCoordinator, updateQueueIssueDashboard } from './coordinator.js';
 
 export interface HandlerContext {
@@ -182,7 +182,7 @@ async function triggerOrEnqueue(
 
   const hasTokens = queueState.tokens > 0;
   const noPriorityInQueue = queueState.priority.length === 0;
-  const bucketFull = queueState.tokens === 3;
+  const bucketFull = queueState.tokens === MAX_TOKENS;
 
   const shouldTriggerNow =
     hasTokens && (
@@ -206,6 +206,8 @@ async function triggerOrEnqueue(
       const updatedBody = replaceCRSection(hq.body, buildCRSectionWaiting(prNumber));
       await github.updateComment(hq.id, updatedBody);
     }
+
+    await updateQueueIssueDashboard(github, env, await state.getState());
   } else {
     // Enqueue
     const newQueueState = enqueue(queueState, { pr: prNumber, title: prTitle, queued_at: new Date().toISOString() }, level);
@@ -221,18 +223,21 @@ async function triggerOrEnqueue(
     }
 
     // Schedule coordinator if not already scheduled, and persist the messageId
+    let finalState = newQueueState;
     if (!newQueueState.refill_qstash_id) {
       const workerUrl = `https://cr-bot.${env.GITHUB_REPO.split('/')[0]}.workers.dev`;
       const msgId = await scheduleCoordinator(env.QSTASH_TOKEN, 60, workerUrl);
       if (msgId) {
-        const withSchedule = {
+        finalState = {
           ...newQueueState,
           refill_qstash_id: msgId,
           refill_at: new Date(Date.now() + 60_000).toISOString(),
         };
-        await state.saveState(withSchedule);
+        await state.saveState(finalState);
       }
     }
+
+    await updateQueueIssueDashboard(github, env, finalState);
   }
 }
 
