@@ -94,7 +94,7 @@ export class RowFinder<T = any> {
                 let added = 0;
 
                 for (const idx of newIndices) {
-                    const smartRow = this.makeSmartRow(currentRows[idx], map, allRows.length, this.tableState.currentPageIndex);
+                    const smartRow = this.makeSmartRow(currentRows[idx], map, idx, this.tableState.currentPageIndex);
 
                     if (isRowLoading && await isRowLoading(smartRow)) {
                         if (rowLoadingTimeout === undefined) {
@@ -104,7 +104,7 @@ export class RowFinder<T = any> {
                         }
 
                         // Wait up to rowLoadingTimeout ms (0 = one immediate re-check, no polling)
-                        logDebug(this.config, 'verbose', `findRows: row ${allRows.length} — waiting up to ${rowLoadingTimeout}ms for row to load`);
+                        logDebug(this.config, 'verbose', `findRows: row ${idx} — waiting up to ${rowLoadingTimeout}ms for row to load`);
                         const deadline = Date.now() + rowLoadingTimeout;
                         let resolved = !(await isRowLoading(smartRow)); // immediate check (handles timeout=0)
                         while (!resolved && Date.now() < deadline) {
@@ -113,14 +113,14 @@ export class RowFinder<T = any> {
                         }
 
                         if (!resolved) {
-                            logDebug(this.config, 'verbose', `findRows: row ${allRows.length} — still loading after ${rowLoadingTimeout}ms, action: ${onRowLoadingTimeout}`);
+                            logDebug(this.config, 'verbose', `findRows: row ${idx} — still loading after ${rowLoadingTimeout}ms, action: ${onRowLoadingTimeout}`);
                             if (onRowLoadingTimeout === 'skip') continue;
                             if (onRowLoadingTimeout === 'throw') {
-                                throw new Error(`[SmartTable] Row ${allRows.length} did not finish loading within ${rowLoadingTimeout}ms`);
+                                throw new Error(`[SmartTable] Row ${idx} did not finish loading within ${rowLoadingTimeout}ms`);
                             }
                             // 'read-as-is': fall through and add the row
                         } else {
-                            logDebug(this.config, 'verbose', `findRows: row ${allRows.length} — finished loading`);
+                            logDebug(this.config, 'verbose', `findRows: row ${idx} — finished loading`);
                         }
                     }
 

@@ -33,7 +33,7 @@ export function parseQueueState(issueBody: string | null | undefined): QueueStat
     };
 
     const tokensRaw = get('tokens');
-    const tokens = tokensRaw !== null ? parseInt(tokensRaw, 10) : 3;
+    const tokens = tokensRaw !== null ? parseInt(tokensRaw, 10) : MAX_TOKENS;
 
     const parseArr = (key: string): QueuedPR[] => {
       const raw = get(key);
@@ -108,7 +108,7 @@ export function serializeQueueState(
   const qstashStr = state.refill_qstash_id
     ? `· QStash: \`${state.refill_qstash_id}\``
     : '';
-  const bucketLine = `🪣 **Token bucket: ${state.tokens} / 3** ${nextRefillStr} ${qstashStr}`.trim();
+  const bucketLine = `🪣 **Token bucket: ${state.tokens} / ${MAX_TOKENS}** ${nextRefillStr} ${qstashStr}`.trim();
 
   const queuedCount = state.priority.length + state.normal.length + state.backburner.length;
   const statsLine = `📊 ${queuedCount} queued · ${inReview} in review · ${unresolved} unresolved · ${state.reviews_this_session || 0} reviews this session`;
@@ -221,7 +221,7 @@ export function computeActualTokens(
  * Priority selection:
  *   1. First item in priority[]
  *   2. First item in normal[]
- *   3. First item in backburner[] — ONLY if state.tokens === 3
+ *   3. First item in backburner[] — ONLY if state.tokens === MAX_TOKENS
  *   4. null (nothing to trigger)
  */
 export function pickNextPR(
