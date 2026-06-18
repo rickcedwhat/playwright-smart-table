@@ -1,25 +1,48 @@
 # Examples
 
-Real tables, real configs, real queries.
+Pick the example closest to what you are trying to do. If you are new, start with Basic Usage, then Pagination.
 
-_Future: pick a grid type and see a live table + config + queries inline. Default: MUI DataGrid._
+## By Task
 
-## MUI DataGrid
+| I want to... | Start here |
+|---|---|
+| Find a row and assert a cell | [Basic Usage](/examples/basic) |
+| Search across pages | [Pagination](/examples/pagination) |
+| Work with infinite scroll | [Infinite Scroll](/examples/infinite-scroll) |
+| Extract many rows into data | [Data Scraping](/examples/data-scraping) |
+| Use MUI DataGrid | [MUI DataGrid](/examples/mui-datagrid) |
+| Use AG Grid | [AG Grid](/examples/ag-grid) |
+| Write a custom strategy | [Custom Strategies](/advanced/custom-strategies) |
 
-_TBD — config, then 3–4 common queries_
+## Common Starting Points
 
-## AG Grid
+### Assert a Cell by Column Name
 
-_TBD_
+```typescript
+const row = table.getRow({ Name: 'John Doe' });
+await expect(row.getCell('Email')).toHaveText('john@example.com');
+```
 
-## Standard HTML table
+### Find Rows Across Pages
 
-_TBD_
+```typescript
+const engineers = await table.findRows({ Department: 'Engineering' });
+expect(engineers.length).toBeGreaterThan(0);
+```
 
-## Infinite scroll
+### Extract Data
 
-_TBD_
+```typescript
+const data = await table.map(({ row }) => row.toJSON());
+```
 
----
+### Fill Editable Cells
 
-_Outline — content TBD_
+```typescript
+const row = table.getRow({ ID: '12345' });
+await row.smartFill({ Email: 'new.email@example.com' });
+```
+
+## Need API Details?
+
+Use the [API Reference](/api/) when you know the method or config option and need exact signatures.
