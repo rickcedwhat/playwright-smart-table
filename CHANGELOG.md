@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [6.14.0] - 2026-06-19
+
+### Added
+- **`isCellLoading` + `cellLoadingTimeout`** — `LoadingStrategy` now accepts `isCellLoading(cell, columnName, row)` to detect per-cell skeleton states. When `cellLoadingTimeout` is set the engine polls every 100ms until the cell resolves or the deadline passes; `onCellLoadingTimeout` controls the fallback (`'read-as-is'` (default), `'skip'`, or `'throw'`). Without a timeout the cell is read immediately (backward compatible).
+- **`rowLoadingTimeout` + `onRowLoadingTimeout`** — Complements the existing `isRowLoading` strategy. When `rowLoadingTimeout` is set, loading rows are polled until they resolve rather than being skipped. `onRowLoadingTimeout` controls the fallback (`'read-as-is'` (default), `'skip'`, or `'throw'`). Closes #280.
+
 ## [6.13.0] - 2026-05-18
 
 ### Added
