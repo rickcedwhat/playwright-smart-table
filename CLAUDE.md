@@ -58,7 +58,7 @@ npx playwright test --config playwright.config.ci-b.ts       # integration tests
 `useTable(locator, config)` is the single entry point. Calling `.init()` runs `TableMapper` to resolve headers → column→index map. After that, all row operations use that frozen map.
 
 **Row access flow:**
-- `getRow(filters)` — **synchronous**. Applies `FilterEngine` to the row locator set and returns `.first()` wrapped in a `SmartRow`. Cannot compute `rowIndex` without async evaluation.
+- `getRow(filters)` — **synchronous**. Applies `FilterEngine` to the row locator set and returns the matched locator wrapped in a `SmartRow`. Throws a Playwright strict mode error on evaluation if multiple rows match. Cannot compute `rowIndex` without async evaluation.
 - `findRow(filters)` — **async**. Delegates to `RowFinder.findRowLocator()`, paginates if needed, returns a `SmartRow` with the real `rowIndex`.
 - `findRows(filters)` — **async**. `RowFinder` runs a pagination loop collecting matches page-by-page.
 
