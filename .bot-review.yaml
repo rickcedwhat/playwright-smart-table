@@ -4,13 +4,15 @@ focus:
   - public API changes and backwards compatibility
 
 ignore:
-  - "*.md"
+  - "CHANGELOG.md"
   - "docs/**"
   - "tests/unit/**"
 
 context_files:
   - AGENTS.md
   - src/types.ts
+  - src/useTable.ts
+  - src/engine/rowFinder.ts
 
 checklist:
   - No changes to useTable() signature without a types.ts update
