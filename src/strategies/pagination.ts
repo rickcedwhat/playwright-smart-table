@@ -32,6 +32,7 @@ export const PaginationStrategies = {  /**
     nextBulkPages?: number,
     previousBulkPages?: number,
     numberOfPages?: number | ((root: import('@playwright/test').Locator) => number | Promise<number>),
+    detectCurrentPage?: (root: import('@playwright/test').Locator) => number | Promise<number>,
     stabilization?: StabilizationStrategy,
     timeout?: number
   } = {}): PaginationStrategy => {
@@ -87,6 +88,7 @@ export const PaginationStrategies = {  /**
       } : undefined,
       nextBulkPages: nextBulk,
       previousBulkPages: prevBulk,
+      detectCurrentPage: options.detectCurrentPage,
     };
   },
 

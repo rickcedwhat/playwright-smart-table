@@ -19,5 +19,6 @@
         "!src/types.ts",
         "!src/typeContext.ts",
         "!src/minimalConfigContext.ts"
-    ]
+    ],
+    "disableTypeChecks": "src/**/*.ts"
 }
