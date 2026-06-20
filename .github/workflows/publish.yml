@@ -93,11 +93,9 @@ jobs:
         if: steps.check_version.outputs.changed == 'true' && success()
         run: node scripts/collect-metrics.mjs
 
-      - name: Commit Metrics
+      - name: Upload Metrics Artifact
         if: steps.check_version.outputs.changed == 'true' && success()
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add metrics/history.json
-          git diff --cached --quiet || git commit -m "chore: record metrics for v${{ steps.check_version.outputs.version }} [skip ci]"
-          git push
+        uses: actions/upload-artifact@v4
+        with:
+          name: metrics-v${{ steps.check_version.outputs.version }}
+          path: metrics/history.json
