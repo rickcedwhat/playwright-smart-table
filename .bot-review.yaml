@@ -1,0 +1,26 @@
+focus:
+  - type correctness and TypeScript strictness
+  - async/await and Playwright timing issues
+  - public API changes and backwards compatibility
+
+ignore:
+  - "CHANGELOG.md"
+  - "docs/**"
+  - "tests/unit/**"
+
+context_files:
+  - AGENTS.md
+  - src/types.ts
+  - src/useTable.ts
+  - src/engine/rowFinder.ts
+
+checklist:
+  - No changes to useTable() signature without a types.ts update
+  - Pagination loop changes stay consistent between _advancePage and RowFinder
+  - Auto-generated files (typeContext.ts, packageVersion.ts) not edited directly
+
+planning:
+  enabled: true
+  focus:
+    - Break work into small, independently mergeable PRs
+    - Flag any changes to public API surface
