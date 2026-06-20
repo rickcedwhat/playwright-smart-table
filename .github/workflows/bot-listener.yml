@@ -75,7 +75,7 @@ jobs:
     permissions:
       issues: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - uses: actions/setup-node@v6
@@ -111,7 +111,7 @@ jobs:
               issue_number: context.issue.number,
               body: '🔍 Running upstream check now...'
             });
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           persist-credentials: false
       - uses: actions/setup-node@v6
