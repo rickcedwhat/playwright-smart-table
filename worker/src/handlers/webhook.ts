@@ -1,19 +1,8 @@
 import type { GitHubClient } from '../lib/github.js';
 import type { StateManager } from '../lib/state.js';
 import type { Env } from '../index.js';
-import type { QueueLevel } from '../lib/types.js';
-import {
-  isSkipComment,
-  isRateLimitComment,
-  computeRateLimitDelay,
-  parseActionableCount,
-  getCheckedLabel,
-  getPriorityFromCheckbox,
-  labelToStatus,
-} from '../lib/coderabbit.js';
-import { enqueue, dequeue, pickNextPR, findPRInQueues, MAX_TOKENS } from '../lib/queue.js';
-import { scheduleCoordinator, updateQueueIssueDashboard } from './coordinator.js';
-
+import type { SpendStatus, ReviewRound } from '../lib/types.js';
+import { serializeReviewHistory } from '../lib/review-history.js';
 export interface HandlerContext {
   github: GitHubClient;
   state: StateManager;
@@ -24,9 +13,15 @@ export interface HandlerContext {
 }
 
 const BOT_LOGIN = 'rickcedwhat-ai';
-const CR_BOT_LOGIN = 'coderabbitai[bot]';
 const DEPENDABOT_LOGIN = 'dependabot[bot]';
-const CR_CONTEXT = 'coderabbit-review';
+export const AI_CONTEXT = 'ai-review';
+
+const ALL_AI_LABELS = [
+  'ai-review: not started',
+  'ai-review: waiting',
+  'ai-review: unresolved',
+  'ai-review: complete',
+];
 
 export const HQ_COMMENT_TEMPLATE = `<!-- bot-hq -->
 ## 🤖 Bot HQ
@@ -38,130 +33,132 @@ export const HQ_COMMENT_TEMPLATE = `<!-- bot-hq -->
 
 ---
 
-<!-- cr-section-start -->
-<!-- cr-trigger-time: -->
+<!-- ai-review-section-start -->
+<!-- ai-review-trigger-time: -->
 
-### 🔍 CodeRabbit Review
-- [ ] 🔴 Priority review _(skips to front)_
-- [ ] 🟡 Normal review _(standard queue)_
-- [ ] ⬜ Backburner review _(triggers only when bucket is full)_
+### 🔍 AI Review
+- [ ] 🔴 Priority review
+- [ ] 🟡 Normal review
+- [ ] ⬜ Backburner review
 
 > _Not yet requested_
-<!-- cr-section-end -->
+<!-- ai-review-section-end -->
 
 ---
 <sub>This comment is managed by the bot — do not edit directly.</sub>`;
 
-const ALL_CR_LABELS = [
-  'coderabbit: not started',
-  'coderabbit: waiting',
-  'coderabbit: rate-limited',
-  'coderabbit: queued',
-  'coderabbit: unresolved',
-  'coderabbit: complete',
-];
-
-async function setExclusiveCRLabel(
+export async function setExclusiveAILabel(
   github: GitHubClient,
   prNumber: number,
   newLabel: string,
   currentLabels?: string[],
 ): Promise<void> {
   const labels = currentLabels ?? await github.getLabels(prNumber);
-  const toRemove = labels.filter(l => ALL_CR_LABELS.includes(l) && l !== newLabel);
+  const toRemove = labels.filter(l => ALL_AI_LABELS.includes(l) && l !== newLabel);
   await Promise.all(toRemove.map(l => github.removeLabel(prNumber, l).catch(() => {})));
   if (!labels.includes(newLabel)) {
     await github.addLabels(prNumber, [newLabel]);
   }
 }
 
-function buildCRSectionNotStarted(currentBody?: string): string {
-  const checkboxes = getCheckedLabel(currentBody ?? '').replace(/\[x\]/g, '[ ]');
-  return `<!-- cr-section-start -->
-<!-- cr-trigger-time: -->
+function spendLine(spend: SpendStatus): string {
+  return `📊 Repo today: $${spend.repo_daily.toFixed(2)} / $${spend.limits.repo_daily.toFixed(2)} · Global today: $${spend.global_daily.toFixed(2)} / $${spend.limits.global_daily.toFixed(2)} · Month: $${spend.global_monthly.toFixed(2)} / $${spend.limits.global_monthly.toFixed(2)}`;
+}
 
-### 🔍 CodeRabbit Review
+function buildAIReviewSectionNotStarted(currentBody?: string): string {
+  const checkboxes = extractCheckboxes(currentBody ?? '').replace(/\[x\]/gi, '[ ]');
+  return `<!-- ai-review-section-start -->
+<!-- ai-review-trigger-time: -->
+
+### 🔍 AI Review
 ${checkboxes}
 
 > _Not yet requested_
-<!-- cr-section-end -->`;
+<!-- ai-review-section-end -->`;
 }
 
-function buildCRSectionWaiting(prNumber: number): string {
+function buildAIReviewSectionWaiting(prNumber: number): string {
   const now = new Date().toISOString();
-  return `<!-- cr-section-start -->
-<!-- cr-trigger-time: ${now} -->
+  return `<!-- ai-review-section-start -->
+<!-- ai-review-trigger-time: ${now} -->
 
-### 🔍 CodeRabbit Review
-- [ ] 🔴 Priority review _(skips to front)_
-- [ ] 🟡 Normal review _(standard queue)_
-- [ ] ⬜ Backburner review _(triggers only when bucket is full)_
+### 🔍 AI Review
+- [ ] 🔴 Priority review
+- [ ] 🟡 Normal review
+- [ ] ⬜ Backburner review
 
-> ⏳ Review requested for #${prNumber} — waiting for CodeRabbit response…
-<!-- cr-section-end -->`;
+> ⏳ Review requested for #${prNumber} — AI review in progress…
+<!-- ai-review-section-end -->`;
 }
 
-function buildCRSectionQueued(level: QueueLevel): string {
-  const levelLabel = level === 'priority' ? '🔴 Priority' : level === 'normal' ? '🟡 Normal' : '⬜ Backburner';
-  return `<!-- cr-section-start -->
-<!-- cr-trigger-time: -->
+export function buildAIReviewSectionComplete(spend: SpendStatus, history: ReviewRound[]): string {
+  return `<!-- ai-review-section-start -->
+<!-- ai-review-trigger-time: -->
 
-### 🔍 CodeRabbit Review
-- [ ] 🔴 Priority review _(skips to front)_
-- [ ] 🟡 Normal review _(standard queue)_
-- [ ] ⬜ Backburner review _(triggers only when bucket is full)_
-
-> 📋 Queued as **${levelLabel}** — will trigger when a token is available.
-<!-- cr-section-end -->`;
-}
-
-function buildCRSectionComplete(): string {
-  return `<!-- cr-section-start -->
-<!-- cr-trigger-time: -->
-
-### 🔍 CodeRabbit Review
-- [ ] 🔴 Priority review _(skips to front)_
-- [ ] 🟡 Normal review _(standard queue)_
-- [ ] ⬜ Backburner review _(triggers only when bucket is full)_
+### 🔍 AI Review
+- [ ] 🔴 Priority review
+- [ ] 🟡 Normal review
+- [ ] ⬜ Backburner review
 
 > ✅ Review complete — no blocking issues.
-<!-- cr-section-end -->`;
+
+${spendLine(spend)}
+
+${serializeReviewHistory(history)}
+<!-- ai-review-section-end -->`;
 }
 
-function buildCRSectionUnresolved(actionableCount: number): string {
-  return `<!-- cr-section-start -->
-<!-- cr-trigger-time: -->
+export function buildAIReviewSectionUnresolved(actionableCount: number, spend: SpendStatus, history: ReviewRound[]): string {
+  return `<!-- ai-review-section-start -->
+<!-- ai-review-trigger-time: -->
 
-### 🔍 CodeRabbit Review
-- [ ] 🔴 Priority review _(skips to front)_
-- [ ] 🟡 Normal review _(standard queue)_
-- [ ] ⬜ Backburner review _(triggers only when bucket is full)_
+### 🔍 AI Review
+- [ ] 🔴 Priority review
+- [ ] 🟡 Normal review
+- [ ] ⬜ Backburner review
 
-> ❌ Review complete — **${actionableCount} actionable comment(s)** require attention.
-<!-- cr-section-end -->`;
+> ❌ Review complete — **${actionableCount} actionable issue(s)** require attention.
+
+${spendLine(spend)}
+
+${serializeReviewHistory(history)}
+<!-- ai-review-section-end -->`;
 }
 
-function buildCRSectionRateLimited(retryAt: string): string {
-  return `<!-- cr-section-start -->
-<!-- cr-trigger-time: -->
+export function buildAIReviewSectionSpendLimited(reason: string): string {
+  return `<!-- ai-review-section-start -->
+<!-- ai-review-trigger-time: -->
 
-### 🔍 CodeRabbit Review
-- [ ] 🔴 Priority review _(skips to front)_
-- [ ] 🟡 Normal review _(standard queue)_
-- [ ] ⬜ Backburner review _(triggers only when bucket is full)_
+### 🔍 AI Review
+- [ ] 🔴 Priority review
+- [ ] 🟡 Normal review
+- [ ] ⬜ Backburner review
 
-> ⏱ Rate-limited · retry scheduled · fires ~${retryAt} UTC
-<!-- cr-section-end -->`;
+> ⛔ Spend limit reached — ${reason}
+<!-- ai-review-section-end -->`;
 }
 
-function replaceCRSection(hqBody: string, newSection: string): string {
+export function replaceAIReviewSection(hqBody: string, newSection: string): string {
   return hqBody.replace(
-    /<!-- cr-section-start -->[\s\S]*?<!-- cr-section-end -->/,
+    /<!-- ai-review-section-start -->[\s\S]*?<!-- ai-review-section-end -->/,
     newSection,
   );
 }
 
-async function findHQComment(
+function extractCheckboxes(body: string): string {
+  const match = body.match(/- \[[ x]\] [^\n]+\n- \[[ x]\] [^\n]+\n- \[[ x]\] [^\n]+/);
+  if (match) return match[0];
+  return `- [ ] 🔴 Priority review\n- [ ] 🟡 Normal review\n- [ ] ⬜ Backburner review`;
+}
+
+function getCheckedPriority(body: string): 'priority' | 'normal' | 'backburner' | null {
+  if (/- \[x\] 🔴/i.test(body)) return 'priority';
+  if (/- \[x\] 🟡/i.test(body)) return 'normal';
+  if (/- \[x\] ⬜/i.test(body)) return 'backburner';
+  return null;
+}
+
+export async function findHQComment(
   github: GitHubClient,
   prNumber: number,
 ): Promise<{ id: number; body: string } | null> {
@@ -170,75 +167,24 @@ async function findHQComment(
   return hq ? { id: hq.id, body: hq.body } : null;
 }
 
-async function triggerOrEnqueue(
+async function triggerReview(
   ctx: HandlerContext,
   prNumber: number,
-  prTitle: string,
   sha: string,
-  level: QueueLevel,
 ): Promise<void> {
-  const { github, state, env } = ctx;
-  const queueState = await state.getState();
+  const { github } = ctx;
 
-  const hasTokens = queueState.tokens > 0;
-  const noPriorityInQueue = queueState.priority.length === 0;
-  const bucketFull = queueState.tokens === MAX_TOKENS;
+  await setExclusiveAILabel(github, prNumber, 'ai-review: waiting');
+  await github.setCommitStatus(sha, 'pending', AI_CONTEXT, 'AI review in progress');
 
-  const shouldTriggerNow =
-    hasTokens && (
-      level === 'priority' ||
-      (level === 'normal' && noPriorityInQueue) ||
-      (level === 'backburner' && bucketFull)
-    );
-
-  if (shouldTriggerNow) {
-    // Post @coderabbitai review comment
-    await github.createComment(prNumber, '@coderabbitai full review');
-    await state.decrementToken();
-
-    // Swap label to waiting
-    await setExclusiveCRLabel(github, prNumber, 'coderabbit: waiting');
-    await github.setCommitStatus(sha, 'pending', CR_CONTEXT, 'CodeRabbit review in progress');
-
-    // Update HQ comment
-    const hq = await findHQComment(github, prNumber);
-    if (hq) {
-      const updatedBody = replaceCRSection(hq.body, buildCRSectionWaiting(prNumber));
-      await github.updateComment(hq.id, updatedBody);
-    }
-
-    await updateQueueIssueDashboard(github, env, await state.getState());
-  } else {
-    // Enqueue
-    const newQueueState = enqueue(queueState, { pr: prNumber, title: prTitle, queued_at: new Date().toISOString() }, level);
-    await state.saveState(newQueueState);
-
-    await setExclusiveCRLabel(github, prNumber, 'coderabbit: queued');
-
-    // Update HQ comment
-    const hq = await findHQComment(github, prNumber);
-    if (hq) {
-      const updatedBody = replaceCRSection(hq.body, buildCRSectionQueued(level));
-      await github.updateComment(hq.id, updatedBody);
-    }
-
-    // Schedule coordinator if not already scheduled, and persist the messageId
-    let finalState = newQueueState;
-    if (!newQueueState.refill_qstash_id) {
-      const workerUrl = `https://cr-bot.${env.GITHUB_REPO.split('/')[0]}.workers.dev`;
-      const msgId = await scheduleCoordinator(env.QSTASH_TOKEN, 60, workerUrl);
-      if (msgId) {
-        finalState = {
-          ...newQueueState,
-          refill_qstash_id: msgId,
-          refill_at: new Date(Date.now() + 60_000).toISOString(),
-        };
-        await state.saveState(finalState);
-      }
-    }
-
-    await updateQueueIssueDashboard(github, env, finalState);
+  const hq = await findHQComment(github, prNumber);
+  if (hq) {
+    const updatedBody = replaceAIReviewSection(hq.body, buildAIReviewSectionWaiting(prNumber));
+    await github.updateComment(hq.id, updatedBody);
   }
+
+  const { executeReview } = await import('../lib/review-executor.js');
+  await executeReview(ctx, prNumber, sha, hq);
 }
 
 export async function handlePullRequest(ctx: HandlerContext): Promise<void> {
@@ -252,40 +198,31 @@ export async function handlePullRequest(ctx: HandlerContext): Promise<void> {
 
   if (action === 'opened') {
     if (isDependabot) {
-      await github.setCommitStatus(sha, 'success', CR_CONTEXT, 'Dependabot PR — CR review not required');
+      await github.setCommitStatus(sha, 'success', AI_CONTEXT, 'Dependabot PR — AI review not required');
       return;
     }
 
-    // Create HQ comment
     await github.createComment(prNumber, HQ_COMMENT_TEMPLATE);
-    // Add label
-    await github.addLabels(prNumber, ['coderabbit: not started']);
-    // Set commit status
-    await github.setCommitStatus(sha, 'pending', CR_CONTEXT, 'CodeRabbit review not yet requested');
+    await github.addLabels(prNumber, ['ai-review: not started']);
+    await github.setCommitStatus(sha, 'pending', AI_CONTEXT, 'AI review not yet requested');
     return;
   }
 
   if (action === 'synchronize') {
     const labels = await github.getLabels(prNumber);
-    // Reset on any non-trivial CR state — terminal (complete/unresolved) AND
-    // in-flight (waiting/queued/rate-limited). Only leave not-started alone.
     const shouldReset = labels.some(l =>
-      l === 'coderabbit: complete' ||
-      l === 'coderabbit: unresolved' ||
-      l === 'coderabbit: waiting' ||
-      l === 'coderabbit: queued' ||
-      l === 'coderabbit: rate-limited',
+      l === 'ai-review: complete' ||
+      l === 'ai-review: unresolved' ||
+      l === 'ai-review: waiting',
     );
 
     if (shouldReset) {
-      // Remove all CR labels, add not started
-      await setExclusiveCRLabel(github, prNumber, 'coderabbit: not started', labels);
-      await github.setCommitStatus(sha, 'pending', CR_CONTEXT, 'CodeRabbit review not yet requested');
+      await setExclusiveAILabel(github, prNumber, 'ai-review: not started', labels);
+      await github.setCommitStatus(sha, 'pending', AI_CONTEXT, 'AI review not yet requested');
 
-      // Update HQ comment
       const hq = await findHQComment(github, prNumber);
       if (hq) {
-        const updatedBody = replaceCRSection(hq.body, buildCRSectionNotStarted(hq.body));
+        const updatedBody = replaceAIReviewSection(hq.body, buildAIReviewSectionNotStarted(hq.body));
         await github.updateComment(hq.id, updatedBody);
       }
     }
@@ -293,7 +230,7 @@ export async function handlePullRequest(ctx: HandlerContext): Promise<void> {
 }
 
 export async function handleIssueComment(ctx: HandlerContext): Promise<void> {
-  const { github, state, env, payload } = ctx;
+  const { github, env, payload } = ctx;
   const action: string = payload.action;
   const comment = payload.comment;
   const issue = payload.issue;
@@ -307,101 +244,11 @@ export async function handleIssueComment(ctx: HandlerContext): Promise<void> {
   const commentAuthor: string = comment.user.login;
   const senderLogin: string = sender.login;
 
-  if (commentAuthor === CR_BOT_LOGIN) {
-    if (isSkipComment(commentBody)) {
-      const pr = await github.getPR(prNumber);
-      await setExclusiveCRLabel(github, prNumber, 'coderabbit: complete');
-      await github.setCommitStatus(pr.head.sha, 'success', CR_CONTEXT, 'CodeRabbit review passed');
-
-      const hq = await findHQComment(github, prNumber);
-      if (hq) {
-        const updatedBody = replaceCRSection(hq.body, buildCRSectionComplete());
-        await github.updateComment(hq.id, updatedBody);
-      }
-      return;
-    }
-
-    if (isRateLimitComment(commentBody)) {
-      const pr = await github.getPR(prNumber);
-      await setExclusiveCRLabel(github, prNumber, 'coderabbit: rate-limited');
-      await github.setCommitStatus(pr.head.sha, 'pending', CR_CONTEXT, 'CodeRabbit rate-limited · retry scheduled');
-
-      // Compute delay and re-enqueue
-      const delaySecs = computeRateLimitDelay(commentBody, comment.created_at, Date.now());
-      const queueState = await state.getState();
-      const newQueueState = enqueue(
-        queueState,
-        { pr: prNumber, title: pr.title, queued_at: new Date().toISOString() },
-        'normal',
-      );
-      await state.saveState(newQueueState);
-
-      // Schedule coordinator — only update HQ if scheduling actually succeeded
-      const workerUrl = `https://cr-bot.${env.GITHUB_REPO.split('/')[0]}.workers.dev`;
-      const msgId = await scheduleCoordinator(env.QSTASH_TOKEN, delaySecs, workerUrl);
-      if (msgId) {
-        const retryAt = new Date(Date.now() + delaySecs * 1000).toISOString().slice(11, 16);
-        const updatedState = {
-          ...newQueueState,
-          refill_qstash_id: msgId,
-          refill_at: new Date(Date.now() + delaySecs * 1000).toISOString(),
-        };
-        await state.saveState(updatedState);
-
-        // Update HQ to show retry time only when retry is actually scheduled
-        const hq = await findHQComment(github, prNumber);
-        if (hq) {
-          await github.updateComment(hq.id, replaceCRSection(hq.body, buildCRSectionRateLimited(retryAt)));
-        }
-      }
-      return;
-    }
-
-    // Other CR bot comments: ignore
-    return;
-  }
-
-  // Human reviewer triggers: "@rickcedwhat-ai review" command
-  if (commentAuthor !== BOT_LOGIN && action === 'created' && /^@rickcedwhat-ai\s+(?:coderabbit\s+)?review/i.test(commentBody)) {
-    // Parse priority from command, default normal
-    let level: QueueLevel = 'normal';
-    if (/priority/i.test(commentBody)) level = 'priority';
-    else if (/backburner/i.test(commentBody)) level = 'backburner';
-
+  // @rickcedwhat-ai review command
+  if (commentAuthor !== BOT_LOGIN && action === 'created' && /^@rickcedwhat-ai\s+(?:ai\s+)?review/i.test(commentBody)) {
     const pr = await github.getPR(prNumber);
-    await triggerOrEnqueue(ctx, prNumber, pr.title, pr.head.sha, level);
+    await triggerReview(ctx, prNumber, pr.head.sha);
     return;
-  }
-
-  // @rickcedwhat-ai promote #N command
-  if (commentAuthor !== BOT_LOGIN && action === 'created') {
-    const promoteMatch = commentBody.match(/^@rickcedwhat-ai\s+promote\s+#(\d+)/i);
-    if (promoteMatch) {
-      const targetPR = parseInt(promoteMatch[1], 10);
-      const queueState = await state.getState();
-      const found = findPRInQueues(queueState, targetPR);
-
-      if (!found) {
-        await github.createComment(prNumber, `❌ PR #${targetPR} is not in the queue.`);
-      } else if (found.level === 'priority') {
-        await github.createComment(prNumber, `PR #${targetPR} is already in the 🔴 Priority queue.`);
-      } else {
-        // Dequeue then re-enqueue at priority
-        const pr = await github.getPR(targetPR);
-        const afterDequeue = dequeue(queueState, targetPR);
-        const afterEnqueue = enqueue(
-          afterDequeue,
-          { pr: targetPR, title: pr.title, queued_at: new Date().toISOString() },
-          'priority',
-        );
-        await state.saveState(afterEnqueue);
-        await github.createComment(prNumber, `✅ PR #${targetPR} promoted to 🔴 Priority queue.`);
-
-        // Update Queue Issue dashboard
-        await updateQueueIssueDashboard(github, env, afterEnqueue);
-      }
-      return;
-    }
   }
 
   // @rickcedwhat-ai reminder <delay> command
@@ -429,7 +276,6 @@ export async function handleIssueComment(ctx: HandlerContext): Promise<void> {
           console.error(`Failed to schedule reminder: QStash returned ${res.status}`);
           return;
         }
-        // Only confirm to the user when scheduling actually succeeded
         const unitLabel = unit === 'm' ? `${amount}m` : unit === 'h' ? `${amount}h` : `${amount}d`;
         await github.createComment(prNumber, `⏱ Reminder scheduled for ${unitLabel}.`);
       } catch (err) {
@@ -440,50 +286,20 @@ export async function handleIssueComment(ctx: HandlerContext): Promise<void> {
   }
 
   // HQ comment checkbox edit detection
-  // The HQ comment is authored by BOT_LOGIN; an edit by someone else is a checkbox toggle
   if (commentAuthor === BOT_LOGIN && senderLogin !== BOT_LOGIN && comment.body.includes('<!-- bot-hq -->')) {
-    const priority = getPriorityFromCheckbox(commentBody);
+    const priority = getCheckedPriority(commentBody);
     if (priority) {
       const pr = await github.getPR(prNumber);
-      await triggerOrEnqueue(ctx, prNumber, pr.title, pr.head.sha, priority);
+      await triggerReview(ctx, prNumber, pr.head.sha);
     }
   }
 }
 
 export async function handlePullRequestReview(ctx: HandlerContext): Promise<void> {
-  const { github, payload } = ctx;
-  const review = payload.review;
-  const pr = payload.pull_request;
-  const prNumber: number = pr.number;
-  const sha: string = pr.head.sha;
-  const reviewerLogin: string = review.user.login;
-  const reviewBody: string = review.body ?? '';
-  const reviewState: string = review.state ?? '';
-
-  if (reviewerLogin !== CR_BOT_LOGIN) return;
-
-  const actionableCount = parseActionableCount(reviewBody);
-  const isApproved = reviewState.toLowerCase() === 'approved';
-  const isChangesRequested = reviewState.toLowerCase() === 'changes_requested';
-  const hasBlocking = !isApproved && (isChangesRequested || actionableCount > 0);
-
-  if (hasBlocking) {
-    await setExclusiveCRLabel(github, prNumber, 'coderabbit: unresolved');
-    await github.setCommitStatus(sha, 'failure', CR_CONTEXT, 'CodeRabbit review has open comments');
-
-    const hq = await findHQComment(github, prNumber);
-    if (hq) {
-      const updatedBody = replaceCRSection(hq.body, buildCRSectionUnresolved(actionableCount));
-      await github.updateComment(hq.id, updatedBody);
-    }
-  } else {
-    await setExclusiveCRLabel(github, prNumber, 'coderabbit: complete');
-    await github.setCommitStatus(sha, 'success', CR_CONTEXT, 'CodeRabbit review passed');
-
-    const hq = await findHQComment(github, prNumber);
-    if (hq) {
-      const updatedBody = replaceCRSection(hq.body, buildCRSectionComplete());
-      await github.updateComment(hq.id, updatedBody);
-    }
-  }
+  // Prevent feedback loops: ignore reviews posted by our own bot
+  const review = ctx.payload.review;
+  if (review?.user?.login === BOT_LOGIN) return;
+  // All other reviews are informational — the AI review commit status is set
+  // by the review executor, not by watching for review events from others.
 }
+

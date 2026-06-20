@@ -1,3 +1,4 @@
+// TODO(#288 Phase 4): remove QueuedPR, QueueLevel, QueueState, CRLabel after queue cleanup
 export interface QueuedPR {
   pr: number;
   title: string;
@@ -26,3 +27,53 @@ export type CRLabel =
   | 'coderabbit: complete';
 
 export type CommitState = 'pending' | 'success' | 'failure' | 'error';
+
+// AI Review types
+
+export type AIReviewLabel =
+  | 'ai-review: not started'
+  | 'ai-review: waiting'
+  | 'ai-review: unresolved'
+  | 'ai-review: complete';
+
+export interface ReviewConfig {
+  focus?: string[];
+  ignore?: string[];
+  context_files?: string[];
+  checklist?: string[];
+  model_override?: string;
+  planning?: {
+    enabled?: boolean;
+    focus?: string[];
+  };
+}
+
+export interface ReviewRound {
+  round: number;
+  timestamp: string;
+  commit_sha: string;
+  input_tokens: number;
+  output_tokens: number;
+  cost: number;
+  summary: string;
+}
+
+export interface SpendLimits {
+  repo_daily: number;
+  global_daily: number;
+  global_monthly: number;
+}
+
+export interface SpendStatus {
+  repo_daily: number;
+  global_daily: number;
+  global_monthly: number;
+  limits: SpendLimits;
+}
+
+export interface AIProviderResponse {
+  review_body: string;
+  input_tokens: number;
+  output_tokens: number;
+  model: string;
+}

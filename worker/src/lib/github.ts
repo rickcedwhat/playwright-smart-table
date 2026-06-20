@@ -134,4 +134,49 @@ export class GitHubClient {
   async getPRLabels(prNumber: number): Promise<string[]> {
     return this.getLabels(prNumber);
   }
+
+  async getPRDiff(prNumber: number): Promise<string> {
+    const url = `${BASE_URL}/repos/${this.repo}/pulls/${prNumber}`;
+    const res = await fetch(url, {
+      headers: {
+        ...this.headers,
+        'Accept': 'application/vnd.github.v3.diff',
+      },
+    });
+    if (!res.ok) {
+      const text = await res.text().catch(() => '');
+      throw new Error(`GitHub API error ${res.status} for PR diff: ${text}`);
+    }
+    return res.text();
+  }
+
+  async getFileContent(path: string, ref: string): Promise<string | null> {
+    try {
+      const data = await this.request<{ content: string; encoding: string }>(
+        `/repos/${this.repo}/contents/${path}?ref=${encodeURIComponent(ref)}`,
+      );
+      if (data.encoding === 'base64') {
+        return atob(data.content.replace(/\n/g, ''));
+      }
+      return data.content;
+    } catch (err) {
+      if (err instanceof Error && err.message.includes('404')) return null;
+      throw err;
+    }
+  }
+
+  async createPRReview(prNumber: number, body: string, event: 'COMMENT' | 'APPROVE' | 'REQUEST_CHANGES' = 'COMMENT'): Promise<void> {
+    return this.request(`/repos/${this.repo}/pulls/${prNumber}/reviews`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ body, event }),
+    });
+  }
+
+  async getIssueBody(issueNumber: number): Promise<{ title: string; body: string }> {
+    const data = await this.request<{ title: string; body: string }>(
+      `/repos/${this.repo}/issues/${issueNumber}`,
+    );
+    return { title: data.title, body: data.body };
+  }
 }

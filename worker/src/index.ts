@@ -3,6 +3,7 @@ import { Receiver } from '@upstash/qstash';
 import { GitHubClient } from './lib/github.js';
 import { StateManager } from './lib/state.js';
 import { handlePullRequest, handleIssueComment, handlePullRequestReview } from './handlers/webhook.js';
+import { handleIssue, handleIssueComment as handleIssueCommentPlain } from './handlers/issue.js';
 import { handleCoordinator } from './handlers/coordinator.js';
 
 export interface Env {
@@ -15,6 +16,16 @@ export interface Env {
   UPSTASH_REDIS_REST_TOKEN: string;
   GITHUB_REPO: string;
   QUEUE_ISSUE_NUMBER: string;
+  // AI review
+  REVIEW_PROVIDER: string;       // 'claude' | 'openai' | 'gemini' (default: 'claude')
+  ANTHROPIC_API_KEY: string;
+  OPENAI_API_KEY: string;
+  GEMINI_API_KEY: string;
+  REVIEW_MODEL_OVERRIDE: string; // optional model override
+  // Spend limits (USD)
+  SPEND_LIMIT_REPO_DAILY: string;    // default: '1'
+  SPEND_LIMIT_GLOBAL_DAILY: string;  // default: '5'
+  SPEND_LIMIT_GLOBAL_MONTHLY: string; // default: '10'
 }
 
 async function verifyGitHubSignature(secret: string, body: string, signature: string): Promise<boolean> {
@@ -87,9 +98,17 @@ app.post('/webhook', async (c) => {
     if (event === 'pull_request' && (action === 'opened' || action === 'synchronize')) {
       await handlePullRequest(ctx);
     } else if (event === 'issue_comment' && (action === 'created' || action === 'edited')) {
-      await handleIssueComment(ctx);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const isOnPR = !!(p as any).issue?.pull_request;
+      if (isOnPR) {
+        await handleIssueComment(ctx);
+      } else {
+        await handleIssueCommentPlain(ctx);
+      }
     } else if (event === 'pull_request_review' && action === 'submitted') {
       await handlePullRequestReview(ctx);
+    } else if (event === 'issues' && (action === 'opened' || action === 'edited')) {
+      await handleIssue(ctx);
     }
     // All others: 200 OK (ignored)
 
