@@ -48,7 +48,7 @@ const email = await row.getCell('Email').innerText();
 
 - [Row access](https://rickcedwhat.github.io/playwright-smart-table/guide/query/) — find rows by column name, not DOM index
 - [Pagination search](https://rickcedwhat.github.io/playwright-smart-table/guide/query/find-rows) — `findRow` and `findRows` scan across pages automatically
-- [Iteration](https://rickcedwhat.github.io/playwright-smart-table/guide/query/iterate) — `forEach`, `map`, `filter`, and `for await...of`
+- [Iteration](https://rickcedwhat.github.io/playwright-smart-table/guide/query/iterate) — `forEach`, `map`, `filter`, with early exit via `stop()`
 - [Table config](https://rickcedwhat.github.io/playwright-smart-table/guide/describe/) — plug in any pagination shape, virtual scroll, or custom header logic
 - [Fill / edit cells](https://rickcedwhat.github.io/playwright-smart-table/guide/query/write) — write values back into table cells
 

@@ -39,18 +39,24 @@ Returns a `SmartRowArray` of all rows where the predicate returns `true`. Defaul
 
 ---
 
-## for await...of
+## Early exit
 
-The table is async-iterable, so you can use `for await...of` directly:
+Call `stop()` from the callback to halt iteration after the current page finishes:
 
 ```typescript
-for await (const { row, rowIndex } of table) {
+await table.forEach(async ({ row, stop }) => {
   const status = await row.getCell('Status').innerText()
-  console.log(rowIndex, status)
-}
+  if (status === 'Archived') stop()
+})
 ```
 
-This is equivalent to `forEach` with sequential concurrency. Useful when you need fine-grained control over loop flow (early `break`, `continue`, or try/catch per row).
+`stop()` works in `forEach`, `map`, and `filter`. If you need to stop mid-page immediately rather than at the page boundary, the table is async-iterable and supports `break`:
+
+```typescript
+for await (const { row } of table) {
+  if (await row.getCell('Status').innerText() === 'Archived') break
+}
+```
 
 ---
 
