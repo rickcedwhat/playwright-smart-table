@@ -6,20 +6,9 @@ This file is the shared source of truth for all AI agents working on this repo.
 
 ## Agent Workflow
 
-Two agents operate on this project with different isolation strategies:
+Both Claude Code and Antigravity work on branches within the main worktree.
 
-| Agent | Isolation | Why |
-|---|---|---|
-| **Claude Code** | Git worktrees | Async tasks — works in a separate directory so the main checkout stays clean |
-| **Antigravity** | Branches within the main worktree | Workspace-bound tools; stays in the current working directory |
-
-### Claude Code
-
-Claude creates a new worktree for each task and opens a PR when done. You never need to switch branches or stash work — Claude's directory is separate from yours.
-
-### Antigravity
-
-Antigravity operates inside the main worktree. Use the `antigravity` branch as a sandbox for exploratory work, then create a descriptive feature branch for the PR (e.g. `feat/issue-42-row-virtualization`). Do **not** switch to or modify a worktree directory — those belong to Claude.
+Use a descriptive feature branch for each task (e.g. `feat/issue-42-row-virtualization`). Open a PR when done — the bot will post a Bot HQ comment automatically. Trigger an AI review by checking a checkbox in that comment or commenting `@rickcedwhat-ai review`.
 
 ---
 
