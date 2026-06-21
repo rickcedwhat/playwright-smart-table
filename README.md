@@ -1,6 +1,8 @@
 # Playwright Smart Table
 
-**Production-ready table testing for Playwright with smart column-aware locators.**
+**Dealing with tables sucks. Locators are brittle, hard to read, and break the moment a column moves or pagination kicks in.**
+
+Playwright Smart Table lets you find rows by column name instead of fragile DOM positions. You describe your table — it does the rest.
 
 [![npm version](https://img.shields.io/github/package-json/v/rickcedwhat/playwright-smart-table?label=npm&color=blue&t=2)](https://www.npmjs.com/package/@rickcedwhat/playwright-smart-table)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -9,42 +11,27 @@
 
 ---
 
-## The Problem
-
-Testing HTML tables in Playwright is fragile by default:
-
 ```typescript
-// ❌ Breaks if columns reorder
-const email = await page.locator('tbody tr').nth(2).locator('td').nth(3).textContent();
-
-// ❌ Manual column mapping every time
-const headers = await page.locator('thead th').allTextContents();
-const emailIndex = headers.indexOf('Email');
-const email = await row.locator('td').nth(emailIndex).textContent();
+// ❌ Before — breaks if columns reorder
+const row = page.locator('tbody tr')
+  .filter({ has: page.locator('td:nth-child(1)', { hasText: 'John' }) })
+  .filter({ has: page.locator('td:nth-child(2)', { hasText: 'Doe' }) })
+const email = await row.locator('td:nth-child(3)').innerText()
 ```
 
-## The Solution
-
 ```typescript
-// ✅ Column-aware — survives column reordering
-const row = table.getRow({ Name: 'John Doe' });
-const email = await row.getCell('Email').textContent();
-
-// ✅ Search across pages
-const allEngineers = await table.findRows({ Department: 'Engineering' }, { maxPages: 5 });
-
-// ✅ Iterate with forEach, map, filter, or for await...of
-await table.forEach(async ({ row }) => {
-  await row.getCell('Checkbox').click();
-});
+// ✅ After — column-aware, survives reordering
+const row = table.getRow({ firstName: 'John', lastName: 'Doe' })
+const email = await row.getCell('Email').innerText()
 ```
+
+---
 
 ## Installation
 
 ```bash
 npm install @rickcedwhat/playwright-smart-table
 ```
-
 
 ## Quick Start
 
@@ -57,14 +44,17 @@ const row = table.getRow({ Name: 'John Doe' });
 const email = await row.getCell('Email').innerText();
 ```
 
-## Key Features
+## Pagination
 
-- 🎯 **Column-aware locators** — find rows and cells by name, not index
-- 📄 **Pagination-aware search** — `findRows` and `forEach` scan across pages automatically
-- 🔁 **Iteration methods** — `forEach`, `map`, `filter`, and `for await...of`
-- 🛠️ **Debug mode** — slow motion playback and structured logs
-- 🔌 **Extensible strategies** — plug in any table implementation or pagination shape
-- 💪 **Full TypeScript support**
+`findRows` searches across pages automatically — no manual next-page logic:
+
+```typescript
+const engineers = await table.findRows({ Department: 'Engineering' }, { maxPages: 10 });
+
+for (const row of engineers) {
+  await row.getCell('Checkbox').click();
+}
+```
 
 ---
 
