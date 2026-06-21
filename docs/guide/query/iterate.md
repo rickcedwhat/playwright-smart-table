@@ -39,6 +39,29 @@ Returns a `SmartRowArray` of all rows where the predicate returns `true`. Defaul
 
 ---
 
+## Early exit
+
+Call `stop()` from the callback to halt iteration early:
+
+```typescript
+await table.forEach(async ({ row, stop }) => {
+  const status = await row.getCell('Status').innerText()
+  if (status === 'Archived') stop()
+})
+```
+
+`stop()` works in `forEach`, `map`, and `filter`. Note that it halts at the page boundary — rows already in-flight on the current page will still complete before iteration stops.
+
+If you need to stop at the exact row rather than the page boundary, the table is async-iterable and supports `break`:
+
+```typescript
+for await (const { row } of table) {
+  if (await row.getCell('Status').innerText() === 'Archived') break
+}
+```
+
+---
+
 ## Concurrency
 
 `forEach`, `map`, and `filter` all accept a `concurrency` option:
