@@ -8,9 +8,7 @@ See `AGENTS.md` for shared conventions (package manager, branch strategy, releas
 
 ## Claude-Specific Setup
 
-**Isolation**: Claude uses git worktrees. Each task gets its own working directory — never modify the main checkout or switch branches manually.
-
-**Package manager**: pnpm. Run `pnpm install --frozen-lockfile` after checking out a worktree.
+**Package manager**: pnpm. Run `pnpm install --frozen-lockfile` before building or testing.
 
 ---
 
@@ -100,7 +98,7 @@ Running `pnpm run build` executes all generators then compiles TypeScript.
    ```bash
    git fetch origin && git rebase origin/main
    ```
-2. Only open PRs as drafts for genuine WIP. CodeRabbit auto-review is disabled — trigger reviews manually with `@rickcedwhat-ai coderabbit review` when ready.
+2. Only open PRs as drafts for genuine WIP. To trigger an AI review, check a checkbox in the Bot HQ comment or comment `@rickcedwhat-ai review`.
 
 ## PR Checklist
 
