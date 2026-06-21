@@ -99,5 +99,10 @@
     "vitepress-plugin-tabs": "^0.9.0",
     "vitest": "^3.2.6"
   },
-  "packageManager": "pnpm@10.33.2"
+  "packageManager": "pnpm@10.33.2",
+  "pnpm": {
+    "overrides": {
+      "fast-uri": ">=3.1.2"
+    }
+  }
 }
