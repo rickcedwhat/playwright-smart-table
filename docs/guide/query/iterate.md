@@ -41,7 +41,7 @@ Returns a `SmartRowArray` of all rows where the predicate returns `true`. Defaul
 
 ## Early exit
 
-Call `stop()` from the callback to halt iteration after the current page finishes:
+Call `stop()` from the callback to halt iteration early:
 
 ```typescript
 await table.forEach(async ({ row, stop }) => {
@@ -50,7 +50,9 @@ await table.forEach(async ({ row, stop }) => {
 })
 ```
 
-`stop()` works in `forEach`, `map`, and `filter`. If you need to stop mid-page immediately rather than at the page boundary, the table is async-iterable and supports `break`:
+`stop()` works in `forEach`, `map`, and `filter`. Note that it halts at the page boundary — rows already in-flight on the current page will still complete before iteration stops.
+
+If you need to stop at the exact row rather than the page boundary, the table is async-iterable and supports `break`:
 
 ```typescript
 for await (const { row } of table) {
