@@ -72,6 +72,6 @@ const email = await row.getCell('Email').innerText();
 - [npm Package](https://www.npmjs.com/package/@rickcedwhat/playwright-smart-table)
 - [GitHub Repository](https://github.com/rickcedwhat/playwright-smart-table)
 - [Issues](https://github.com/rickcedwhat/playwright-smart-table/issues)
-- [Discussions](https://github.com/rickcedwhat/playwright-smart-table/discussions) — questions, ideas, and show & tell
+- [Discussions](https://github.com/rickcedwhat/playwright-smart-table/discussions) — questions and ideas
 
 MIT © Cedrick Catalan
