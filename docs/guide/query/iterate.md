@@ -39,6 +39,21 @@ Returns a `SmartRowArray` of all rows where the predicate returns `true`. Defaul
 
 ---
 
+## for await...of
+
+The table is async-iterable, so you can use `for await...of` directly:
+
+```typescript
+for await (const { row, rowIndex } of table) {
+  const status = await row.getCell('Status').innerText()
+  console.log(rowIndex, status)
+}
+```
+
+This is equivalent to `forEach` with sequential concurrency. Useful when you need fine-grained control over loop flow (early `break`, `continue`, or try/catch per row).
+
+---
+
 ## Concurrency
 
 `forEach`, `map`, and `filter` all accept a `concurrency` option:

@@ -44,17 +44,13 @@ const row = table.getRow({ Name: 'John Doe' });
 const email = await row.getCell('Email').innerText();
 ```
 
-## Pagination
+## Features
 
-`findRows` searches across pages automatically — no manual next-page logic:
-
-```typescript
-const engineers = await table.findRows({ Department: 'Engineering' }, { maxPages: 10 });
-
-for (const row of engineers) {
-  await row.getCell('Checkbox').click();
-}
-```
+- [Row access](https://rickcedwhat.github.io/playwright-smart-table/guide/query/) — find rows by column name, not DOM index
+- [Pagination search](https://rickcedwhat.github.io/playwright-smart-table/guide/query/find-rows) — `findRow` and `findRows` scan across pages automatically
+- [Iteration](https://rickcedwhat.github.io/playwright-smart-table/guide/query/iterate) — `forEach`, `map`, `filter`, and `for await...of`
+- [Table config](https://rickcedwhat.github.io/playwright-smart-table/guide/describe/) — plug in any pagination shape, virtual scroll, or custom header logic
+- [Fill / edit cells](https://rickcedwhat.github.io/playwright-smart-table/guide/query/write) — write values back into table cells
 
 ---
 
