@@ -4,7 +4,6 @@
 
 [![npm version](https://img.shields.io/github/package-json/v/rickcedwhat/playwright-smart-table?label=npm&color=blue&t=2)](https://www.npmjs.com/package/@rickcedwhat/playwright-smart-table)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![CodeRabbit Reviews](https://img.shields.io/coderabbit/prs/github/rickcedwhat/playwright-smart-table?utm_source=oss&utm_medium=github&utm_campaign=rickcedwhat%2Fplaywright-smart-table&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)](https://coderabbit.ai)
 
 ## 📚 [Full Documentation →](https://rickcedwhat.github.io/playwright-smart-table/)
 
@@ -73,5 +72,6 @@ const email = await row.getCell('Email').innerText();
 - [npm Package](https://www.npmjs.com/package/@rickcedwhat/playwright-smart-table)
 - [GitHub Repository](https://github.com/rickcedwhat/playwright-smart-table)
 - [Issues](https://github.com/rickcedwhat/playwright-smart-table/issues)
+- [Discussions](https://github.com/rickcedwhat/playwright-smart-table/discussions) — questions and ideas
 
 MIT © Cedrick Catalan
