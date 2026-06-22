@@ -111,7 +111,7 @@ const Cell: React.FC<CellProps> = ({ content, columnId, width, rowConfig, defaul
 
     if (!isLoaded) {
         return (
-            <div style={{ width, paddingRight: '16px', display: 'flex', alignItems: 'center' }}>
+            <div role="cell" style={{ width, paddingRight: '16px', display: 'flex', alignItems: 'center' }}>
                 <div data-testid="cell-loading" style={{ height: '12px', width: '80%', backgroundColor: '#edf2f7', borderRadius: '4px' }} />
             </div>
         );
