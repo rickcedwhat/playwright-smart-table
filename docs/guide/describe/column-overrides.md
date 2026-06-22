@@ -42,3 +42,8 @@ useTable(locator, {
 `read` and `write` can coexist on the same column. When both are defined, `smartFill` will call `read` first to get the current value before writing — useful when you need to compare before acting.
 
 _Config: `columnOverrides`_
+
+
+---
+
+→ [API Reference: Config Options — columnOverrides](/api/table-config#columnoverrides)

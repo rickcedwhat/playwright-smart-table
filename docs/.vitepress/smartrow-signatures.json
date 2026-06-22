@@ -1,11 +1,11 @@
 [
   {
-    "name": "rowIndex?",
+    "name": "rowIndex",
     "signature": "rowIndex?: number",
     "comment": "/** Optional row index (0-based) if known */"
   },
   {
-    "name": "tablePageIndex?",
+    "name": "tablePageIndex",
     "signature": "tablePageIndex?: number",
     "comment": "/** Optional page index this row was found on (0-based) */"
   },

@@ -44,3 +44,8 @@ useTable(locator, { cellSelector: '.ag-cell' })
 ```
 
 _Config: `cellSelector`_
+
+
+---
+
+→ [API Reference: Config Options](/api/table-config)

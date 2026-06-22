@@ -73,3 +73,8 @@ await table.map(async ({ row }) => row.toJSON(), { concurrency: 'sequential' })
 - **`parallel`** — all row callbacks run concurrently. Fastest. Default for `map`.
 - **`sequential`** — one row at a time, in order. Default for `forEach` and `filter`.
 - **`synchronized`** — row callbacks run in parallel, but the library waits for all rows on the current page to finish before advancing to the next page. Use when your callbacks interact with the table and page navigation needs to be coordinated.
+
+
+---
+
+→ [API Reference: Table Methods — forEach](/api/table-methods#foreach) · [Table Methods — map](/api/table-methods#map) · [Table Methods — filter](/api/table-methods#filter)

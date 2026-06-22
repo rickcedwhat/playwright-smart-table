@@ -48,3 +48,8 @@ headerTransformer: async ({ text }) => text.toLowerCase().replace(/_/g, ' ').tri
 :::
 
 _Config: `headerTransformer`_
+
+
+---
+
+→ [API Reference: Config Options — headerTransformer](/api/table-config#headertransformer)

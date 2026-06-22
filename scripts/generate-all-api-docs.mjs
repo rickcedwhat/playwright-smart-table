@@ -18,9 +18,9 @@ const typesContent = fs.readFileSync(typesPath, 'utf-8');
 
 // Extract multiple interfaces
 const interfaces = {
-    // TableResult extends AsyncIterable — keep regex in sync with src/types.ts declaration line.
+    // TableResult — match everything between the declaration line and closing brace.
     TableResult:
-        /export interface TableResult<T = any> extends AsyncIterable<\{ row: SmartRow<T>; rowIndex: number \}> \{([\s\S]*?)\n\}/,
+        /export interface TableResult[^{]+\{([\s\S]*?)\n\}/,
     TableConfig: /export interface TableConfig<T = any> \{([\s\S]*?)\n\}/,
     SmartRow: /export type SmartRow<T = any> = Locator & \{([\s\S]*?)\n\};/,
     TableStrategies: /export interface TableStrategies \{([\s\S]*?)\n\}/
@@ -126,7 +126,7 @@ function extractMethods(content, interfaceName) {
 Object.entries(allSignatures).forEach(([interfaceName, methods]) => {
     const outputPath = path.join(rootDir, `docs/.vitepress/${interfaceName.toLowerCase()}-signatures.json`);
     const formatted = methods.map(m => ({
-        name: m.name.replace(/[<(].*$/, '').trim(),
+        name: m.name.replace(/[<(].*$/, '').replace(/\?$/, '').trim(),
         signature: m.signature.replace(/;$/, '').trim(),
         comment: m.comment
     }));

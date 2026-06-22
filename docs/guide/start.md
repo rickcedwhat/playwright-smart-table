@@ -33,3 +33,10 @@ test('find a row by value', async ({ page }) => {
 ## That's the basics
 
 If your use case is more complicated — and it likely is — head to [Describe Your Table](/guide/describe/).
+
+
+---
+
+::: tip Full API Reference
+All config options → [Config Options](/api/table-config) · All table methods → [Table Methods](/api/table-methods) · Row API → [SmartRow](/api/smart-row) · Strategies → [Strategies](/api/strategies)
+:::
