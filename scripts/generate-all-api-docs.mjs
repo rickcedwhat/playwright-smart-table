@@ -20,7 +20,7 @@ const typesContent = fs.readFileSync(typesPath, 'utf-8');
 const interfaces = {
     // TableResult — match everything between the declaration line and closing brace.
     TableResult:
-        /export interface TableResult[^{]+\{([\s\S]*?)\n\}/,
+        /export interface TableResult[^\n]*\{([\s\S]*?)\n\}/,
     TableConfig: /export interface TableConfig<T = any> \{([\s\S]*?)\n\}/,
     SmartRow: /export type SmartRow<T = any> = Locator & \{([\s\S]*?)\n\};/,
     TableStrategies: /export interface TableStrategies \{([\s\S]*?)\n\}/
