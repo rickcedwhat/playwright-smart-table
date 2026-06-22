@@ -70,9 +70,13 @@ export default defineConfig({
       ],
       '/api/': [
         {
-          text: 'API',
+          text: 'API Reference',
           items: [
-            { text: 'Reference', link: '/api/' },
+            { text: 'Overview', link: '/api/' },
+            { text: 'Config Options', link: '/api/table-config' },
+            { text: 'Table Methods', link: '/api/table-methods' },
+            { text: 'SmartRow', link: '/api/smart-row' },
+            { text: 'Strategies', link: '/api/strategies' },
           ]
         }
       ],

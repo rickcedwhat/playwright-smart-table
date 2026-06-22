@@ -18,3 +18,8 @@ const data = await row.toJSON()
 ```
 
 Returns all cells as a plain object keyed by column name. If the table is virtualized, pair this with `row.bringIntoView()` first to make sure the row is rendered before reading.
+
+
+---
+
+→ [API Reference: SmartRow — getCell](/api/smart-row#getcell) · [SmartRow — toJSON](/api/smart-row#tojson) · [Table Methods](/api/table-methods)

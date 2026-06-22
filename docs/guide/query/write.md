@@ -24,3 +24,8 @@ await row.smartFill(
 `inputMappers` lets you point `smartFill` at the right input inside a cell. For more complex interactions (modals, date pickers, rich editors), use `columnOverrides.write` instead — see [Column overrides](/guide/describe/column-overrides).
 
 For custom editors that need full control, configure a fill strategy. See [How do we write to cells?](/guide/describe/editing).
+
+
+---
+
+→ [API Reference: SmartRow — smartFill](/api/smart-row#smartfill) · [Config Options — columnOverrides](/api/table-config#columnoverrides)

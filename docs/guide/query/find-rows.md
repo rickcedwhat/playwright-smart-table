@@ -27,3 +27,8 @@ const activeUsers = await table.findRows({ Status: 'Active' }, { maxPages: 10 })
 ```
 
 Returns every match across pages. Add a pagination strategy to search beyond page one.
+
+
+---
+
+→ [API Reference: Table Methods — findRow](/api/table-methods#findrow) · [Table Methods — findRows](/api/table-methods#findrows)

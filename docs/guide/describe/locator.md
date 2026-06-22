@@ -9,3 +9,8 @@ useTable(page.locator('.ag-root'))
 ```
 
 _Config: first argument to `useTable()`_
+
+
+---
+
+→ [API Reference: Config Options](/api/table-config)

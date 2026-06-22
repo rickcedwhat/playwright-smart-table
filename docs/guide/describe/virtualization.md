@@ -73,3 +73,8 @@ strategies: {
 ```
 
 _Config: `strategies.viewport`_
+
+
+---
+
+→ [API Reference: Strategies — viewport](/api/strategies#viewport)

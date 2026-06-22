@@ -146,3 +146,8 @@ Don't set a pagination strategy. All queries stay on the current page.
 :::
 
 _Config: `strategies.pagination`_
+
+
+---
+
+→ [API Reference: Strategies — pagination](/api/strategies#pagination)
