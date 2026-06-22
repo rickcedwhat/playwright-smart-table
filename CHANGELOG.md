@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [6.15.0] - 2026-06-22
+
+### Added
+- **`onCellLoadingTimeout` callback** — `onCellLoadingTimeout` now accepts a function `(cell, columnName, row) => Promise<string>` in addition to the existing `'skip' | 'read-as-is' | 'throw'` string values. When a callback is provided and a cell times out, the function is awaited and its return value is used as the cell's string. Closes #308.
+
 ## [6.14.0] - 2026-06-19
 
 ### Added
