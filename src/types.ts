@@ -503,9 +503,14 @@ export interface LoadingStrategy {
    * - 'skip': use empty string for this cell value
    * - 'read-as-is': read the cell content even though it's still loading (default)
    * - 'throw': throw an error with column name, row index and timeout info
+   * - callback: called with (cell, columnName, row); its return value becomes the cell's string value
    * Defaults to 'read-as-is' when cellLoadingTimeout is set.
    */
-  onCellLoadingTimeout?: 'skip' | 'read-as-is' | 'throw';
+  onCellLoadingTimeout?:
+    | 'skip'
+    | 'read-as-is'
+    | 'throw'
+    | ((cell: import('@playwright/test').Locator, columnName: string, row: SmartRow) => Promise<string>);
 }
 
 /**

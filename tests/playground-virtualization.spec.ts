@@ -474,4 +474,45 @@ test.describe('Loading Strategy: row and cell timeout', () => {
         // All rows are still loading and immediately skipped (legacy behavior)
         expect(rows.length).toBe(0);
     });
+
+    test('onCellLoadingTimeout callback — returns callback value when cell times out', async ({ page }) => {
+        test.setTimeout(30000);
+
+        await setPlaygroundConfig(page, {
+            rowCount: 5,
+            defaults: {
+                tableInitDelay: 0,
+                rowDelay: 0,
+                cellDelay: 60000,
+                generator: 'simple'
+            }
+        });
+
+        const table = useTable(page.locator('.virtual-table-container'), {
+            rowSelector: '.virtual-row',
+            headerSelector: '.header [role="columnheader"]',
+            cellSelector: '[role="cell"]',
+            strategies: {
+                loading: {
+                    isCellLoading: async (cell) => {
+                        return (await cell.locator('[data-testid="cell-loading"]').count()) > 0;
+                    },
+                    cellLoadingTimeout: 100,
+                    onCellLoadingTimeout: async (_cell, columnName) => `<TIMEOUT:${columnName}>`
+                }
+            },
+            maxPages: 1
+        });
+
+        await table.init();
+        const rows = await table.findRows({}, { maxPages: 1 });
+
+        expect(rows.length).toBe(5);
+        for (const row of rows) {
+            const data = await row.toJSON() as Record<string, string>;
+            for (const [col, value] of Object.entries(data)) {
+                expect(value).toBe(`<TIMEOUT:${col}>`);
+            }
+        }
+    });
 });

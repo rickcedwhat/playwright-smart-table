@@ -557,7 +557,11 @@ const createSmartRow = <T = any>(
                         cellResolved = !(await isCellLoading(targetCell, col, smart));
                     }
                     if (!cellResolved) {
-                        logDebug(config, 'verbose', `toJSON: cell "${col}" — still loading after ${cellLoadingTimeout}ms, action: ${onCellLoadingTimeout}`);
+                        logDebug(config, 'verbose', `toJSON: cell "${col}" — still loading after ${cellLoadingTimeout}ms, action: ${typeof onCellLoadingTimeout === 'function' ? 'callback' : onCellLoadingTimeout}`);
+                        if (typeof onCellLoadingTimeout === 'function') {
+                            result[col] = await onCellLoadingTimeout(targetCell, col, smart) as any;
+                            continue;
+                        }
                         if (onCellLoadingTimeout === 'skip') {
                             result[col] = '' as any;
                             continue;
