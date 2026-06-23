@@ -50,7 +50,7 @@ await table.scrollToColumn('Notes')
 const cell = row.getCell('Notes')
 ```
 
-Scrolls the table horizontally to bring the named column's header into the viewport. Useful before reading a far-right column from a row you already have. For most virtualized tables `getCell()` handles this automatically via `strategies.viewport.scrollToColumn` — call `scrollToColumn()` manually only when you need the column visible for an assertion on the header itself.
+Scrolls the table horizontally to bring the named column's header into the viewport. Use it when you need the header itself visible — for example, to click it for sorting or assert its `aria-sort` attribute. Reading cell data via `toJSON()` scrolls columns into view internally, so you don't need to call this first when collecting row data.
 
 ---
 
