@@ -10,7 +10,7 @@ on:
       - 'tests/**'
       - 'playground/**'
       - 'package.json'
-      - 'package-lock.json'
+      - 'pnpm-lock.yaml'
       - 'tsconfig*.json'
       - 'scripts/**'
       - 'vite.config*.ts'
