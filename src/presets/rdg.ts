@@ -225,3 +225,5 @@ export const RDG2D: Partial<TableConfig> & { Strategies: typeof RDG2DStrategies 
     'Strategies',
     { get: () => RDG2DStrategies, enumerable: false }
 ) as Partial<TableConfig> & { Strategies: typeof RDG2DStrategies };
+
+export { RDG as rdg, RDG2D as rdg2D };
