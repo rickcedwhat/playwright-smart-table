@@ -41,6 +41,7 @@ export default defineConfig({
                 { text: 'Headers, rows & cells', link: '/guide/describe/identify' },
                 { text: 'Pagination', link: '/guide/describe/pagination' },
                 { text: 'Virtualization', link: '/guide/describe/virtualization' },
+                { text: 'Loading states', link: '/guide/describe/loading' },
                 { text: 'Header text', link: '/guide/describe/header-text' },
                 { text: 'Editing cells', link: '/guide/describe/editing' },
                 { text: 'Column overrides', link: '/guide/describe/column-overrides' },

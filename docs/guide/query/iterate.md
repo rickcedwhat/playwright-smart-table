@@ -77,4 +77,25 @@ await table.map(async ({ row }) => row.toJSON(), { concurrency: 'sequential' })
 
 ---
 
+## Options
+
+All three methods accept a second `options` argument:
+
+```typescript
+await table.map(
+  async ({ row }) => row.toJSON(),
+  {
+    maxPages: 5,
+    dedupe: async (row) => row.getCell('ID').innerText(),
+  }
+)
+```
+
+- **`maxPages`** — cap how many pages are visited. Defaults to `config.maxPages`.
+- **`dedupe`** — for infinite-scroll tables that replay rows as you scroll, pass a function returning a unique key per row. Already-seen rows are skipped.
+
+The callback also receives `index` (0-based visit counter) and `pageIndex` (which page the row came from). See the [API reference](/api/table-methods#foreach) for the full options list.
+
+---
+
 → [API Reference: Table Methods — forEach](/api/table-methods#foreach) · [Table Methods — map](/api/table-methods#map) · [Table Methods — filter](/api/table-methods#filter)
