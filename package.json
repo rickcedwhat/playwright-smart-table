@@ -64,6 +64,14 @@
     "./presets/mui": {
       "types": "./dist/presets/mui.d.ts",
       "default": "./dist/presets/mui.js"
+    },
+    "./presets/rdg": {
+      "types": "./dist/presets/rdg.d.ts",
+      "default": "./dist/presets/rdg.js"
+    },
+    "./presets/glide": {
+      "types": "./dist/presets/glide/index.d.ts",
+      "default": "./dist/presets/glide/index.js"
     }
   },
   "keywords": [

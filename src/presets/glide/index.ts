@@ -152,3 +152,5 @@ export const Glide: Partial<TableConfig> & { Strategies: typeof GlideStrategies 
     'Strategies',
     { get: () => GlideStrategies, enumerable: false }
 ) as Partial<TableConfig> & { Strategies: typeof GlideStrategies };
+
+export { Glide as glide };
