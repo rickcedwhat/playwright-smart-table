@@ -32,19 +32,28 @@ Individual cells can also be in a loading state. `onCellLoadingTimeout` controls
 
 ```typescript
 const table = useTable(locator, {
-  cellLoadingTimeout: 5000,
-  onCellLoadingTimeout: 'skip', // omit from toJSON() | 'read-as-is' | 'throw'
+  strategies: {
+    loading: {
+      cellLoadingTimeout: 5000,
+      onCellLoadingTimeout: 'skip', // omit from toJSON() | 'read-as-is' | 'throw'
+    }
+  }
 })
 ```
 
 Pass a callback to handle it yourself:
 
 ```typescript
-onCellLoadingTimeout: async (cell, columnName, row) => {
-  return '' // value to use for this cell
+strategies: {
+  loading: {
+    cellLoadingTimeout: 5000,
+    onCellLoadingTimeout: async (cell, columnName, row) => {
+      return '' // value to use for this cell
+    }
+  }
 }
 ```
 
 ---
 
-→ [API Reference: Strategies — loading](/api/strategies#loading) · [Config Options — cellLoadingTimeout](/api/table-config#cellloadingtimeout)
+→ [API Reference: Strategies — loading](/api/strategies#loading)
