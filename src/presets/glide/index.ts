@@ -85,7 +85,7 @@ const glideGetActiveCell = async ({ page }: any) => {
     } else if (id !== '') {
         throw new Error(
             `Glide preset: focused element has id "${id}" which does not match the expected format "glide-cell-{colIndex}-{rowIndex}". ` +
-            `If Glide has changed its id format, update glideGetActiveCell in src/presets/glide/index.ts.`
+            `Glide may have changed its internal id format. Please open an issue at https://github.com/rickcedwhat/playwright-smart-table/issues.`
         );
     }
 
