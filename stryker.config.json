@@ -1,10 +1,8 @@
 {
     "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
-    "mutator": {
-        "plugins": [
-            "@stryker-mutator/vitest-runner"
-        ]
-    },
+    "plugins": [
+        "@stryker-mutator/vitest-runner"
+    ],
     "packageManager": "pnpm",
     "reporters": [
         "html",
