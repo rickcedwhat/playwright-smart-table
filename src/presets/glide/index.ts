@@ -80,7 +80,7 @@ const glideGetActiveCell = async ({ page }: any) => {
     let columnIndex = -1;
 
     if (parts.length >= 4 && parts[0] === 'glide' && parts[1] === 'cell') {
-        columnIndex = parseInt(parts[2]) - 1;
+        columnIndex = parseInt(parts[2]); // 0-based in Glide's id format: glide-cell-{col}-{row}
         rowIndex = parseInt(parts[3]);
     } else if (id !== '') {
         throw new Error(
