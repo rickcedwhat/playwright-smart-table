@@ -1,10 +1,12 @@
 # Loading States
 
-Configure `strategies.loading` to tell the library how to detect when a table or its rows are still loading.
+Some tables show loading indicators while data fetches — a spinner overlay, skeleton rows, or headers that shift as columns load. Configure `strategies.loading` to tell the library what "loading" looks like so it waits before reading.
 
 ---
 
-## Table spinner
+## Detecting table and row loading
+
+Each loading strategy is a function that returns `true` while loading and `false` when ready. The library provides built-in helpers for common patterns (spinners, skeleton class names, header stability), or you can pass your own function:
 
 ```typescript
 import { LoadingStrategies } from 'playwright-smart-table'
@@ -13,55 +15,29 @@ const table = useTable(locator, {
   strategies: {
     loading: {
       table: LoadingStrategies.Table.hasSpinner('.loading-overlay'),
+      row: LoadingStrategies.Row.hasClass('skeleton'),
+      headers: LoadingStrategies.Headers.stable(300),
     }
   }
 })
 ```
 
-Waits until the spinner element is no longer visible before proceeding.
-
----
-
-## Skeleton rows
-
-```typescript
-strategies: {
-  loading: {
-    row: LoadingStrategies.Row.hasClass('skeleton-row'),
-  }
-}
-```
-
-Skips rows while they carry the given class name.
-
----
-
-## Header stabilization
-
-```typescript
-strategies: {
-  loading: {
-    headers: LoadingStrategies.Headers.stable(300),
-  }
-}
-```
-
-Waits until the header list stops changing for 300 ms before resolving column names. Useful when columns load asynchronously or visibility toggles are in flight during `init()`.
+See the [API reference](/api/strategies#loading) for the full list of built-in helpers and the function signatures for each level.
 
 ---
 
 ## Cell loading timeout
 
-When a cell takes too long to render, `onCellLoadingTimeout` controls the fallback:
+Individual cells can also be in a loading state. `onCellLoadingTimeout` controls what happens when a cell hasn't resolved after `cellLoadingTimeout` ms:
 
 ```typescript
 const table = useTable(locator, {
   cellLoadingTimeout: 5000,
-  onCellLoadingTimeout: 'skip', // or 'read-as-is' | 'throw'
+  onCellLoadingTimeout: 'skip', // omit from toJSON() | 'read-as-is' | 'throw'
 })
 ```
 
-Pass a callback for full control:
+Pass a callback to handle it yourself:
 
 ```typescript
 onCellLoadingTimeout: async (cell, columnName, row) => {

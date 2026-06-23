@@ -58,7 +58,6 @@ export default defineConfig({
                 { text: 'Write to cells', link: '/guide/query/write' },
               ]
             },
-            { text: 'Debugging', link: '/guide/debug' },
           ]
         }
       ],

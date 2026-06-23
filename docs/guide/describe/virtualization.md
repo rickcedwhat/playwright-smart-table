@@ -76,10 +76,4 @@ _Config: `strategies.viewport`_
 
 ---
 
-## Keyboard navigation fallback
-
-For grids that expose an accessible HTML layer but require keyboard navigation to reach off-screen columns (e.g. canvas-rendered grids with ARIA accessibility mode), you can configure `strategies.navigation` with arrow-key primitives. Viewport scrolling is always tried first; keyboard navigation is the fallback. See the [API reference](/api/strategies#navigation) for the full interface.
-
----
-
-→ [API Reference: Strategies — viewport](/api/strategies#viewport) · [Strategies — navigation](/api/strategies#navigation)
+→ [API Reference: Strategies — viewport](/api/strategies#viewport)
