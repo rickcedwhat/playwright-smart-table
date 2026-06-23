@@ -55,19 +55,21 @@ test.describe('React Data Grid 2D (rdg2D preset)', () => {
 
         await table.init();
 
+        type RdgRow = { ID: string; Task?: string };
+
         const rows = await table.map(
             ({ row }) => row.toJSON({ columns: ['ID', 'Task'] }),
             { maxPages: 4 },
-        );
+        ) as RdgRow[];
 
-        const dataRows = rows.filter((r: any) => r.ID !== 'Total');
+        const dataRows = rows.filter(r => r.ID !== 'Total');
         expect(dataRows.length).toBeGreaterThanOrEqual(50);
 
         // All IDs must be valid positive integers
-        expect(dataRows.every((r: any) => /^\d+$/.test(String(r.ID)))).toBe(true);
+        expect(dataRows.every(r => /^\d+$/.test(String(r.ID)))).toBe(true);
 
         // No duplicates
-        const uniqueIds = new Set(dataRows.map((r: any) => r.ID));
+        const uniqueIds = new Set(dataRows.map(r => r.ID));
         expect(uniqueIds.size).toBe(dataRows.length);
     });
 
@@ -81,9 +83,9 @@ test.describe('React Data Grid 2D (rdg2D preset)', () => {
         await table.init();
 
         const rows = await table.findRows({}, { maxPages: 1 });
-        const firstRow = rows[0];
+        expect(rows.length).toBeGreaterThan(0);
 
-        const data = await firstRow.toJSON({ columns: ['ID', 'Task', 'Completion'] });
+        const data = await rows[0].toJSON({ columns: ['ID', 'Task', 'Completion'] });
         expect(data).toHaveProperty('ID');
         expect(data).toHaveProperty('Task');
         expect(data).toHaveProperty('Completion');
