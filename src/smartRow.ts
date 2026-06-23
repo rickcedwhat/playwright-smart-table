@@ -347,7 +347,8 @@ const _navigateToCell = async (params: {
             navResult = await navigateUntilReached();
         }
 
-        if (navResult instanceof Object && (navResult as any)._isLocator) {
+        // navigateUntilReached may return a Locator it found mid-navigation; duck-type check via .count() (public API) rather than the internal _isLocator flag
+        if (navResult && typeof (navResult as any).count === 'function') {
             const loc = navResult as unknown as Locator;
             if (await loc.count() > 0) return loc;
         }
