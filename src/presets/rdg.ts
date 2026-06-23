@@ -1,4 +1,4 @@
-import { TableContext, Selector, TableConfig } from '../types';
+import { TableContext, Selector, TableConfig, ViewportStrategy } from '../types';
 import { PaginationStrategies } from '../strategies/pagination';
 import { StabilizationStrategies } from '../strategies/stabilization';
 
@@ -136,3 +136,92 @@ export const RDG: Partial<TableConfig> & { Strategies: typeof RDGStrategies } = 
     'Strategies',
     { get: () => RDGStrategies, enumerable: false }
 ) as Partial<TableConfig> & { Strategies: typeof RDGStrategies };
+
+// ---------------------------------------------------------------------------
+// rdg2D — React Data Grid with both rows AND columns virtualized
+// ---------------------------------------------------------------------------
+
+const rdg2DViewportStrategy: ViewportStrategy = {
+    getVisibleRowRange: async ({ root }) => {
+        return root.evaluate((el) => {
+            const rows = [...el.querySelectorAll('[role="row"][aria-rowindex]')];
+            const indices = rows.map(r => parseInt(r.getAttribute('aria-rowindex') || '0', 10) - 1);
+            if (!indices.length) return { first: 0, last: 0 };
+            return { first: Math.min(...indices), last: Math.max(...indices) };
+        });
+    },
+
+    getVisibleColumnRange: async ({ root }) => {
+        return root.evaluate((el) => {
+            const cells = [...el.querySelectorAll('[role="gridcell"][aria-colindex]')];
+            const indices = cells.map(c => parseInt(c.getAttribute('aria-colindex') || '0', 10) - 1);
+            if (!indices.length) return { first: 0, last: 0 };
+            return { first: Math.min(...indices), last: Math.max(...indices) };
+        });
+    },
+
+    scrollToRow: async ({ root }, rowIndex) => {
+        await root.evaluate((el, rowIndex) => {
+            const grid = (el.querySelector('[role="grid"]') || el.closest('[role="grid"]') || el) as HTMLElement;
+
+            // Try to locate the target row by aria-rowindex (1-based in RDG)
+            const ariaIndex = rowIndex + 1;
+            const targetRow = el.querySelector(`[role="row"][aria-rowindex="${ariaIndex}"]`) as HTMLElement | null;
+            if (targetRow) {
+                const top = parseInt(targetRow.style.top || '0', 10);
+                grid.scrollTop = Math.max(0, top - grid.clientHeight / 3);
+                return;
+            }
+
+            // Row not in DOM — estimate position from an actual visible row's height
+            const anyRow = el.querySelector('[role="row"][aria-rowindex]') as HTMLElement | null;
+            const rowHeight = anyRow ? anyRow.getBoundingClientRect().height || 35 : 35;
+            grid.scrollTop = Math.max(0, rowIndex * rowHeight - grid.clientHeight / 3);
+        }, rowIndex);
+    },
+
+    scrollToColumn: async ({ root }, columnIndex) => {
+        await root.evaluate((el, columnIndex) => {
+            const grid = (el.querySelector('[role="grid"]') || el.closest('[role="grid"]') || el) as HTMLElement;
+
+            // Try to locate the header cell by aria-colindex (1-based in RDG)
+            const ariaIndex = columnIndex + 1;
+            const header = el.querySelector(`[role="columnheader"][aria-colindex="${ariaIndex}"]`) as HTMLElement | null;
+            if (header) {
+                grid.scrollLeft = header.offsetLeft;
+                return;
+            }
+
+            // Column not visible — estimate from average width of visible headers
+            const headers = [...el.querySelectorAll('[role="columnheader"][aria-colindex]')] as HTMLElement[];
+            if (headers.length > 0) {
+                const avgWidth = headers.reduce((sum, h) => sum + h.offsetWidth, 0) / headers.length;
+                grid.scrollLeft = Math.max(0, columnIndex * avgWidth);
+            }
+        }, columnIndex);
+    },
+};
+
+/** Default strategies for the RDG2D preset (extends RDG with viewport recovery). */
+const RDG2DDefaultStrategies = {
+    ...RDGDefaultStrategies,
+    viewport: rdg2DViewportStrategy,
+};
+
+// fallow-ignore-next-line unused-export
+export const RDG2DStrategies = RDG2DDefaultStrategies;
+
+/**
+ * Full preset for React Data Grid with 2D virtualization (rows + columns both virtualized).
+ * Use instead of `rdg` when horizontal scrolling causes "could not reach cell" errors.
+ * The viewport strategy detects when a row is evicted by a horizontal scroll and restores it.
+ */
+const RDG2DPreset: Partial<TableConfig> = {
+    ...RDGPreset,
+    strategies: RDG2DDefaultStrategies,
+};
+export const RDG2D: Partial<TableConfig> & { Strategies: typeof RDG2DStrategies } = Object.defineProperty(
+    RDG2DPreset,
+    'Strategies',
+    { get: () => RDG2DStrategies, enumerable: false }
+) as Partial<TableConfig> & { Strategies: typeof RDG2DStrategies };
