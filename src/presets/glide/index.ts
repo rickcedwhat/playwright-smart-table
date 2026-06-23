@@ -80,9 +80,16 @@ const glideGetActiveCell = async ({ page }: any) => {
     let columnIndex = -1;
 
     if (parts.length >= 4 && parts[0] === 'glide' && parts[1] === 'cell') {
-        columnIndex = parseInt(parts[2]) - 1;
+        columnIndex = parseInt(parts[2]); // 0-based in Glide's id format: glide-cell-{col}-{row}
         rowIndex = parseInt(parts[3]);
+    } else if (id !== '') {
+        throw new Error(
+            `Glide preset: focused element has id "${id}" which does not match the expected format "glide-cell-{colIndex}-{rowIndex}". ` +
+            `Glide may have changed its internal id format. Please open an issue at https://github.com/rickcedwhat/playwright-smart-table/issues.`
+        );
     }
+
+    if (rowIndex === -1 || columnIndex === -1) return null;
 
     return {
         rowIndex,
