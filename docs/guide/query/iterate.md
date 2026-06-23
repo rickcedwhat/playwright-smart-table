@@ -77,4 +77,62 @@ await table.map(async ({ row }) => row.toJSON(), { concurrency: 'sequential' })
 
 ---
 
+## Callback context
+
+Every callback receives a `RowIterationContext` object:
+
+```typescript
+await table.forEach(async ({ row, index, pageIndex, stop }) => {
+  console.log(`Row ${index} on page ${pageIndex}`)
+})
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `row` | `SmartRow` | The current row |
+| `index` | `number` | 0-based counter — order visited, not DOM position |
+| `pageIndex` | `number` | 0-based page index the row was collected from |
+| `stop` | `() => void` | Halt iteration at the next page boundary |
+
+> **Note:** The legacy `rowIndex` field is deprecated and will be removed in v7. Use `index` instead.
+
+---
+
+## Limiting pages
+
+```typescript
+await table.forEach(async ({ row }) => { ... }, { maxPages: 3 })
+```
+
+`maxPages` caps how many pages are visited. Defaults to `config.maxPages` (which defaults to `Infinity`). All three methods accept this option.
+
+---
+
+## Deduplication
+
+Infinite-scroll tables replay rows as you scroll. Pass `dedupe` to skip rows you've already seen:
+
+```typescript
+await table.map(
+  async ({ row }) => row.toJSON(),
+  {
+    dedupe: async (row) => row.getCell('ID').innerText(),
+  }
+)
+```
+
+`dedupe` is a function that returns a unique string key per row. Rows with a key already seen are skipped silently.
+
+---
+
+## Bulk pagination
+
+```typescript
+await table.map(async ({ row }) => row.toJSON(), { useBulkPagination: true })
+```
+
+When `strategies.pagination.goNextBulk` is configured, setting `useBulkPagination: true` advances pages in larger jumps during iteration instead of one page at a time. Useful for tables with a very large number of pages.
+
+---
+
 → [API Reference: Table Methods — forEach](/api/table-methods#foreach) · [Table Methods — map](/api/table-methods#map) · [Table Methods — filter](/api/table-methods#filter)

@@ -41,6 +41,7 @@ export default defineConfig({
                 { text: 'Headers, rows & cells', link: '/guide/describe/identify' },
                 { text: 'Pagination', link: '/guide/describe/pagination' },
                 { text: 'Virtualization', link: '/guide/describe/virtualization' },
+                { text: 'Loading states', link: '/guide/describe/loading' },
                 { text: 'Header text', link: '/guide/describe/header-text' },
                 { text: 'Editing cells', link: '/guide/describe/editing' },
                 { text: 'Column overrides', link: '/guide/describe/column-overrides' },
@@ -54,9 +55,11 @@ export default defineConfig({
                 { text: 'Find rows', link: '/guide/query/find-rows' },
                 { text: 'Read cells', link: '/guide/query/read-cells' },
                 { text: 'Iterate rows', link: '/guide/query/iterate' },
+                { text: 'Table methods', link: '/guide/query/table-methods' },
                 { text: 'Write to cells', link: '/guide/query/write' },
               ]
             },
+            { text: 'Debugging', link: '/guide/debug' },
           ]
         }
       ],

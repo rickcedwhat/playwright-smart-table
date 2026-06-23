@@ -74,7 +74,46 @@ strategies: {
 
 _Config: `strategies.viewport`_
 
+---
+
+## NavigationPrimitives
+
+For grids that navigate columns via keyboard (e.g. React Data Grid accessibility mode), you can configure keyboard-based navigation so the library uses arrow keys rather than scroll position to reach off-screen columns:
+
+```typescript
+import { Strategies } from 'playwright-smart-table'
+
+strategies: {
+  navigation: {
+    // Move focus one cell left/right/up/down
+    goLeft:  async ({ page }) => { await page.keyboard.press('ArrowLeft') },
+    goRight: async ({ page }) => { await page.keyboard.press('ArrowRight') },
+    goUp:    async ({ page }) => { await page.keyboard.press('ArrowUp') },
+    goDown:  async ({ page }) => { await page.keyboard.press('ArrowDown') },
+
+    // Jump focus to the first column of the current row
+    goHome:  async ({ page }) => { await page.keyboard.press('Home') },
+
+    // Reset horizontal scroll without moving vertical position
+    snapFirstColumnIntoView: async ({ root }) => {
+      await root.evaluate(el => { el.scrollLeft = 0 })
+    },
+
+    // Coarse jump to a column index before fine-grained arrow stepping
+    seekColumnIndex: async ({ root }, columnIndex) => {
+      // e.g. for ARIA grids: click the header at that colindex to scroll it into view
+      await root.locator(`[aria-colindex="${columnIndex + 1}"]`).first().click()
+    },
+
+    // Optional timing overrides
+    settleMs: 50,    // ms to wait after each arrow key step (default: varies)
+    maxWaitMs: 2000, // ms before giving up on reaching a column (default: varies)
+  }
+}
+```
+
+All fields are optional — implement only what your grid supports. When both `viewport` and `navigation` are configured, `viewport` is tried first.
 
 ---
 
-→ [API Reference: Strategies — viewport](/api/strategies#viewport)
+→ [API Reference: Strategies — viewport](/api/strategies#viewport) · [Strategies — navigation](/api/strategies#navigation)
