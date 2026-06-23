@@ -16,7 +16,7 @@ test.describe('generateConfig', () => {
 
         const table = useTable(page.locator('#my-table'));
 
-        await expect(table.generateConfig()).rejects.toThrow(/COPY INTO GEMINI/);
+        await expect(table.generateConfig()).rejects.toThrow(/Paste into your AI assistant/);
 
         try {
             await table.generateConfig();
@@ -26,7 +26,7 @@ test.describe('generateConfig', () => {
             expect(message).toContain('Val 2');
             expect(message).toContain(tableHTML.trim());
             expect(message).toContain(MINIMAL_CONFIG_CONTEXT);
-            expect(message).toContain('COPY INTO GEMINI / ChatGPT');
+            expect(message).toContain('Paste into your AI assistant');
         }
     });
 
@@ -36,7 +36,7 @@ test.describe('generateConfig', () => {
         `);
         const table = useTable(page.locator('#t'));
 
-        await expect(table.generateConfigPrompt()).rejects.toThrow(/COPY INTO GEMINI/);
+        await expect(table.generateConfigPrompt()).rejects.toThrow(/Paste into your AI assistant/);
         // Implementation also calls console.warn with deprecation message
     });
 });
