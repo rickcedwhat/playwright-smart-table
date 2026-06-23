@@ -55,7 +55,6 @@ export default defineConfig({
                 { text: 'Find rows', link: '/guide/query/find-rows' },
                 { text: 'Read cells', link: '/guide/query/read-cells' },
                 { text: 'Iterate rows', link: '/guide/query/iterate' },
-                { text: 'Table methods', link: '/guide/query/table-methods' },
                 { text: 'Write to cells', link: '/guide/query/write' },
               ]
             },
