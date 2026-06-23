@@ -112,9 +112,6 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     return item;
   };
 
-  // Internal State
-  let _hasPaginated = false;
-
   // Helpers
   const log = (msg: string) => {
     logDebug(config, 'verbose', msg);
@@ -353,7 +350,6 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
         log("No goToFirst strategy configured. Table may not be on page 1.");
       }
 
-      _hasPaginated = false;
       tableState.currentPageIndex = 0;
       tableMapper.clear();
       log("Table reset complete. Calling autoInit to restore state.");
@@ -555,7 +551,11 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       log("Generating table config prompt...");
       const html = await _getCleanHtml(rootLocator);
       const separator = "=".repeat(50);
-      const content = `\n${separator} \n🤖 COPY INTO GEMINI / ChatGPT 🤖\n${separator} \nI am using 'playwright-smart-table'.\nTarget Table Locator: ${rootLocator.toString()} \nGenerate config for: \n\`\`\`html\n${html.substring(0, 10000)} ...\n\`\`\`\n${separator}\n`;
+      const maxLen = 10000;
+      const truncated = html.length > maxLen;
+      const htmlSnippet = truncated ? html.substring(0, maxLen) : html;
+      const truncationNote = truncated ? `\n[truncated — ${html.length} chars total, showing first ${maxLen}]` : '';
+      const content = `\n${separator} \n🤖 Paste into your AI assistant 🤖\n${separator} \nI am using 'playwright-smart-table'.\nTarget Table Locator: ${rootLocator.toString()} \nGenerate config for: \n\`\`\`html\n${htmlSnippet}${truncationNote}\n\`\`\`\n${separator}\n`;
       await _handlePrompt('Smart Table Config', content);
     },
 
