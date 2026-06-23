@@ -27,9 +27,9 @@ If a column uses a custom editor that `smartFill` can't auto-detect, define how 
 useTable(locator, {
   columnOverrides: {
     StartDate: {
-      write: async (cell, value) => {
+      write: async ({ cell, targetValue }) => {
         await cell.click()
-        await page.getByRole('dialog').getByLabel('Date').fill(value)
+        await page.getByRole('dialog').getByLabel('Date').fill(targetValue)
         await page.getByRole('button', { name: 'Confirm' }).click()
       },
     },
