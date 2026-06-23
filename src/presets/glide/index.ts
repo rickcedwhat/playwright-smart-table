@@ -82,7 +82,14 @@ const glideGetActiveCell = async ({ page }: any) => {
     if (parts.length >= 4 && parts[0] === 'glide' && parts[1] === 'cell') {
         columnIndex = parseInt(parts[2]) - 1;
         rowIndex = parseInt(parts[3]);
+    } else if (id !== '') {
+        throw new Error(
+            `Glide preset: focused element has id "${id}" which does not match the expected format "glide-cell-{colIndex}-{rowIndex}". ` +
+            `If Glide has changed its id format, update glideGetActiveCell in src/presets/glide/index.ts.`
+        );
     }
+
+    if (rowIndex === -1 || columnIndex === -1) return null;
 
     return {
         rowIndex,
