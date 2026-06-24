@@ -46,7 +46,7 @@ export class RowFinder<T = any> {
 
         const sentinel = this.resolve(this.config.rowSelector, this.rootLocator)
             .filter({ hasText: "___SENTINEL_ROW_NOT_FOUND___" + Date.now() });
-        const smartRow = this.makeSmartRow(sentinel, await this.tableMapper.getMap(), 0);
+        const smartRow = this.makeSmartRow(sentinel, await this.tableMapper.getMap(), undefined);
         (smartRow as any)[SENTINEL_ROW] = true;
         return smartRow;
     }
