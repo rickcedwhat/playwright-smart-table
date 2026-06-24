@@ -139,6 +139,7 @@ history.sort((a, b) => {
     return 0;
 });
 
+fs.mkdirSync(path.dirname(historyPath), { recursive: true });
 fs.writeFileSync(historyPath, JSON.stringify(history, null, 2) + '\n');
 
 // ── Console summary ───────────────────────────────────────────────────────────
