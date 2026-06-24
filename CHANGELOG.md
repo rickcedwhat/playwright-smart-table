@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [6.16.0] - 2026-06-24
+
+### Fixed
+- **`typesVersions` for subpath type resolution** — added `typesVersions` to `package.json` so that `@rickcedwhat/playwright-smart-table/types` (and other subpaths) resolve correctly in projects using `moduleResolution: "node"`. Previously, consumers on older `moduleResolution` settings would see subpath types collapse to `{}` even though the types were correctly present in the published package.
+
 ## [6.15.0] - 2026-06-22
 
 ### Added
