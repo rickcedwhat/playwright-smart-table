@@ -247,9 +247,6 @@ export const muiDataGrid: Partial<TableConfig> = {
                         await header.click({ force: true });
                     }
                     
-                    // Sorting can trigger large re-renders/virtualization shifts
-                    await context.page.waitForTimeout(500); 
-                    
                     // Wait for stabilization (using DataGrid specific overlay check inside helper)
                     const displayedRows = context.root.locator('.MuiTablePagination-displayedRows');
                     const text = await displayedRows.innerText().catch(() => '');

@@ -126,3 +126,29 @@ describe('RowFinder.findRow — isTableLoading polling', () => {
         expect(waitForTimeout).toHaveBeenCalledTimes(2); // once per "still loading" response
     });
 });
+
+// ─── findRow() sentinel row index ─────────────────────────────────────────────
+
+describe('RowFinder.findRow — sentinel row index', () => {
+    it('passes undefined rowIndex to makeSmartRow when row is not found', async () => {
+        const page = { waitForTimeout: vi.fn().mockResolvedValue(undefined) };
+        const root = makeMinimalRoot(page);
+        const noRows = { count: vi.fn().mockResolvedValue(0), all: vi.fn().mockResolvedValue([]), filter: vi.fn().mockReturnThis() };
+        const makeSmartRow = vi.fn().mockReturnValue({ rowIndex: undefined });
+
+        const finder = new RowFinder(
+            root,
+            makeConfig({ maxPages: 1 }),
+            vi.fn().mockReturnValue(noRows),
+            { applyFilters: vi.fn().mockReturnValue(noRows) } as any,
+            { getMap: vi.fn().mockResolvedValue(new Map([['id', 0]])) } as any,
+            makeSmartRow,
+        );
+
+        await finder.findRow({ id: 'missing' });
+
+        // Sentinel construction is the last makeSmartRow call; rowIndex must be undefined
+        const sentinelCall = makeSmartRow.mock.calls.at(-1);
+        expect(sentinelCall?.[2]).toBeUndefined();
+    });
+});
