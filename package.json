@@ -1,6 +1,6 @@
 {
   "name": "@rickcedwhat/playwright-smart-table",
-  "version": "6.15.0",
+  "version": "6.16.0",
   "description": "Smart, column-aware table interactions for Playwright",
   "author": "Cedrick Catalan",
   "license": "MIT",
@@ -72,6 +72,15 @@
     "./presets/glide": {
       "types": "./dist/presets/glide/index.d.ts",
       "default": "./dist/presets/glide/index.js"
+    }
+  },
+  "typesVersions": {
+    "*": {
+      "types": ["./dist/types.d.ts"],
+      "presets": ["./dist/presets/index.d.ts"],
+      "presets/mui": ["./dist/presets/mui.d.ts"],
+      "presets/rdg": ["./dist/presets/rdg.d.ts"],
+      "presets/glide": ["./dist/presets/glide/index.d.ts"]
     }
   },
   "keywords": [
