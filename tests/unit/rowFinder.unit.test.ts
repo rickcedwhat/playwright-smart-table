@@ -39,48 +39,48 @@ afterEach(() => vi.restoreAllMocks());
 // ─── findRows() non-bulk pagination ──────────────────────────────────────────
 
 describe('RowFinder.findRows — bulk pagination flag', () => {
-    it('uses goNext when useBulkPagination is false, even when goNextBulk is present', async () => {
-        const goNext = vi.fn().mockResolvedValue(false);
-        const goNextBulk = vi.fn().mockResolvedValue(false);
+    it('calls advancePage with useBulk=false when useBulkPagination option is false', async () => {
+        const advancePage = vi.fn().mockResolvedValue(false);
         const page = { waitForTimeout: vi.fn().mockResolvedValue(undefined) };
         const root = makeMinimalRoot(page);
         const rowLocator = makeEmptyRowLocator();
 
         const finder = new RowFinder(
             root,
-            makeConfig({ strategies: { pagination: { goNext, goNextBulk } } }),
+            makeConfig({ strategies: { pagination: { goNext: vi.fn(), goNextBulk: vi.fn() } } }),
             vi.fn().mockReturnValue(rowLocator),
             { applyFilters: vi.fn().mockReturnValue(rowLocator) } as any,
             { getMap: vi.fn().mockResolvedValue(new Map([['id', 0]])) } as any,
             vi.fn().mockReturnValue({ rowIndex: 0 }),
+            undefined,
+            advancePage,
         );
 
         await finder.findRows({}, { useBulkPagination: false });
 
-        expect(goNext).toHaveBeenCalledTimes(1);
-        expect(goNextBulk).not.toHaveBeenCalled();
+        expect(advancePage).toHaveBeenCalledWith(false);
     });
 
-    it('uses goNextBulk by default when both goNext and goNextBulk are present', async () => {
-        const goNext = vi.fn().mockResolvedValue(false);
-        const goNextBulk = vi.fn().mockResolvedValue(false);
+    it('calls advancePage with useBulk=true by default when goNextBulk is present', async () => {
+        const advancePage = vi.fn().mockResolvedValue(false);
         const page = { waitForTimeout: vi.fn().mockResolvedValue(undefined) };
         const root = makeMinimalRoot(page);
         const rowLocator = makeEmptyRowLocator();
 
         const finder = new RowFinder(
             root,
-            makeConfig({ strategies: { pagination: { goNext, goNextBulk } } }),
+            makeConfig({ strategies: { pagination: { goNext: vi.fn(), goNextBulk: vi.fn() } } }),
             vi.fn().mockReturnValue(rowLocator),
             { applyFilters: vi.fn().mockReturnValue(rowLocator) } as any,
             { getMap: vi.fn().mockResolvedValue(new Map([['id', 0]])) } as any,
             vi.fn().mockReturnValue({ rowIndex: 0 }),
+            undefined,
+            advancePage,
         );
 
         await finder.findRows({});
 
-        expect(goNextBulk).toHaveBeenCalledTimes(1);
-        expect(goNext).not.toHaveBeenCalled();
+        expect(advancePage).toHaveBeenCalledWith(true);
     });
 });
 
@@ -127,7 +127,7 @@ describe('RowFinder.findRow — isTableLoading polling', () => {
     });
 });
 
-// ─── findRow() sentinel row index ─────────────────────────────────────────────
+// ─── findRow() sentinel row index ────────────────────────────────────────────
 
 describe('RowFinder.findRow — sentinel row index', () => {
     it('passes undefined rowIndex to makeSmartRow when row is not found', async () => {

@@ -1,12 +1,12 @@
 import type { Locator, Page } from '@playwright/test';
-import { FinalTableConfig, TableContext, Selector, SmartRow, FilterValue, PaginationPrimitives } from '../types';
+import { FinalTableConfig, Selector, SmartRow, FilterValue } from '../types';
 import { FilterEngine } from '../filterEngine';
 import { TableMapper } from './tableMapper';
 import { logDebug, debugDelay } from '../utils/debugUtils';
 import { createSmartRowArray, SmartRowArray } from '../utils/smartRowArray';
-import { validatePaginationResult } from '../strategies/validation';
 import { ElementTracker } from '../utils/elementTracker';
 import { SENTINEL_ROW } from '../utils/sentinel';
+import { NavigationBarrier } from '../utils/navigationBarrier';
 
 export class RowFinder<T = any> {
     private resolve: (item: Selector, parent: Locator | Page) => Locator;
@@ -17,8 +17,9 @@ export class RowFinder<T = any> {
         resolve: (item: Selector, parent: Locator | Page) => Locator,
         private filterEngine: FilterEngine,
         private tableMapper: TableMapper,
-        private makeSmartRow: (loc: Locator, map: Map<string, number>, index: number | undefined, tablePageIndex?: number) => SmartRow<T>,
-        private tableState: { currentPageIndex: number } = { currentPageIndex: 0 }
+        private makeSmartRow: (loc: Locator, map: Map<string, number>, index: number | undefined, tablePageIndex?: number, barrier?: NavigationBarrier) => SmartRow<T>,
+        private tableState: { currentPageIndex: number } = { currentPageIndex: 0 },
+        private advancePage: (useBulk: boolean) => Promise<boolean> = async () => false
     ) {
         this.resolve = resolve;
     }
@@ -93,13 +94,18 @@ export class RowFinder<T = any> {
                 const onRowLoadingTimeout = this.config.strategies.loading?.onRowLoadingTimeout ?? 'read-as-is';
                 let added = 0;
 
+                // One barrier per batch — synchronizes cell navigation across all rows in this page's results
+                const useBarrier = this.config.concurrency === 'synchronized' && newIndices.length > 1;
+                const barrier = useBarrier ? new NavigationBarrier(newIndices.length) : undefined;
+
                 for (const idx of newIndices) {
-                    const smartRow = this.makeSmartRow(currentRows[idx], map, allRows.length, this.tableState.currentPageIndex);
+                    const smartRow = this.makeSmartRow(currentRows[idx], map, allRows.length, this.tableState.currentPageIndex, barrier);
 
                     if (isRowLoading && await isRowLoading(smartRow)) {
                         if (rowLoadingTimeout === undefined) {
                             // No timeout configured (or invalid value) — legacy skip behavior
                             logDebug(this.config, 'verbose', `findRows: page ${this.tableState.currentPageIndex} — row skipped (isRowLoading=true, no timeout)`);
+                            barrier?.markFinished();
                             continue;
                         }
 
@@ -114,8 +120,9 @@ export class RowFinder<T = any> {
 
                         if (!resolved) {
                             logDebug(this.config, 'verbose', `findRows: row ${allRows.length} — still loading after ${rowLoadingTimeout}ms, action: ${onRowLoadingTimeout}`);
-                            if (onRowLoadingTimeout === 'skip') continue;
+                            if (onRowLoadingTimeout === 'skip') { barrier?.markFinished(); continue; }
                             if (onRowLoadingTimeout === 'throw') {
+                                barrier?.markFinished();
                                 throw new Error(`[SmartTable] Row ${allRows.length} did not finish loading within ${rowLoadingTimeout}ms`);
                             }
                             // 'read-as-is': fall through and add the row
@@ -135,32 +142,15 @@ export class RowFinder<T = any> {
 
             // Pagination Loop
             while (pagesScanned < effectiveMaxPages && this.config.strategies.pagination) {
-                const context: TableContext = {
-                    root: this.rootLocator,
-                    config: this.config,
-                    resolve: this.resolve,
-                    page: this.rootLocator.page()
-                };
-
-                let paginationResult: boolean | number | PaginationPrimitives | undefined;
                 const useBulk = options?.useBulkPagination !== false && !!this.config.strategies.pagination?.goNextBulk;
-                if (useBulk) {
-                    paginationResult = await this.config.strategies.pagination.goNextBulk!(context);
-                } else if (this.config.strategies.pagination?.goNext) {
-                    paginationResult = await this.config.strategies.pagination.goNext(context);
-                } else {
-                    logDebug(this.config, 'verbose',`findRows: no pagination primitive — stopping`);
-                    break;
-                }
-
-                const didPaginate = validatePaginationResult(paginationResult, 'Pagination Strategy');
+                const prevPage = this.tableState.currentPageIndex;
+                const didPaginate = await this.advancePage(useBulk);
                 if (!didPaginate) {
                     logDebug(this.config, 'verbose',`findRows: pagination returned false — end of data`);
                     break;
                 }
 
-                const pagesJumped = typeof paginationResult === 'number' ? paginationResult : 1;
-                this.tableState.currentPageIndex += pagesJumped;
+                const pagesJumped = this.tableState.currentPageIndex - prevPage;
                 pagesScanned += pagesJumped;
                 logDebug(this.config, 'verbose',`findRows: advanced ${pagesJumped} page(s), now at page ${this.tableState.currentPageIndex}`);
                 await debugDelay(this.config, 'pagination');
@@ -236,30 +226,12 @@ export class RowFinder<T = any> {
 
             if (pagesScanned < effectiveMaxPages) {
                 logDebug(this.config, 'verbose',`Page ${this.tableState.currentPageIndex}: Not found. Attempting pagination...`);
-                const context: TableContext = {
-                    root: this.rootLocator,
-                    config: this.config,
-                    resolve: this.resolve,
-                    page: this.rootLocator.page()
-                };
-
-                let paginationResult: boolean | number | PaginationPrimitives | undefined;
-                const pagination = this.config.strategies.pagination;
-                const useBulk = options.useBulkPagination !== false && !!pagination?.goNextBulk;
-                if (useBulk && pagination?.goNextBulk) {
-                    paginationResult = await pagination.goNextBulk(context);
-                } else if (pagination?.goNext) {
-                    paginationResult = await pagination.goNext(context);
-                } else {
-                    logDebug(this.config, 'verbose',`Page ${this.tableState.currentPageIndex}: Pagination failed (no goNext or goNextBulk primitive).`);
-                    return null;
-                }
-
-                const didLoadMore = validatePaginationResult(paginationResult, 'Pagination Strategy');
+                const useBulk = options.useBulkPagination !== false && !!this.config.strategies.pagination?.goNextBulk;
+                const prevPage = this.tableState.currentPageIndex;
+                const didLoadMore = await this.advancePage(useBulk);
 
                 if (didLoadMore) {
-                    const pagesJumped = typeof paginationResult === 'number' ? paginationResult : 1;
-                    this.tableState.currentPageIndex += pagesJumped;
+                    const pagesJumped = this.tableState.currentPageIndex - prevPage;
                     pagesScanned += pagesJumped;
                     logDebug(this.config, 'verbose', `findRowLocator: advanced ${pagesJumped} page(s), now at page ${this.tableState.currentPageIndex}`);
                     await debugDelay(this.config, 'pagination');
