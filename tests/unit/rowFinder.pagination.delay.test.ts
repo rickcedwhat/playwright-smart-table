@@ -76,6 +76,27 @@ function makeRowFinder(config: FinalTableConfig) {
     idx: number | undefined,
   ): SmartRow => ({ rowIndex: idx, getCell: () => ({}), toJSON: async () => ({}) } as unknown as SmartRow);
 
+  const tableState = { currentPageIndex: 0 };
+
+  // Mirror _advancePage from useTable.ts so tests that configure goNext/goNextBulk work correctly
+  const advancePage = async (useBulk: boolean): Promise<boolean> => {
+    const pagination = config.strategies.pagination;
+    const fakeContext = { root: rootLocator, config, page: rootLocator.page(), resolve: (_: any, p: any) => p } as any;
+    let rawResult: boolean | number | undefined;
+    if (useBulk && pagination?.goNextBulk) {
+      rawResult = await pagination.goNextBulk(fakeContext);
+    } else if (pagination?.goNext) {
+      rawResult = await pagination.goNext(fakeContext);
+    } else if (pagination?.goNextBulk) {
+      rawResult = await pagination.goNextBulk(fakeContext);
+    } else {
+      return false;
+    }
+    const did = typeof rawResult === 'number' ? rawResult > 0 : !!rawResult;
+    if (did) tableState.currentPageIndex += typeof rawResult === 'number' ? rawResult : 1;
+    return did;
+  };
+
   return new RowFinder(
     rootLocator,
     config,
@@ -83,7 +104,8 @@ function makeRowFinder(config: FinalTableConfig) {
     filterEngine,
     tableMapper,
     makeSmartRow,
-    { currentPageIndex: 0 },
+    tableState,
+    advancePage,
   );
 }
 

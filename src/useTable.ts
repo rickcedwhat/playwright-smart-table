@@ -151,7 +151,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
   };
 
   const tableState = { currentPageIndex: 0 };
-  const rowFinder = new RowFinder<T>(rootLocator, config, resolve, filterEngine, tableMapper, _makeSmart, tableState);
+  const rowFinder = new RowFinder<T>(rootLocator, config, resolve, filterEngine, tableMapper, _makeSmart, tableState, (useBulk) => _advancePage(useBulk));
 
   /** Builds a full TableContext/StrategyContext with getHeaderCell, getHeaders, scrollToColumn. Set after result is created. */
   let createStrategyContext: () => TableContext = () => ({ root: rootLocator, config, page: rootLocator.page(), resolve });
