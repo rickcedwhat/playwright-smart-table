@@ -526,6 +526,19 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       );
     },
 
+    toArray: async <R = Record<string, unknown>>(
+        callback?: (ctx: import('./types').RowIterationContext<T>) => R | Promise<R>,
+        options: import('./types').RowIterationOptions = {}
+    ): Promise<R[]> => {
+      log(`toArray: options=${safeStringify(options)}`);
+      const cb = callback ?? (({ row }: import('./types').RowIterationContext<T>) => row.toJSON() as unknown as Promise<R>);
+      try {
+        return await result.map(cb, options);
+      } finally {
+        await result.reset();
+      }
+    },
+
     filter: async (predicate, options = {}) => {
       log(`filter: options=${safeStringify(options)}`);
       await _autoInit();
