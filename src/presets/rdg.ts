@@ -1,4 +1,5 @@
-import { TableContext, Selector, TableConfig, ViewportStrategy } from '../types';
+import type { Locator } from '@playwright/test';
+import { TableContext, Selector, TableConfig, ViewportStrategy, StrategyContext } from '../types';
 import { PaginationStrategies } from '../strategies/pagination';
 import { StabilizationStrategies } from '../strategies/stabilization';
 
@@ -61,7 +62,7 @@ const scrollRightHeaderRDG = async (context: TableContext) => {
     return Array.from(collectedHeaders);
 };
 
-const rdgGetCellLocator = ({ row, columnIndex }: any) => {
+const rdgGetCellLocator = ({ row, columnIndex }: { row: Locator; columnIndex: number }) => {
     const ariaColIndex = columnIndex + 1;
     return row.locator(`[role="gridcell"][aria-colindex="${ariaColIndex}"]`);
 };
@@ -73,36 +74,36 @@ const rdgPaginationStrategy = PaginationStrategies.infiniteScroll({
 });
 
 const rdgNavigation = {
-    goRight: async ({ root, page }: any) => {
+    goRight: async ({ root }: StrategyContext) => {
         await root.evaluate((el: HTMLElement) => {
             const grid = el.querySelector('[role="grid"]') || el.closest('[role="grid"]') || el;
-            if (grid) grid.scrollLeft += 150;
+            if (grid) (grid as HTMLElement).scrollLeft += 150;
         });
     },
-    goLeft: async ({ root, page }: any) => {
+    goLeft: async ({ root }: StrategyContext) => {
         await root.evaluate((el: HTMLElement) => {
             const grid = el.querySelector('[role="grid"]') || el.closest('[role="grid"]') || el;
-            if (grid) grid.scrollLeft -= 150;
+            if (grid) (grid as HTMLElement).scrollLeft -= 150;
         });
     },
-    goDown: async ({ root, page }: any) => {
+    goDown: async ({ root }: StrategyContext) => {
         await root.evaluate((el: HTMLElement) => {
             const grid = el.querySelector('[role="grid"]') || el.closest('[role="grid"]') || el;
-            if (grid) grid.scrollTop += 35;
+            if (grid) (grid as HTMLElement).scrollTop += 35;
         });
     },
-    goUp: async ({ root, page }: any) => {
+    goUp: async ({ root }: StrategyContext) => {
         await root.evaluate((el: HTMLElement) => {
             const grid = el.querySelector('[role="grid"]') || el.closest('[role="grid"]') || el;
-            if (grid) grid.scrollTop -= 35;
+            if (grid) (grid as HTMLElement).scrollTop -= 35;
         });
     },
-    goHome: async ({ root, page }: any) => {
+    goHome: async ({ root }: StrategyContext) => {
         await root.evaluate((el: HTMLElement) => {
             const grid = el.querySelector('[role="grid"]') || el.closest('[role="grid"]') || el;
             if (grid) {
-                grid.scrollLeft = 0;
-                grid.scrollTop = 0;
+                (grid as HTMLElement).scrollLeft = 0;
+                (grid as HTMLElement).scrollTop = 0;
             }
         });
     }
