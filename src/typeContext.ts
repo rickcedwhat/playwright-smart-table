@@ -812,6 +812,31 @@ export interface TableResult<T = any> extends AsyncIterable<{ row: SmartRow<T>; 
   ): Promise<R[]>;
 
   /**
+   * Shorthand for \`map()\` + \`reset()\`. Iterates every row across all pages, applies the
+   * callback (defaults to \`row.toJSON()\`), then resets the table back to page 1 — even if
+   * the callback throws.
+   *
+   * @param callback - Optional map function. Defaults to \`({ row }) => row.toJSON()\`.
+   * @param options - Same options as \`map()\`.
+   *
+   * @example
+   * // Zero-arg: returns toJSON() for every row
+   * const rows = await table.toArray();
+   *
+   * @example
+   * // Custom callback
+   * const names = await table.toArray(({ row }) => row.getCell('Name').innerText());
+   *
+   * @example
+   * // With options
+   * const rows = await table.toArray(({ row }) => row.toJSON(), { concurrency: 'parallel' });
+   */
+  toArray<R = Record<string, unknown>>(
+    callback?: (ctx: RowIterationContext<T>) => R | Promise<R>,
+    options?: RowIterationOptions
+  ): Promise<R[]>;
+
+  /**
    * Filters rows across all pages by an async predicate. Returns a SmartRowArray.
    * Rows are returned as-is — call \`bringIntoView()\` on each if needed.
    * Execution is sequential by default.
