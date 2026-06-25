@@ -5,10 +5,10 @@ import type { TableConfig } from '../types';
  *
  * Merge semantics:
  * - Top-level keys (`rowSelector`, `maxPages`, etc.): overrides win — same as `{ ...base, ...overrides }`.
- * - `strategies`: each sub-key is merged independently. Strategy sub-objects (`loading`, `viewport`)
- *   are merged key-by-key so that neither side silently wipes the other's settings.
- *   Function-valued strategies (`pagination`, `header`, `dedupe`, `getCellLocator`, etc.) are
- *   replaced in full by the override value (a function cannot be meaningfully object-spread).
+ * - `strategies`: each sub-key is merged independently. Object-valued strategies (`loading`,
+ *   `viewport`, `pagination`) are merged key-by-key so that neither side silently wipes the
+ *   other's settings. Function-valued strategies (`header`, `dedupe`, `getCellLocator`, etc.)
+ *   are replaced in full by the override value (a function cannot be meaningfully object-spread).
  * - `columnOverrides`: merged key-by-key (each column entry merged independently).
  * - Everything else: overrides win (shallow merge).
  *
@@ -54,7 +54,10 @@ export function mergeTableConfig<T = any>(
                 typeof baseVal !== 'function' &&
                 typeof overrideVal !== 'function'
             ) {
-                (result.strategies as any)[key] = { ...baseVal, ...overrideVal };
+                // The spread result can't be expressed as the union of all strategy types;
+                // the runtime object-check above guarantees safety.
+                (result.strategies as NonNullable<TableConfig<T>['strategies']>)[key] =
+                    { ...baseVal, ...overrideVal } as never;
             }
         }
     }

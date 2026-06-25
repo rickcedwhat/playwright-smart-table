@@ -84,7 +84,7 @@ describe('mergeTableConfig', () => {
             expect(result.strategies?.viewport?.scrollToRow).toBe(scrollToRow);
         });
 
-        it('function-valued strategies are replaced, not merged', () => {
+        it('object-valued strategies (pagination) are merged key-by-key', () => {
             const basePagination = { goNext: vi.fn(), goNextBulk: vi.fn() };
             const overridePagination = { goNext: vi.fn() };
 
@@ -96,10 +96,9 @@ describe('mergeTableConfig', () => {
             };
 
             const result = mergeTableConfig(base, overrides);
-            // pagination is a plain object, so it should be merged like other plain objects
-            // Actually pagination is an object with function values — it is itself an object
-            // and should be deep-merged. Let's verify override wins the goNext key:
-            expect(result.strategies?.pagination).toBeDefined();
+            // override's goNext wins; base's goNextBulk is preserved
+            expect(result.strategies?.pagination?.goNext).toBe(overridePagination.goNext);
+            expect(result.strategies?.pagination?.goNextBulk).toBe(basePagination.goNextBulk);
         });
 
         it('function strategy (getCellLocator) is replaced by override', () => {
