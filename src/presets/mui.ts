@@ -83,7 +83,7 @@ export function createMuiTable(opts?: { buttonLabels?: MuiButtonLabels }): Parti
         pagination: {
             goNext: async (context) => {
                 const root = await getPaginationRoot(context);
-                const nextBtn = root.locator(`button[aria-label="${labels.nextPage}"]`);
+                const nextBtn = root.getByRole('button', { name: labels.nextPage, exact: true });
                 if (await nextBtn.count() === 0 || await nextBtn.isDisabled()) return false;
 
                 const displayedRows = root.locator('.MuiTablePagination-displayedRows');
@@ -96,7 +96,7 @@ export function createMuiTable(opts?: { buttonLabels?: MuiButtonLabels }): Parti
             },
             goPrevious: async (context) => {
                 const root = await getPaginationRoot(context);
-                const prevBtn = root.locator(`button[aria-label="${labels.previousPage}"]`);
+                const prevBtn = root.getByRole('button', { name: labels.previousPage, exact: true });
                 if (await prevBtn.count() === 0 || await prevBtn.isDisabled()) return false;
 
                 const displayedRows = root.locator('.MuiTablePagination-displayedRows');
@@ -111,7 +111,7 @@ export function createMuiTable(opts?: { buttonLabels?: MuiButtonLabels }): Parti
                 const displayedRows = root.locator('.MuiTablePagination-displayedRows');
 
                 // MUI TablePagination optionally renders a "first page" button (showFirstButton prop)
-                const firstBtn = root.locator(`button[aria-label="${labels.firstPage}"]`);
+                const firstBtn = root.getByRole('button', { name: labels.firstPage, exact: true });
                 if (await firstBtn.count() > 0 && !(await firstBtn.isDisabled())) {
                     const oldText = await displayedRows.innerText().catch(() => '');
                     await firstBtn.click({ force: true });
@@ -120,14 +120,14 @@ export function createMuiTable(opts?: { buttonLabels?: MuiButtonLabels }): Parti
                 }
 
                 // Fall back to stepping backward one page at a time
-                const prevBtn = root.locator(`button[aria-label="${labels.previousPage}"]`);
+                const prevBtn = root.getByRole('button', { name: labels.previousPage, exact: true });
                 let clicked = false;
                 let noProgressCount = 0;
                 const NO_PROGRESS_LIMIT = 3;
 
                 while (await prevBtn.count() > 0 && !(await prevBtn.isDisabled())) {
                     const oldText = await displayedRows.innerText().catch(() => '');
-                    await prevBtn.click();
+                    await prevBtn.click({ force: true });
                     await waitForMuiPaginationStabilization(context, displayedRows, oldText);
                     clicked = true;
 
@@ -217,7 +217,7 @@ export function createMuiDataGrid(opts?: { buttonLabels?: MuiButtonLabels }): Pa
         pagination: {
             goNext: async (context) => {
                 const footer = context.root.locator('.MuiDataGrid-footerContainer');
-                const nextBtn = footer.locator(`button[aria-label="${labels.nextPage}"]`);
+                const nextBtn = footer.getByRole('button', { name: labels.nextPage, exact: true });
 
                 try {
                     await nextBtn.waitFor({ state: 'visible', timeout: 2000 });
@@ -237,7 +237,7 @@ export function createMuiDataGrid(opts?: { buttonLabels?: MuiButtonLabels }): Pa
             },
             goPrevious: async (context) => {
                 const footer = context.root.locator('.MuiDataGrid-footerContainer');
-                const prevBtn = footer.locator(`button[aria-label="${labels.previousPage}"]`);
+                const prevBtn = footer.getByRole('button', { name: labels.previousPage, exact: true });
 
                 try {
                     await prevBtn.waitFor({ state: 'visible', timeout: 2000 });
@@ -259,7 +259,7 @@ export function createMuiDataGrid(opts?: { buttonLabels?: MuiButtonLabels }): Pa
                 const footer = context.root.locator('.MuiDataGrid-footerContainer');
                 const displayedRows = footer.locator('.MuiTablePagination-displayedRows');
 
-                const firstBtn = footer.locator(`button[aria-label="${labels.firstPage}"]`);
+                const firstBtn = footer.getByRole('button', { name: labels.firstPage, exact: true });
                 try {
                     await firstBtn.waitFor({ state: 'visible', timeout: 1000 });
                     if (!(await firstBtn.isDisabled())) {
@@ -273,7 +273,7 @@ export function createMuiDataGrid(opts?: { buttonLabels?: MuiButtonLabels }): Pa
                     // first-page button not present; fall back to stepping backward
                 }
 
-                const prevBtn = footer.locator(`button[aria-label="${labels.previousPage}"]`);
+                const prevBtn = footer.getByRole('button', { name: labels.previousPage, exact: true });
                 let clicked = false;
                 let noProgressCount = 0;
                 const NO_PROGRESS_LIMIT = 3;
