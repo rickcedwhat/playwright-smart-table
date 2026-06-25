@@ -5,6 +5,15 @@
 ### Added
 - **`table.toArray()`** — shorthand for `map()` + `reset()`. Accepts an optional callback (defaults to `row.toJSON()`) and the same options as `map()`. Calls `reset()` in a `finally` block so the table always lands on page 1. Closes #336.
 - **`mergeTableConfig(base, overrides)`** — utility for composing a shared base config with per-table overrides. Deep-merges `strategies` and `columnOverrides` sub-keys; shallow-merges everything else. Closes #337.
+- **`createMuiTable(opts?)` / `createMuiDataGrid(opts?)`** — factory functions for the MUI presets. Accept `{ buttonLabels }` to override pagination button aria-labels for non-English locales. The static `muiTable` / `muiDataGrid` exports are unchanged and use English defaults. Closes #327 (v6 parts).
+- **`muiDataGrid.goToFirst`** — MUI DataGrid now supports `goToFirst` (tries the first-page button, falls back to stepping backward). Previously absent.
+- **`MuiButtonLabels`** — exported interface for the button label overrides accepted by `createMuiTable` and `createMuiDataGrid`.
+
+### Fixed
+- **`muiTable.goToFirst`** — now checks for an explicit "Go to first page" button (MUI's `showFirstButton` prop) before falling back to the step-backward loop.
+
+### Changed
+- **RDG navigation typing** — `rdgNavigation` functions and `rdgGetCellLocator` no longer use `any`; properly typed as `StrategyContext` and `{ row: Locator; columnIndex: number }` respectively.
 
 ## [6.16.0] - 2026-06-24
 

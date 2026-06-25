@@ -3,6 +3,19 @@ import { TableConfig, TableContext } from '../types';
 import { PaginationStrategies } from '../strategies';
 import { logDebug } from '../utils/debugUtils';
 
+/** Aria-labels for MUI pagination buttons. Override for non-English locales. */
+export interface MuiButtonLabels {
+    nextPage?: string;
+    previousPage?: string;
+    firstPage?: string;
+}
+
+const DEFAULT_LABELS: Required<MuiButtonLabels> = {
+    nextPage: 'Go to next page',
+    previousPage: 'Go to previous page',
+    firstPage: 'Go to first page',
+};
+
 /** 
  * Safely wait for MUI pagination to stabilize.
  * Polls for displayed row text changes and waits for loading overlays to disappear.
@@ -49,15 +62,17 @@ async function getPaginationRoot(context: TableContext) {
 }
 
 /**
- * Preset configuration for the standard Material UI `<Table />` component.
- * 
- * Handles:
- * - Selectors for `.MuiTableRow-root`, `.MuiTableCell-head`, etc.
- * - Pagination via the standard `.MuiTablePagination-actions` footer.
- * - Sorting via the `.MuiTableSortLabel-root` header classes.
- * - Virtualized DOM deduplication (falls back to cell text if unvirtualized).
+ * Creates a preset configuration for the standard Material UI `<Table />` component.
+ *
+ * @param opts.buttonLabels - Override aria-labels for pagination buttons (use for non-English locales).
+ *
+ * @example
+ * // French locale
+ * const table = useTable(loc, createMuiTable({ buttonLabels: { nextPage: 'Page suivante', previousPage: 'Page précédente' } }));
  */
-export const muiTable: Partial<TableConfig> = {
+export function createMuiTable(opts?: { buttonLabels?: MuiButtonLabels }): Partial<TableConfig> {
+    const labels = { ...DEFAULT_LABELS, ...opts?.buttonLabels };
+    return {
     rowSelector: 'tbody tr, tbody .MuiTableRow-root',
     cellSelector: 'td, th, .MuiTableCell-body',
     headerSelector: 'thead th, .MuiTableCell-head',
@@ -68,7 +83,7 @@ export const muiTable: Partial<TableConfig> = {
         pagination: {
             goNext: async (context) => {
                 const root = await getPaginationRoot(context);
-                const nextBtn = root.locator('button[aria-label="Go to next page"]');
+                const nextBtn = root.locator(`button[aria-label="${labels.nextPage}"]`);
                 if (await nextBtn.count() === 0 || await nextBtn.isDisabled()) return false;
 
                 const displayedRows = root.locator('.MuiTablePagination-displayedRows');
@@ -81,7 +96,7 @@ export const muiTable: Partial<TableConfig> = {
             },
             goPrevious: async (context) => {
                 const root = await getPaginationRoot(context);
-                const prevBtn = root.locator('button[aria-label="Go to previous page"]');
+                const prevBtn = root.locator(`button[aria-label="${labels.previousPage}"]`);
                 if (await prevBtn.count() === 0 || await prevBtn.isDisabled()) return false;
 
                 const displayedRows = root.locator('.MuiTablePagination-displayedRows');
@@ -93,9 +108,19 @@ export const muiTable: Partial<TableConfig> = {
             },
             goToFirst: async (context) => {
                 const root = await getPaginationRoot(context);
-                const prevBtn = root.locator('button[aria-label="Go to previous page"]');
                 const displayedRows = root.locator('.MuiTablePagination-displayedRows');
 
+                // MUI TablePagination optionally renders a "first page" button (showFirstButton prop)
+                const firstBtn = root.locator(`button[aria-label="${labels.firstPage}"]`);
+                if (await firstBtn.count() > 0 && !(await firstBtn.isDisabled())) {
+                    const oldText = await displayedRows.innerText().catch(() => '');
+                    await firstBtn.click({ force: true });
+                    await waitForMuiPaginationStabilization(context, displayedRows, oldText);
+                    return true;
+                }
+
+                // Fall back to stepping backward one page at a time
+                const prevBtn = root.locator(`button[aria-label="${labels.previousPage}"]`);
                 let clicked = false;
                 let noProgressCount = 0;
                 const NO_PROGRESS_LIMIT = 3;
@@ -163,11 +188,17 @@ export const muiTable: Partial<TableConfig> = {
             return text || String(Math.random());
         }
     }
-};
+    };
+}
+
+/** Default preset for MUI `<Table />`. For non-English locales use `createMuiTable({ buttonLabels })`. */
+export const muiTable: Partial<TableConfig> = createMuiTable();
 
 /**
- * Preset configuration for the MUI DataGrid component (@mui/x-data-grid).
- * 
+ * Creates a preset configuration for the MUI DataGrid component (@mui/x-data-grid).
+ *
+ * @param opts.buttonLabels - Override aria-labels for pagination buttons (use for non-English locales).
+ *
  * Handles:
  * - Selectors for `.MuiDataGrid-row`, `.MuiDataGrid-cell`, and `.MuiDataGrid-columnHeader`.
  * - Pagination via the `.MuiDataGrid-footerContainer` (handling React's async rendering).
@@ -175,7 +206,9 @@ export const muiTable: Partial<TableConfig> = {
  * - Vertical Virtualization deduplication using `data-rowindex`.
  * - Horizontal Virtualization support via `aria-colindex`.
  */
-export const muiDataGrid: Partial<TableConfig> = {
+export function createMuiDataGrid(opts?: { buttonLabels?: MuiButtonLabels }): Partial<TableConfig> {
+    const labels = { ...DEFAULT_LABELS, ...opts?.buttonLabels };
+    return {
     rowSelector: '.MuiDataGrid-row',
     cellSelector: '.MuiDataGrid-cell',
     headerSelector: '.MuiDataGrid-columnHeader',
@@ -184,8 +217,8 @@ export const muiDataGrid: Partial<TableConfig> = {
         pagination: {
             goNext: async (context) => {
                 const footer = context.root.locator('.MuiDataGrid-footerContainer');
-                const nextBtn = footer.locator('button[aria-label="Go to next page"]');
-                
+                const nextBtn = footer.locator(`button[aria-label="${labels.nextPage}"]`);
+
                 try {
                     await nextBtn.waitFor({ state: 'visible', timeout: 2000 });
                 } catch (e) {
@@ -204,8 +237,8 @@ export const muiDataGrid: Partial<TableConfig> = {
             },
             goPrevious: async (context) => {
                 const footer = context.root.locator('.MuiDataGrid-footerContainer');
-                const prevBtn = footer.locator('button[aria-label="Go to previous page"]');
-                
+                const prevBtn = footer.locator(`button[aria-label="${labels.previousPage}"]`);
+
                 try {
                     await prevBtn.waitFor({ state: 'visible', timeout: 2000 });
                 } catch (e) {
@@ -221,6 +254,56 @@ export const muiDataGrid: Partial<TableConfig> = {
                 await prevBtn.click({ force: true });
                 await waitForMuiPaginationStabilization(context, displayedRows, oldText);
                 return true;
+            },
+            goToFirst: async (context) => {
+                const footer = context.root.locator('.MuiDataGrid-footerContainer');
+                const displayedRows = footer.locator('.MuiTablePagination-displayedRows');
+
+                const firstBtn = footer.locator(`button[aria-label="${labels.firstPage}"]`);
+                try {
+                    await firstBtn.waitFor({ state: 'visible', timeout: 1000 });
+                    if (!(await firstBtn.isDisabled())) {
+                        const oldText = await displayedRows.innerText().catch(() => '');
+                        await firstBtn.scrollIntoViewIfNeeded().catch(() => {});
+                        await firstBtn.click({ force: true });
+                        await waitForMuiPaginationStabilization(context, displayedRows, oldText);
+                        return true;
+                    }
+                } catch {
+                    // first-page button not present; fall back to stepping backward
+                }
+
+                const prevBtn = footer.locator(`button[aria-label="${labels.previousPage}"]`);
+                let clicked = false;
+                let noProgressCount = 0;
+                const NO_PROGRESS_LIMIT = 3;
+
+                while (true) {
+                    try {
+                        await prevBtn.waitFor({ state: 'visible', timeout: 2000 });
+                    } catch {
+                        break;
+                    }
+                    if (await prevBtn.isDisabled()) break;
+
+                    const oldText = await displayedRows.innerText().catch(() => '');
+                    await prevBtn.scrollIntoViewIfNeeded().catch(() => {});
+                    await prevBtn.click({ force: true });
+                    await waitForMuiPaginationStabilization(context, displayedRows, oldText);
+                    clicked = true;
+
+                    const newText = await displayedRows.innerText().catch(() => '');
+                    if (newText === oldText) {
+                        noProgressCount++;
+                        if (noProgressCount >= NO_PROGRESS_LIMIT) {
+                            logDebug(context.config, 'error', `goToFirst: no pagination progress after ${NO_PROGRESS_LIMIT} consecutive clicks — aborting to avoid infinite loop`);
+                            return false;
+                        }
+                    } else {
+                        noProgressCount = 0;
+                    }
+                }
+                return clicked;
             }
         },
         sorting: {
@@ -351,4 +434,8 @@ export const muiDataGrid: Partial<TableConfig> = {
             }
         }
     }
-};
+    };
+}
+
+/** Default preset for MUI DataGrid. For non-English locales use `createMuiDataGrid({ buttonLabels })`. */
+export const muiDataGrid: Partial<TableConfig> = createMuiDataGrid();
