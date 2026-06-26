@@ -26,9 +26,11 @@ jobs:
               pull_number: context.payload.pull_request.number,
             });
             const body = pr.data.body || '';
-            // Matches both semver (1.2.3) and major-only (5) version strings —
-            // GitHub Actions Dependabot uses major-only tags like "from 5 to 6".
-            const regex = /from\s+([0-9]+)(?:\.[0-9]+)*[^\n]*to\s+([0-9]+)(?:\.[0-9]+)*/ig;
+            // Scoped to Dependabot's own update summary line ("Updates `pkg` from X to Y"
+            // or "Bumps `pkg` from X to Y"). Handles both semver (1.2.3) and major-only
+            // (5) tags used by GitHub Actions Dependabot. Avoids matching changelog text
+            // in the PR body which contains many unrelated version numbers.
+            const regex = /(?:Updates|Bumps)\s+`[^`]+`\s+from\s+([0-9]+)(?:\.[0-9]+)*\s+to\s+([0-9]+)(?:\.[0-9]+)*/ig;
             let m;
             let foundMatch = false;
             while ((m = regex.exec(body)) !== null) {
