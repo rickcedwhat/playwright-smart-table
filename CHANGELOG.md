@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [6.17.0] - 2026-06-27
+
 ### Added
 - **`table.toArray()`** — shorthand for `map()` + `reset()`. Accepts an optional callback (defaults to `row.toJSON()`) and the same options as `map()`. Calls `reset()` in a `finally` block so the table always lands on page 1. Closes #336.
 - **`mergeTableConfig(base, overrides)`** — utility for composing a shared base config with per-table overrides. Deep-merges `strategies` and `columnOverrides` sub-keys; shallow-merges everything else. Closes #337.
