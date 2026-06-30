@@ -99,7 +99,8 @@ export class RowFinder<T = any> {
                 const barrier = useBarrier ? new NavigationBarrier(newIndices.length) : undefined;
 
                 for (const idx of newIndices) {
-                    const smartRow = this.makeSmartRow(currentRows[idx], map, allRows.length, this.tableState.currentPageIndex, barrier);
+                    const rowIndex = await this.resolveRowIndex(currentRows[idx]);
+                    const smartRow = this.makeSmartRow(currentRows[idx], map, rowIndex, this.tableState.currentPageIndex, barrier);
 
                     if (isRowLoading && await isRowLoading(smartRow)) {
                         if (rowLoadingTimeout === undefined) {
@@ -245,6 +246,13 @@ export class RowFinder<T = any> {
     }
 
     private async resolveRowIndex(rowLocator: Locator): Promise<number | undefined> {
+        // Prefer data-rowindex attribute: it carries the table's own stable index
+        // (e.g. MUI DataGrid uses a global, monotone counter across pages) rather than
+        // the transient DOM position, which resets to 0 for each page's virtual window.
+        const attr = await rowLocator.getAttribute('data-rowindex').catch(() => null);
+        if (attr !== null && !isNaN(Number(attr))) return Number(attr);
+
+        // Fallback: find the row's position in the current DOM order.
         const allRows = await this.resolve(this.config.rowSelector, this.rootLocator).all();
         const targetHandle = await rowLocator.elementHandle();
         if (!targetHandle) return undefined;

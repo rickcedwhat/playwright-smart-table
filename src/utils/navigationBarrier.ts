@@ -1,12 +1,20 @@
+import { Mutex } from './mutex';
+
 /**
- * A synchronization barrier that allows multiple parallel row processors 
+ * A synchronization barrier that allows multiple parallel row processors
  * to coordinate their navigation actions.
  */
+type BarrierWaiter = {
+  resolve: (v: any) => void;
+  reject: (e: any) => void;
+  moveAction?: () => Promise<any>;
+};
+
 export class NavigationBarrier {
   private total: number;
   private finishedCount = 0;
-  // Map of colIndex -> Set of waiting resolvers
-  private buckets: Map<number, Set<(v: any) => void>> = new Map();
+  private buckets: Map<number, Set<BarrierWaiter>> = new Map();
+  private recoveryMutex: Mutex | null = null;
 
   constructor(total: number) {
     this.total = total;
@@ -27,22 +35,32 @@ export class NavigationBarrier {
       return;
     }
 
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       let bucket = this.buckets.get(colIndex);
       if (!bucket) {
         bucket = new Set();
         this.buckets.set(colIndex, bucket);
       }
-      bucket.add(resolve);
+      bucket.add({ resolve, reject, moveAction });
 
       if (bucket.size + this.finishedCount >= this.total) {
-        // Use a self-executing async function to handle the moveAction synchronously in this context
         (async () => {
           let result: T | undefined;
+          let err: unknown;
           try {
-            if (moveAction) result = await moveAction();
+            // Find the first waiter that supplied a moveAction — the last arrival may be
+            // a no-op (fast-path) row with no action, but an earlier waiter's action must
+            // still run, otherwise the column scroll is silently skipped.
+            const action = (Array.from(bucket).find(w => w.moveAction)?.moveAction) as (() => Promise<T>) | undefined;
+            if (action) result = await action();
+          } catch (e) {
+            err = e;
           } finally {
-            this.broadcast(colIndex, result);
+            if (err !== undefined) {
+              this.broadcastError(colIndex, err);
+            } else {
+              this.broadcast(colIndex, result);
+            }
           }
         })();
       }
@@ -55,7 +73,6 @@ export class NavigationBarrier {
    */
   markFinished(): void {
     this.finishedCount++;
-    // Check all buckets - any bucket that was waiting for this row might now be ready
     for (const colIndex of Array.from(this.buckets.keys())) {
       const bucket = this.buckets.get(colIndex)!;
       if (bucket.size + this.finishedCount >= this.total) {
@@ -67,9 +84,26 @@ export class NavigationBarrier {
   private broadcast(colIndex: number, result?: any) {
     const bucket = this.buckets.get(colIndex);
     if (bucket) {
-      for (const resolve of bucket) {
-        resolve(result);
-      }
+      for (const { resolve } of bucket) resolve(result);
+      this.buckets.delete(colIndex);
+    }
+  }
+
+  /**
+   * Run a recovery action exclusively — serialized so concurrent rows don't race
+   * on scrollTop after a horizontal scroll evicts rows from the vertical viewport.
+   * The fn receives a fresh `targetReached` check; if the previous row's scroll
+   * already brought this row into view, fn can no-op immediately.
+   */
+  async runExclusiveRecovery<T>(fn: () => Promise<T>): Promise<T> {
+    if (!this.recoveryMutex) this.recoveryMutex = new Mutex();
+    return this.recoveryMutex.run(fn);
+  }
+
+  private broadcastError(colIndex: number, err: unknown) {
+    const bucket = this.buckets.get(colIndex);
+    if (bucket) {
+      for (const { reject } of bucket) reject(err);
       this.buckets.delete(colIndex);
     }
   }
