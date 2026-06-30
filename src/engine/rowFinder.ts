@@ -246,11 +246,9 @@ export class RowFinder<T = any> {
     }
 
     private async resolveRowIndex(rowLocator: Locator): Promise<number | undefined> {
-        // Prefer data-rowindex attribute: it carries the table's own stable index
-        // (e.g. MUI DataGrid uses a global, monotone counter across pages) rather than
-        // the transient DOM position, which resets to 0 for each page's virtual window.
-        const attr = await rowLocator.getAttribute('data-rowindex').catch(() => null);
-        if (attr !== null && !isNaN(Number(attr))) return Number(attr);
+        if (this.config.strategies.resolveRowIndex) {
+            return this.config.strategies.resolveRowIndex(rowLocator);
+        }
 
         // Fallback: find the row's position in the current DOM order.
         const allRows = await this.resolve(this.config.rowSelector, this.rootLocator).all();

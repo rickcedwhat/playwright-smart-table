@@ -215,6 +215,11 @@ export function createMuiDataGrid(opts?: { buttonLabels?: MuiButtonLabels }): Pa
     concurrency: 'synchronized',
 
     strategies: {
+        resolveRowIndex: async (row) => {
+            const v = await row.getAttribute('data-rowindex').catch(() => null);
+            return v !== null && !isNaN(Number(v)) ? Number(v) : undefined;
+        },
+
         pagination: {
             goNext: async (context) => {
                 const footer = context.root.locator('.MuiDataGrid-footerContainer');
