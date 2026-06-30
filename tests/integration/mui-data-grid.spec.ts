@@ -13,10 +13,7 @@ test.describe('MUI DataGrid Recon', () => {
         const root = page.locator('[role="grid"]').first();
         await expect(root).toBeVisible();
 
-        const table = await useTable(root, { 
-            ...presets.muiDataGrid as any,
-            maxPages: 10
-        }).init();
+        const table = await useTable(root, presets.muiDataGrid).init();
 
         // 1. Verify Headers
         const headers = await table.getHeaders();
@@ -29,7 +26,7 @@ test.describe('MUI DataGrid Recon', () => {
         await table.sorting.apply('Desk', 'asc'); // Ensure stable order
 
         // D-1011 should be on page 2 (index 10-19) since pageSize is 10
-        const rowOnPage2 = await table.findRow({ Desk: 'D-1011' });
+        const rowOnPage2 = await table.findRow({ Desk: 'D-1011' }, { maxPages: 10 });
         expect(rowOnPage2.wasFound()).toBe(true);
         expect(table.currentPageIndex).toBe(1);
 
@@ -40,10 +37,7 @@ test.describe('MUI DataGrid Recon', () => {
 
     test('map() reaches off-screen columns via barrier-coordinated scroll', async ({ page }) => {
         const root = page.locator('[role="grid"]').first();
-        const table = await useTable(root, {
-            ...presets.muiDataGrid as any,
-            maxPages: 5,
-        }).init();
+        const table = await useTable(root, presets.muiDataGrid).init();
 
         const headers = await table.getHeaders();
         // Confirm column virtualization is active: off-screen columns exist
@@ -66,10 +60,7 @@ test.describe('MUI DataGrid Recon', () => {
 
     test('should handle sorting via preset', async ({ page }) => {
         const root = page.locator('[role="grid"]').first();
-        const table = await useTable(root, { 
-            ...presets.muiDataGrid as any,
-            maxPages: 10
-        }).init();
+        const table = await useTable(root, presets.muiDataGrid).init();
 
         console.log('Testing sort: Desk...');
         // DataGrid Name header is usually sortable

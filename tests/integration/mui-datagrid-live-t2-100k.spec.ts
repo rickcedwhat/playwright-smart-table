@@ -9,22 +9,20 @@
  * Selector: .MuiDataGrid-root:has([aria-rowcount="100001"])
  */
 import { test, expect } from '@playwright/test';
-import { useTable, presets, Strategies } from '../../src/index';
+import { useTable, presets, Strategies, mergeTableConfig } from '../../src/index';
 
 const LIVE_URL = 'https://mui.com/x/react-data-grid/';
 const GRID_SELECTOR = '.MuiDataGrid-root:has([aria-rowcount="100001"])';
 
-const tableConfig = {
-    ...presets.muiDataGrid as any,
+const tableConfig = mergeTableConfig(presets.muiDataGrid, {
     strategies: {
-        ...(presets.muiDataGrid as any).strategies,
         pagination: Strategies.Pagination.infiniteScroll({
             scrollTarget: '.MuiDataGrid-virtualScroller',
             action: 'js-scroll',
             stabilization: Strategies.Stabilization.contentChanged({ timeout: 3000 }),
         }),
     },
-};
+});
 
 test.describe('MUI DataGrid — live site table 2 (100k infinite scroll)', () => {
     test.setTimeout(120_000);
@@ -56,14 +54,14 @@ test.describe('MUI DataGrid — live site table 2 (100k infinite scroll)', () =>
         expect(headers.length).toBeGreaterThanOrEqual(6);
     });
 
-    test('map() collects rows across pages including off-screen columns', async ({ page }) => {
+    test('map() collects rows across pages via infinite scroll', async ({ page }) => {
         const root = page.locator(GRID_SELECTOR).first();
         const table = await useTable(root, tableConfig).init();
 
-        const headers = await table.getHeaders();
-        // Read all visible headers — checkbox column has no label so the preset
-        // auto-names it __col_N; include it like any other column.
-        const rows = await table.map(({ row }) => row.toJSON({ columns: headers }), { maxPages: 3 });
+        // toJSON() with no column filter reads every column in the map (all discovered at init).
+        // Off-screen column access in horizontal virtualization is exercised by the local
+        // integration test (tests/integration/mui-data-grid.spec.ts) which uses a wider table.
+        const rows = await table.map(({ row }) => row.toJSON(), { maxPages: 3 });
         console.log(`Collected ${rows.length} rows`);
         console.log('Sample row:', rows[0]);
 

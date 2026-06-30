@@ -4,10 +4,16 @@ import { Mutex } from './mutex';
  * A synchronization barrier that allows multiple parallel row processors
  * to coordinate their navigation actions.
  */
+type BarrierWaiter = {
+  resolve: (v: any) => void;
+  reject: (e: any) => void;
+  moveAction?: () => Promise<any>;
+};
+
 export class NavigationBarrier {
   private total: number;
   private finishedCount = 0;
-  private buckets: Map<number, Set<{ resolve: (v: any) => void; reject: (e: any) => void }>> = new Map();
+  private buckets: Map<number, Set<BarrierWaiter>> = new Map();
   private recoveryMutex: Mutex | null = null;
 
   constructor(total: number) {
@@ -35,14 +41,18 @@ export class NavigationBarrier {
         bucket = new Set();
         this.buckets.set(colIndex, bucket);
       }
-      bucket.add({ resolve, reject });
+      bucket.add({ resolve, reject, moveAction });
 
       if (bucket.size + this.finishedCount >= this.total) {
         (async () => {
           let result: T | undefined;
           let err: unknown;
           try {
-            if (moveAction) result = await moveAction();
+            // Find the first waiter that supplied a moveAction — the last arrival may be
+            // a no-op (fast-path) row with no action, but an earlier waiter's action must
+            // still run, otherwise the column scroll is silently skipped.
+            const action = (Array.from(bucket).find(w => w.moveAction)?.moveAction) as (() => Promise<T>) | undefined;
+            if (action) result = await action();
           } catch (e) {
             err = e;
           } finally {

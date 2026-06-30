@@ -388,8 +388,18 @@ export function createMuiDataGrid(opts?: { buttonLabels?: MuiButtonLabels }): Pa
                         });
                         if (inView) targetRow = inView;
                     }
+                    const scrollerRect = scroller?.getBoundingClientRect();
                     const indices = Array.from(targetRow.querySelectorAll(cellSel))
-                        .map(c => Number(c.getAttribute('aria-colindex')) - 1)
+                        .map(c => {
+                            if (scrollerRect) {
+                                const rect = (c as HTMLElement).getBoundingClientRect();
+                                const visible = rect.width > 0 &&
+                                    rect.right > scrollerRect.left &&
+                                    rect.left < scrollerRect.right;
+                                if (!visible) return NaN;
+                            }
+                            return Number(c.getAttribute('aria-colindex')) - 1;
+                        })
                         .filter(n => !isNaN(n) && n >= 0);
                     if (!indices.length) return { first: 0, last: 0 };
                     return { first: Math.min(...indices), last: Math.max(...indices) };
@@ -494,7 +504,10 @@ export function createMuiDataGrid(opts?: { buttonLabels?: MuiButtonLabels }): Pa
                 // (32 cols), MUI DataGrid updates the DOM on requestAnimationFrame after a
                 // scrollLeft change — so we may need to wait a tick. If it doesn't appear,
                 // fall back to a brief pause; targetReached() is the authoritative gate.
-                const appeared = await root.locator(`[aria-colindex="${colIndex + 1}"]`)
+                // Scope to body cells (.MuiDataGrid-cell) — [aria-colindex] also matches
+                // column headers which appear before body cells after a scroll.
+                const cellSel = typeof config.cellSelector === 'string' ? config.cellSelector : '.MuiDataGrid-cell';
+                const appeared = await root.locator(`${cellSel}[aria-colindex="${colIndex + 1}"]`)
                     .first()
                     .waitFor({ state: 'attached', timeout: 2000 })
                     .then(() => true)

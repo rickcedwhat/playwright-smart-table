@@ -99,7 +99,8 @@ export class RowFinder<T = any> {
                 const barrier = useBarrier ? new NavigationBarrier(newIndices.length) : undefined;
 
                 for (const idx of newIndices) {
-                    const smartRow = this.makeSmartRow(currentRows[idx], map, allRows.length, this.tableState.currentPageIndex, barrier);
+                    const rowIndex = await this.resolveRowIndex(currentRows[idx]);
+                    const smartRow = this.makeSmartRow(currentRows[idx], map, rowIndex, this.tableState.currentPageIndex, barrier);
 
                     if (isRowLoading && await isRowLoading(smartRow)) {
                         if (rowLoadingTimeout === undefined) {

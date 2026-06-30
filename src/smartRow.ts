@@ -53,6 +53,8 @@ const _navigateToCell = async (params: {
         // Optimization: Check if we are ALREADY at the target cell
         if (activeCell && activeCell.rowIndex === rowIndex && activeCell.columnIndex === index) {
             logDebug(config, 'verbose', `_navigateToCell: Already at target cell {row: ${rowIndex}, col: ${index}}`);
+            // Still participate in the barrier (no-op) so peers are not left waiting.
+            if (barrier) await barrier.sync(index);
             return activeCell.locator;
         }
     }
