@@ -54,6 +54,32 @@ describe('Navigation Orchestrator Utilities', () => {
       expect(action).not.toHaveBeenCalled(); // No move needed because everyone finished or moved
     });
 
+    it('fast-path rows (no moveAction) do not allow markFinished to fire prematurely for waiting peers', async () => {
+      // Scenario: 5-row batch. Rows 0 and 1 take the fast path — they call barrier.sync(7)
+      // with NO moveAction (cell already in DOM). Rows 2-4 need the scroll and call
+      // barrier.sync(7, action). If markFinished() from fast-path rows fires before all
+      // waiting rows arrive, action would fire too early (before all peers are ready).
+      const barrier = new NavigationBarrier(5);
+      const action = vi.fn().mockResolvedValue(undefined);
+
+      // Fast-path rows join the barrier WITHOUT a moveAction
+      const fp0 = barrier.sync(7); // no moveAction
+      const fp1 = barrier.sync(7); // no moveAction
+
+      // Rows needing scroll join WITH moveAction
+      const p2 = barrier.sync(7, action);
+      const p3 = barrier.sync(7, action);
+
+      // Only 4/5 have joined — action must NOT fire yet
+      expect(action).not.toHaveBeenCalled();
+
+      // Last row arrives — barrier fires exactly once
+      const p4 = barrier.sync(7, action);
+      await Promise.all([fp0, fp1, p2, p3, p4]);
+
+      expect(action).toHaveBeenCalledTimes(1);
+    });
+
     it('resolves immediately and calls moveAction when total is 0', async () => {
       const barrier = new NavigationBarrier(0);
       const action = vi.fn().mockResolvedValue('result');

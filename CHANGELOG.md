@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+## [6.17.1] - 2026-06-29
+
+### Fixed
+
+- **`muiDataGrid` — `findRow` returns wrong cell on page 2+** — `resolveRowIndex` was returning the row's DOM position (0-based within the current virtual window) instead of its `data-rowindex` attribute value. MUI DataGrid's `data-rowindex` is a global monotone counter across pages (page 2 starts at 10, not 0), so passing the DOM position to `getCellLocator` caused it to look for a page-1 cell. Now reads the `data-rowindex` attribute directly; falls back to DOM position only when the attribute is absent.
+- **`muiDataGrid.getCellLocator` — stable row reference after vertical eviction** — now scopes via `root.locator('[data-rowindex="${rowIndex}"]')` instead of the row locator directly. nth-based locators become stale when MUI DataGrid evicts and re-mounts rows during virtual scroll; the attribute-based lookup always reflects the current DOM position.
+- **`muiDataGrid.getVisibleColumnRange` — overscan row inflated column range** — the previous implementation used the first DOM row, which is often an overscan row with extra columns rendered outside the clip boundary, making the apparent range wider than the actual viewport. Now picks the first row fully within the scroller's bounding rect.
+- **`muiDataGrid.scrollToColumn` — DOM-position vs aria-colindex mismatch** — with column virtualization active, `headers[colIndex]` picks the wrong header because only the current virtual window is rendered. Now finds the header by `aria-colindex` attribute, with an interpolation fallback for columns not yet in the DOM.
+- **`muiDataGrid.scrollToRow` — `scrollIntoView` reset horizontal scroll** — replaced `row.scrollIntoView()` with a manual `scrollTop`-only adjustment that preserves `scrollLeft`. Also replaced the linear height estimate for off-screen rows with `style.top` interpolation (more accurate for absolute-positioned virtual rows). The post-scroll `waitFor` is now non-fatal — a timeout no longer throws when the row re-enters the viewport on its own.
+- **`NavigationBarrier` — error propagation** — errors thrown by `moveAction` were previously swallowed; waiters resolved to `undefined` rather than rejecting. Now calls `reject` on all waiting peers when `moveAction` throws.
+- **`_navigateToCell` — fast-path bypassed barrier coordination** — the `!barrier` guard was missing from the fast-path check, allowing rows that found their cell in the current viewport to exit before the barrier's `scrollToColumn` ran, racing with rows that still needed the scroll. Added `!barrier` so synchronized rows always participate in the barrier round-trip.
+- **`_navigateToCell` — per-row row-recovery after column scroll** — horizontal scroll can evict rows from the vertical viewport (scrollbar layout shift). The recovery block now serializes via `barrier.runExclusiveRecovery` so concurrent rows don't race on `scrollTop`; adjacent rows often come into view for free after the preceding recovery.
+- **`_advancePage` — viewport cache not invalidated on page change** — `getVisibleColumnRange` and `getVisibleRowRange` caches were not cleared after a page advance, causing stale ranges to be used on the new page. Cache is now invalidated inside `_advancePage`.
+- **`muiDataGrid` — missing `concurrency: 'synchronized'`** — the DataGrid preset now sets `concurrency: 'synchronized'` by default so `map()` batches coordinate column scrolling correctly. Previously each row scrolled independently, causing races on the horizontal scroll position.
+
 ## [6.17.0] - 2026-06-27
 
 ### Added

@@ -38,6 +38,32 @@ test.describe('MUI DataGrid Recon', () => {
         expect(deskValue).toBe('D-1011');
     });
 
+    test('map() reaches off-screen columns via barrier-coordinated scroll', async ({ page }) => {
+        const root = page.locator('[role="grid"]').first();
+        const table = await useTable(root, {
+            ...presets.muiDataGrid as any,
+            maxPages: 5,
+        }).init();
+
+        const headers = await table.getHeaders();
+        // Confirm column virtualization is active: off-screen columns exist
+        expect(headers).toContain('Notes');
+        expect(headers).toContain('Filled Qty');
+
+        // map() must reach every column including those beyond the initial scroll position
+        const rows = await table.map(({ row }) => row.toJSON(), { maxPages: 5 });
+        expect(rows.length).toBeGreaterThan(0);
+
+        const sample = rows[0] as Record<string, string>;
+        expect(sample).toHaveProperty('Notes');
+        expect(sample).toHaveProperty('Filled Qty');
+        expect(sample).toHaveProperty('Desk');
+
+        // Every row on every page must have all off-screen columns
+        const missing = rows.filter(r => !r || !('Notes' in (r as object)));
+        expect(missing.length).toBe(0);
+    });
+
     test('should handle sorting via preset', async ({ page }) => {
         const root = page.locator('[role="grid"]').first();
         const table = await useTable(root, { 

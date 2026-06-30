@@ -212,6 +212,7 @@ export function createMuiDataGrid(opts?: { buttonLabels?: MuiButtonLabels }): Pa
     rowSelector: '.MuiDataGrid-row',
     cellSelector: '.MuiDataGrid-cell',
     headerSelector: '.MuiDataGrid-columnHeader',
+    concurrency: 'synchronized',
 
     strategies: {
         pagination: {
@@ -344,9 +345,13 @@ export function createMuiDataGrid(opts?: { buttonLabels?: MuiButtonLabels }): Pa
             // DataGrid uses data-rowindex for its own virtualization management
             return (await row.getAttribute('data-rowindex').catch(() => null)) ?? '';
         },
-        getCellLocator: ({ row, columnIndex }) => {
-            // Horizontal virtualization uses aria-colindex (1-indexed)
-            return row.locator(`[aria-colindex="${columnIndex + 1}"]`);
+        getCellLocator: ({ row, root, columnIndex, rowIndex }) => {
+            // Use data-rowindex for a stable row reference: nth-based locators break after
+            // vertical eviction because the DOM order shifts when rows are removed/added.
+            const stableRow = typeof rowIndex === 'number'
+                ? root.locator(`[data-rowindex="${rowIndex}"]`)
+                : row;
+            return stableRow.locator(`[aria-colindex="${columnIndex + 1}"]`);
         },
         // MUI DataGrid virtualizes rows vertically (always) and columns horizontally (when
         // columnBuffer is configured). The virtualScroller is a descendant of root, so
@@ -366,11 +371,26 @@ export function createMuiDataGrid(opts?: { buttonLabels?: MuiButtonLabels }): Pa
                 const rowSel = config.rowSelector;
                 const cellSel = typeof config.cellSelector === 'string' ? config.cellSelector : '[aria-colindex]';
                 return root.evaluate((el, { rowSel, cellSel }) => {
-                    const firstRow = el.querySelector(rowSel);
-                    if (!firstRow) return { first: 0, last: 0 };
-                    const indices = Array.from(firstRow.querySelectorAll(cellSel))
+                    const scroller = el.querySelector('.MuiDataGrid-virtualScroller') as HTMLElement | null;
+                    const allRows = Array.from(el.querySelectorAll(rowSel));
+                    if (!allRows.length) return { first: 0, last: 0 };
+                    // Use a row that's fully within the scroller's viewport bounds.
+                    // The first DOM row is often an overscan row with extra columns rendered
+                    // outside the clip boundary, causing the range to appear wider than it is.
+                    let targetRow = allRows[0];
+                    if (scroller) {
+                        const scrollerRect = scroller.getBoundingClientRect();
+                        const inView = allRows.find(r => {
+                            const rect = (r as HTMLElement).getBoundingClientRect();
+                            return rect.height > 0 &&
+                                rect.top >= scrollerRect.top &&
+                                rect.bottom <= scrollerRect.bottom;
+                        });
+                        if (inView) targetRow = inView;
+                    }
+                    const indices = Array.from(targetRow.querySelectorAll(cellSel))
                         .map(c => Number(c.getAttribute('aria-colindex')) - 1)
-                        .filter(n => !isNaN(n));
+                        .filter(n => !isNaN(n) && n >= 0);
                     if (!indices.length) return { first: 0, last: 0 };
                     return { first: Math.min(...indices), last: Math.max(...indices) };
                 }, { rowSel, cellSel });
@@ -380,41 +400,88 @@ export function createMuiDataGrid(opts?: { buttonLabels?: MuiButtonLabels }): Pa
                 await root.evaluate((el, { rowSel, idx }) => {
                     const scroller = el.querySelector('.MuiDataGrid-virtualScroller') as HTMLElement;
                     if (!scroller) return;
-                    const row = el.querySelector(`${rowSel}[data-rowindex="${idx}"]`);
-                    if (row) {
-                        row.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+                    const existingRow = el.querySelector(`${rowSel}[data-rowindex="${idx}"]`) as HTMLElement | null;
+                    if (existingRow) {
+                        // Row is in DOM — adjust scrollTop only, never scrollLeft.
+                        const scrollerRect = scroller.getBoundingClientRect();
+                        const rowRect = existingRow.getBoundingClientRect();
+                        if (rowRect.top < scrollerRect.top) {
+                            scroller.scrollTop -= (scrollerRect.top - rowRect.top) + 4;
+                        } else if (rowRect.bottom > scrollerRect.bottom) {
+                            scroller.scrollTop += (rowRect.bottom - scrollerRect.bottom) + 4;
+                        }
                         return;
                     }
+                    // Row not in DOM — interpolate from visible rows' style.top positions.
+                    // This is far more accurate than estimating from row heights because MUI
+                    // DataGrid uses absolute positioning (style.top) for each virtual row.
                     const visibleRows = Array.from(el.querySelectorAll(rowSel)) as HTMLElement[];
+                    const rowsWithPos = visibleRows
+                        .map(r => {
+                            const ridx = Number(r.getAttribute('data-rowindex'));
+                            const top = parseFloat(r.style.top);
+                            return { ridx, top };
+                        })
+                        .filter(r => !isNaN(r.ridx) && !isNaN(r.top) && r.top >= 0)
+                        .sort((a, b) => a.ridx - b.ridx);
+                    if (rowsWithPos.length >= 2) {
+                        const first = rowsWithPos[0];
+                        const last = rowsWithPos[rowsWithPos.length - 1];
+                        const rowHeight = (last.top - first.top) / (last.ridx - first.ridx);
+                        const targetTop = first.top + (idx - first.ridx) * rowHeight;
+                        scroller.scrollTop = Math.max(0, targetTop - 20);
+                        return;
+                    }
+                    // Fallback: use bounding-rect heights.
                     const heights = visibleRows
-                        .map(visibleRow => visibleRow.getBoundingClientRect().height)
-                        .filter(height => height > 0);
+                        .map(r => r.getBoundingClientRect().height)
+                        .filter(h => h > 0);
                     const estimatedHeight = heights.length
-                        ? heights.reduce((sum, height) => sum + height, 0) / heights.length
+                        ? heights.reduce((s, h) => s + h, 0) / heights.length
                         : 52;
                     scroller.scrollTop = Math.max(0, idx * estimatedHeight - 20);
                 }, { rowSel, idx: rowIndex });
+                // Swallow timeout: the row may still be readable if it re-enters the
+                // virtual viewport. targetReached() in the caller is the authoritative check.
                 await root.locator(`${rowSel}[data-rowindex="${rowIndex}"]`)
-                    .waitFor({ state: 'attached', timeout: 3000 });
+                    .waitFor({ state: 'attached', timeout: 3000 })
+                    .catch(() => {});
             },
-            scrollToColumn: async ({ root, config }, colIndex) => {
+            scrollToColumn: async ({ root, config, page }, colIndex) => {
                 const headerSel = typeof config.headerSelector === 'string' ? config.headerSelector : null;
                 await root.evaluate((el, { headerSel, idx }) => {
-                    // virtualScroller is a descendant — querySelector, not closest
                     const scroller = el.querySelector('.MuiDataGrid-virtualScroller') as HTMLElement;
                     if (!scroller || !headerSel) return;
-                    const headers = Array.from(el.querySelectorAll(headerSel));
-                    const target = headers[idx] as HTMLElement | undefined;
+                    const headers = Array.from(el.querySelectorAll(headerSel)) as HTMLElement[];
+                    const targetAriaIdx = idx + 1; // aria-colindex is 1-based
+
+                    // Find header by aria-colindex, NOT by DOM position. With column
+                    // virtualization, DOM order does not match colIndex — only headers in
+                    // the current virtual window are rendered, so headers[idx] would be wrong.
+                    const target = headers.find(h => Number(h.getAttribute('aria-colindex')) === targetAriaIdx);
+
                     if (!target) {
-                        const widths = headers
-                            .map(header => (header as HTMLElement).getBoundingClientRect().width)
-                            .filter(width => width > 0);
-                        const estimatedWidth = widths.length
-                            ? widths.reduce((sum, width) => sum + width, 0) / widths.length
-                            : 100;
-                        scroller.scrollLeft = Math.max(0, idx * estimatedWidth - 20);
+                        // Header not in DOM (column virtualized away). Interpolate scrollLeft
+                        // from the positions of currently visible headers.
+                        const visibleHeaders = headers
+                            .map(h => ({ colIdx: Number(h.getAttribute('aria-colindex')), rect: h.getBoundingClientRect() }))
+                            .filter(h => !isNaN(h.colIdx) && h.rect.width > 0)
+                            .sort((a, b) => a.colIdx - b.colIdx);
+
+                        if (visibleHeaders.length >= 2) {
+                            const first = visibleHeaders[0];
+                            const last = visibleHeaders[visibleHeaders.length - 1];
+                            const pxPerCol = (last.rect.left - first.rect.left) / (last.colIdx - first.colIdx);
+                            const sRect = scroller.getBoundingClientRect();
+                            const firstAbsLeft = first.rect.left - sRect.left + scroller.scrollLeft;
+                            scroller.scrollLeft = Math.max(0, firstAbsLeft + (targetAriaIdx - first.colIdx) * pxPerCol - 20);
+                        } else if (visibleHeaders.length === 1) {
+                            const h = visibleHeaders[0];
+                            scroller.scrollLeft = Math.max(0, scroller.scrollLeft + (targetAriaIdx - h.colIdx) * h.rect.width - 20);
+                        }
                         return;
                     }
+
                     const cRect = scroller.getBoundingClientRect();
                     const tRect = target.getBoundingClientRect();
                     if (tRect.left < cRect.left) {
@@ -423,9 +490,18 @@ export function createMuiDataGrid(opts?: { buttonLabels?: MuiButtonLabels }): Pa
                         scroller.scrollLeft += (tRect.right - cRect.right) + 20;
                     }
                 }, { headerSel, idx: colIndex });
-                await root.locator(`${config.rowSelector} [aria-colindex="${colIndex + 1}"]`)
+                // Wait for any cell with this colIndex to appear. With column virtualization
+                // (32 cols), MUI DataGrid updates the DOM on requestAnimationFrame after a
+                // scrollLeft change — so we may need to wait a tick. If it doesn't appear,
+                // fall back to a brief pause; targetReached() is the authoritative gate.
+                const appeared = await root.locator(`[aria-colindex="${colIndex + 1}"]`)
                     .first()
-                    .waitFor({ state: 'attached', timeout: 3000 });
+                    .waitFor({ state: 'attached', timeout: 2000 })
+                    .then(() => true)
+                    .catch(() => false);
+                if (!appeared) {
+                    await page.waitForTimeout(300);
+                }
             },
         },
         loading: {

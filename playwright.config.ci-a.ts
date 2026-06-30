@@ -12,6 +12,7 @@ export default defineConfig({
     '**/integration/glide.spec.ts',
     '**/integration/rdg.spec.ts',
     '**/integration/mui-table.spec.ts',
+    '**/integration/mui-datagrid-live*.spec.ts',
   ],
   fullyParallel: true,
   forbidOnly: true,
