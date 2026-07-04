@@ -103,7 +103,7 @@ export class RowFinder<T = any> {
                     // Without a strategy, fall back to sequential position to avoid the O(n)
                     // elementHandle scan that resolveRowIndex() would otherwise perform per row.
                     const rowIndex = this.config.strategies.resolveRowIndex
-                        ? await this.config.strategies.resolveRowIndex(currentRows[idx])
+                        ? (await this.config.strategies.resolveRowIndex(currentRows[idx]) ?? allRows.length)
                         : allRows.length;
                     const smartRow = this.makeSmartRow(currentRows[idx], map, rowIndex, this.tableState.currentPageIndex, barrier);
 
@@ -252,7 +252,9 @@ export class RowFinder<T = any> {
 
     private async resolveRowIndex(rowLocator: Locator): Promise<number | undefined> {
         if (this.config.strategies.resolveRowIndex) {
-            return this.config.strategies.resolveRowIndex(rowLocator);
+            const result = await this.config.strategies.resolveRowIndex(rowLocator);
+            if (result !== undefined) return result;
+            // Strategy returned undefined — fall through to DOM scan below.
         }
 
         // Fallback: find the row's position in the current DOM order.
