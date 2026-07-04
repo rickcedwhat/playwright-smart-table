@@ -27,7 +27,7 @@ export class NavigationBarrier {
 
   /**
    * Synchronize all active rows at a specific column index.
-   * The last row to arrive will trigger the `moveAction`.
+   * The last row to arrive (or the last markFinished call) triggers the `moveAction`.
    */
   async sync<T = void>(colIndex: number, moveAction?: () => Promise<T>): Promise<T | void> {
     if (this.total <= 1) {
@@ -44,48 +44,23 @@ export class NavigationBarrier {
       bucket.add({ resolve, reject, moveAction });
 
       if (bucket.size + this.finishedCount >= this.total) {
-        (async () => {
-          let result: T | undefined;
-          let err: unknown;
-          try {
-            // Find the first waiter that supplied a moveAction — the last arrival may be
-            // a no-op (fast-path) row with no action, but an earlier waiter's action must
-            // still run, otherwise the column scroll is silently skipped.
-            const action = (Array.from(bucket).find(w => w.moveAction)?.moveAction) as (() => Promise<T>) | undefined;
-            if (action) result = await action();
-          } catch (e) {
-            err = e;
-          } finally {
-            if (err !== undefined) {
-              this.broadcastError(colIndex, err);
-            } else {
-              this.broadcast(colIndex, result);
-            }
-          }
-        })();
+        this.triggerBucket(colIndex);
       }
     });
   }
 
   /**
    * Mark a row as finished (no more cells to process).
-   * This ensures the barrier doesn't wait for rows that have exited the loop.
+   * This ensures the barrier doesn't wait for rows that have exited the loop,
+   * and runs the pending move action so waiting peers are not starved.
    */
   markFinished(): void {
     this.finishedCount++;
     for (const colIndex of Array.from(this.buckets.keys())) {
       const bucket = this.buckets.get(colIndex)!;
       if (bucket.size + this.finishedCount >= this.total) {
-        this.broadcast(colIndex);
+        this.triggerBucket(colIndex);
       }
-    }
-  }
-
-  private broadcast(colIndex: number, result?: any) {
-    const bucket = this.buckets.get(colIndex);
-    if (bucket) {
-      for (const { resolve } of bucket) resolve(result);
-      this.buckets.delete(colIndex);
     }
   }
 
@@ -100,11 +75,37 @@ export class NavigationBarrier {
     return this.recoveryMutex.run(fn);
   }
 
-  private broadcastError(colIndex: number, err: unknown) {
+  /**
+   * Detach the bucket for `colIndex`, run the first available moveAction,
+   * then resolve or reject all captured waiters.
+   *
+   * Detaching before the await prevents a concurrent markFinished() from
+   * broadcasting the same bucket a second time while the action is in-flight.
+   */
+  private triggerBucket(colIndex: number): void {
     const bucket = this.buckets.get(colIndex);
-    if (bucket) {
-      for (const { reject } of bucket) reject(err);
-      this.buckets.delete(colIndex);
-    }
+    if (!bucket) return;
+    const waiters = Array.from(bucket);
+    this.buckets.delete(colIndex);
+
+    (async () => {
+      let result: any;
+      let err: unknown;
+      try {
+        // Find the first waiter that supplied a moveAction — the last arrival may be
+        // a no-op (fast-path) row with no action, but an earlier waiter's action must
+        // still run, otherwise the column scroll is silently skipped.
+        const action = waiters.find(w => w.moveAction)?.moveAction;
+        if (action) result = await action();
+      } catch (e) {
+        err = e;
+      } finally {
+        if (err !== undefined) {
+          for (const { reject } of waiters) reject(err);
+        } else {
+          for (const { resolve } of waiters) resolve(result);
+        }
+      }
+    })();
   }
 }

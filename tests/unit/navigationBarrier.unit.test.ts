@@ -43,15 +43,47 @@ describe('Navigation Orchestrator Utilities', () => {
       expect(action).toHaveBeenCalledTimes(1);
     });
 
-    it('should broadcast even if all remaining rows finish', async () => {
+    it('runs the move action and unblocks waiters when remaining rows finish', async () => {
+      // markFinished must trigger the scroll — silently resolving with undefined would
+      // let the waiting row proceed without the column ever scrolling into view.
       const barrier = new NavigationBarrier(2);
       const action = vi.fn().mockResolvedValue(undefined);
 
       const p1 = barrier.sync(10, action);
-      barrier.markFinished(); // Row 2 finishes
+      barrier.markFinished(); // Row 2 exits early
 
       await p1;
-      expect(action).not.toHaveBeenCalled(); // No move needed because everyone finished or moved
+      expect(action).toHaveBeenCalledTimes(1);
+    });
+
+    it('rejects all waiting peers when moveAction throws', async () => {
+      const error = new Error('scroll failed');
+      const barrier = new NavigationBarrier(2);
+      const action = vi.fn().mockRejectedValue(error);
+
+      const p1 = barrier.sync(4, action);
+      const p2 = barrier.sync(4, action); // trigger
+
+      const [r1, r2] = await Promise.allSettled([p1, p2]);
+      expect(r1.status).toBe('rejected');
+      expect(r2.status).toBe('rejected');
+      expect((r1 as PromiseRejectedResult).reason).toBe(error);
+      expect(action).toHaveBeenCalledTimes(1);
+    });
+
+    it('markFinished-triggered scroll propagates errors to all waiters', async () => {
+      const error = new Error('scroll failed');
+      const barrier = new NavigationBarrier(3);
+      const action = vi.fn().mockRejectedValue(error);
+
+      const p1 = barrier.sync(5, action);
+      const p2 = barrier.sync(5, action);
+      barrier.markFinished(); // row 3 exits — triggers the scroll, which throws
+
+      const [r1, r2] = await Promise.allSettled([p1, p2]);
+      expect(r1.status).toBe('rejected');
+      expect(r2.status).toBe('rejected');
+      expect(action).toHaveBeenCalledTimes(1);
     });
 
     it('fast-path rows (no moveAction) do not allow markFinished to fire prematurely for waiting peers', async () => {

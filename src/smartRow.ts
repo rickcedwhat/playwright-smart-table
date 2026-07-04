@@ -93,8 +93,11 @@ const _navigateToCell = async (params: {
                     ? await viewport.getVisibleRowRange(context)
                     : null;
                 const rowVisible = !rowRange || (rowIndex >= rowRange.first && rowIndex <= rowRange.last);
-                if (rowVisible && !barrier && await targetReached()) {
+                if (rowVisible && await targetReached()) {
                     logDebug(config, 'verbose', `_navigateToCell: col ${index} in visible range [${knownColRange.first}-${knownColRange.last}], reading directly`);
+                    // Check in to the barrier without a moveAction — peers that need the scroll
+                    // still supply their own action and will trigger it when all rows arrive.
+                    if (barrier) await barrier.sync(index);
                     return getCellLocator();
                 }
             }

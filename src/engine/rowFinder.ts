@@ -99,7 +99,12 @@ export class RowFinder<T = any> {
                 const barrier = useBarrier ? new NavigationBarrier(newIndices.length) : undefined;
 
                 for (const idx of newIndices) {
-                    const rowIndex = await this.resolveRowIndex(currentRows[idx]);
+                    // Use the configured strategy (O(1), e.g. MUI data-rowindex) when available.
+                    // Without a strategy, fall back to sequential position to avoid the O(n)
+                    // elementHandle scan that resolveRowIndex() would otherwise perform per row.
+                    const rowIndex = this.config.strategies.resolveRowIndex
+                        ? await this.config.strategies.resolveRowIndex(currentRows[idx])
+                        : allRows.length;
                     const smartRow = this.makeSmartRow(currentRows[idx], map, rowIndex, this.tableState.currentPageIndex, barrier);
 
                     if (isRowLoading && await isRowLoading(smartRow)) {
