@@ -53,6 +53,8 @@ const _navigateToCell = async (params: {
         // Optimization: Check if we are ALREADY at the target cell
         if (activeCell && activeCell.rowIndex === rowIndex && activeCell.columnIndex === index) {
             logDebug(config, 'verbose', `_navigateToCell: Already at target cell {row: ${rowIndex}, col: ${index}}`);
+            // Still participate in the barrier (no-op) so peers are not left waiting.
+            if (barrier) await barrier.sync(index);
             return activeCell.locator;
         }
     }
@@ -93,6 +95,9 @@ const _navigateToCell = async (params: {
                 const rowVisible = !rowRange || (rowIndex >= rowRange.first && rowIndex <= rowRange.last);
                 if (rowVisible && await targetReached()) {
                     logDebug(config, 'verbose', `_navigateToCell: col ${index} in visible range [${knownColRange.first}-${knownColRange.last}], reading directly`);
+                    // Check in to the barrier without a moveAction — peers that need the scroll
+                    // still supply their own action and will trigger it when all rows arrive.
+                    if (barrier) await barrier.sync(index);
                     return getCellLocator();
                 }
             }
@@ -105,43 +110,41 @@ const _navigateToCell = async (params: {
         // Column is out of view. Scroll to bring it in.
         // In synchronized mode, the last row to arrive triggers the scroll once for all rows.
         const scrollIntoViewport = async () => {
-            // Reuse the range fetched during the fast-path check; re-query only if unknown.
-            const colRange = knownColRange ?? (viewport.getVisibleColumnRange
-                ? await viewport.getVisibleColumnRange(context)
-                : null);
-            const colOutOfView = !colRange || index < colRange.first || index > colRange.last;
-
-            if (colOutOfView) {
-                logDebug(config, 'verbose', `_navigateToCell: col ${index} out of view, scrolling`);
-                if (viewport.scrollToColumn) {
-                    await viewport.scrollToColumn(context, index);
-                }
+            // Always scroll — scrollToColumn is idempotent (bounds-checks before acting).
+            // The trigger row may already have the cell via overscan, but other rows in the
+            // batch might not; skipping the scroll here would silently starve them.
+            logDebug(config, 'verbose', `_navigateToCell: col ${index} out of view, scrolling`);
+            if (viewport.scrollToColumn) {
+                await viewport.scrollToColumn(context, index);
             }
 
-            // Some row locators (notably rows returned by findRow()) have a logical
-            // rowIndex that is not the grid's viewport coordinate. If the target cell
-            // is already mounted after any column scroll, avoid a misleading row jump.
-            if (await targetReached()) {
-                return;
-            }
-
-            // 2D scroll hazard: horizontal scroll may evict the target row from the DOM.
-            // scrollToRow moves the viewport to one specific row, which would evict every
-            // other row in a parallel batch — safe only when there are no peers to evict.
-            if ((!barrier || !barrier.isParallel()) && viewport.scrollToRow && viewport.getVisibleRowRange) {
-                const rowRange = await viewport.getVisibleRowRange(context);
-                const rowOutOfView = rowRange && (rowIndex < rowRange.first || rowIndex > rowRange.last);
-                if (rowOutOfView) {
-                    logDebug(config, 'verbose', `_navigateToCell: row ${rowIndex} out of view after col scroll, recovering`);
-                    await viewport.scrollToRow(context, rowIndex);
-                }
-            }
         };
 
         if (barrier) {
             await barrier.sync(index, scrollIntoViewport);
         } else {
             await scrollIntoViewport();
+        }
+
+        // Per-row 2D recovery: horizontal scroll may evict rows from the vertical viewport
+        // (scrollbar layout shift) or rows may simply be outside the virtual row window.
+        // Recovery is serialized via the barrier's mutex so concurrent rows don't race on
+        // scrollTop — adjacent rows often appear in view for free after the previous recovery.
+        // scrollToRow must only adjust scrollTop (not scrollLeft) to preserve the column
+        // position established by scrollToColumn.
+        if (!await targetReached() && viewport.scrollToRow && typeof rowIndex === 'number') {
+            const scrollToRow = viewport.scrollToRow;
+            const recover = async () => {
+                if (!await targetReached()) {
+                    logDebug(config, 'verbose', `_navigateToCell: row ${rowIndex} evicted by col scroll, recovering`);
+                    await scrollToRow(context, rowIndex);
+                }
+            };
+            if (barrier) {
+                await barrier.runExclusiveRecovery(recover);
+            } else {
+                await recover();
+            }
         }
 
         if (await targetReached()) {

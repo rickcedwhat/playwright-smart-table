@@ -55,6 +55,11 @@
     "comment": "/**\n* Strategy for detecting loading states. Use this for table-, row-, and header-level readiness.\n* E.g. after sort/pagination, the engine uses loading.isTableLoading when present.\n*/"
   },
   {
+    "name": "resolveRowIndex",
+    "signature": "resolveRowIndex?: (row: Locator) => Promise<number | undefined>",
+    "comment": "/**\n* Resolve the stable data-model index for a row locator.\n*\n* Called by `findRow` / `findRows` to convert a DOM row into the index used for\n* virtual-scroll positioning. Useful for grids where DOM position resets to 0 on\n* each page while the grid itself maintains a monotone counter (e.g. MUI DataGrid's\n* `data-rowindex` attribute).\n*\n* Return `undefined` to fall back to DOM position.\n*\n* @example\n* // MUI DataGrid: read the global monotone counter from the attribute\n* resolveRowIndex: async (row) => {\n*   const v = await row.getAttribute('data-rowindex').catch(() => null);\n*   return v !== null && !isNaN(Number(v)) ? Number(v) : undefined;\n* }\n*/"
+  },
+  {
     "name": "viewport",
     "signature": "viewport?: ViewportStrategy",
     "comment": "/**\n* Viewport oracle strategies for 2D virtualized tables (e.g. MUI DataGrid, AG Grid,\n* Braintrust-style grids where both rows and columns are virtualized simultaneously).\n*\n* When present, the cell-reading engine uses these to jump directly to the target\n* row/column and to detect the 2D scroll hazard (scrolling to reveal a column can\n* knock rows out of the vertical viewport, and vice versa).\n*\n* Completely optional and additive — existing `navigation` primitives remain the fallback.\n*/"

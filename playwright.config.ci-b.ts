@@ -9,6 +9,7 @@ export default defineConfig({
   // Exclude the self-contained dedupe test — it lives in Group A
   testIgnore: [
     '**/virtualized-horizontal-dedupe.spec.ts',
+    '**/mui-datagrid-live*.spec.ts',
   ],
   fullyParallel: true,
   forbidOnly: true,

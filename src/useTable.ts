@@ -71,10 +71,17 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
 
   // Automatically memoize viewport range oracles so user-provided functions are
   // pure DOM queries with no cache bookkeeping. Invalidated after each scroll call.
+  let _clearViewportCache: (() => void) | null = null;
+
   if (config.strategies.viewport && !config.strategies.viewport.disableCache) {
     const vp = config.strategies.viewport;
     let colRangeCache: { first: number; last: number } | null = null;
     let rowRangeCache: { first: number; last: number } | null = null;
+
+    _clearViewportCache = () => {
+      colRangeCache = null;
+      rowRangeCache = null;
+    };
 
     config.strategies.viewport = {
       ...vp,
@@ -215,6 +222,9 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     if (pagesJumped > 0) {
       tableState.currentPageIndex += pagesJumped;
       log(`_advancePage: ${primitive} advanced ${pagesJumped} page(s) — now at page ${tableState.currentPageIndex}`);
+      // Invalidate viewport caches: after a page advance the row set changes and the
+      // column renderer may recalculate (e.g. scrollbar appearance changes available width).
+      if (_clearViewportCache) _clearViewportCache();
       await debugDelay(config, 'pagination');
     } else {
       log(`_advancePage: ${primitive} returned false — end of data`);

@@ -552,6 +552,25 @@ export interface TableStrategies {
   loading?: LoadingStrategy;
 
   /**
+   * Resolve the stable data-model index for a row locator.
+   *
+   * Called by `findRow` / `findRows` to convert a DOM row into the index used for
+   * virtual-scroll positioning. Useful for grids where DOM position resets to 0 on
+   * each page while the grid itself maintains a monotone counter (e.g. MUI DataGrid's
+   * `data-rowindex` attribute).
+   *
+   * Return `undefined` to fall back to DOM position.
+   *
+   * @example
+   * // MUI DataGrid: read the global monotone counter from the attribute
+   * resolveRowIndex: async (row) => {
+   *   const v = await row.getAttribute('data-rowindex').catch(() => null);
+   *   return v !== null && !isNaN(Number(v)) ? Number(v) : undefined;
+   * }
+   */
+  resolveRowIndex?: (row: Locator) => Promise<number | undefined>;
+
+  /**
    * Viewport oracle strategies for 2D virtualized tables (e.g. MUI DataGrid, AG Grid,
    * Braintrust-style grids where both rows and columns are virtualized simultaneously).
    *

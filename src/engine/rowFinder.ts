@@ -99,7 +99,13 @@ export class RowFinder<T = any> {
                 const barrier = useBarrier ? new NavigationBarrier(newIndices.length) : undefined;
 
                 for (const idx of newIndices) {
-                    const smartRow = this.makeSmartRow(currentRows[idx], map, allRows.length, this.tableState.currentPageIndex, barrier);
+                    // Use the configured strategy (O(1), e.g. MUI data-rowindex) when available.
+                    // Without a strategy, fall back to sequential position to avoid the O(n)
+                    // elementHandle scan that resolveRowIndex() would otherwise perform per row.
+                    const rowIndex = this.config.strategies.resolveRowIndex
+                        ? (await this.config.strategies.resolveRowIndex(currentRows[idx]) ?? allRows.length)
+                        : allRows.length;
+                    const smartRow = this.makeSmartRow(currentRows[idx], map, rowIndex, this.tableState.currentPageIndex, barrier);
 
                     if (isRowLoading && await isRowLoading(smartRow)) {
                         if (rowLoadingTimeout === undefined) {
@@ -245,6 +251,13 @@ export class RowFinder<T = any> {
     }
 
     private async resolveRowIndex(rowLocator: Locator): Promise<number | undefined> {
+        if (this.config.strategies.resolveRowIndex) {
+            const result = await this.config.strategies.resolveRowIndex(rowLocator);
+            if (result !== undefined) return result;
+            // Strategy returned undefined — fall through to DOM scan below.
+        }
+
+        // Fallback: find the row's position in the current DOM order.
         const allRows = await this.resolve(this.config.rowSelector, this.rootLocator).all();
         const targetHandle = await rowLocator.elementHandle();
         if (!targetHandle) return undefined;

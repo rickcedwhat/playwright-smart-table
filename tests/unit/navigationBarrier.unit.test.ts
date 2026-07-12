@@ -43,15 +43,73 @@ describe('Navigation Orchestrator Utilities', () => {
       expect(action).toHaveBeenCalledTimes(1);
     });
 
-    it('should broadcast even if all remaining rows finish', async () => {
+    it('runs the move action and unblocks waiters when remaining rows finish', async () => {
+      // markFinished must trigger the scroll — silently resolving with undefined would
+      // let the waiting row proceed without the column ever scrolling into view.
       const barrier = new NavigationBarrier(2);
       const action = vi.fn().mockResolvedValue(undefined);
 
       const p1 = barrier.sync(10, action);
-      barrier.markFinished(); // Row 2 finishes
+      barrier.markFinished(); // Row 2 exits early
 
       await p1;
-      expect(action).not.toHaveBeenCalled(); // No move needed because everyone finished or moved
+      expect(action).toHaveBeenCalledTimes(1);
+    });
+
+    it('rejects all waiting peers when moveAction throws', async () => {
+      const error = new Error('scroll failed');
+      const barrier = new NavigationBarrier(2);
+      const action = vi.fn().mockRejectedValue(error);
+
+      const p1 = barrier.sync(4, action);
+      const p2 = barrier.sync(4, action); // trigger
+
+      const [r1, r2] = await Promise.allSettled([p1, p2]);
+      expect(r1.status).toBe('rejected');
+      expect(r2.status).toBe('rejected');
+      expect((r1 as PromiseRejectedResult).reason).toBe(error);
+      expect(action).toHaveBeenCalledTimes(1);
+    });
+
+    it('markFinished-triggered scroll propagates errors to all waiters', async () => {
+      const error = new Error('scroll failed');
+      const barrier = new NavigationBarrier(3);
+      const action = vi.fn().mockRejectedValue(error);
+
+      const p1 = barrier.sync(5, action);
+      const p2 = barrier.sync(5, action);
+      barrier.markFinished(); // row 3 exits — triggers the scroll, which throws
+
+      const [r1, r2] = await Promise.allSettled([p1, p2]);
+      expect(r1.status).toBe('rejected');
+      expect(r2.status).toBe('rejected');
+      expect(action).toHaveBeenCalledTimes(1);
+    });
+
+    it('fast-path rows (no moveAction) do not allow markFinished to fire prematurely for waiting peers', async () => {
+      // Scenario: 5-row batch. Rows 0 and 1 take the fast path — they call barrier.sync(7)
+      // with NO moveAction (cell already in DOM). Rows 2-4 need the scroll and call
+      // barrier.sync(7, action). If markFinished() from fast-path rows fires before all
+      // waiting rows arrive, action would fire too early (before all peers are ready).
+      const barrier = new NavigationBarrier(5);
+      const action = vi.fn().mockResolvedValue(undefined);
+
+      // Fast-path rows join the barrier WITHOUT a moveAction
+      const fp0 = barrier.sync(7); // no moveAction
+      const fp1 = barrier.sync(7); // no moveAction
+
+      // Rows needing scroll join WITH moveAction
+      const p2 = barrier.sync(7, action);
+      const p3 = barrier.sync(7, action);
+
+      // Only 4/5 have joined — action must NOT fire yet
+      expect(action).not.toHaveBeenCalled();
+
+      // Last row arrives — barrier fires exactly once
+      const p4 = barrier.sync(7, action);
+      await Promise.all([fp0, fp1, p2, p3, p4]);
+
+      expect(action).toHaveBeenCalledTimes(1);
     });
 
     it('resolves immediately and calls moveAction when total is 0', async () => {

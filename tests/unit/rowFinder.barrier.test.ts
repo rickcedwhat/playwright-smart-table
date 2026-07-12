@@ -39,8 +39,9 @@ describe('RowFinder.findRows — barrier propagation', () => {
 
         const page = { waitForTimeout: vi.fn() };
         const root = { page: () => page } as any;
-        const row1 = {} as any;
-        const row2 = {} as any;
+        const makeRow = () => ({ getAttribute: vi.fn().mockResolvedValue(null), elementHandle: vi.fn().mockResolvedValue(null) } as any);
+        const row1 = makeRow();
+        const row2 = makeRow();
 
         const rowLocator = {
             all: vi.fn().mockResolvedValue([row1, row2]),
@@ -75,8 +76,9 @@ describe('RowFinder.findRows — barrier propagation', () => {
         const page = { waitForTimeout: vi.fn() };
         const root = { page: () => page } as any;
 
+        const makeRow2 = () => ({ getAttribute: vi.fn().mockResolvedValue(null), elementHandle: vi.fn().mockResolvedValue(null) } as any);
         const rowLocator = {
-            all: vi.fn().mockResolvedValue([{}, {}]),
+            all: vi.fn().mockResolvedValue([makeRow2(), makeRow2()]),
             count: vi.fn().mockResolvedValue(2),
         } as any;
 

@@ -100,6 +100,7 @@ describe('RowFinder.findRow — isTableLoading polling', () => {
         // Row locator that reports count=1 (match found) once loading is done.
         const rowLocator = {
             elementHandle: vi.fn().mockResolvedValue(null),
+            getAttribute: vi.fn().mockResolvedValue(null),
         };
         const matchedRows = {
             count: vi.fn().mockResolvedValue(1),
