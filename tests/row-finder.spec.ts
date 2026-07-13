@@ -35,6 +35,18 @@ test.describe('findRow() — rowIndex', () => {
     const dave = await table.findRow({ Name: 'Dave' });
     expect(dave.rowIndex).toBe(3);
   });
+
+  // #350: resolveRowIndex now resolves position via a single evaluateAll roundtrip
+  // instead of an O(n) elementHandle() loop. Behavior must be unchanged across
+  // first/middle/last positions.
+  test('resolves rowIndex for first, middle, and last rows', async ({ page }) => {
+    await page.setContent(SIMPLE_TABLE_HTML);
+    const table = await useTable(page.locator('#t')).init();
+
+    expect((await table.findRow({ Name: 'Alice' })).rowIndex).toBe(0);
+    expect((await table.findRow({ Name: 'Carol' })).rowIndex).toBe(2);
+    expect((await table.findRow({ Name: 'Eve' })).rowIndex).toBe(4);
+  });
 });
 
 test.describe('findRows() — pagination flag', () => {

@@ -306,6 +306,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       const tracker = new ElementTracker('countRows');
       let total = 0;
       let pagesScanned = 1;
+      let paginationError: unknown;
       try {
         while (true) {
           const newIndices = await tracker.getUnseenIndices(resolve(config.rowSelector, rootLocator));
@@ -315,11 +316,22 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
           if (!await _advancePage(false)) break;
           pagesScanned++;
         }
+      } catch (e) {
+        paginationError = e;
+        throw e;
       } finally {
         await tracker.cleanup(rootLocator.page());
+        // Always restore page 1, even if pagination threw mid-count (#348), so the table
+        // stays usable for callers that catch the error. If reset() itself fails, only let
+        // it surface when pagination succeeded — otherwise preserve the original error.
+        log(`countRows: ${total} total row(s) across ${pagesScanned} page(s) — resetting`);
+        try {
+          await result.reset();
+        } catch (resetError) {
+          if (paginationError === undefined) throw resetError;
+          logDebug(config, 'error', 'countRows: reset() failed after pagination error', resetError);
+        }
       }
-      log(`countRows: ${total} total row(s) across ${pagesScanned} page(s) — resetting`);
-      await result.reset();
       return total;
     },
 

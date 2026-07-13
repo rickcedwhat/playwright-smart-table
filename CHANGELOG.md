@@ -2,6 +2,15 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **`map`/`forEach`/`filter` — dedupe key computed on skeleton rows** — the iteration engine evaluated the dedupe strategy before any loading wait, so a content-based dedupe key (with a positional fallback for skeletons) changed between a row's first encounter (skeleton) and a later re-scan (loaded), appending duplicates out of order. The engine now honors `loading.isRowLoading` + `rowLoadingTimeout` + `onRowLoadingTimeout` (same semantics as `findRows`) and runs the wait **before** the dedupe strategy. Backward-compatible difference from `findRows`: when no `rowLoadingTimeout` is configured, `map`/`forEach`/`filter` keep processing loading rows as-is instead of skipping them — the pre-existing behavior. Closes #355.
+- **`countRows` — table left mid-paginated when pagination throws** — `countRows` called `reset()` after its pagination loop but outside the `try/finally`, so an error thrown during `_advancePage` (network failure, timeout) skipped the reset and stranded the table on whichever page it had reached. `reset()` now runs in the `finally` block. If `reset()` itself fails, the original pagination error is preserved (the reset error is logged, not surfaced) so callers see the real cause. Closes #348.
+
+### Performance
+
+- **`findRow`/`findRows` — O(n) row-index resolution replaced with a single roundtrip** — the fallback in `RowFinder.resolveRowIndex` (used when no `resolveRowIndex` strategy is configured) previously called the soft-deprecated `elementHandle()` on every row in a loop, issuing one CDP roundtrip per row on each `findRow` call. It now resolves the target once and locates its position with a single `evaluateAll`. Behavior is unchanged. Closes #350.
+
 ## [6.17.1] - 2026-06-29
 
 ### Fixed

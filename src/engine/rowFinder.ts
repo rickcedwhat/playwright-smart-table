@@ -257,16 +257,23 @@ export class RowFinder<T = any> {
             // Strategy returned undefined — fall through to DOM scan below.
         }
 
-        // Fallback: find the row's position in the current DOM order.
-        const allRows = await this.resolve(this.config.rowSelector, this.rootLocator).all();
+        // Fallback: find the row's position in the current DOM order in a SINGLE roundtrip.
+        // Previously this looped over every row calling elementHandle() + evaluate() per row
+        // (O(n) CDP roundtrips, and elementHandle() is soft-deprecated). We now resolve the
+        // target once and let evaluateAll compare it against the full row set in the browser.
+        // The row set is resolved through the same selector/scope as everywhere else, so a
+        // string, function, or Locator rowSelector all behave identically. (#350)
         const targetHandle = await rowLocator.elementHandle();
         if (!targetHandle) return undefined;
-        for (let i = 0; i < allRows.length; i++) {
-            const handle = await allRows[i].elementHandle();
-            if (handle && await handle.evaluate((el, t) => el === t, targetHandle)) {
-                return i;
-            }
+        try {
+            const rowsLocator = this.resolve(this.config.rowSelector, this.rootLocator);
+            const index = await rowsLocator.evaluateAll(
+                (rows, target) => (rows as Element[]).indexOf(target as Element),
+                targetHandle
+            );
+            return index >= 0 ? index : undefined;
+        } finally {
+            await targetHandle.dispose();
         }
-        return undefined;
     }
 }
