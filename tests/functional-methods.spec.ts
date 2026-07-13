@@ -452,6 +452,57 @@ test.describe('new API additions', () => {
         expect(await table.countRows()).toBe(2);
     });
 
+    test('countRows resets to the first page even when pagination throws mid-count (#348)', async ({ page }) => {
+        await page.setContent(TABLE_HTML);
+
+        let nextCalls = 0;
+        let goToFirstCalls = 0;
+        const table = useTable(page.locator('#tbl'), {
+            maxPages: 10,
+            strategies: {
+                pagination: {
+                    // Advance twice, then fail on the third advance (e.g. network error / timeout).
+                    goNext: async () => {
+                        nextCalls++;
+                        if (nextCalls >= 3) throw new Error('simulated pagination failure');
+                        return true;
+                    },
+                    goToFirst: async () => { goToFirstCalls++; return true; },
+                },
+            },
+        });
+
+        // The failure must propagate to the caller...
+        await expect(table.countRows()).rejects.toThrow('simulated pagination failure');
+
+        // ...but the table must be reset to page 1 (reset runs in finally), not left
+        // stranded on whichever page pagination had reached.
+        expect(table.currentPageIndex).toBe(0);
+        expect(goToFirstCalls).toBeGreaterThan(0);
+    });
+
+    test('countRows returns to the first page on the success path (#348 regression guard)', async ({ page }) => {
+        await page.setContent(TABLE_HTML);
+
+        let resetCalls = 0;
+        const table = useTable(page.locator('#tbl'), {
+            maxPages: 3,
+            strategies: {
+                pagination: Strategies.Pagination.click({
+                    next: () => page.locator('#next'),
+                    first: () => page.locator('#first'),
+                }),
+            },
+            onReset: async () => { resetCalls++; },
+        });
+
+        expect(await table.countRows()).toBe(6);
+        expect(table.currentPageIndex).toBe(0);
+        // reset runs exactly once (guards against a double-reset from the finally refactor)
+        expect(resetCalls).toBe(1);
+        expect(await page.locator('#current-page').innerText()).toBe('1');
+    });
+
     test('mapColumn collects values for a single column', async ({ page }) => {
         await page.setContent(TABLE_HTML);
         const table = makeTable(page);
