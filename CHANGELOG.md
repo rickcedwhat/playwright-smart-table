@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **`map`/`forEach`/`filter` — dedupe key computed on skeleton rows** — the iteration engine evaluated the dedupe strategy before any loading wait, so a content-based dedupe key (with a positional fallback for skeletons) changed between a row's first encounter (skeleton) and a later re-scan (loaded), appending duplicates out of order. The engine now honors `loading.isRowLoading` + `rowLoadingTimeout` + `onRowLoadingTimeout` (same semantics as `findRows`) and runs the wait **before** the dedupe strategy. Backward-compatible difference from `findRows`: when no `rowLoadingTimeout` is configured, `map`/`forEach`/`filter` keep processing loading rows as-is instead of skipping them — the pre-existing behavior. Closes #355.
+
 ## [6.17.1] - 2026-06-29
 
 ### Fixed

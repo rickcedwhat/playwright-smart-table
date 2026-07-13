@@ -472,7 +472,10 @@ export interface LoadingStrategy {
 
   /**
    * How long (ms) to wait for a loading row to resolve before applying onRowLoadingTimeout.
-   * When not set, loading rows are immediately skipped (backward-compatible behavior).
+   * Honored by findRows AND by map/forEach/filter, where the wait runs before the dedupe
+   * strategy so content-based dedupe keys see the row's final loaded state.
+   * When not set (backward-compatible behavior): findRows skips loading rows immediately;
+   * map/forEach/filter process them as-is.
    */
   rowLoadingTimeout?: number;
 
