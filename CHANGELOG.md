@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **`findRow` / `findRows` now default to single-step pagination (`goNext`)** — previously they defaulted to `goNextBulk` whenever a bulk primitive was configured, which advanced several pages per step and **silently skipped the rows on the intermediate pages** (`findRows` returned fewer rows than exist; `findRow` could miss a row on a jumped-over page). All row methods now share the same default: advance one page at a time. This aligns `findRow`/`findRows` with `map`/`forEach`/`countRows`, which already defaulted to `goNext`. **Behavior change** — if you relied on bulk-by-default, pass `{ useBulkPagination: true }` to restore it. Closes #349.
+
 ### Fixed
 
 - **`map`/`forEach`/`filter` — dedupe key computed on skeleton rows** — the iteration engine evaluated the dedupe strategy before any loading wait, so a content-based dedupe key (with a positional fallback for skeletons) changed between a row's first encounter (skeleton) and a later re-scan (loaded), appending duplicates out of order. The engine now honors `loading.isRowLoading` + `rowLoadingTimeout` + `onRowLoadingTimeout` (same semantics as `findRows`) and runs the wait **before** the dedupe strategy. Backward-compatible difference from `findRows`: when no `rowLoadingTimeout` is configured, `map`/`forEach`/`filter` keep processing loading rows as-is instead of skipping them — the pre-existing behavior. Closes #355.

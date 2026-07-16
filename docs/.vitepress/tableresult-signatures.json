@@ -42,7 +42,7 @@
   {
     "name": "findRows",
     "signature": "findRows: (\n  filters?: Record<string, FilterValue>,\n  options?: { exact?: boolean, maxPages?: number, useBulkPagination?: boolean }",
-    "comment": "/**\n* ASYNC: Searches for all matching rows across pages using pagination.\n* Auto-initializes the table if not already initialized.\n* @param filters - The filter criteria to match (omit or pass {} for all rows)\n* @param options - Search options including exact match and max pages\n*/"
+    "comment": "/**\n* ASYNC: Searches for all matching rows across pages using pagination.\n* Auto-initializes the table if not already initialized.\n* @param filters - The filter criteria to match (omit or pass {} for all rows)\n* @param options - Search options. `useBulkPagination` defaults to `false`: pages advance\n*   one at a time via `goNext` so no intermediate page is skipped. Set it to `true` to opt\n*   into `goNextBulk` (faster, but skips the rows on jumped-over pages).\n*/"
   },
   {
     "name": "scrollToColumn",

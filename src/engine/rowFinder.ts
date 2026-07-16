@@ -148,7 +148,11 @@ export class RowFinder<T = any> {
 
             // Pagination Loop
             while (pagesScanned < effectiveMaxPages && this.config.strategies.pagination) {
-                const useBulk = options?.useBulkPagination !== false && !!this.config.strategies.pagination?.goNextBulk;
+                // Default to single-step goNext; bulk is opt-in via useBulkPagination: true (#349).
+                // Bulk-by-default made findRows jump N pages per advance and silently skip the
+                // rows on intermediate pages. When only a bulk primitive exists, _advancePage
+                // still falls back to it.
+                const useBulk = options?.useBulkPagination === true && !!this.config.strategies.pagination?.goNextBulk;
                 const prevPage = this.tableState.currentPageIndex;
                 const didPaginate = await this.advancePage(useBulk);
                 if (!didPaginate) {
@@ -232,7 +236,9 @@ export class RowFinder<T = any> {
 
             if (pagesScanned < effectiveMaxPages) {
                 logDebug(this.config, 'verbose',`Page ${this.tableState.currentPageIndex}: Not found. Attempting pagination...`);
-                const useBulk = options.useBulkPagination !== false && !!this.config.strategies.pagination?.goNextBulk;
+                // Default to single-step goNext; bulk is opt-in via useBulkPagination: true (#349).
+                // Bulk-by-default made findRow jump past the page holding the target row.
+                const useBulk = options.useBulkPagination === true && !!this.config.strategies.pagination?.goNextBulk;
                 const prevPage = this.tableState.currentPageIndex;
                 const didLoadMore = await this.advancePage(useBulk);
 

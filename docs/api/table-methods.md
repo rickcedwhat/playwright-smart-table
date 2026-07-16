@@ -200,7 +200,7 @@ findRows(
 ### Parameters
 
 - `filters` - The filter criteria to match (omit or pass {} for all rows)
-- `options` - Search options including exact match and max pages
+- `options` - Search options. `useBulkPagination` defaults to `false`: pages advance
 
 <!-- /api-signature: findRows -->
 
