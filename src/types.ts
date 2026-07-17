@@ -739,9 +739,7 @@ export interface TableResult<T = any> extends AsyncIterable<{ row: SmartRow<T>; 
    * ASYNC: Searches for all matching rows across pages using pagination.
    * Auto-initializes the table if not already initialized.
    * @param filters - The filter criteria to match (omit or pass {} for all rows)
-   * @param options - Search options. `useBulkPagination` defaults to `false`: pages advance
-   *   one at a time via `goNext` so no intermediate page is skipped. Set it to `true` to opt
-   *   into `goNextBulk` (faster, but skips the rows on jumped-over pages).
+   * @param options - Search options (exact, maxPages). `useBulkPagination` defaults to `false`: pages advance one at a time via `goNext` so no intermediate page is skipped. Set it to `true` to opt into `goNextBulk` (faster, but skips the rows on jumped-over pages).
    */
   findRows: (
     filters?: Record<string, FilterValue>,

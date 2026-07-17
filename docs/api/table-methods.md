@@ -200,7 +200,7 @@ findRows(
 ### Parameters
 
 - `filters` - The filter criteria to match (omit or pass {} for all rows)
-- `options` - Search options. `useBulkPagination` defaults to `false`: pages advance
+- `options` - Search options (exact, maxPages). `useBulkPagination` defaults to `false`: pages advance one at a time via `goNext` so no intermediate page is skipped. Set it to `true` to opt into `goNextBulk` (faster, but skips the rows on jumped-over pages).
 
 <!-- /api-signature: findRows -->
 
