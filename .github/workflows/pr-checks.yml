@@ -47,6 +47,8 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
+        with:
+          version: 10.33.2 # keep in sync with packageManager; latest pnpm (v11) audit hits npm's retired endpoint (410)
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -87,6 +89,8 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
+        with:
+          version: 10.33.2 # keep in sync with packageManager; latest pnpm (v11) audit hits npm's retired endpoint (410)
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -136,6 +140,8 @@ jobs:
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
+        with:
+          version: 10.33.2 # keep in sync with packageManager; latest pnpm (v11) audit hits npm's retired endpoint (410)
 
       - name: Setup Node.js
         uses: actions/setup-node@v6

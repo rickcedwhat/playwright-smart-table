@@ -61,7 +61,8 @@ describe('RowFinder.findRows — bulk pagination flag', () => {
         expect(advancePage).toHaveBeenCalledWith(false);
     });
 
-    it('calls advancePage with useBulk=true by default when goNextBulk is present', async () => {
+    it('calls advancePage with useBulk=false by default even when goNextBulk is present (#349)', async () => {
+        // Default is single-step goNext so no intermediate page is skipped. Bulk is opt-in.
         const advancePage = vi.fn().mockResolvedValue(false);
         const page = { waitForTimeout: vi.fn().mockResolvedValue(undefined) };
         const root = makeMinimalRoot(page);
@@ -79,6 +80,28 @@ describe('RowFinder.findRows — bulk pagination flag', () => {
         );
 
         await finder.findRows({});
+
+        expect(advancePage).toHaveBeenCalledWith(false);
+    });
+
+    it('calls advancePage with useBulk=true when useBulkPagination option is true', async () => {
+        const advancePage = vi.fn().mockResolvedValue(false);
+        const page = { waitForTimeout: vi.fn().mockResolvedValue(undefined) };
+        const root = makeMinimalRoot(page);
+        const rowLocator = makeEmptyRowLocator();
+
+        const finder = new RowFinder(
+            root,
+            makeConfig({ strategies: { pagination: { goNext: vi.fn(), goNextBulk: vi.fn() } } }),
+            vi.fn().mockReturnValue(rowLocator),
+            { applyFilters: vi.fn().mockReturnValue(rowLocator) } as any,
+            { getMap: vi.fn().mockResolvedValue(new Map([['id', 0]])) } as any,
+            vi.fn().mockReturnValue({ rowIndex: 0 }),
+            undefined,
+            advancePage,
+        );
+
+        await finder.findRows({}, { useBulkPagination: true });
 
         expect(advancePage).toHaveBeenCalledWith(true);
     });

@@ -380,6 +380,65 @@ test.describe('useBulkPagination option', () => {
     });
 });
 
+// ─── Bug #349: findRow/findRows must default to single-step goNext ──────────────
+// Before the fix, findRow/findRows defaulted to goNextBulk whenever a bulk primitive
+// existed, so they jumped N pages per advance and silently skipped the rows on the
+// intermediate pages. map/forEach/countRows already default to goNext. These lock in
+// the unified default: single-step unless useBulkPagination: true is passed.
+test.describe('Bug #349 — findRow/findRows default to goNext (bulk is opt-in)', () => {
+    const bulkPagination = (page: import('@playwright/test').Page) =>
+        Strategies.Pagination.click(
+            {
+                next: () => page.locator('#next'),
+                nextBulk: () => page.locator('#next-bulk'),
+            },
+            { nextBulkPages: 2 }, // #next-bulk jumps 2 pages in the fixture
+        );
+
+    test('findRows visits every page by default (no bulk skip)', async ({ page }) => {
+        await page.setContent(TABLE_HTML_WITH_BULK);
+        const table = useTable(page.locator('#tbl'), {
+            maxPages: 3,
+            strategies: { pagination: bulkPagination(page) },
+        });
+
+        // 3 pages × 2 rows = 6. A bulk jump would skip page 1 and collect only 4.
+        // (Row cell content isn't asserted here: button pagination holds one page in the
+        //  DOM at a time, so the collected positional locators read the final page after
+        //  traversal. The row count is the reliable signal that no page was skipped —
+        //  findRow below verifies per-page content directly.)
+        const rows = await table.findRows({}, { maxPages: 3 });
+        expect(rows.length).toBe(6);
+    });
+
+    test('findRow locates AND reads a row on an intermediate page by default', async ({ page }) => {
+        await page.setContent(TABLE_HTML_WITH_BULK);
+        const table = useTable(page.locator('#tbl'), {
+            maxPages: 3,
+            strategies: { pagination: bulkPagination(page) },
+        });
+
+        // Carol is on page index 1 — a bulk jump from page 0 would land on page 2 and miss her.
+        // findRow stops on her page, so reading her cell here is on-page and reliable.
+        const carol = await table.findRow({ Name: 'Carol' }, { maxPages: 3 });
+        expect(carol.wasFound()).toBe(true);
+        expect(carol.rowIndex).toBe(0); // first row on her page
+        expect(await carol.getCell('ID').innerText()).toBe('3');
+    });
+
+    test('findRows still honors explicit useBulkPagination: true (skips intermediate pages)', async ({ page }) => {
+        await page.setContent(TABLE_HTML_WITH_BULK);
+        const table = useTable(page.locator('#tbl'), {
+            maxPages: 3,
+            strategies: { pagination: bulkPagination(page) },
+        });
+
+        // Opt in to bulk: the jump from page 0 to page 2 skips page 1, so 2 rows are missed.
+        const rows = await table.findRows({}, { maxPages: 3, useBulkPagination: true });
+        expect(rows.length).toBe(4);
+    });
+});
+
 // ─── numeric pagination result (useTable path) ─────────────────────────────────
 test.describe('numeric pagination result in useTable iteration', () => {
     test('currentPageIndex increases by numeric return from goNextBulk', async ({ page }) => {

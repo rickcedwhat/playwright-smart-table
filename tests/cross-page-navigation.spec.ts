@@ -291,7 +291,10 @@ test.describe('Stateful Cross-Page Navigation & PaginationPrimitives', () => {
 
     test('bringIntoView from page 0 with next+nextBulk only (no prev) uses goNextBulk when exact, not when overshoot', async ({ page }) => {
         await setupThreePageTable(page);
-        // findRows with goNextBulk(2) visits pages 0 then 2, so rows[2] is on page 2. No-overshoot case (0→1) is in unit tests (paginationPath.test.ts).
+        // This test exercises bringIntoView's bulk navigation, so it opts into bulk pagination
+        // explicitly (#349: findRows now defaults to single-step goNext). With goNextBulk(2),
+        // findRows visits pages 0 then 2, so rows[2] is on page 2. The no-overshoot case (0→1)
+        // is in unit tests (paginationPath.test.ts).
 
         const table = useTable(page.locator('#my-table'), {
             strategies: {
@@ -303,12 +306,12 @@ test.describe('Stateful Cross-Page Navigation & PaginationPrimitives', () => {
             maxPages: 3,
         });
 
-        await table.findRows({});
+        await table.findRows({}, { useBulkPagination: true });
         expect(table.currentPageIndex).toBe(2);
         await table.reset();
         expect(table.currentPageIndex).toBe(0);
 
-        const rows = await table.findRows({});
+        const rows = await table.findRows({}, { useBulkPagination: true });
         await rows[2].bringIntoView();
 
         expect(table.currentPageIndex).toBe(2);
