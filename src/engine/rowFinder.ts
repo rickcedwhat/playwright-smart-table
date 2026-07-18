@@ -7,6 +7,7 @@ import { createSmartRowArray, SmartRowArray } from '../utils/smartRowArray';
 import { ElementTracker } from '../utils/elementTracker';
 import { SENTINEL_ROW } from '../utils/sentinel';
 import { NavigationBarrier } from '../utils/navigationBarrier';
+import { resolveLogicalRowIndex, resolveRowLoading } from './rowResolution';
 
 export class RowFinder<T = any> {
     private resolve: (item: Selector, parent: Locator | Page) => Locator;
@@ -84,14 +85,6 @@ export class RowFinder<T = any> {
                 // Get only newly seen matched rows
                 const newIndices = await tracker.getUnseenIndices(rowLocators);
                 const currentRows = await rowLocators.all();
-                const isRowLoading = this.config.strategies.loading?.isRowLoading;
-                const rawRowTimeout = this.config.strategies.loading?.rowLoadingTimeout;
-                // undefined = unset (legacy skip); 0 = no wait (immediate check); >0 = wait up to N ms
-                // Non-finite values are treated as unset (defensive guard against Infinity/NaN)
-                const rowLoadingTimeout = rawRowTimeout !== undefined && Number.isFinite(rawRowTimeout) && rawRowTimeout >= 0
-                    ? rawRowTimeout
-                    : undefined;
-                const onRowLoadingTimeout = this.config.strategies.loading?.onRowLoadingTimeout ?? 'read-as-is';
                 let added = 0;
 
                 // One barrier per batch — synchronizes cell navigation across all rows in this page's results
@@ -99,42 +92,27 @@ export class RowFinder<T = any> {
                 const barrier = useBarrier ? new NavigationBarrier(newIndices.length) : undefined;
 
                 for (const idx of newIndices) {
-                    // Use the configured strategy (O(1), e.g. MUI data-rowindex) when available.
-                    // Without a strategy, fall back to sequential position to avoid the O(n)
-                    // elementHandle scan that resolveRowIndex() would otherwise perform per row.
-                    const rowIndex = this.config.strategies.resolveRowIndex
-                        ? (await this.config.strategies.resolveRowIndex(currentRows[idx]) ?? allRows.length)
-                        : allRows.length;
+                    const rowIndex = await resolveLogicalRowIndex(
+                        currentRows[idx],
+                        this.config,
+                        () => allRows.length,
+                    );
                     const smartRow = this.makeSmartRow(currentRows[idx], map, rowIndex, this.tableState.currentPageIndex, barrier);
 
-                    if (isRowLoading && await isRowLoading(smartRow)) {
-                        if (rowLoadingTimeout === undefined) {
-                            // No timeout configured (or invalid value) — legacy skip behavior
-                            logDebug(this.config, 'verbose', `findRows: page ${this.tableState.currentPageIndex} — row skipped (isRowLoading=true, no timeout)`);
-                            barrier?.markFinished();
-                            continue;
+                    // findRows skips a still-loading row when no timeout is configured (legacy
+                    // behavior) — see resolveRowLoading's `noTimeoutAction: 'skip'`.
+                    const loadingOutcome = await resolveRowLoading(
+                        smartRow,
+                        this.config.strategies.loading,
+                        'skip',
+                        (msg) => logDebug(this.config, 'verbose', `findRows: ${msg}`),
+                    );
+                    if (loadingOutcome !== 'process') {
+                        barrier?.markFinished();
+                        if (loadingOutcome === 'throw') {
+                            throw new Error(`[SmartTable] Row ${allRows.length} did not finish loading within ${this.config.strategies.loading?.rowLoadingTimeout}ms`);
                         }
-
-                        // Wait up to rowLoadingTimeout ms (0 = one immediate re-check, no polling)
-                        logDebug(this.config, 'verbose', `findRows: row ${allRows.length} — waiting up to ${rowLoadingTimeout}ms for row to load`);
-                        const deadline = Date.now() + rowLoadingTimeout;
-                        let resolved = !(await isRowLoading(smartRow)); // immediate check (handles timeout=0)
-                        while (!resolved && Date.now() < deadline) {
-                            await currentRows[idx].page().waitForTimeout(100);
-                            resolved = !(await isRowLoading(smartRow));
-                        }
-
-                        if (!resolved) {
-                            logDebug(this.config, 'verbose', `findRows: row ${allRows.length} — still loading after ${rowLoadingTimeout}ms, action: ${onRowLoadingTimeout}`);
-                            if (onRowLoadingTimeout === 'skip') { barrier?.markFinished(); continue; }
-                            if (onRowLoadingTimeout === 'throw') {
-                                barrier?.markFinished();
-                                throw new Error(`[SmartTable] Row ${allRows.length} did not finish loading within ${rowLoadingTimeout}ms`);
-                            }
-                            // 'read-as-is': fall through and add the row
-                        } else {
-                            logDebug(this.config, 'verbose', `findRows: row ${allRows.length} — finished loading`);
-                        }
+                        continue; // 'skip'
                     }
 
                     allRows.push(smartRow);
@@ -256,19 +234,21 @@ export class RowFinder<T = any> {
         }
     }
 
-    private async resolveRowIndex(rowLocator: Locator): Promise<number | undefined> {
-        if (this.config.strategies.resolveRowIndex) {
-            const result = await this.config.strategies.resolveRowIndex(rowLocator);
-            if (result !== undefined) return result;
-            // Strategy returned undefined — fall through to DOM scan below.
-        }
+    private resolveRowIndex(rowLocator: Locator): Promise<number | undefined> {
+        // Shared resolver: resolveRowIndex strategy first, else the DOM-position fallback.
+        return resolveLogicalRowIndex(rowLocator, this.config, () => this.scanDomPosition(rowLocator));
+    }
 
-        // Fallback: find the row's position in the current DOM order in a SINGLE roundtrip.
-        // Previously this looped over every row calling elementHandle() + evaluate() per row
-        // (O(n) CDP roundtrips, and elementHandle() is soft-deprecated). We now resolve the
-        // target once and let evaluateAll compare it against the full row set in the browser.
-        // The row set is resolved through the same selector/scope as everywhere else, so a
-        // string, function, or Locator rowSelector all behave identically. (#350)
+    /**
+     * Fallback for findRow when no resolveRowIndex strategy is configured: find the row's
+     * position in the current DOM order in a SINGLE roundtrip. Previously this looped over
+     * every row calling elementHandle() + evaluate() per row (O(n) CDP roundtrips, and
+     * elementHandle() is soft-deprecated). We resolve the target once and let evaluateAll
+     * compare it against the full row set in the browser. The row set is resolved through the
+     * same selector/scope as everywhere else, so a string, function, or Locator rowSelector
+     * all behave identically. (#350)
+     */
+    private async scanDomPosition(rowLocator: Locator): Promise<number | undefined> {
         const targetHandle = await rowLocator.elementHandle();
         if (!targetHandle) return undefined;
         try {

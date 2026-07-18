@@ -6,6 +6,7 @@ import { ElementTracker } from '../utils/elementTracker';
 import { logDebug } from '../utils/debugUtils';
 import { NavigationBarrier } from '../utils/navigationBarrier';
 import { Mutex } from '../utils/mutex';
+import { resolveRowLoading } from './rowResolution';
 
 export interface TableIterationEnv<T = any> {
   getRowLocators: () => Locator;
@@ -57,22 +58,6 @@ export async function runMap<T, R>(
   const useMutex = concurrency === 'sequential';
   const useBulk = options.useBulkPagination ?? false;
   const tracker = new ElementTracker(label);
-
-  // Row-level loading gate (Bug #355). Must run BEFORE the dedupe strategy so
-  // content-based dedupe keys are computed on the row's final loaded state — a key
-  // computed on a skeleton changes once the row loads, and the ElementTracker
-  // re-flags the row (text signature changed), producing duplicates.
-  // Semantics mirror findRows (rowFinder.ts), with one deliberate difference:
-  // findRows drops loading rows when no timeout is set (legacy skip), but map/forEach
-  // historically visited every row — so without a timeout we process the row as-is.
-  const isRowLoading = env.config.strategies.loading?.isRowLoading;
-  const rawRowTimeout = env.config.strategies.loading?.rowLoadingTimeout;
-  // undefined = unset (process as-is); 0 = no wait (immediate re-check); >0 = wait up to N ms
-  // Non-finite values are treated as unset (defensive guard against Infinity/NaN)
-  const rowLoadingTimeout = rawRowTimeout !== undefined && Number.isFinite(rawRowTimeout) && rawRowTimeout >= 0
-    ? rawRowTimeout
-    : undefined;
-  const onRowLoadingTimeout = env.config.strategies.loading?.onRowLoadingTimeout ?? 'read-as-is';
 
   log(env.config, `${label}: starting (maxPages=${effectiveMaxPages}, mode=${concurrency}, dedupe=${!!dedupeStrategy})`);
 
@@ -128,23 +113,17 @@ export async function runMap<T, R>(
             }
 
             // Wait for the row to finish loading BEFORE evaluating its dedupe key (Bug #355).
-            if (isRowLoading && rowLoadingTimeout !== undefined && await isRowLoading(row)) {
-              log(env.config, `${label}: row ${row.rowIndex} — waiting up to ${rowLoadingTimeout}ms for row to load`);
-              const deadline = Date.now() + rowLoadingTimeout;
-              let resolved = !(await isRowLoading(row)); // immediate check (handles timeout=0)
-              while (!resolved && Date.now() < deadline) {
-                await env.getPage().waitForTimeout(100);
-                resolved = !(await isRowLoading(row));
-              }
-
-              if (!resolved) {
-                log(env.config, `${label}: row ${row.rowIndex} — still loading after ${rowLoadingTimeout}ms, action: ${onRowLoadingTimeout}`);
-                if (onRowLoadingTimeout === 'skip') return SKIP;
-                if (onRowLoadingTimeout === 'throw') {
-                  throw new Error(`[SmartTable] Row ${row.rowIndex} did not finish loading within ${rowLoadingTimeout}ms`);
-                }
-                // 'read-as-is': fall through and process the row
-              }
+            // map/forEach/filter process a still-loading row when no timeout is set (unlike
+            // findRows, which skips) — see resolveRowLoading's `noTimeoutAction`.
+            const loadingOutcome = await resolveRowLoading(
+              row,
+              env.config.strategies.loading,
+              'process',
+              (msg) => log(env.config, `${label}: ${msg}`),
+            );
+            if (loadingOutcome === 'skip') return SKIP;
+            if (loadingOutcome === 'throw') {
+              throw new Error(`[SmartTable] Row ${row.rowIndex} did not finish loading within ${env.config.strategies.loading?.rowLoadingTimeout}ms`);
             }
 
             if (dedupeKeys && dedupeStrategy) {
