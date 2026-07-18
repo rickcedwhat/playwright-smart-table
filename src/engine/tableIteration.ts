@@ -6,7 +6,7 @@ import { ElementTracker } from '../utils/elementTracker';
 import { logDebug } from '../utils/debugUtils';
 import { NavigationBarrier } from '../utils/navigationBarrier';
 import { Mutex } from '../utils/mutex';
-import { resolveRowLoading } from './rowResolution';
+import { resolveLogicalRowIndex, resolveRowLoading } from './rowResolution';
 
 export interface TableIterationEnv<T = any> {
   getRowLocators: () => Locator;
@@ -102,9 +102,13 @@ export async function runMap<T, R>(
         const barrier = useBarrier ? new NavigationBarrier(batchSize) : undefined;
         const actionMutex = useMutex ? new Mutex() : null;
         
-        const smartRows = newIndices.map((idx, i) =>
-          env.makeSmartRow(pageRows[idx], map, rowIndex + i, env.getCurrentPageIndex(), barrier)
-        );
+        // B-hybrid (#362): the row's rowIndex is its logical/data-model index when a
+        // resolveRowIndex strategy is configured (so bringIntoView and position math are
+        // correct on virtualized tables), else the running enumeration counter (rowIndex + i).
+        const smartRows = await Promise.all(newIndices.map(async (idx, i) => {
+          const logicalIndex = await resolveLogicalRowIndex(pageRows[idx], env.config, () => rowIndex + i) ?? (rowIndex + i);
+          return env.makeSmartRow(pageRows[idx], map, logicalIndex, env.getCurrentPageIndex(), barrier);
+        }));
 
         const processRow = async (row: SmartRow<T>) => {
           try {

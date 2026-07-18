@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **`map` / `forEach` / `filter` — `rowIndex` is now the logical row index when a `resolveRowIndex` strategy is configured** — the callback previously always received a running enumeration counter (0, 1, 2 …), even on virtualized tables where a `resolveRowIndex` strategy (e.g. MUI's `data-rowindex`) knows each row's true data-model position. It now matches `findRow`/`findRows`: the logical index when a resolver is configured, the running counter otherwise. This makes `row.bringIntoView()` and position math correct on virtualized tables. **Behavior change** — only if you both configure a `resolveRowIndex` strategy and rely on the callback's `rowIndex`/`index` being a contiguous 0-based counter; track your own counter in that case. No change when no `resolveRowIndex` strategy is set. Part of #362.
+
 ### Fixed
 
 - **`Strategies.Viewport.dataAttribute().getVisibleRowRange` — now geometry-aware** — it previously reported every mounted row, including overscan rows the virtual scroller keeps mounted above/below the fold, so the "visible" range was wider than what is actually on screen. It now intersects each row against the scroll container's vertical bounds (inclusive — a row with any overlap counts as visible; only rows entirely off-screen are dropped, so a partially-visible row is never lost). Falls back to the previous all-rows behavior when the scroll container can't be resolved. Part of #353 (part 1 — accurate range; iteration-level filtering tracked separately in #362).
