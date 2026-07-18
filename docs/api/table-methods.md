@@ -114,7 +114,7 @@ getRow(
 
 <!-- /api-signature: getRow -->
 
-Finds a row on the **current page only** by column filters. Returns synchronously — does not paginate.
+Finds a row on the **current page only** by column filters. Returns synchronously — does not paginate. Because the sync path can't compute a real index, the returned row's `rowIndex` is `undefined` (so `bringIntoView()` is limited); use [`findRow`](#findrow) when you need a row with an accurate `rowIndex`.
 
 ```typescript
 const row = table.getRow({ Name: 'John Doe' });
