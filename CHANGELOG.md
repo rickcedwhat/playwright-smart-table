@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [6.18.0] - 2026-07-18
+
 ### Changed
 
 - **`findRow` / `findRows` now default to single-step pagination (`goNext`)** — previously they defaulted to `goNextBulk` whenever a bulk primitive was configured, which advanced several pages per step and **silently skipped the rows on the intermediate pages** (`findRows` returned fewer rows than exist; `findRow` could miss a row on a jumped-over page). All row methods now share the same default: advance one page at a time. This aligns `findRow`/`findRows` with `map`/`forEach`/`countRows`, which already defaulted to `goNext`. **Behavior change** — if you relied on bulk-by-default, pass `{ useBulkPagination: true }` to restore it. Closes #349.
