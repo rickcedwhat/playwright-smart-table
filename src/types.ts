@@ -707,8 +707,9 @@ export interface TableResult<T = any> extends AsyncIterable<{ row: SmartRow<T>; 
   /**
    * Finds a row by filters on the current page only. Returns immediately (sync).
    * Throws error if table is not initialized.
-   * @note The returned SmartRow may have `rowIndex` as 0 when the match is not the first row.
-   * Use getRowByIndex(index) when you need a known index (e.g. for bringIntoView()).
+   * @note The sync path cannot compute a real `rowIndex`, so the returned SmartRow's
+   * `rowIndex` is `undefined` (virtual-scroll positioning via `bringIntoView()` is limited).
+   * Use `findRow()` (async) when you need a row with an accurate `rowIndex`.
    */
   getRow: (
     filters: Record<string, FilterValue>,
@@ -716,9 +717,19 @@ export interface TableResult<T = any> extends AsyncIterable<{ row: SmartRow<T>; 
   ) => SmartRow<T>;
 
   /**
-   * Gets a row by 0-based index on the current page.
-   * Throws error if table is not initialized.
-   * @param index 0-based row index
+   * Gets a row by its 0-based position in the currently-rendered DOM (sync, no scroll).
+   * Throws if the table is not initialized.
+   *
+   * For button-paginated tables this is the i-th row on the current page. For virtualized
+   * tables the render window shifts as you scroll, so `getRowByIndex(i)` returns whatever
+   * row currently sits at DOM position `i` — NOT the logical/absolute row `i` in the dataset
+   * once the list has scrolled. To iterate virtualized rows by logical identity, use `map` /
+   * `findRows` (with a `dedupe` strategy) instead.
+   *
+   * Resolution is lazy: an out-of-range index yields a SmartRow whose operations fail when
+   * it is used, rather than throwing here.
+   *
+   * @param index 0-based position within the current render window
    */
   getRowByIndex: (
     index: number
