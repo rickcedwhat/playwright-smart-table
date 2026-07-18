@@ -326,3 +326,53 @@ test.describe('Viewport strategy — estimated-width fallback', () => {
     });
 });
 
+// ─── getVisibleRowRange geometry (#353) ──────────────────────────────────────
+//
+// The dataAttribute strategy must report only rows actually within the scroll
+// container's vertical bounds — not every mounted row. makeHorizontalVirtHtml
+// never evicts rows vertically, so all N rows stay in the DOM while only those
+// overlapping the 200px viewport are "visible".
+
+test.describe('Viewport strategy — getVisibleRowRange geometry (#353)', () => {
+    const makeContext = (page: import('@playwright/test').Page) => ({
+        root: page.locator('[role="grid"]'),
+        config: {
+            rowSelector: '.row[aria-rowindex]',
+            headerSelector: '[role="columnheader"]',
+            cellSelector: '[role="gridcell"]',
+        },
+    } as any);
+
+    const vp: ViewportStrategy = Strategies.Viewport.dataAttribute({
+        scrollContainer: '#scroller',
+        rowAttribute: 'aria-rowindex',
+        rowOffset: 2,
+    });
+
+    test('excludes overscan rows below the fold', async ({ page }) => {
+        // 10 rows × 30px in a 200px container: all 10 are mounted, but rows ~7–9 sit
+        // entirely below the fold. Before #353, getVisibleRowRange returned {0,9}.
+        await page.setContent(makeHorizontalVirtHtml(10));
+        await page.waitForTimeout(100);
+
+        if (!vp.getVisibleRowRange) throw new Error('getVisibleRowRange not implemented');
+        const range = await vp.getVisibleRowRange(makeContext(page));
+
+        expect(range.first).toBe(0);
+        expect(range.last).toBeLessThan(9);          // overscan rows excluded (was 9)
+        expect(range.last).toBeGreaterThanOrEqual(5); // several rows genuinely visible
+    });
+
+    test('tracks scroll position (top rows drop out once scrolled)', async ({ page }) => {
+        await page.setContent(makeHorizontalVirtHtml(10));
+        await page.waitForTimeout(100);
+        await page.locator('#scroller').evaluate((el: HTMLElement) => { el.scrollTop = 90; });
+        await page.waitForTimeout(50);
+
+        if (!vp.getVisibleRowRange) throw new Error('getVisibleRowRange not implemented');
+        const range = await vp.getVisibleRowRange(makeContext(page));
+
+        expect(range.first).toBeGreaterThanOrEqual(2); // rows 0–1 scrolled out of view
+    });
+});
+

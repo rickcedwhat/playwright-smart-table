@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **`Strategies.Viewport.dataAttribute().getVisibleRowRange` — now geometry-aware** — it previously reported every mounted row, including overscan rows the virtual scroller keeps mounted above/below the fold, so the "visible" range was wider than what is actually on screen. It now intersects each row against the scroll container's vertical bounds (inclusive — a row with any overlap counts as visible; only rows entirely off-screen are dropped, so a partially-visible row is never lost). Falls back to the previous all-rows behavior when the scroll container can't be resolved. Part of #353 (part 1 — accurate range; iteration-level filtering tracked separately in #362).
+
 ### Added
 
 - **`columnOverrides.read` now receives row context** — the `read` hook is called as `read(cell, { row, columnName, columnIndex })`. This enables synthetic / row-derived columns (e.g. an identity column pulling an `a[href]` or `data-*` attribute from the row) without the `getCellLocator`-returns-`row` workaround, and aligns `read` with `beforeCellRead`, which already receives the row. Backwards-compatible: existing single-argument `read(cell)` implementations keep working. Closes #365.

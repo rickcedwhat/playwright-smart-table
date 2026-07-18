@@ -96,13 +96,30 @@ const dataAttribute = (options?: DataAttributeViewportOptions): ViewportStrategy
 
         getVisibleRowRange: async ({ root, config }) => {
             const rowSel = config.rowSelector;
-            return root.evaluate((el, { rowSel, rowAttr, rowOffset }) => {
-                const indices = Array.from(el.querySelectorAll(rowSel))
+            return root.evaluate((el, { rowSel, rowAttr, rowOffset, containerSel }) => {
+                const rows = Array.from(el.querySelectorAll(rowSel));
+                // #353: report only rows actually within the scroll container's vertical
+                // bounds, not every mounted row. Previously overscan rows (kept mounted by
+                // the virtual scroller above/below the fold) were counted as "visible".
+                // Inclusive: a row with ANY vertical overlap counts as visible; only rows
+                // entirely above or below the container are dropped — so we never drop a
+                // partially-visible real row.
+                const container = el.closest(containerSel) as HTMLElement | null;
+                const containerRect = container ? container.getBoundingClientRect() : null;
+                const indices = rows
+                    .filter(r => {
+                        // Container not resolvable — can't measure, so keep all rows (safe
+                        // fallback, preserves pre-#353 behavior rather than risk dropping real rows).
+                        if (!containerRect) return true;
+                        const rect = (r as HTMLElement).getBoundingClientRect();
+                        if (rect.height === 0) return false; // unrendered / detached
+                        return rect.bottom > containerRect.top && rect.top < containerRect.bottom;
+                    })
                     .map(r => Number(r.getAttribute(rowAttr)) - rowOffset)
                     .filter(n => !isNaN(n));
                 if (!indices.length) return { first: 0, last: 0 };
                 return { first: Math.min(...indices), last: Math.max(...indices) };
-            }, { rowSel, rowAttr, rowOffset });
+            }, { rowSel, rowAttr, rowOffset, containerSel });
         },
 
         scrollToColumn: async ({ root, config }, colIndex) => {
