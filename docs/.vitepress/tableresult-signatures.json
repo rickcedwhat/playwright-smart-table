@@ -27,12 +27,12 @@
   {
     "name": "getRow",
     "signature": "getRow: (\n  filters: Record<string, FilterValue>,\n  options?: { exact?: boolean }",
-    "comment": "/**\n* Finds a row by filters on the current page only. Returns immediately (sync).\n* Throws error if table is not initialized.\n* @note The returned SmartRow may have `rowIndex` as 0 when the match is not the first row.\n* Use getRowByIndex(index) when you need a known index (e.g. for bringIntoView()).\n*/"
+    "comment": "/**\n* Finds a row by filters on the current page only. Returns immediately (sync).\n* Throws error if table is not initialized.\n* @note The sync path cannot compute a real `rowIndex`, so the returned SmartRow's\n* `rowIndex` is `undefined` (virtual-scroll positioning via `bringIntoView()` is limited).\n* Use `findRow()` (async) when you need a row with an accurate `rowIndex`.\n*/"
   },
   {
     "name": "getRowByIndex",
     "signature": "getRowByIndex: (\n  index: number\n  ) => SmartRow<T>",
-    "comment": "/**\n* Gets a row by 0-based index on the current page.\n* Throws error if table is not initialized.\n* @param index 0-based row index\n*/"
+    "comment": "/**\n* Gets a row by its 0-based position in the currently-rendered DOM (sync, no scroll).\n* Throws if the table is not initialized.\n*\n* For button-paginated tables this is the i-th row on the current page. For virtualized\n* tables the render window shifts as you scroll, so `getRowByIndex(i)` returns whatever\n* row currently sits at DOM position `i` — NOT the logical/absolute row `i` in the dataset\n* once the list has scrolled. To iterate virtualized rows by logical identity, use `map` /\n* `findRows` (with a `dedupe` strategy) instead.\n*\n* Resolution is lazy: an out-of-range index yields a SmartRow whose operations fail when\n* it is used, rather than throwing here.\n*\n* @param index 0-based position within the current render window\n*/"
   },
   {
     "name": "findRow",
