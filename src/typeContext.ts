@@ -421,12 +421,28 @@ export type FillStrategy = (options: {
   fillOptions?: FillOptions;
 }) => Promise<void>;
 
-export interface ColumnOverride<TValue = any> {
-  /** 
-   * How to extract the value from the cell.
-   * \`context\` provides access to the parent row, permitting multi-cell logic or bypassing the default cell locator.
+/** Context passed as the second argument to {@link ColumnOverride.read}. */
+export interface ColumnOverrideReadContext {
+  /**
+   * The parent row. Use for multi-cell or row-derived values — e.g. a synthetic column
+   * that reads an \`a[href]\` or a \`data-*\` attribute from the row rather than a cell:
+   * \`read: (_cell, { row }) => row.evaluate(el => el.querySelector('a')?.href)\`.
    */
-  read?: (cell: Locator) => Promise<TValue> | TValue;
+  row: SmartRow;
+  /** The column being read. */
+  columnName: string;
+  /** The column's 0-based index in the resolved header map. */
+  columnIndex: number;
+}
+
+export interface ColumnOverride<TValue = any> {
+  /**
+   * How to extract the value from the cell.
+   * The second \`context\` argument provides the parent \`row\` (for multi-cell or row-derived
+   * values), plus \`columnName\` and \`columnIndex\`. Backwards-compatible: existing
+   * single-argument \`read(cell)\` implementations keep working.
+   */
+  read?: (cell: Locator, context: ColumnOverrideReadContext) => Promise<TValue> | TValue;
 
   /** 
    * How to fill the cell with a new value. (Replaces smartFill default logic)

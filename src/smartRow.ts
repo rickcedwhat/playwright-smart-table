@@ -581,7 +581,7 @@ const createSmartRow = <T = any>(
 
             if (mapper) {
                 // Apply mapper
-                const mappedValue = await mapper(targetCell);
+                const mappedValue = await mapper(targetCell, { row: smart, columnName: col, columnIndex: idx });
                 result[col] = mappedValue;
             } else {
                 // Default string extraction
@@ -622,7 +622,7 @@ const createSmartRow = <T = any>(
 
                 let currentValue;
                 if (columnOverride.read) {
-                    currentValue = await columnOverride.read(cellLocator);
+                    currentValue = await columnOverride.read(cellLocator, { row: smart, columnName: colName, columnIndex: colIdx });
                 }
 
                 await columnOverride.write({
