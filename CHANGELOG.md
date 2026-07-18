@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **`columnOverrides.read` now receives row context** — the `read` hook is called as `read(cell, { row, columnName, columnIndex })`. This enables synthetic / row-derived columns (e.g. an identity column pulling an `a[href]` or `data-*` attribute from the row) without the `getCellLocator`-returns-`row` workaround, and aligns `read` with `beforeCellRead`, which already receives the row. Backwards-compatible: existing single-argument `read(cell)` implementations keep working. Closes #365.
+
 ## [6.18.0] - 2026-07-18
 
 ### Changed
