@@ -114,7 +114,7 @@ getRow(
 
 <!-- /api-signature: getRow -->
 
-Finds a row on the **current page only** by column filters. Returns synchronously — does not paginate.
+Finds a row on the **current page only** by column filters. Returns synchronously — does not paginate. Because the sync path can't compute a real index, the returned row's `rowIndex` is `undefined` (so `bringIntoView()` is limited); use [`findRow`](#findrow) when you need a row with an accurate `rowIndex`.
 
 ```typescript
 const row = table.getRow({ Name: 'John Doe' });
@@ -141,13 +141,18 @@ getRowByIndex(index: number): SmartRow
 
 ### Parameters
 
-- `index` - 0-based row index
+- `index` - 0-based position within the current render window
 
 <!-- /api-signature: getRowByIndex -->
 
-Gets a row by 0-based index on the current page. The returned `SmartRow` has its `rowIndex` set, enabling `bringIntoView()`.
+Gets a row by its 0-based position **in the currently-rendered DOM** — synchronous, no scroll.
+
+For button-paginated tables this is the i-th row on the current page. For **virtualized tables the render window shifts as you scroll**, so `getRowByIndex(i)` returns whatever row currently sits at DOM position `i`, **not** the logical/absolute row `i` in the dataset once the list has scrolled. To iterate virtualized rows by their logical identity, use [`map`](#map) / [`findRows`](#findrows) with a `dedupe` strategy.
+
+Resolution is lazy: an out-of-range index returns a `SmartRow` whose operations fail when it is used, rather than throwing here.
 
 ```typescript
+// i-th row currently rendered (e.g. row 0 of the current page)
 const firstRow = table.getRowByIndex(0);
 ```
 
