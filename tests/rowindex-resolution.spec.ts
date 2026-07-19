@@ -65,33 +65,37 @@ test.describe('rowIndex resolution — characterization (#362)', () => {
     });
 });
 
-test.describe('map/forEach rowIndex — B-hybrid (#362)', () => {
-    test('map rowIndex uses the resolveRowIndex strategy when configured', async ({ page }) => {
-        await page.setContent(HTML);
-        const table = await useTable(page.locator('#t'), { strategies: { resolveRowIndex } }).init();
-        const indices = await table.map(({ rowIndex }) => rowIndex);
-        expect(indices).toEqual([100, 101, 102]);
-    });
-
-    test('map rowIndex falls back to a running counter without a resolver', async ({ page }) => {
-        await page.setContent(HTML);
-        const table = await useTable(page.locator('#t')).init();
-        const indices = await table.map(({ rowIndex }) => rowIndex);
-        expect(indices).toEqual([0, 1, 2]);
-    });
-
-    test('forEach rowIndex uses the resolver too', async ({ page }) => {
-        await page.setContent(HTML);
-        const seen: (number | undefined)[] = [];
-        const table = await useTable(page.locator('#t'), { strategies: { resolveRowIndex } }).init();
-        await table.forEach(({ rowIndex }) => { seen.push(rowIndex); });
-        expect(seen).toEqual([100, 101, 102]);
-    });
-
-    test('ctx.index stays equal to rowIndex (both logical with a resolver)', async ({ page }) => {
+test.describe('map/forEach index vs rowIndex — B-hybrid + decoupling (#362, supersedes #86/#87)', () => {
+    test('rowIndex is the logical index (resolver); index is the visit-order counter', async ({ page }) => {
         await page.setContent(HTML);
         const table = await useTable(page.locator('#t'), { strategies: { resolveRowIndex } }).init();
         const pairs = await table.map(({ index, rowIndex }) => `${index}:${rowIndex}`);
-        expect(pairs).toEqual(['100:100', '101:101', '102:102']);
+        // index = 0,1,2 (counter); rowIndex = 100,101,102 (logical/data-model)
+        expect(pairs).toEqual(['0:100', '1:101', '2:102']);
+    });
+
+    test('without a resolver, index and rowIndex are both the running counter', async ({ page }) => {
+        await page.setContent(HTML);
+        const table = await useTable(page.locator('#t')).init();
+        const pairs = await table.map(({ index, rowIndex }) => `${index}:${rowIndex}`);
+        expect(pairs).toEqual(['0:0', '1:1', '2:2']);
+    });
+
+    test('forEach exposes the same index/rowIndex split', async ({ page }) => {
+        await page.setContent(HTML);
+        const seen: string[] = [];
+        const table = await useTable(page.locator('#t'), { strategies: { resolveRowIndex } }).init();
+        await table.forEach(({ index, rowIndex }) => { seen.push(`${index}:${rowIndex}`); });
+        expect(seen).toEqual(['0:100', '1:101', '2:102']);
+    });
+
+    test('async iterator exposes the same index/rowIndex split', async ({ page }) => {
+        await page.setContent(HTML);
+        const table = await useTable(page.locator('#t'), { strategies: { resolveRowIndex } }).init();
+        const pairs: string[] = [];
+        for await (const { index, rowIndex } of table) {
+            pairs.push(`${index}:${rowIndex}`);
+        }
+        expect(pairs).toEqual(['0:100', '1:101', '2:102']);
     });
 });

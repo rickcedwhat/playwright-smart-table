@@ -4,7 +4,13 @@
 
 ### Changed
 
-- **`map` / `forEach` / `filter` — `rowIndex` is now the logical row index when a `resolveRowIndex` strategy is configured** — the callback previously always received a running enumeration counter (0, 1, 2 …), even on virtualized tables where a `resolveRowIndex` strategy (e.g. MUI's `data-rowindex`) knows each row's true data-model position. It now matches `findRow`/`findRows`: the logical index when a resolver is configured, the running counter otherwise. This makes `row.bringIntoView()` and position math correct on virtualized tables. **Behavior change** — only if you both configure a `resolveRowIndex` strategy and rely on the callback's `rowIndex`/`index` being a contiguous 0-based counter; track your own counter in that case. No change when no `resolveRowIndex` strategy is set. Part of #362.
+- **`map` / `forEach` / `filter` / async iterator — `index` and `rowIndex` now have distinct meanings** — the iteration callback context exposes two indices that were previously identical:
+  - **`index`** — the 0-based enumeration counter (visit order, contiguous). Unchanged.
+  - **`rowIndex`** — the row's **logical/data-model index**: from the `resolveRowIndex` strategy when configured (e.g. MUI DataGrid's `data-rowindex`), else equal to `index`. This makes `row.bringIntoView()` and position math correct on virtualized tables, matching `findRow`/`findRows`.
+
+  `rowIndex` is **no longer deprecated** — it now carries real, stable identity rather than being a rename-target for `index`. This supersedes the planned v7 change (#87, "rename `rowIndex` → `index`") and the docs warning (#86, "`rowIndex` is iteration-local"): instead of removing `rowIndex`, it is given a meaningful value distinct from `index`.
+
+  **Behavior change** — only if you configure a `resolveRowIndex` strategy *and* rely on the callback's `rowIndex` being a contiguous 0-based counter; use `index` for the visit-order counter. No change when no `resolveRowIndex` strategy is set (`index === rowIndex`). Part of #362; closes #86, #87.
 
 ### Fixed
 

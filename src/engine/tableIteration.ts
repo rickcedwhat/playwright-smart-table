@@ -102,17 +102,21 @@ export async function runMap<T, R>(
         const barrier = useBarrier ? new NavigationBarrier(batchSize) : undefined;
         const actionMutex = useMutex ? new Mutex() : null;
         
+        // `index` (ctx.index) is the enumeration counter — the order rows are visited,
+        // contiguous and monotonic. It drives the internal stop()/ordering logic.
+        const positionBase = rowIndex;
         // B-hybrid (#362): the row's rowIndex is its logical/data-model index when a
         // resolveRowIndex strategy is configured (so bringIntoView and position math are
-        // correct on virtualized tables), else the running enumeration counter (rowIndex + i).
+        // correct on virtualized tables); otherwise it equals the enumeration counter.
         const smartRows = await Promise.all(newIndices.map(async (idx, i) => {
-          const logicalIndex = await resolveLogicalRowIndex(pageRows[idx], env.config, () => rowIndex + i) ?? (rowIndex + i);
+          const logicalIndex = await resolveLogicalRowIndex(pageRows[idx], env.config, () => positionBase + i) ?? (positionBase + i);
           return env.makeSmartRow(pageRows[idx], map, logicalIndex, env.getCurrentPageIndex(), barrier);
         }));
 
-        const processRow = async (row: SmartRow<T>) => {
+        // enumIndex = visit-order counter (ctx.index); row.rowIndex = logical (ctx.rowIndex).
+        const processRow = async (row: SmartRow<T>, enumIndex: number) => {
           try {
-            if (stopped && row.rowIndex! > stoppedIndex) {
+            if (stopped && enumIndex > stoppedIndex) {
               return SKIP;
             }
 
@@ -141,9 +145,9 @@ export async function runMap<T, R>(
 
             // Execute callback (optionally serialized via mutex)
             const runCallback = async () => {
-              if (stopped && row.rowIndex! > stoppedIndex) return SKIP;
-              log(env.config, `${label}: processing row ${row.rowIndex}`);
-              return await callback({ row, index: row.rowIndex!, rowIndex: row.rowIndex!, pageIndex: env.getCurrentPageIndex(), stop: () => stop(row.rowIndex!) });
+              if (stopped && enumIndex > stoppedIndex) return SKIP;
+              log(env.config, `${label}: processing row (index ${enumIndex}, rowIndex ${row.rowIndex})`);
+              return await callback({ row, index: enumIndex, rowIndex: row.rowIndex!, pageIndex: env.getCurrentPageIndex(), stop: () => stop(enumIndex) });
             };
 
             if (actionMutex) {
@@ -159,20 +163,20 @@ export async function runMap<T, R>(
 
         const pageResults: (R | typeof SKIP)[] = [];
         if (concurrency === 'sequential') {
-          for (const row of smartRows) {
-            pageResults.push(await processRow(row));
+          for (let i = 0; i < smartRows.length; i++) {
+            pageResults.push(await processRow(smartRows[i], positionBase + i));
           }
         } else {
-          const results = await Promise.all(smartRows.map(processRow));
+          const results = await Promise.all(smartRows.map((row, i) => processRow(row, positionBase + i)));
           pageResults.push(...results);
         }
 
         for (let i = 0; i < pageResults.length; i++) {
-          if (smartRows[i].rowIndex! > stoppedIndex) break;
+          if (positionBase + i > stoppedIndex) break;
           const r = pageResults[i];
           if (r !== SKIP) results.push(r as R);
         }
-        
+
         rowIndex += batchSize;
       }
 
