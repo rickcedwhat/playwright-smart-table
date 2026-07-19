@@ -372,6 +372,26 @@ export function createMuiDataGrid(opts?: { buttonLabels?: MuiButtonLabels }): Pa
                     return { first: Math.min(...indices), last: Math.max(...indices) };
                 }, rowSel);
             },
+            // Geometry-based visible-row set for the iteration engine (A2, #353/#357). Returns
+            // the DOM positions of rows overlapping the virtualScroller's bounds so map/forEach
+            // skip the overscan rows MUI keeps mounted above/below the fold. The scroller is a
+            // descendant of root, so querySelector (not closest).
+            getVisibleRowIndices: async ({ root, config }) => {
+                const rowSel = config.rowSelector;
+                return root.evaluate((el, rowSel) => {
+                    const scroller = el.querySelector('.MuiDataGrid-virtualScroller') as HTMLElement | null;
+                    const rows = Array.from(el.querySelectorAll(rowSel));
+                    const scrollerRect = scroller ? scroller.getBoundingClientRect() : null;
+                    const visible: number[] = [];
+                    rows.forEach((r, i) => {
+                        if (!scrollerRect) { visible.push(i); return; } // can't measure → keep all
+                        const rect = (r as HTMLElement).getBoundingClientRect();
+                        if (rect.height === 0) return;
+                        if (rect.bottom > scrollerRect.top && rect.top < scrollerRect.bottom) visible.push(i);
+                    });
+                    return visible;
+                }, rowSel);
+            },
             getVisibleColumnRange: async ({ root, config }) => {
                 const rowSel = config.rowSelector;
                 const cellSel = typeof config.cellSelector === 'string' ? config.cellSelector : '[aria-colindex]';

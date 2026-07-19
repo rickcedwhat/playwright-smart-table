@@ -9,6 +9,21 @@ test.describe('MUI DataGrid Recon', () => {
         await expect(page.locator('.MuiDataGrid-footerContainer')).toBeVisible();
     });
 
+    test('muiDataGrid viewport.getVisibleRowIndices returns valid visible DOM positions (A2, #353/#357)', async ({ page }) => {
+        const root = page.locator('[role="grid"]').first();
+        await expect(root).toBeVisible();
+
+        const vp = presets.muiDataGrid.strategies!.viewport!;
+        const visible = await vp.getVisibleRowIndices!({ root, config: presets.muiDataGrid } as any);
+        const mounted = await root.locator('.MuiDataGrid-row').count();
+
+        expect(visible.length).toBeGreaterThan(0);
+        // Every entry is a valid DOM position within the mounted rows...
+        expect(visible.every(i => Number.isInteger(i) && i >= 0 && i < mounted)).toBe(true);
+        // ...and the visible set never exceeds what's mounted (overscan is excluded, not added).
+        expect(visible.length).toBeLessThanOrEqual(mounted);
+    });
+
     test('should scrape a virtualized DataGrid using preset', async ({ page }) => {
         const root = page.locator('[role="grid"]').first();
         await expect(root).toBeVisible();
