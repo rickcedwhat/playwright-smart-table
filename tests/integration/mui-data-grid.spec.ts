@@ -24,6 +24,20 @@ test.describe('MUI DataGrid Recon', () => {
         expect(visible.length).toBeLessThanOrEqual(mounted);
     });
 
+    test('findRowByIndex reaches a row on a later page by its logical index (#354)', async ({ page }) => {
+        const root = page.locator('[role="grid"]').first();
+        await expect(root).toBeVisible();
+
+        const table = await useTable(root, presets.muiDataGrid).init();
+        await table.sorting.apply('Desk', 'asc'); // stable order (D-1000..D-1099)
+
+        // data-rowindex 25 is on page 2 (pageSize 10) — not initially mounted. findRowByIndex
+        // must navigate to it via the pagination fallback and identify it by resolveRowIndex.
+        const row = await table.findRowByIndex(25, { maxPages: 10 });
+        expect(row.rowIndex).toBe(25);
+        expect(await row.getCell('Desk').innerText()).toBe('D-1025');
+    });
+
     test('should scrape a virtualized DataGrid using preset', async ({ page }) => {
         const root = page.locator('[role="grid"]').first();
         await expect(root).toBeVisible();
