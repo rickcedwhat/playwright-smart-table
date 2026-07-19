@@ -162,6 +162,16 @@ export interface ViewportStrategy {
   getVisibleRowRange?: (context: TableContext) => Promise<{ first: number; last: number }>;
 
   /**
+   * Returns the DOM positions (0-based, document order — indices into the resolved
+   * `rowSelector` set) of rows currently within the scroll container's visible bounds.
+   * Unlike `getVisibleRowRange` (a logical min/max), this identifies the exact rows, so
+   * `map`/`forEach`/`filter` can skip overscan rows during collection (see #353 / #357).
+   * Geometry-based and inclusive (any overlap counts as visible). When the container can't
+   * be measured, return all positions so no rows are filtered.
+   */
+  getVisibleRowIndices?: (context: TableContext) => Promise<number[]>;
+
+  /**
    * Returns the 0-based index range of columns currently rendered in the DOM.
    * Used to detect when a target column is not yet mounted before reading.
    */

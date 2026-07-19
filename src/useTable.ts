@@ -78,10 +78,12 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     const vp = config.strategies.viewport;
     let colRangeCache: { first: number; last: number } | null = null;
     let rowRangeCache: { first: number; last: number } | null = null;
+    let rowIndicesCache: number[] | null = null;
 
     _clearViewportCache = () => {
       colRangeCache = null;
       rowRangeCache = null;
+      rowIndicesCache = null;
     };
 
     config.strategies.viewport = {
@@ -98,16 +100,24 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
             return rowRangeCache;
           }
         : undefined,
+      getVisibleRowIndices: vp.getVisibleRowIndices
+        ? async (ctx) => {
+            if (!rowIndicesCache) rowIndicesCache = await vp.getVisibleRowIndices!(ctx);
+            return rowIndicesCache;
+          }
+        : undefined,
       scrollToColumn: vp.scrollToColumn
         ? async (ctx, colIndex) => {
             colRangeCache = null;
             rowRangeCache = null;
+            rowIndicesCache = null;
             await vp.scrollToColumn!(ctx, colIndex);
           }
         : undefined,
       scrollToRow: vp.scrollToRow
         ? async (ctx, rowIndex) => {
             rowRangeCache = null;
+            rowIndicesCache = null;
             await vp.scrollToRow!(ctx, rowIndex);
           }
         : undefined,
@@ -526,6 +536,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
           config,
           getPage: () => rootLocator.page(),
           getCurrentPageIndex: () => tableState.currentPageIndex,
+          getContext: () => createStrategyContext(),
         },
         callback,
         options
@@ -545,6 +556,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
           config,
           getPage: () => rootLocator.page(),
           getCurrentPageIndex: () => tableState.currentPageIndex,
+          getContext: () => createStrategyContext(),
         },
         callback,
         options
@@ -577,6 +589,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
           config,
           getPage: () => rootLocator.page(),
           getCurrentPageIndex: () => tableState.currentPageIndex,
+          getContext: () => createStrategyContext(),
         },
         predicate,
         options
