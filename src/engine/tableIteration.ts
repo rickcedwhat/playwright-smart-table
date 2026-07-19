@@ -127,7 +127,11 @@ export async function runMap<T, R>(
         // correct on virtualized tables); otherwise it equals the enumeration counter.
         const smartRows = await Promise.all(newIndices.map(async (idx, i) => {
           const logicalIndex = await resolveLogicalRowIndex(pageRows[idx], env.config, () => positionBase + i) ?? (positionBase + i);
-          return env.makeSmartRow(pageRows[idx], map, logicalIndex, env.getCurrentPageIndex(), barrier);
+          const sr = env.makeSmartRow(pageRows[idx], map, logicalIndex, env.getCurrentPageIndex(), barrier);
+          // Mark as part of an iteration batch so toJSON's #366 re-pin uses rescan-only recovery
+          // (no scroll-back) — scrolling here would disrupt sibling rows' positional locators.
+          (sr as any)._inBatch = true;
+          return sr;
         }));
 
         // enumIndex = visit-order counter (ctx.index); row.rowIndex = logical (ctx.rowIndex).

@@ -494,6 +494,12 @@ const createSmartRow = <T = any>(
         const resolveRI = config.strategies.resolveRowIndex;
         const canPin = !!resolveRI && typeof rowIndex === 'number';
         const stableCtx = { root: rootLocator, config, page, resolve } as any;
+        // scrollToRow recovery is only safe for standalone reads (findRow/findRowByIndex/getRow*).
+        // Inside a map/forEach/filter or async-iterator batch, the other rows are positional
+        // locators from one DOM snapshot (and, in synchronized mode, coordinated by a barrier),
+        // so an independent scroll here would fight peers / invalidate their locators. In a batch
+        // we recover by rescanning the currently-mounted rows only, and throw if that fails.
+        const inBatch = (smart as any)._inBatch === true || !!(smart as any)._barrier;
         const resolveStableRow = async (): Promise<Locator> => {
             if (!canPin) return rowLocator;
             if ((await resolveRI!(rowLocator)) === rowIndex) return rowLocator; // still correct
@@ -506,14 +512,18 @@ const createSmartRow = <T = any>(
                 return null;
             };
             let recovered = await rescan();
-            if (!recovered && config.strategies.viewport?.scrollToRow) {
+            // Scroll the row back only when it's safe to move the viewport (not mid-batch).
+            if (!recovered && !inBatch && config.strategies.viewport?.scrollToRow) {
                 await config.strategies.viewport.scrollToRow(stableCtx, rowIndex as number);
                 recovered = await rescan();
             }
             if (!recovered) {
                 throw new Error(
                     `[SmartTable] toJSON: row ${rowIndex} recycled out of the DOM mid-read and could not be recovered — ` +
-                    `the returned object would mix fields from different rows. Ensure a viewport.scrollToRow can restore the row.`
+                    `the returned object would mix fields from different rows. ` +
+                    (inBatch
+                        ? `(During a map/forEach batch, scroll-back recovery is disabled to avoid disrupting sibling rows; the row must stay mounted for the read.)`
+                        : `Ensure a viewport.scrollToRow can restore the row.`)
                 );
             }
             return recovered;

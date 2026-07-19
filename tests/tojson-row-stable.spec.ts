@@ -94,3 +94,63 @@ test.describe('toJSON row stability (#366)', () => {
         expect(result).toEqual({ Name: 'Bob', Type: 'Type-Bob', Extra: 'Extra-Bob' });
     });
 });
+
+/**
+ * #366 concurrency safety — the scroll-back recovery must only fire for STANDALONE reads.
+ * During a map/forEach/iterator batch (parallel or synchronized), sibling rows share the same
+ * viewport; a scroll-back to recover one drifted row would recycle the others out from under
+ * their in-flight reads. So batch reads use rescan-only recovery (never scrollToRow) and throw
+ * if the row can't be found in the current DOM; standalone reads may attempt scrollToRow.
+ *
+ * Both cases drift the target row's node away irrecoverably (the spied scrollToRow is a no-op),
+ * so both ultimately throw — the observable difference is whether scrollToRow was CALLED.
+ */
+test.describe('toJSON recovery is concurrency-safe (#366)', () => {
+    // Recycle the target row's node away on the first (Name) read so re-pin can't rescan it back.
+    const recycleAwayOverride = {
+        Name: {
+            read: async (cell: import('@playwright/test').Locator) => {
+                const name = (await cell.innerText()).trim();
+                await cell.page().evaluate(() => {
+                    // Every data-ri becomes something else → no row resolves to its original index.
+                    document.querySelectorAll('#t tbody tr').forEach((tr, i) => {
+                        tr.setAttribute('data-ri', String(100 + i));
+                    });
+                });
+                return name;
+            },
+        },
+    };
+
+    test('standalone toJSON attempts scrollToRow recovery', async ({ page }) => {
+        await page.setContent(HTML);
+        let scrollCalls = 0;
+        const table = await useTable(page.locator('#t'), {
+            strategies: {
+                resolveRowIndex,
+                viewport: { scrollToRow: async () => { scrollCalls++; } },
+            },
+            columnOverrides: recycleAwayOverride,
+        }).init();
+
+        await expect(table.getRowByIndex(1).toJSON()).rejects.toThrow(/recycled out of the DOM/);
+        // Standalone read is allowed to scroll back to try to recover the row.
+        expect(scrollCalls).toBeGreaterThan(0);
+    });
+
+    test('map batch never scrolls (rescan-only) and throws with a batch-aware message', async ({ page }) => {
+        await page.setContent(HTML);
+        let scrollCalls = 0;
+        const table = await useTable(page.locator('#t'), {
+            strategies: {
+                resolveRowIndex,
+                viewport: { scrollToRow: async () => { scrollCalls++; } },
+            },
+            columnOverrides: recycleAwayOverride,
+        }).init();
+
+        await expect(table.map(({ row }) => row.toJSON())).rejects.toThrow(/map\/forEach batch/);
+        // No scroll-back during a batch — that would disrupt sibling rows.
+        expect(scrollCalls).toBe(0);
+    });
+});
