@@ -4,6 +4,7 @@
 
 ### Added
 
+- **`table.findRowByIndex(index, options?)`** — async accessor for the row with a specific logical/data-model index on virtualized tables, complementing the sync, render-window-relative `getRowByIndex`. It reaches the row via a currently-mounted match, the viewport's random-access `scrollToRow` fast path, then advancing pages (a "page" is a scroll step on infinite-scroll tables) up to `maxPages`. Requires a `strategies.resolveRowIndex` to identify rows by logical index, and throws if one is absent or the row cannot be reached — never a silent wrong-row result. Addresses #354.
 - **`ViewportStrategy.getVisibleRowIndices`** — optional strategy method returning the DOM positions of rows currently within the scroll container's visible bounds (geometry-based, inclusive). Implemented by `Strategies.Viewport.dataAttribute` and the `muiDataGrid` preset. Enables the iteration engine to skip overscan rows (below).
 
 ### Changed

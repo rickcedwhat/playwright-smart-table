@@ -423,6 +423,64 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       return _makeSmart(rowLocator, map, index);
     },
 
+    findRowByIndex: async (index: number, options?: { maxPages?: number }): Promise<SmartRowType<T>> => {
+      log(`findRowByIndex: index=${index} options=${safeStringify(options)}`);
+      await _autoInit();
+      const map = tableMapper.getMapSync()!;
+      const resolveRI = config.strategies.resolveRowIndex;
+      const viewport = config.strategies.viewport;
+
+      // Identifying a row by its logical index requires a resolveRowIndex strategy. Without one
+      // the library can only offer render-window-relative getRowByIndex, or filter-based findRow.
+      if (!resolveRI) {
+        throw new Error(
+          `findRowByIndex(${index}) requires a strategies.resolveRowIndex to identify rows by their logical index. ` +
+          `Configure one (e.g. read the grid's row-index attribute), or use getRowByIndex() (current render window) / findRow(filters).`
+        );
+      }
+
+      // The currently-mounted row whose logical index === index, if any.
+      const findMounted = async (): Promise<Locator | null> => {
+        const rows = await resolve(config.rowSelector, rootLocator).all();
+        for (const r of rows) {
+          if ((await resolveRI(r)) === index) return r;
+        }
+        return null;
+      };
+
+      // 1. Already mounted (no navigation needed)?
+      let loc = await findMounted();
+
+      // 2. Fast path: jump straight to it via the viewport's random-access scroll.
+      if (!loc && viewport?.scrollToRow) {
+        log(`findRowByIndex: scrolling to row ${index}`);
+        await viewport.scrollToRow(createStrategyContext(), index);
+        loc = await findMounted();
+      }
+
+      // 3. Fallback: advance pages (on infinite-scroll tables, a "page" is a scroll step) until
+      //    the row is reached. Bounded by maxPages so an unreachable index can't loop forever.
+      if (!loc && config.strategies.pagination) {
+        const effectiveMaxPages = options?.maxPages ?? config.maxPages;
+        let pagesScanned = 1;
+        while (!loc && pagesScanned < effectiveMaxPages) {
+          if (!await _advancePage(false)) break;
+          pagesScanned++;
+          loc = await findMounted();
+        }
+      }
+
+      if (!loc) {
+        throw new Error(
+          `findRowByIndex(${index}): could not reach row ${index}. ` +
+          `Ensure a viewport.scrollToRow or pagination can bring it into view (searched up to maxPages=${options?.maxPages ?? config.maxPages}).`
+        );
+      }
+
+      await debugDelay(config, 'findRow');
+      return _makeSmart(loc, map, index, tableState.currentPageIndex);
+    },
+
     findRow: async (filters: Record<string, FilterValue>, options?: { exact?: boolean, maxPages?: number }): Promise<SmartRowType<T>> => {
       log(`findRow: filters=${safeStringify(filters)} options=${safeStringify(options)}`);
       return rowFinder.findRow(filters, options);

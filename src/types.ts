@@ -757,8 +757,9 @@ export interface TableResult<T = any> extends AsyncIterable<{ row: SmartRow<T>; 
    * For button-paginated tables this is the i-th row on the current page. For virtualized
    * tables the render window shifts as you scroll, so `getRowByIndex(i)` returns whatever
    * row currently sits at DOM position `i` — NOT the logical/absolute row `i` in the dataset
-   * once the list has scrolled. To iterate virtualized rows by logical identity, use `map` /
-   * `findRows` (with a `dedupe` strategy) instead.
+   * once the list has scrolled. For the row with a specific logical/data-model index on a
+   * virtualized table, use the async `findRowByIndex(i)` instead (it scrolls to the row);
+   * to iterate by logical identity, use `map` / `findRows` (with a `dedupe` strategy).
    *
    * Resolution is lazy: an out-of-range index yields a SmartRow whose operations fail when
    * it is used, rather than throwing here.
@@ -768,6 +769,26 @@ export interface TableResult<T = any> extends AsyncIterable<{ row: SmartRow<T>; 
   getRowByIndex: (
     index: number
   ) => SmartRow<T>;
+
+  /**
+   * ASYNC: Returns the row with a specific logical/data-model index, scrolling/paginating to
+   * reach it. Unlike the sync `getRowByIndex` (render-window position), this resolves the true
+   * data-model row `index` on virtualized tables.
+   *
+   * Reaches the row via, in order: a currently-mounted match, the viewport's random-access
+   * `scrollToRow` fast path, then advancing pages (on infinite-scroll tables a "page" is a
+   * scroll step) up to `maxPages`.
+   *
+   * Requires a `strategies.resolveRowIndex` to identify rows by logical index — throws if one
+   * is not configured. Also throws if the row cannot be reached (no silent wrong-row fallback).
+   *
+   * @param index 0-based logical/data-model row index
+   * @param options - `maxPages` bounds how far to scroll/paginate (defaults to config.maxPages)
+   */
+  findRowByIndex: (
+    index: number,
+    options?: { maxPages?: number }
+  ) => Promise<SmartRow<T>>;
 
   /**
    * ASYNC: Searches for a single row across pages using pagination.
