@@ -485,10 +485,47 @@ const createSmartRow = <T = any>(
                 return resolve(config.headerSelector as any, rootLocator).nth(idx);
             };
 
+        // #366: on virtualized tables the row's DOM node can recycle between the per-column
+        // awaits below, which would make one toJSON() mix fields from different logical rows.
+        // When a resolveRowIndex strategy is configured and this row has a known logical index,
+        // re-pin the row before each column read: if the current locator has drifted to a
+        // different logical row, re-locate the correct one (rescan, then scrollToRow) — or throw,
+        // rather than silently returning a mixed-row object. No-op without resolveRowIndex/rowIndex.
+        const resolveRI = config.strategies.resolveRowIndex;
+        const canPin = !!resolveRI && typeof rowIndex === 'number';
+        const stableCtx = { root: rootLocator, config, page, resolve } as any;
+        const resolveStableRow = async (): Promise<Locator> => {
+            if (!canPin) return rowLocator;
+            if ((await resolveRI!(rowLocator)) === rowIndex) return rowLocator; // still correct
+            // Drifted (recycled). Re-locate the row carrying the expected logical index.
+            const rescan = async (): Promise<Locator | null> => {
+                const rows = await resolve(config.rowSelector, rootLocator).all();
+                for (const r of rows) {
+                    if ((await resolveRI!(r)) === rowIndex) return r;
+                }
+                return null;
+            };
+            let recovered = await rescan();
+            if (!recovered && config.strategies.viewport?.scrollToRow) {
+                await config.strategies.viewport.scrollToRow(stableCtx, rowIndex as number);
+                recovered = await rescan();
+            }
+            if (!recovered) {
+                throw new Error(
+                    `[SmartTable] toJSON: row ${rowIndex} recycled out of the DOM mid-read and could not be recovered — ` +
+                    `the returned object would mix fields from different rows. Ensure a viewport.scrollToRow can restore the row.`
+                );
+            }
+            return recovered;
+        };
+
         for (const [col, idx] of map.entries()) {
             if (options?.columns && !options.columns.includes(col)) {
                 continue;
             }
+
+            // Re-pin to the correct logical row before reading this column (#366).
+            const stableRow = await resolveStableRow();
 
             // Check if we have a column override for this column
             const columnOverride = config.columnOverrides?.[col as keyof T];
@@ -497,7 +534,7 @@ const createSmartRow = <T = any>(
             // --- Navigation Logic Start ---
             const cell = config.strategies.getCellLocator
                 ? config.strategies.getCellLocator({
-                    row: rowLocator,
+                    row: stableRow,
                     root: rootLocator,
                     columnName: col,
                     columnIndex: idx,
@@ -505,7 +542,7 @@ const createSmartRow = <T = any>(
                     page: page,
                     config
                 })
-                : resolve(config.cellSelector, rowLocator).nth(idx);
+                : resolve(config.cellSelector, stableRow).nth(idx);
 
             let targetCell = cell;
             // Always call _navigateToCell to ensure Lock-Step synchronization
@@ -518,7 +555,7 @@ const createSmartRow = <T = any>(
                 getHeaders: table?.getHeaders,
                 column: col,
                 index: idx,
-                rowLocator,
+                rowLocator: stableRow,
                 rowIndex,
                 barrier: (smart as any)._barrier
             });
@@ -535,7 +572,7 @@ const createSmartRow = <T = any>(
                     cell: targetCell,
                     columnName: col,
                     columnIndex: idx,
-                    row: rowLocator,
+                    row: stableRow,
                     page,
                     root: rootLocator,
                     getHeaderCell,

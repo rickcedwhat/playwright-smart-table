@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **`toJSON` — cross-column row tear on virtualized tables** — a single `toJSON()` reads columns with an `await` per column, and the row's DOM node can recycle between those reads (virtual scrollers reuse nodes for other logical rows), so the returned object could silently mix fields from different rows. When a `resolveRowIndex` strategy is configured and the row has a known logical index, `toJSON` now re-pins to that logical row before each column read: if the node drifted, it re-locates the correct row (rescan, then `viewport.scrollToRow`) and reads from it — or throws rather than returning a mixed-row object. No-op (unchanged behavior) without a `resolveRowIndex` strategy. Closes #366.
+
 ### Added
 
 - **`table.findRowByIndex(index, options?)`** — async accessor for the row with a specific logical/data-model index on virtualized tables, complementing the sync, render-window-relative `getRowByIndex`. It reaches the row via a currently-mounted match, the viewport's random-access `scrollToRow` fast path, then advancing pages (a "page" is a scroll step on infinite-scroll tables) up to `maxPages`. Requires a `strategies.resolveRowIndex` to identify rows by logical index, and throws if one is absent or the row cannot be reached — never a silent wrong-row result. Addresses #354.
