@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **`map` / `forEach` / `filter` / async iterator — `index` and `rowIndex` now have distinct meanings** — the iteration callback context exposes two indices that were previously identical:
+  - **`index`** — the 0-based enumeration counter (visit order, contiguous). Unchanged.
+  - **`rowIndex`** — the row's **logical/data-model index**: from the `resolveRowIndex` strategy when configured (e.g. MUI DataGrid's `data-rowindex`), else equal to `index`. This makes `row.bringIntoView()` and position math correct on virtualized tables, matching `findRow`/`findRows`.
+
+  `rowIndex` is **no longer deprecated** — it now carries real, stable identity rather than being a rename-target for `index`. This supersedes the planned v7 change (#87, "rename `rowIndex` → `index`") and the docs warning (#86, "`rowIndex` is iteration-local"): instead of removing `rowIndex`, it is given a meaningful value distinct from `index`.
+
+  **Behavior change** — only if you configure a `resolveRowIndex` strategy *and* rely on the callback's `rowIndex` being a contiguous 0-based counter; use `index` for the visit-order counter. No change when no `resolveRowIndex` strategy is set (`index === rowIndex`). Part of #362; closes #86, #87.
+
 ### Fixed
 
 - **`Strategies.Viewport.dataAttribute().getVisibleRowRange` — now geometry-aware** — it previously reported every mounted row, including overscan rows the virtual scroller keeps mounted above/below the fold, so the "visible" range was wider than what is actually on screen. It now intersects each row against the scroll container's vertical bounds (inclusive — a row with any overlap counts as visible; only rows entirely off-screen are dropped, so a partially-visible row is never lost). Falls back to the previous all-rows behavior when the scroll container can't be resolved. Part of #353 (part 1 — accurate range; iteration-level filtering tracked separately in #362).

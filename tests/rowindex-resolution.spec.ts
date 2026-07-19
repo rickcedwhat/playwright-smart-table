@@ -64,3 +64,38 @@ test.describe('rowIndex resolution — characterization (#362)', () => {
         expect(rows.map(r => r.rowIndex)).toEqual([0, 999, 2]);
     });
 });
+
+test.describe('map/forEach index vs rowIndex — B-hybrid + decoupling (#362, supersedes #86/#87)', () => {
+    test('rowIndex is the logical index (resolver); index is the visit-order counter', async ({ page }) => {
+        await page.setContent(HTML);
+        const table = await useTable(page.locator('#t'), { strategies: { resolveRowIndex } }).init();
+        const pairs = await table.map(({ index, rowIndex }) => `${index}:${rowIndex}`);
+        // index = 0,1,2 (counter); rowIndex = 100,101,102 (logical/data-model)
+        expect(pairs).toEqual(['0:100', '1:101', '2:102']);
+    });
+
+    test('without a resolver, index and rowIndex are both the running counter', async ({ page }) => {
+        await page.setContent(HTML);
+        const table = await useTable(page.locator('#t')).init();
+        const pairs = await table.map(({ index, rowIndex }) => `${index}:${rowIndex}`);
+        expect(pairs).toEqual(['0:0', '1:1', '2:2']);
+    });
+
+    test('forEach exposes the same index/rowIndex split', async ({ page }) => {
+        await page.setContent(HTML);
+        const seen: string[] = [];
+        const table = await useTable(page.locator('#t'), { strategies: { resolveRowIndex } }).init();
+        await table.forEach(({ index, rowIndex }) => { seen.push(`${index}:${rowIndex}`); });
+        expect(seen).toEqual(['0:100', '1:101', '2:102']);
+    });
+
+    test('async iterator exposes the same index/rowIndex split', async ({ page }) => {
+        await page.setContent(HTML);
+        const table = await useTable(page.locator('#t'), { strategies: { resolveRowIndex } }).init();
+        const pairs: string[] = [];
+        for await (const { index, rowIndex } of table) {
+            pairs.push(`${index}:${rowIndex}`);
+        }
+        expect(pairs).toEqual(['0:100', '1:101', '2:102']);
+    });
+});

@@ -662,9 +662,17 @@ export interface FillOptions {
 /** Callback context passed to forEach, map, and filter. */
 export type RowIterationContext<T = any> = {
   row: SmartRow<T>;
-  /** 0-based iteration counter — the order this row was visited, not its DOM position or grid identity. @deprecated Use `index` instead. `rowIndex` will be removed in v7.0.0. */
+  /**
+   * The row's logical/data-model index. When a `resolveRowIndex` strategy is configured
+   * (e.g. MUI DataGrid's `data-rowindex`) this is the grid's true row index; otherwise it
+   * equals `index`. Use this for `row.bringIntoView()` and position math on virtualized
+   * tables — it is stable across scrolling/dedupe, unlike the visit-order `index`.
+   */
   rowIndex: number;
-  /** 0-based iteration counter — the order this row was visited, not its DOM position or grid identity. */
+  /**
+   * 0-based enumeration counter — the order this row was visited (contiguous within the run).
+   * Not a DOM position or grid identity. Use `rowIndex` for the row's data-model index.
+   */
   index: number;
   /** 0-based page index — which page this row was collected from. */
   pageIndex: number;

@@ -16,6 +16,7 @@ import { FilterEngine } from './filterEngine';
 import { TableMapper } from './engine/tableMapper';
 import { RowFinder } from './engine/rowFinder';
 import { runForEach, runMap, runFilter } from './engine/tableIteration';
+import { resolveLogicalRowIndex } from './engine/rowResolution';
 import { ResolutionStrategies } from './strategies/resolution';
 import { debugDelay, logDebug, warnIfDebugInCI } from './utils/debugUtils';
 import { createSmartRowArray, SmartRowArray } from './utils/smartRowArray';
@@ -495,7 +496,9 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
           const barrier = new NavigationBarrier(newIndices.length);
 
           for (const idx of newIndices) {
-            yield { row: _makeSmart(pageRows[idx], map, rowIndex, tableState.currentPageIndex, barrier), index: rowIndex, rowIndex, pageIndex: tableState.currentPageIndex };
+            // index = visit-order counter; rowIndex = logical/data index (B-hybrid, #362).
+            const logical = await resolveLogicalRowIndex(pageRows[idx], config, () => rowIndex) ?? rowIndex;
+            yield { row: _makeSmart(pageRows[idx], map, logical, tableState.currentPageIndex, barrier), index: rowIndex, rowIndex: logical, pageIndex: tableState.currentPageIndex };
             rowIndex++;
           }
 
