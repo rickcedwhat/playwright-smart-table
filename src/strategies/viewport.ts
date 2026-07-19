@@ -94,6 +94,26 @@ const dataAttribute = (options?: DataAttributeViewportOptions): ViewportStrategy
             }, { rowSel, cellSel, colAttr, colOffset });
         },
 
+        getVisibleRowIndices: async ({ root, config }) => {
+            const rowSel = config.rowSelector;
+            // Geometry-based (mirrors getVisibleRowRange's inclusive intersection), but returns
+            // the rows' DOM positions so the iteration engine can drop overscan rows (#353/#357).
+            return root.evaluate((el, { rowSel, containerSel }) => {
+                const rows = Array.from(el.querySelectorAll(rowSel));
+                const container = el.closest(containerSel) as HTMLElement | null;
+                const containerRect = container ? container.getBoundingClientRect() : null;
+                const visible: number[] = [];
+                rows.forEach((r, i) => {
+                    // Container not resolvable — can't measure, so keep every row (no filtering).
+                    if (!containerRect) { visible.push(i); return; }
+                    const rect = (r as HTMLElement).getBoundingClientRect();
+                    if (rect.height === 0) return; // unrendered / detached
+                    if (rect.bottom > containerRect.top && rect.top < containerRect.bottom) visible.push(i);
+                });
+                return visible;
+            }, { rowSel, containerSel });
+        },
+
         getVisibleRowRange: async ({ root, config }) => {
             const rowSel = config.rowSelector;
             return root.evaluate((el, { rowSel, rowAttr, rowOffset, containerSel }) => {

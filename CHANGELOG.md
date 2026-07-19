@@ -2,7 +2,13 @@
 
 ## [Unreleased]
 
+### Added
+
+- **`ViewportStrategy.getVisibleRowIndices`** — optional strategy method returning the DOM positions of rows currently within the scroll container's visible bounds (geometry-based, inclusive). Implemented by `Strategies.Viewport.dataAttribute` and the `muiDataGrid` preset. Enables the iteration engine to skip overscan rows (below).
+
 ### Changed
+
+- **`map` / `forEach` / `filter` — overscan rows are skipped during iteration on virtualized tables** — when the configured viewport implements `getVisibleRowIndices`, iteration now collects only rows within the visible bounds, not the overscan rows a virtual scroller keeps mounted above/below the fold. Overscan rows are collected later, once scrolled into view, so nothing is lost. This fixes inflated results from `toArray`/`map` on virtualized grids (#353 part 2) and removes the overscan/node-recycling duplicate race (#357). Default-on when the viewport reports visible rows (the `dataAttribute` strategy and `muiDataGrid` preset both do); no change for tables without such a viewport. Closes #353, #357.
 
 - **`map` / `forEach` / `filter` / async iterator — `index` and `rowIndex` now have distinct meanings** — the iteration callback context exposes two indices that were previously identical:
   - **`index`** — the 0-based enumeration counter (visit order, contiguous). Unchanged.

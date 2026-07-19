@@ -1,5 +1,5 @@
 import type { Locator, Page } from '@playwright/test';
-import type { SmartRow, RowIterationContext, RowIterationOptions } from '../types';
+import type { SmartRow, RowIterationContext, RowIterationOptions, TableContext } from '../types';
 import type { FinalTableConfig } from '../types';
 import type { SmartRowArray } from '../utils/smartRowArray';
 import { ElementTracker } from '../utils/elementTracker';
@@ -17,6 +17,8 @@ export interface TableIterationEnv<T = any> {
   config: FinalTableConfig<T>;
   getPage: () => Page;
   getCurrentPageIndex: () => number;
+  /** Builds a TableContext for strategy calls (e.g. the viewport visible-row oracle). */
+  getContext: () => TableContext;
 }
 
 function log(config: FinalTableConfig, msg: string) {
@@ -82,14 +84,29 @@ export async function runMap<T, R>(
       const allIndices = await tracker.peekUnseenIndices(rowLocators);
       const pageRows = await rowLocators.all();
 
+      // A2 (#353 part 2 / #357): when the viewport can report which rows are within the visible
+      // bounds, drop overscan rows from collection. They are left uncommitted (still unseen), so
+      // they're picked up on a later page once scrolled into view — preventing overscan from
+      // being ingested (#353) or double-collected via node recycling (#357). No-op when no
+      // viewport reports visible rows.
+      let candidateIndices = allIndices;
+      const getVisibleRowIndices = env.config.strategies.viewport?.getVisibleRowIndices;
+      if (getVisibleRowIndices) {
+        const visible = new Set(await getVisibleRowIndices(env.getContext()));
+        candidateIndices = allIndices.filter(idx => visible.has(idx));
+        if (candidateIndices.length !== allIndices.length) {
+          log(env.config, `${label}: viewport visible filter — ${candidateIndices.length}/${allIndices.length} row(s) in view`);
+        }
+      }
+
       // In synchronized mode, overscan rows rendered beyond the visible viewport by virtual
       // scrollers can be evicted when the horizontal barrier fires snapFirstColumnIntoView.
       // Filter them out before committing so they stay unseen and are picked up on the next page.
       const newIndices = concurrency === 'synchronized'
         ? (await Promise.all(
-            allIndices.map(async idx => ({ idx, present: pageRows[idx] != null && (await pageRows[idx].count()) > 0 }))
+            candidateIndices.map(async idx => ({ idx, present: pageRows[idx] != null && (await pageRows[idx].count()) > 0 }))
           )).filter(r => r.present).map(r => r.idx)
-        : allIndices;
+        : candidateIndices;
 
       await tracker.commitIndices(rowLocators, newIndices);
 
