@@ -196,3 +196,175 @@ test.describe('toJSON recovery is concurrency-safe (#366)', () => {
         expect(scrollCalls).toBe(0);
     });
 });
+
+test.describe('toJSON({ atomic }) — frozen snapshot with lazy materialization', () => {
+    test('reads all columns in one snapshot (no stagger possible)', async ({ page }) => {
+        await page.setContent(HTML);
+        const table = await useTable(page.locator('#t')).init();
+        const result = (await table.getRowByIndex(1).toJSON({ atomic: true })) as Record<string, string>;
+        expect(result).toEqual({ Name: 'Bob', Type: 'Type-Bob', Extra: 'Extra-Bob' });
+    });
+
+    test('columns filter works in atomic mode', async ({ page }) => {
+        await page.setContent(HTML);
+        const table = await useTable(page.locator('#t')).init();
+        const result = (await table.getRowByIndex(0).toJSON({ atomic: true, columns: ['Name', 'Extra'] })) as Record<string, string>;
+        expect(result).toEqual({ Name: 'Alice', Extra: 'Extra-Alice' });
+        expect(result).not.toHaveProperty('Type');
+    });
+
+    test('immune to mid-read recycling that breaks non-atomic toJSON', async ({ page }) => {
+        await page.setContent(HTML);
+
+        // Non-atomic: the column override on Name swaps the DOM between reads → stagger.
+        const staggerTable = await useTable(page.locator('#t'), {
+            columnOverrides: {
+                Name: {
+                    read: async (cell) => {
+                        const name = (await cell.innerText()).trim();
+                        await cell.page().evaluate(() => {
+                            const rows = document.querySelectorAll('#t tbody tr');
+                            const set = (tr: Element, a: string, b: string, c: string) => {
+                                const tds = tr.querySelectorAll('td');
+                                tds[0].textContent = a; tds[1].textContent = b; tds[2].textContent = c;
+                            };
+                            set(rows[1], 'Ghost', 'Type-Ghost', 'Extra-Ghost');
+                        });
+                        return name;
+                    },
+                },
+            },
+        }).init();
+
+        // Without resolveRowIndex, non-atomic toJSON silently mixes fields.
+        const broken = (await staggerTable.getRowByIndex(1).toJSON()) as Record<string, string>;
+        expect(broken.Name).toBe('Bob');
+        expect(broken.Type).toBe('Type-Ghost'); // stagger: read Ghost's Type
+
+        // Reset DOM for atomic test.
+        await page.setContent(HTML);
+        const atomicTable = await useTable(page.locator('#t')).init();
+
+        // Atomic snapshots the row before any column override can fire → coherent.
+        const coherent = (await atomicTable.getRowByIndex(1).toJSON({ atomic: true })) as Record<string, string>;
+        expect(coherent).toEqual({ Name: 'Bob', Type: 'Type-Bob', Extra: 'Extra-Bob' });
+    });
+
+    test('skips fake columns that exceed DOM cell count', async ({ page }) => {
+        await page.setContent(HTML);
+        const table = await useTable(page.locator('#t'), {
+            strategies: {
+                header: async (ctx) => {
+                    const headers = await ctx.root.locator('th').allInnerTexts();
+                    headers.push('fake');
+                    return headers;
+                },
+            },
+        }).init();
+        const result = (await table.getRowByIndex(1).toJSON({ atomic: true })) as Record<string, string>;
+        // 'fake' maps to index 3, but only 3 cells exist (indices 0-2) → omitted.
+        expect(result).toEqual({ Name: 'Bob', Type: 'Type-Bob', Extra: 'Extra-Bob' });
+        expect(result).not.toHaveProperty('fake');
+    });
+
+    test('column overrides run against the frozen reconstruction (not live DOM)', async ({ page }) => {
+        await page.setContent(HTML);
+
+        const table = await useTable(page.locator('#t'), {
+            columnOverrides: {
+                Name: {
+                    read: async (cell) => {
+                        const name = (await cell.innerText()).trim();
+                        // Mutate the LIVE DOM after reading — this would break non-atomic reads
+                        // of later columns, but atomic reads from the frozen reconstruction.
+                        await page.evaluate(() => {
+                            const rows = document.querySelectorAll('#t tbody tr');
+                            rows[1].querySelectorAll('td')[1].textContent = 'CORRUPTED';
+                        });
+                        return name;
+                    },
+                },
+            },
+        }).init();
+
+        const result = (await table.getRowByIndex(1).toJSON({ atomic: true })) as Record<string, string>;
+        // Name comes from the override (which reads the frozen cell). Type comes from the
+        // snapshot text. Neither is affected by the live DOM mutation.
+        expect(result.Name).toBe('Bob');
+        expect(result.Type).toBe('Type-Bob'); // NOT 'CORRUPTED'
+    });
+
+    test('getCell() lets an override read a sibling cell from the same frozen row', async ({ page }) => {
+        await page.setContent(HTML);
+
+        const table = await useTable(page.locator('#t'), {
+            strategies: {
+                header: async (ctx) => {
+                    const headers = await ctx.root.locator('th').allInnerTexts();
+                    headers.push('derived');
+                    return headers;
+                },
+            },
+            columnOverrides: {
+                derived: {
+                    read: async (_cell, { getCell }) => {
+                        const name = (await getCell('Name').innerText()).trim();
+                        const type = (await getCell('Type').innerText()).trim();
+                        return `${name}::${type}`;
+                    },
+                },
+            },
+        }).init();
+
+        const result = (await table.getRowByIndex(1).toJSON({ atomic: true })) as Record<string, string>;
+        expect(result.derived).toBe('Bob::Type-Bob');
+        // Real columns still come from the snapshot text.
+        expect(result.Name).toBe('Bob');
+        expect(result.Type).toBe('Type-Bob');
+    });
+
+    test('getCell() works in non-atomic mode too (live cell)', async ({ page }) => {
+        await page.setContent(HTML);
+
+        const table = await useTable(page.locator('#t'), {
+            strategies: {
+                header: async (ctx) => {
+                    const headers = await ctx.root.locator('th').allInnerTexts();
+                    headers.push('combo');
+                    return headers;
+                },
+                getCellLocator: ({ row, columnName, columnIndex, config: cfg }) => {
+                    if (columnName === 'combo') return row;
+                    return row.locator(cfg.cellSelector as string).nth(columnIndex);
+                },
+            },
+            columnOverrides: {
+                combo: {
+                    read: async (_cell, { getCell }) => {
+                        const name = (await getCell('Name').innerText()).trim();
+                        const extra = (await getCell('Extra').innerText()).trim();
+                        return `${name}+${extra}`;
+                    },
+                },
+            },
+        }).init();
+
+        const result = (await table.getRowByIndex(0).toJSON()) as Record<string, string>;
+        expect(result.combo).toBe('Alice+Extra-Alice');
+    });
+
+    test('snapshot container is cleaned up after toJSON completes', async ({ page }) => {
+        await page.setContent(HTML);
+
+        const table = await useTable(page.locator('#t'), {
+            columnOverrides: {
+                Name: { read: async (cell) => (await cell.innerText()).trim().toUpperCase() },
+            },
+        }).init();
+
+        await table.getRowByIndex(1).toJSON({ atomic: true });
+        // No snapshot containers should remain in the DOM.
+        const leftover = await page.locator('[id^="__st_snap_"]').count();
+        expect(leftover).toBe(0);
+    });
+});

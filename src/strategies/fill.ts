@@ -16,7 +16,10 @@ export const FillStrategies = {
             // Auto-sync: If read exists, get current state first
             if (columnOverride.read) {
                 const columnIndex = table ? (await table.getHeaders()).indexOf(columnName) : -1;
-                currentValue = await columnOverride.read(cell, { row, columnName, columnIndex });
+                currentValue = await columnOverride.read(cell, {
+                    row, columnName, columnIndex,
+                    getCell: (name: string) => row.getCell(name),
+                });
             }
             await columnOverride.write({
                 cell,

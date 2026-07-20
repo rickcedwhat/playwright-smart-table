@@ -471,7 +471,87 @@ const createSmartRow = <T = any>(
         return !(smart as any)[SENTINEL_ROW];
     };
 
-    smart.toJSON = async (options?: { columns?: string[] }): Promise<T> => {
+    smart.toJSON = async (options?: { columns?: string[]; atomic?: boolean }): Promise<T> => {
+        // Atomic mode: snapshot the row in a single evaluate, then apply column overrides
+        // against a frozen reconstruction. Zero inter-column stagger — even in-place React
+        // re-renders can't affect it because overrides read from a detached clone.
+        if (options?.atomic) {
+            const cellSel = config.cellSelector;
+            if (typeof cellSel !== 'string') {
+                throw new Error('[SmartTable] toJSON({ atomic: true }) requires cellSelector to be a CSS string, not a function.');
+            }
+            const page = rootLocator.page();
+
+            // Step 1: clone row in browser memory (NOT in the DOM), extract text + row HTML
+            const cloneHandle = await rowLocator.evaluateHandle(el => el.cloneNode(true) as HTMLElement);
+            const snapshot = await cloneHandle.evaluate(
+                (row: HTMLElement, sel: string) => {
+                    const cells = row.querySelectorAll(sel);
+                    return {
+                        rowHTML: row.outerHTML,
+                        cells: [...cells].map(c => ({
+                            text: ((c as HTMLElement).innerText || '').trim(),
+                        })),
+                    };
+                }, cellSel);
+            await cloneHandle.dispose();
+
+            // Determine which columns have overrides (need lazy materialization)
+            const columnsToProcess = [...map.entries()]
+                .filter(([col]) => !options?.columns || options.columns.includes(col));
+            const hasAnyOverride = columnsToProcess.some(
+                ([col]) => !!config.columnOverrides?.[col as keyof T]?.read
+            );
+
+            // Step 2: lazily materialize the row if any override needs a Locator.
+            // Uses position:fixed off-screen (NOT display:none — that breaks innerText).
+            const snapId = `__st_snap_${Math.random().toString(36).slice(2, 10)}`;
+            let materialized = false;
+            const materializeRow = async () => {
+                if (materialized) return;
+                await page.evaluate(([html, id]) => {
+                    const c = document.createElement('div');
+                    c.id = id;
+                    c.style.cssText = 'position:fixed;left:-99999px;top:-99999px;opacity:0;pointer-events:none';
+                    // Wrap in <table><tbody> so the browser's HTML parser keeps <tr>/<td> intact.
+                    c.innerHTML = `<table><tbody>${html}</tbody></table>`;
+                    document.body.appendChild(c);
+                }, [snapshot.rowHTML, snapId] as const);
+                materialized = true;
+            };
+            const cleanupSnapshot = async () => {
+                if (!materialized) return;
+                await page.evaluate(id => document.getElementById(id)?.remove(), snapId);
+            };
+
+            // Step 3: build getCell helper — returns Locator to cell in materialized row
+            const getCell = (colName: string): Locator => {
+                const colIdx = map.get(colName);
+                if (colIdx === undefined) throw new Error(`[SmartTable] getCell: column "${colName}" not found`);
+                return page.locator(`#${snapId}`).locator(cellSel).nth(colIdx);
+            };
+
+            try {
+                if (hasAnyOverride) await materializeRow();
+
+                const result: Record<string, any> = {};
+                for (const [col, idx] of columnsToProcess) {
+                    const columnOverride = config.columnOverrides?.[col as keyof T];
+                    const mapper = columnOverride?.read;
+
+                    if (mapper) {
+                        const cell = page.locator(`#${snapId}`).locator(cellSel).nth(idx);
+                        result[col] = await mapper(cell, { row: smart, columnName: col, columnIndex: idx, getCell });
+                    } else if (idx < snapshot.cells.length) {
+                        result[col] = snapshot.cells[idx].text;
+                    }
+                }
+                return result as unknown as T;
+            } finally {
+                await cleanupSnapshot();
+            }
+        }
+
         const result: Record<string, any> = {};
         const page = rootLocator.page();
 
@@ -533,6 +613,22 @@ const createSmartRow = <T = any>(
             }
             lastGood = recovered;
             return recovered;
+        };
+
+        // getCell for non-atomic mode: returns a live cell Locator via the column map.
+        // Uses the last-known-good row from the re-pin so it's as fresh as possible,
+        // but returns raw cell Locators, not override-processed values.
+        const getCellLive = (colName: string): Locator => {
+            const colIdx = map.get(colName);
+            if (colIdx === undefined) throw new Error(`[SmartTable] getCell: column "${colName}" not found`);
+            const row = lastGood;
+            if (config.strategies.getCellLocator) {
+                return config.strategies.getCellLocator({
+                    row, root: rootLocator, columnName: colName,
+                    columnIndex: colIdx, rowIndex, page, config,
+                });
+            }
+            return resolve(config.cellSelector, row).nth(colIdx);
         };
 
         for (const [col, idx] of map.entries()) {
@@ -634,7 +730,7 @@ const createSmartRow = <T = any>(
 
             if (mapper) {
                 // Apply mapper
-                const mappedValue = await mapper(targetCell, { row: smart, columnName: col, columnIndex: idx });
+                const mappedValue = await mapper(targetCell, { row: smart, columnName: col, columnIndex: idx, getCell: getCellLive });
                 result[col] = mappedValue;
             } else {
                 // Default string extraction
@@ -675,7 +771,10 @@ const createSmartRow = <T = any>(
 
                 let currentValue;
                 if (columnOverride.read) {
-                    currentValue = await columnOverride.read(cellLocator, { row: smart, columnName: colName, columnIndex: colIdx });
+                    currentValue = await columnOverride.read(cellLocator, {
+                        row: smart, columnName: colName, columnIndex: colIdx,
+                        getCell: (name: string) => smart.getCell(name),
+                    });
                 }
 
                 await columnOverride.write({
