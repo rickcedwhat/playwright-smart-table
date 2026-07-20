@@ -138,6 +138,48 @@ test.describe('toJSON recovery is concurrency-safe (#366)', () => {
         expect(scrollCalls).toBeGreaterThan(0);
     });
 
+    test('standalone toJSON recovers via viewport.scrollToRow when the row is unmounted', async ({ page }) => {
+        await page.setContent(HTML);
+        let scrollCalls = 0;
+        const table = await useTable(page.locator('#t'), {
+            strategies: {
+                resolveRowIndex,
+                viewport: {
+                    // scrollToRow brings the unmounted target row back into the DOM so the
+                    // subsequent rescan finds it — exercising the recovery success branch.
+                    scrollToRow: async () => {
+                        scrollCalls++;
+                        await page.evaluate(() => {
+                            const tbody = document.querySelector('#t tbody')!;
+                            if (tbody.querySelector('tr[data-ri="1"]')) return;
+                            const tr = document.createElement('tr');
+                            tr.setAttribute('data-ri', '1');
+                            tr.innerHTML = '<td>Bob</td><td>Type-Bob</td><td>Extra-Bob</td>';
+                            const carol = tbody.querySelector('tr[data-ri="2"]');
+                            tbody.insertBefore(tr, carol);
+                        });
+                    },
+                },
+            },
+            columnOverrides: {
+                Name: {
+                    read: async (cell) => {
+                        const name = (await cell.innerText()).trim();
+                        // Fully unmount Bob's row — only scrollToRow can bring it back.
+                        await cell.page().evaluate(() => {
+                            document.querySelector('#t tbody tr[data-ri="1"]')?.remove();
+                        });
+                        return name;
+                    },
+                },
+            },
+        }).init();
+
+        const result = (await table.getRowByIndex(1).toJSON()) as Record<string, string>;
+        expect(result).toEqual({ Name: 'Bob', Type: 'Type-Bob', Extra: 'Extra-Bob' });
+        expect(scrollCalls).toBeGreaterThan(0);
+    });
+
     test('map batch never scrolls (rescan-only) and throws with a batch-aware message', async ({ page }) => {
         await page.setContent(HTML);
         let scrollCalls = 0;

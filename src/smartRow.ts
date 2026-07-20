@@ -500,9 +500,14 @@ const createSmartRow = <T = any>(
         // so an independent scroll here would fight peers / invalidate their locators. In a batch
         // we recover by rescanning the currently-mounted rows only, and throw if that fails.
         const inBatch = (smart as any)._inBatch === true || !!(smart as any)._barrier;
+        // The last locator we confirmed points at the expected logical row. After a recovery the
+        // node the original `rowLocator` referenced stays drifted, so re-checking it every column
+        // would re-run the full rescan needlessly; validate the last-known-good locator first and
+        // only fall back to a rescan when it too has drifted.
+        let lastGood = rowLocator;
         const resolveStableRow = async (): Promise<Locator> => {
             if (!canPin) return rowLocator;
-            if ((await resolveRI!(rowLocator)) === rowIndex) return rowLocator; // still correct
+            if ((await resolveRI!(lastGood)) === rowIndex) return lastGood; // still correct
             // Drifted (recycled). Re-locate the row carrying the expected logical index.
             const rescan = async (): Promise<Locator | null> => {
                 const rows = await resolve(config.rowSelector, rootLocator).all();
@@ -526,6 +531,7 @@ const createSmartRow = <T = any>(
                         : `Ensure a viewport.scrollToRow can restore the row.`)
                 );
             }
+            lastGood = recovered;
             return recovered;
         };
 
