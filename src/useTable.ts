@@ -566,7 +566,11 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
           for (const idx of newIndices) {
             // index = visit-order counter; rowIndex = logical/data index (B-hybrid, #362).
             const logical = await resolveLogicalRowIndex(pageRows[idx], config, () => rowIndex) ?? rowIndex;
-            yield { row: _makeSmart(pageRows[idx], map, logical, tableState.currentPageIndex, barrier), index: rowIndex, rowIndex: logical, pageIndex: tableState.currentPageIndex };
+            const sr = _makeSmart(pageRows[idx], map, logical, tableState.currentPageIndex, barrier);
+            // Iterator rows share one per-page DOM snapshot (positional locators); disable
+            // toJSON's scroll-back recovery so reading one row can't invalidate the others (#366).
+            (sr as any)._inBatch = true;
+            yield { row: sr, index: rowIndex, rowIndex: logical, pageIndex: tableState.currentPageIndex };
             rowIndex++;
           }
 

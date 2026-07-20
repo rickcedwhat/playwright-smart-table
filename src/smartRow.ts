@@ -485,10 +485,63 @@ const createSmartRow = <T = any>(
                 return resolve(config.headerSelector as any, rootLocator).nth(idx);
             };
 
+        // #366: on virtualized tables the row's DOM node can recycle between the per-column
+        // awaits below, which would make one toJSON() mix fields from different logical rows.
+        // When a resolveRowIndex strategy is configured and this row has a known logical index,
+        // re-pin the row before each column read: if the current locator has drifted to a
+        // different logical row, re-locate the correct one (rescan, then scrollToRow) — or throw,
+        // rather than silently returning a mixed-row object. No-op without resolveRowIndex/rowIndex.
+        const resolveRI = config.strategies.resolveRowIndex;
+        const canPin = !!resolveRI && typeof rowIndex === 'number';
+        const stableCtx = { root: rootLocator, config, page, resolve } as any;
+        // scrollToRow recovery is only safe for standalone reads (findRow/findRowByIndex/getRow*).
+        // Inside a map/forEach/filter or async-iterator batch, the other rows are positional
+        // locators from one DOM snapshot (and, in synchronized mode, coordinated by a barrier),
+        // so an independent scroll here would fight peers / invalidate their locators. In a batch
+        // we recover by rescanning the currently-mounted rows only, and throw if that fails.
+        const inBatch = (smart as any)._inBatch === true || !!(smart as any)._barrier;
+        // The last locator we confirmed points at the expected logical row. After a recovery the
+        // node the original `rowLocator` referenced stays drifted, so re-checking it every column
+        // would re-run the full rescan needlessly; validate the last-known-good locator first and
+        // only fall back to a rescan when it too has drifted.
+        let lastGood = rowLocator;
+        const resolveStableRow = async (): Promise<Locator> => {
+            if (!canPin) return rowLocator;
+            if ((await resolveRI!(lastGood)) === rowIndex) return lastGood; // still correct
+            // Drifted (recycled). Re-locate the row carrying the expected logical index.
+            const rescan = async (): Promise<Locator | null> => {
+                const rows = await resolve(config.rowSelector, rootLocator).all();
+                for (const r of rows) {
+                    if ((await resolveRI!(r)) === rowIndex) return r;
+                }
+                return null;
+            };
+            let recovered = await rescan();
+            // Scroll the row back only when it's safe to move the viewport (not mid-batch).
+            if (!recovered && !inBatch && config.strategies.viewport?.scrollToRow) {
+                await config.strategies.viewport.scrollToRow(stableCtx, rowIndex as number);
+                recovered = await rescan();
+            }
+            if (!recovered) {
+                throw new Error(
+                    `[SmartTable] toJSON: row ${rowIndex} recycled out of the DOM mid-read and could not be recovered — ` +
+                    `the returned object would mix fields from different rows. ` +
+                    (inBatch
+                        ? `(During a map/forEach batch, scroll-back recovery is disabled to avoid disrupting sibling rows; the row must stay mounted for the read.)`
+                        : `Ensure a viewport.scrollToRow can restore the row.`)
+                );
+            }
+            lastGood = recovered;
+            return recovered;
+        };
+
         for (const [col, idx] of map.entries()) {
             if (options?.columns && !options.columns.includes(col)) {
                 continue;
             }
+
+            // Re-pin to the correct logical row before reading this column (#366).
+            const stableRow = await resolveStableRow();
 
             // Check if we have a column override for this column
             const columnOverride = config.columnOverrides?.[col as keyof T];
@@ -497,7 +550,7 @@ const createSmartRow = <T = any>(
             // --- Navigation Logic Start ---
             const cell = config.strategies.getCellLocator
                 ? config.strategies.getCellLocator({
-                    row: rowLocator,
+                    row: stableRow,
                     root: rootLocator,
                     columnName: col,
                     columnIndex: idx,
@@ -505,7 +558,7 @@ const createSmartRow = <T = any>(
                     page: page,
                     config
                 })
-                : resolve(config.cellSelector, rowLocator).nth(idx);
+                : resolve(config.cellSelector, stableRow).nth(idx);
 
             let targetCell = cell;
             // Always call _navigateToCell to ensure Lock-Step synchronization
@@ -518,7 +571,7 @@ const createSmartRow = <T = any>(
                 getHeaders: table?.getHeaders,
                 column: col,
                 index: idx,
-                rowLocator,
+                rowLocator: stableRow,
                 rowIndex,
                 barrier: (smart as any)._barrier
             });
@@ -535,7 +588,7 @@ const createSmartRow = <T = any>(
                     cell: targetCell,
                     columnName: col,
                     columnIndex: idx,
-                    row: rowLocator,
+                    row: stableRow,
                     page,
                     root: rootLocator,
                     getHeaderCell,
