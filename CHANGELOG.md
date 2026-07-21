@@ -1,15 +1,20 @@
 # Changelog
 
-## [Unreleased]
+## [6.19.0] - 2026-07-21
+
+### Added
+
+- **`toJSON({ atomic: true })` — stagger-free row snapshots** — clones the row in a single `evaluateHandle`, extracts all cell values from the detached clone. Column overrides run against a lazily-materialized off-screen reconstruction. Immune to both DOM node recycling and in-place React re-renders. Requires `cellSelector` to be a CSS string. Uses `textContent` (not layout-dependent `innerText`) for non-override columns. Closes #376.
+- **`getCell(columnName)` in column override context** — new helper on `ColumnOverrideReadContext`. In atomic mode returns a Locator to the frozen cell; in non-atomic mode returns a live cell Locator. Enables cross-cell access in overrides without circular-dependency risk. Part of #376.
+- **`table.findRowByIndex(index, options?)`** — async accessor for the row with a specific logical/data-model index on virtualized tables, complementing the sync, render-window-relative `getRowByIndex`. It reaches the row via a currently-mounted match, the viewport's random-access `scrollToRow` fast path, then advancing pages (a "page" is a scroll step on infinite-scroll tables) up to `maxPages`. Requires a `strategies.resolveRowIndex` to identify rows by logical index, and throws if one is absent or the row cannot be reached — never a silent wrong-row result. Addresses #354.
+- **`ViewportStrategy.getVisibleRowIndices`** — optional strategy method returning the DOM positions of rows currently within the scroll container's visible bounds (geometry-based, inclusive). Implemented by `Strategies.Viewport.dataAttribute` and the `muiDataGrid` preset. Enables the iteration engine to skip overscan rows (below).
+- **`columnOverrides.read` now receives row context** — the `read` hook is called as `read(cell, { row, columnName, columnIndex, getCell })`. This enables synthetic / row-derived columns (e.g. an identity column pulling an `a[href]` or `data-*` attribute from the row) without the `getCellLocator`-returns-`row` workaround, and aligns `read` with `beforeCellRead`, which already receives the row. Backwards-compatible: existing single-argument `read(cell)` implementations keep working. Closes #365.
+- **`config.emptyState` — graceful init when the table has no data** — new config option accepting a Locator for an empty-state element. When header resolution fails during `init()` and this locator is visible, `init()` succeeds and `table.isEmpty()` returns `true`. All row operations still throw normally; `countRows()` returns `0`. `reset()` and `revalidate()` clear the empty flag so the table can leave the empty-state path when data appears. Closes #379.
 
 ### Fixed
 
 - **`toJSON` — cross-column row tear on virtualized tables** — a single `toJSON()` reads columns with an `await` per column, and the row's DOM node can recycle between those reads (virtual scrollers reuse nodes for other logical rows), so the returned object could silently mix fields from different rows. When a `resolveRowIndex` strategy is configured and the row has a known logical index, `toJSON` now re-pins to that logical row before each column read: if the node drifted, it re-locates the correct row (rescan, then `viewport.scrollToRow`) and reads from it — or throws rather than returning a mixed-row object. No-op (unchanged behavior) without a `resolveRowIndex` strategy. Closes #366.
-
-### Added
-
-- **`table.findRowByIndex(index, options?)`** — async accessor for the row with a specific logical/data-model index on virtualized tables, complementing the sync, render-window-relative `getRowByIndex`. It reaches the row via a currently-mounted match, the viewport's random-access `scrollToRow` fast path, then advancing pages (a "page" is a scroll step on infinite-scroll tables) up to `maxPages`. Requires a `strategies.resolveRowIndex` to identify rows by logical index, and throws if one is absent or the row cannot be reached — never a silent wrong-row result. Addresses #354.
-- **`ViewportStrategy.getVisibleRowIndices`** — optional strategy method returning the DOM positions of rows currently within the scroll container's visible bounds (geometry-based, inclusive). Implemented by `Strategies.Viewport.dataAttribute` and the `muiDataGrid` preset. Enables the iteration engine to skip overscan rows (below).
+- **`Strategies.Viewport.dataAttribute().getVisibleRowRange` — now geometry-aware** — it previously reported every mounted row, including overscan rows the virtual scroller keeps mounted above/below the fold, so the "visible" range was wider than what is actually on screen. It now intersects each row against the scroll container's vertical bounds (inclusive — a row with any overlap counts as visible; only rows entirely off-screen are dropped, so a partially-visible row is never lost). Falls back to the previous all-rows behavior when the scroll container can't be resolved. Part of #353 (part 1 — accurate range; iteration-level filtering tracked separately in #362).
 
 ### Changed
 
@@ -22,14 +27,6 @@
   `rowIndex` is **no longer deprecated** — it now carries real, stable identity rather than being a rename-target for `index`. This supersedes the planned v7 change (#87, "rename `rowIndex` → `index`") and the docs warning (#86, "`rowIndex` is iteration-local"): instead of removing `rowIndex`, it is given a meaningful value distinct from `index`.
 
   **Behavior change** — only if you configure a `resolveRowIndex` strategy *and* rely on the callback's `rowIndex` being a contiguous 0-based counter; use `index` for the visit-order counter. No change when no `resolveRowIndex` strategy is set (`index === rowIndex`). Part of #362; closes #86, #87.
-
-### Fixed
-
-- **`Strategies.Viewport.dataAttribute().getVisibleRowRange` — now geometry-aware** — it previously reported every mounted row, including overscan rows the virtual scroller keeps mounted above/below the fold, so the "visible" range was wider than what is actually on screen. It now intersects each row against the scroll container's vertical bounds (inclusive — a row with any overlap counts as visible; only rows entirely off-screen are dropped, so a partially-visible row is never lost). Falls back to the previous all-rows behavior when the scroll container can't be resolved. Part of #353 (part 1 — accurate range; iteration-level filtering tracked separately in #362).
-
-### Added
-
-- **`columnOverrides.read` now receives row context** — the `read` hook is called as `read(cell, { row, columnName, columnIndex })`. This enables synthetic / row-derived columns (e.g. an identity column pulling an `a[href]` or `data-*` attribute from the row) without the `getCellLocator`-returns-`row` workaround, and aligns `read` with `beforeCellRead`, which already receives the row. Backwards-compatible: existing single-argument `read(cell)` implementations keep working. Closes #365.
 
 ## [6.18.0] - 2026-07-18
 
