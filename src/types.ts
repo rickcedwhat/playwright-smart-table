@@ -664,6 +664,13 @@ export interface TableConfig<T = any> {
    * Overrides both default extraction (toJSON) and filling (smartFill) logic.
    */
   columnOverrides?: Partial<Record<keyof T, ColumnOverride<T[keyof T]>>>;
+
+  /**
+   * Locator for an empty-state element that replaces the table when there are no results.
+   * If header resolution fails during init() and this locator is visible, init() succeeds
+   * and isEmpty() returns true. All row operations still throw normally.
+   */
+  emptyState?: Locator;
 }
 
 export interface FinalTableConfig<T = any> extends TableConfig<T> {
@@ -755,6 +762,13 @@ export interface TableResult<T = any> extends AsyncIterable<{ row: SmartRow<T>; 
    * @returns true if init() has been called and completed, false otherwise
    */
   isInitialized(): boolean;
+
+  /**
+   * SYNC: Returns true if init() resolved via the emptyState path — the table's
+   * empty-state locator was visible when header resolution failed.
+   * Row operations still throw normally; use this to branch before calling them.
+   */
+  isEmpty(): boolean;
 
   getHeaders: () => Promise<string[]>;
   getHeaderCell: (columnName: string) => Promise<Locator>;

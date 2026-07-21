@@ -168,7 +168,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     return createSmartRow<T>(rowLocator, map, rowIndex, config, rootLocator, resolve, finalTable, tablePageIndex, barrier);
   };
 
-  const tableState = { currentPageIndex: 0 };
+  const tableState = { currentPageIndex: 0, empty: false };
   const rowFinder = new RowFinder<T>(rootLocator, config, resolve, filterEngine, tableMapper, _makeSmart, tableState, (useBulk) => _advancePage(useBulk));
 
   /** Builds a full TableContext/StrategyContext with getHeaderCell, getHeaders, scrollToColumn. Set after result is created. */
@@ -247,7 +247,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     get currentPageIndex() { return tableState.currentPageIndex; },
     set currentPageIndex(v: number) { tableState.currentPageIndex = v; },
     init: async (options?: { timeout?: number }): Promise<TableResult<T>> => {
-      if (tableMapper.isInitialized()) return result;
+      if (tableMapper.isInitialized() || tableState.empty) return result;
 
       if (config.strategies.sorting) validateSortingStrategy(config.strategies.sorting);
       if (config.strategies.fill) validateFillStrategy(config.strategies.fill);
@@ -255,7 +255,20 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       warnIfDebugInCI(config);
       logDebug(config, 'info', 'Initializing table');
 
-      const map = await tableMapper.getMap(options?.timeout);
+      let map: Map<string, number>;
+      try {
+        map = await tableMapper.getMap(options?.timeout);
+      } catch (headerError) {
+        if (config.emptyState) {
+          const visible = await config.emptyState.isVisible().catch(() => false);
+          if (visible) {
+            tableState.empty = true;
+            logDebug(config, 'info', 'init: header resolution failed but emptyState locator is visible — table is empty');
+            return result;
+          }
+        }
+        throw headerError;
+      }
 
       logDebug(config, 'info', `Table initialized with ${map.size} columns`, Array.from(map.keys()));
 
@@ -497,9 +510,13 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     },
 
     isInitialized: (): boolean => {
-      const initialized = tableMapper.isInitialized();
+      const initialized = tableMapper.isInitialized() || tableState.empty;
       log(`isInitialized: ${initialized}`);
       return initialized;
+    },
+
+    isEmpty: (): boolean => {
+      return tableState.empty;
     },
 
     sorting: {
