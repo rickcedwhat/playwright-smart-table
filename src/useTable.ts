@@ -318,6 +318,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     },
 
     countRows: async (): Promise<number> => {
+      if (tableState.empty) return 0;
       await _autoInit();
       const pag = config.strategies.pagination;
       const hasPagination = config.maxPages > 1 && !!(pag?.goNext || pag?.goNextBulk);
@@ -400,6 +401,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       }
 
       tableState.currentPageIndex = 0;
+      tableState.empty = false;
       tableMapper.clear();
       log("Table reset complete. Calling autoInit to restore state.");
       await _autoInit();
@@ -408,6 +410,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     revalidate: async () => {
       log("Revalidating table structure...");
       await tableMapper.remapHeaders();
+      tableState.empty = false;
       log("Table revalidated.");
     },
 

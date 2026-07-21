@@ -99,6 +99,16 @@ test.describe('emptyState config (#379)', () => {
         await expect(table.findRow({ Name: 'Alice' })).rejects.toThrow();
     });
 
+    test('countRows returns 0 in empty state', async ({ page }) => {
+        await page.setContent(EMPTY_STATE_HTML);
+
+        const table = await useTable(page.locator('#t'), {
+            emptyState: page.locator('.empty-state'),
+        }).init();
+
+        expect(await table.countRows()).toBe(0);
+    });
+
     test('getHeaders throws in empty state', async ({ page }) => {
         await page.setContent(EMPTY_STATE_HTML);
 
