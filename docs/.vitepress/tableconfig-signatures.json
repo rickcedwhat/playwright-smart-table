@@ -53,5 +53,10 @@
     "name": "columnOverrides",
     "signature": "columnOverrides?: Partial<Record<keyof T, ColumnOverride<T[keyof T]>>>",
     "comment": "/**\n* Unified interface for reading and writing data to specific columns.\n* Overrides both default extraction (toJSON) and filling (smartFill) logic.\n*/"
+  },
+  {
+    "name": "emptyState",
+    "signature": "emptyState?: Locator",
+    "comment": "/**\n* Locator for an empty-state element that replaces the table when there are no results.\n* If header resolution fails during init() and this locator is visible, init() succeeds\n* and isEmpty() returns true. All row operations still throw normally.\n*/"
   }
 ]
