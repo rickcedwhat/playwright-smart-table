@@ -482,19 +482,25 @@ const createSmartRow = <T = any>(
             }
             const page = rootLocator.page();
 
-            // Step 1: clone row in browser memory (NOT in the DOM), extract text + row HTML
+            // Step 1: clone row in browser memory (NOT in the DOM), extract text + row HTML.
+            // Uses textContent (not innerText) because the clone is detached — innerText
+            // falls back to textContent on detached nodes per HTML spec, so be explicit.
             const cloneHandle = await rowLocator.evaluateHandle(el => el.cloneNode(true) as HTMLElement);
-            const snapshot = await cloneHandle.evaluate(
-                (row: HTMLElement, sel: string) => {
-                    const cells = row.querySelectorAll(sel);
-                    return {
-                        rowHTML: row.outerHTML,
-                        cells: [...cells].map(c => ({
-                            text: ((c as HTMLElement).innerText || '').trim(),
-                        })),
-                    };
-                }, cellSel);
-            await cloneHandle.dispose();
+            let snapshot: { rowHTML: string; cells: { text: string }[] };
+            try {
+                snapshot = await cloneHandle.evaluate(
+                    (row: HTMLElement, sel: string) => {
+                        const cells = row.querySelectorAll(sel);
+                        return {
+                            rowHTML: row.outerHTML,
+                            cells: [...cells].map(c => ({
+                                text: (c.textContent || '').trim(),
+                            })),
+                        };
+                    }, cellSel);
+            } finally {
+                await cloneHandle.dispose();
+            }
 
             // Determine which columns have overrides (need lazy materialization)
             const columnsToProcess = [...map.entries()]
@@ -541,7 +547,15 @@ const createSmartRow = <T = any>(
 
                     if (mapper) {
                         const cell = page.locator(`#${snapId}`).locator(cellSel).nth(idx);
-                        result[col] = await mapper(cell, { row: smart, columnName: col, columnIndex: idx, getCell });
+                        try {
+                            result[col] = await mapper(cell, { row: smart, columnName: col, columnIndex: idx, getCell });
+                        } catch (err) {
+                            const wrapped = new Error(
+                                `[SmartTable] toJSON({ atomic: true }): column override for "${col}" failed — ${(err as Error).message}`,
+                            );
+                            (wrapped as any).cause = err;
+                            throw wrapped;
+                        }
                     } else if (idx < snapshot.cells.length) {
                         result[col] = snapshot.cells[idx].text;
                     }

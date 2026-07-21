@@ -353,6 +353,30 @@ test.describe('toJSON({ atomic }) — frozen snapshot with lazy materialization'
         expect(result.combo).toBe('Alice+Extra-Alice');
     });
 
+    test('atomic uses textContent — includes text from hidden children', async ({ page }) => {
+        const htmlWithHidden = `
+          <table id="t">
+            <thead><tr><th>Name</th><th>Type</th></tr></thead>
+            <tbody>
+              <tr><td>Visible<span style="display:none">Hidden</span></td><td>Type-A</td></tr>
+            </tbody>
+          </table>
+        `;
+        await page.setContent(htmlWithHidden);
+        const table = await useTable(page.locator('#t')).init();
+
+        const nonAtomic = (await table.getRowByIndex(0).toJSON()) as Record<string, string>;
+        const atomic = (await table.getRowByIndex(0).toJSON({ atomic: true })) as Record<string, string>;
+
+        // Non-atomic uses Playwright's live innerText which respects display:none.
+        expect(nonAtomic.Name).toBe('Visible');
+        // Atomic uses textContent on a detached clone — hidden children are included.
+        expect(atomic.Name).toBe('VisibleHidden');
+        // Columns without hidden elements match in both modes.
+        expect(nonAtomic.Type).toBe('Type-A');
+        expect(atomic.Type).toBe('Type-A');
+    });
+
     test('snapshot container is cleaned up after toJSON completes', async ({ page }) => {
         await page.setContent(HTML);
 

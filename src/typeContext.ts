@@ -263,7 +263,9 @@ export type SmartRow<T = any> = Locator & {
    * // { Name: 'John', Email: 'john@example.com' }
    *
    * // Atomic: snapshot all cell values in a single evaluate — zero inter-column stagger.
-   * // Column overrides, beforeCellRead, navigation, and cell loading waits are skipped.
+   * // Requires cellSelector to be a CSS string (not a function).
+   * // Column overrides ARE supported (run against a frozen off-screen reconstruction).
+   * // Uses textContent (not layout-dependent innerText) for non-override columns.
    * const coherent = await row.toJSON({ atomic: true });
    */
   toJSON(options?: { columns?: string[]; atomic?: boolean }): Promise<T>;
