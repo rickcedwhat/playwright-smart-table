@@ -358,7 +358,10 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
         
         const columnOverride = config.columnOverrides?.[columnName as keyof T];
         if (columnOverride?.read) {
-            return await columnOverride.read(cell, { row, columnName, columnIndex: map.get(columnName)! }) as R;
+            return await columnOverride.read(cell, {
+                row, columnName, columnIndex: map.get(columnName)!,
+                getCell: (name: string) => row.getCell(name),
+            }) as R;
         }
         
         const text = await cell.innerText();

@@ -21,8 +21,8 @@
   },
   {
     "name": "toJSON",
-    "signature": "toJSON(options?: { columns?: string[] }): Promise<T>",
-    "comment": "/**\n* Extract all cell data as a key-value object.\n* @param options - Optional configuration\n* @param options.columns - Specific columns to extract (extracts all if not specified)\n* @returns Promise resolving to row data\n* @example\n* const data = await row.toJSON();\n* // { Name: 'John', Email: 'john@example.com', ... }\n*\n* const partial = await row.toJSON({ columns: ['Name', 'Email'] });\n* // { Name: 'John', Email: 'john@example.com' }\n*/"
+    "signature": "toJSON(options?: { columns?: string[]; atomic?: boolean }): Promise<T>",
+    "comment": "/**\n* Extract all cell data as a key-value object.\n* @param options - Optional configuration\n* @param options.columns - Specific columns to extract (extracts all if not specified)\n* @returns Promise resolving to row data\n* @example\n* const data = await row.toJSON();\n* // { Name: 'John', Email: 'john@example.com', ... }\n*\n* const partial = await row.toJSON({ columns: ['Name', 'Email'] });\n* // { Name: 'John', Email: 'john@example.com' }\n*\n* // Atomic: snapshot all cell values in a single evaluate — zero inter-column stagger.\n* // Column overrides, beforeCellRead, navigation, and cell loading waits are skipped.\n* const coherent = await row.toJSON({ atomic: true });\n*/"
   },
   {
     "name": "bringIntoView",

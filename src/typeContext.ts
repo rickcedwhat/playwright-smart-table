@@ -261,8 +261,14 @@ export type SmartRow<T = any> = Locator & {
    * 
    * const partial = await row.toJSON({ columns: ['Name', 'Email'] });
    * // { Name: 'John', Email: 'john@example.com' }
+   *
+   * // Atomic: snapshot all cell values in a single evaluate — zero inter-column stagger.
+   * // Requires cellSelector to be a CSS string (not a function).
+   * // Column overrides ARE supported (run against a frozen off-screen reconstruction).
+   * // Uses textContent (not layout-dependent innerText) for non-override columns.
+   * const coherent = await row.toJSON({ atomic: true });
    */
-  toJSON(options?: { columns?: string[] }): Promise<T>;
+  toJSON(options?: { columns?: string[]; atomic?: boolean }): Promise<T>;
 
   /**
    * Scrolls/paginates to bring this row into view.
@@ -443,6 +449,21 @@ export interface ColumnOverrideReadContext {
   columnName: string;
   /** The column's 0-based index in the resolved header map. */
   columnIndex: number;
+  /**
+   * Get a Locator for another cell in the same row by column name.
+   * Returns raw cell Locators, not override-processed values.
+   *
+   * In atomic mode, the Locator points at the frozen reconstructed cell — coherent with
+   * every other cell from the same snapshot. In non-atomic mode, it points at the live cell.
+   *
+   * @example
+   * read: async (_cell, { getCell }) => {
+   *   const name = (await getCell('Name').innerText()).trim();
+   *   const href = await getCell('Name').locator('a').getAttribute('href') || '';
+   *   return \`\${name} | \${href}\`;
+   * }
+   */
+  getCell: (columnName: string) => Locator;
 }
 
 export interface ColumnOverride<TValue = any> {
