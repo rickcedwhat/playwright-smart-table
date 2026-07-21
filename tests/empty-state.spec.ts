@@ -78,4 +78,49 @@ test.describe('emptyState config (#379)', () => {
         const same = await table.init();
         expect(same.isEmpty()).toBe(true);
     });
+
+    test('getRow throws in empty state', async ({ page }) => {
+        await page.setContent(EMPTY_STATE_HTML);
+
+        const table = await useTable(page.locator('#t'), {
+            emptyState: page.locator('.empty-state'),
+        }).init();
+
+        expect(() => table.getRow({ Name: 'Alice' })).toThrow();
+    });
+
+    test('findRow throws in empty state', async ({ page }) => {
+        await page.setContent(EMPTY_STATE_HTML);
+
+        const table = await useTable(page.locator('#t'), {
+            emptyState: page.locator('.empty-state'),
+        }).init();
+
+        await expect(table.findRow({ Name: 'Alice' })).rejects.toThrow();
+    });
+
+    test('getHeaders throws in empty state', async ({ page }) => {
+        await page.setContent(EMPTY_STATE_HTML);
+
+        const table = await useTable(page.locator('#t'), {
+            emptyState: page.locator('.empty-state'),
+        }).init();
+
+        await expect(table.getHeaders()).rejects.toThrow();
+    });
+
+    test('emptyState with both table and empty element — headers win', async ({ page }) => {
+        await page.setContent(`
+            ${TABLE_HTML}
+            ${EMPTY_STATE_HTML}
+        `);
+
+        const table = await useTable(page.locator('#t'), {
+            emptyState: page.locator('.empty-state'),
+        }).init();
+
+        expect(table.isEmpty()).toBe(false);
+        const headers = await table.getHeaders();
+        expect(headers).toEqual(['Name', 'Status']);
+    });
 });

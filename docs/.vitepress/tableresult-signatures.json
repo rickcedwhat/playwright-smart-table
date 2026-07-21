@@ -15,6 +15,11 @@
     "comment": "/**\n* SYNC: Checks if the table has been initialized.\n* @returns true if init() has been called and completed, false otherwise\n*/"
   },
   {
+    "name": "isEmpty",
+    "signature": "isEmpty(): boolean",
+    "comment": "/**\n* SYNC: Returns true if init() resolved via the emptyState path — the table's\n* empty-state locator was visible when header resolution failed.\n* Row operations still throw normally; use this to branch before calling them.\n*/"
+  },
+  {
     "name": "getHeaders",
     "signature": "getHeaders: () => Promise<string[]>",
     "comment": ""
