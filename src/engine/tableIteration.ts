@@ -156,13 +156,13 @@ export async function runMap<T, R>(
               throw new Error(`[SmartTable] Row ${row.rowIndex} did not finish loading within ${env.config.strategies.loading?.rowLoadingTimeout}ms`);
             }
 
+            let dedupeKey: string | number | undefined;
             if (dedupeKeys && dedupeStrategy) {
-              const key = await dedupeStrategy(row);
-              if (dedupeKeys.has(key)) {
-                log(env.config, `${label}: dedupe skip key="${key}"`);
+              dedupeKey = await dedupeStrategy(row);
+              if (dedupeKeys.has(dedupeKey)) {
+                log(env.config, `${label}: dedupe skip key="${dedupeKey}"`);
                 return SKIP;
               }
-              dedupeKeys.add(key);
             }
 
             // Execute callback (optionally serialized via mutex)
@@ -172,11 +172,15 @@ export async function runMap<T, R>(
               return await callback({ row, index: enumIndex, rowIndex: row.rowIndex!, pageIndex: env.getCurrentPageIndex(), stop: () => stop(enumIndex) });
             };
 
-            if (actionMutex) {
-              return await actionMutex.run(runCallback);
-            } else {
-              return await runCallback();
+            const result = actionMutex
+              ? await actionMutex.run(runCallback)
+              : await runCallback();
+
+            if (dedupeKeys && dedupeKey !== undefined && result !== SKIP) {
+              dedupeKeys.add(dedupeKey);
             }
+
+            return result;
           } finally {
             // Ensure the barrier is notified once per row, even on error or skip.
             barrier?.markFinished();
