@@ -59,8 +59,9 @@ describe('EOF final scan (#383)', () => {
   });
 
   it('map collects rows revealed by the final scroll when advancePage returns false', async () => {
-    // Page 1: rows 0,1.  After advance (returns true): rows 2,3.
-    // After second advance (returns false — EOF): rows 4,5 appear (last scroll revealed them).
+    // Page 0: rows 0,1.  Advance (returns true) → page 1: rows 2,3.
+    // Advance returns false but reveals rows 4,5 (stabilization said "no change" at EOF).
+    // Without the fix, rows 4,5 would be missed.
     let page = 0;
     const pages = [
       [makeRow(0), makeRow(1)],
@@ -72,12 +73,14 @@ describe('EOF final scan (#383)', () => {
       getRowLocators: () => ({ all: async () => pages[page] }) as any,
       getMap: () => new Map([['A', 0]]),
       advancePage: async () => {
-        if (page < 2) {
-          page++;
+        if (page === 0) {
+          page = 1;
           return true;
         }
-        // Simulate: scroll happened, new rows appeared, but stabilization said "no change"
-        page = 2;
+        if (page === 1) {
+          page = 2;
+          return false;
+        }
         return false;
       },
       makeSmartRow: (_loc: any, _map: any, idx: number) =>
@@ -95,6 +98,8 @@ describe('EOF final scan (#383)', () => {
   });
 
   it('forEach visits rows revealed by the final scroll', async () => {
+    // Page 0: rows 0,1.  Advance returns false but reveals rows 2,3.
+    // Without the fix, only rows 0,1 would be visited.
     let page = 0;
     const pages = [
       [makeRow(0), makeRow(1)],
@@ -105,11 +110,10 @@ describe('EOF final scan (#383)', () => {
       getRowLocators: () => ({ all: async () => pages[page] }) as any,
       getMap: () => new Map([['A', 0]]),
       advancePage: async () => {
-        if (page < 1) {
-          page++;
-          return true;
+        if (page === 0) {
+          page = 1;
+          return false;
         }
-        // EOF: stabilization returned false, but rows 2,3 are newly visible
         return false;
       },
       makeSmartRow: (_loc: any, _map: any, idx: number) =>
@@ -148,19 +152,21 @@ describe('EOF final scan (#383)', () => {
   });
 
   it('final scan respects stop() — does not process rows beyond stoppedIndex', async () => {
+    // Page 0: rows 0,1.  Advance returns false but reveals rows 2,3,4.
+    // stop() is called on row 2 (during the final scan), so rows 3,4 should be skipped.
     let page = 0;
     const pages = [
       [makeRow(0), makeRow(1)],
-      [makeRow(2), makeRow(3)],
+      [makeRow(2), makeRow(3), makeRow(4)],
     ];
 
     const env: TableIterationEnv<any> = {
       getRowLocators: () => ({ all: async () => pages[page] }) as any,
       getMap: () => new Map([['A', 0]]),
       advancePage: async () => {
-        if (page < 1) {
-          page++;
-          return false; // EOF immediately after first page
+        if (page === 0) {
+          page = 1;
+          return false;
         }
         return false;
       },
@@ -176,9 +182,8 @@ describe('EOF final scan (#383)', () => {
     const visited: number[] = [];
     await runForEach(env, ({ row, stop }) => {
       visited.push(row.rowIndex!);
-      if (row.rowIndex === 0) stop();
+      if (row.rowIndex === 2) stop();
     }, {});
-    // stop() at row 0 means row 1+ should not be visited
-    expect(visited).toEqual([0]);
+    expect(visited).toEqual([0, 1, 2]);
   });
 });
