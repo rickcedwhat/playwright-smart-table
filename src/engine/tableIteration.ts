@@ -70,6 +70,7 @@ export async function runMap<T, R>(
     let stopped = false;
     let stoppedIndex = Infinity;
     let pagesScanned = 1;
+    let reachedEnd = false;
 
     const stop = (idx: number) => {
       if (!stopped) {
@@ -201,12 +202,13 @@ export async function runMap<T, R>(
         rowIndex += batchSize;
       }
 
-      if (stopped || pagesScanned >= effectiveMaxPages) break;
+      if (stopped || pagesScanned >= effectiveMaxPages || reachedEnd) break;
 
       log(env.config, `${label}: advancing to next page (${pagesScanned} → ${pagesScanned + 1})`);
       if (!await env.advancePage(useBulk)) {
-        log(env.config, `${label}: no more pages — done`);
-        break;
+        log(env.config, `${label}: pagination returned false — final scan`);
+        reachedEnd = true;
+        continue;
       }
       pagesScanned++;
     }

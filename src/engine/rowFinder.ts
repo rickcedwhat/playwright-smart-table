@@ -134,7 +134,8 @@ export class RowFinder<T = any> {
                 const prevPage = this.tableState.currentPageIndex;
                 const didPaginate = await this.advancePage(useBulk);
                 if (!didPaginate) {
-                    logDebug(this.config, 'verbose',`findRows: pagination returned false — end of data`);
+                    logDebug(this.config, 'verbose',`findRows: pagination returned false — final scan`);
+                    await collectMatches();
                     break;
                 }
 
@@ -227,7 +228,9 @@ export class RowFinder<T = any> {
                     await debugDelay(this.config, 'pagination');
                     continue;
                 } else {
-                    logDebug(this.config, 'verbose',`Page ${this.tableState.currentPageIndex}: Pagination failed (end of data).`);
+                    logDebug(this.config, 'verbose',`Page ${this.tableState.currentPageIndex}: pagination returned false — final scan`);
+                    pagesScanned = effectiveMaxPages;
+                    continue;
                 }
             }
             return null;
