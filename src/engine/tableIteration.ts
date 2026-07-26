@@ -90,11 +90,16 @@ export async function runMap<T, R>(
       // they're picked up on a later page once scrolled into view — preventing overscan from
       // being ingested (#353) or double-collected via node recycling (#357). No-op when no
       // viewport reports visible rows.
+      //
+      // #384: overscan rows ABOVE the visible range have already scrolled past and will never
+      // re-enter the viewport — collect them now. Only defer rows BELOW the visible range
+      // (they'll scroll into view on a later page).
       let candidateIndices = allIndices;
       const getVisibleRowIndices = env.config.strategies.viewport?.getVisibleRowIndices;
       if (getVisibleRowIndices) {
         const visible = new Set(await getVisibleRowIndices(env.getContext()));
-        candidateIndices = allIndices.filter(idx => visible.has(idx));
+        const minVisible = visible.size > 0 ? Math.min(...visible) : Infinity;
+        candidateIndices = allIndices.filter(idx => visible.has(idx) || idx < minVisible);
         if (candidateIndices.length !== allIndices.length) {
           log(env.config, `${label}: viewport visible filter — ${candidateIndices.length}/${allIndices.length} row(s) in view`);
         }
