@@ -16,7 +16,7 @@ import { FilterEngine } from './filterEngine';
 import { TableMapper } from './engine/tableMapper';
 import { RowFinder } from './engine/rowFinder';
 import { runForEach, runMap, runFilter } from './engine/tableIteration';
-import { resolveLogicalRowIndex } from './engine/rowResolution';
+import { resolveLogicalRowIndex, normalizeRowIndexResult } from './engine/rowResolution';
 import { ResolutionStrategies } from './strategies/resolution';
 import { debugDelay, logDebug, warnIfDebugInCI } from './utils/debugUtils';
 import { createSmartRowArray, SmartRowArray } from './utils/smartRowArray';
@@ -164,8 +164,13 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
   let finalTable: TableResult<T> = null as unknown as TableResult<T>;
 
   // Helper factory
-  const _makeSmart = (rowLocator: Locator, map: Map<string, number>, rowIndex?: number, tablePageIndex?: number, barrier?: NavigationBarrier): SmartRowType => {
-    return createSmartRow<T>(rowLocator, map, rowIndex, config, rootLocator, resolve, finalTable, tablePageIndex, barrier);
+  const _makeSmart = (rowLocator: Locator, map: Map<string, number>, rowIndex?: number, tablePageIndex?: number, barrier?: NavigationBarrier, rowSelector?: string): SmartRowType => {
+    const effectiveLocator = rowSelector
+      ? resolve(config.rowSelector, rootLocator).filter({ has: rootLocator.page().locator(rowSelector) })
+      : rowLocator;
+    const sr = createSmartRow<T>(effectiveLocator, map, rowIndex, config, rootLocator, resolve, finalTable, tablePageIndex, barrier);
+    if (rowSelector) (sr as any)._selfHealing = true;
+    return sr;
   };
 
   const tableState = { currentPageIndex: 0, empty: false };
@@ -458,11 +463,19 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
         );
       }
 
+      let foundSelector: string | undefined;
+
       // The currently-mounted row whose logical index === index, if any.
       const findMounted = async (): Promise<Locator | null> => {
         const rows = await resolve(config.rowSelector, rootLocator).all();
         for (const r of rows) {
-          if ((await resolveRI(r)) === index) return r;
+          const result = await resolveRI(r);
+          if (result === undefined) continue;
+          const normalized = normalizeRowIndexResult(result);
+          if (normalized.index === index) {
+            foundSelector = normalized.selector;
+            return r;
+          }
         }
         return null;
       };
@@ -497,7 +510,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       }
 
       await debugDelay(config, 'findRow');
-      return _makeSmart(loc, map, index, tableState.currentPageIndex);
+      return _makeSmart(loc, map, index, tableState.currentPageIndex, undefined, foundSelector);
     },
 
     findRow: async (filters: Record<string, FilterValue>, options?: { exact?: boolean, maxPages?: number }): Promise<SmartRowType<T>> => {
@@ -588,8 +601,9 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
 
           for (const idx of newIndices) {
             // index = visit-order counter; rowIndex = logical/data index (B-hybrid, #362).
-            const logical = await resolveLogicalRowIndex(pageRows[idx], config, () => rowIndex) ?? rowIndex;
-            const sr = _makeSmart(pageRows[idx], map, logical, tableState.currentPageIndex, barrier);
+            const resolved = await resolveLogicalRowIndex(pageRows[idx], config, () => rowIndex);
+            const logical = resolved?.index ?? rowIndex;
+            const sr = _makeSmart(pageRows[idx], map, logical, tableState.currentPageIndex, barrier, resolved?.selector);
             // Iterator rows share one per-page DOM snapshot (positional locators); disable
             // toJSON's scroll-back recovery so reading one row can't invalidate the others (#366).
             (sr as any)._inBatch = true;
@@ -616,7 +630,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
           getRowLocators: () => resolve(config.rowSelector, rootLocator),
           getMap: () => tableMapper.getMapSync()!,
           advancePage: _advancePage,
-          makeSmartRow: (loc, map, idx, pageIdx, barrier) => _makeSmart(loc, map, idx, pageIdx, barrier),
+          makeSmartRow: (loc, map, idx, pageIdx, barrier, sel) => _makeSmart(loc, map, idx, pageIdx, barrier, sel),
           createSmartRowArray,
           config,
           getPage: () => rootLocator.page(),
@@ -636,7 +650,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
           getRowLocators: () => resolve(config.rowSelector, rootLocator),
           getMap: () => tableMapper.getMapSync()!,
           advancePage: _advancePage,
-          makeSmartRow: (loc, map, idx, pageIdx, barrier) => _makeSmart(loc, map, idx, pageIdx, barrier),
+          makeSmartRow: (loc, map, idx, pageIdx, barrier, sel) => _makeSmart(loc, map, idx, pageIdx, barrier, sel),
           createSmartRowArray,
           config,
           getPage: () => rootLocator.page(),
@@ -669,7 +683,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
           getRowLocators: () => resolve(config.rowSelector, rootLocator),
           getMap: () => tableMapper.getMapSync()!,
           advancePage: _advancePage,
-          makeSmartRow: (loc, map, idx, pageIdx, barrier) => _makeSmart(loc, map, idx, pageIdx, barrier),
+          makeSmartRow: (loc, map, idx, pageIdx, barrier, sel) => _makeSmart(loc, map, idx, pageIdx, barrier, sel),
           createSmartRowArray,
           config,
           getPage: () => rootLocator.page(),

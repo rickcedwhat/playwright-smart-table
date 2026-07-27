@@ -18,7 +18,7 @@ export class RowFinder<T = any> {
         resolve: (item: Selector, parent: Locator | Page) => Locator,
         private filterEngine: FilterEngine,
         private tableMapper: TableMapper,
-        private makeSmartRow: (loc: Locator, map: Map<string, number>, index: number | undefined, tablePageIndex?: number, barrier?: NavigationBarrier) => SmartRow<T>,
+        private makeSmartRow: (loc: Locator, map: Map<string, number>, index: number | undefined, tablePageIndex?: number, barrier?: NavigationBarrier, rowSelector?: string) => SmartRow<T>,
         private tableState: { currentPageIndex: number } = { currentPageIndex: 0 },
         private advancePage: (useBulk: boolean) => Promise<boolean> = async () => false
     ) {
@@ -39,8 +39,8 @@ export class RowFinder<T = any> {
             logDebug(this.config, 'info', 'Row found');
             await debugDelay(this.config, 'findRow');
             const map = await this.tableMapper.getMap();
-            const rowIndex = await this.resolveRowIndex(rowLocator);
-            return this.makeSmartRow(rowLocator, map, rowIndex, this.tableState.currentPageIndex);
+            const resolved = await this.resolveRowIndex(rowLocator);
+            return this.makeSmartRow(rowLocator, map, resolved?.index, this.tableState.currentPageIndex, undefined, resolved?.selector);
         }
 
         logDebug(this.config, 'error', 'Row not found', filters);
@@ -92,12 +92,12 @@ export class RowFinder<T = any> {
                 const barrier = useBarrier ? new NavigationBarrier(newIndices.length) : undefined;
 
                 for (const idx of newIndices) {
-                    const rowIndex = await resolveLogicalRowIndex(
+                    const resolved = await resolveLogicalRowIndex(
                         currentRows[idx],
                         this.config,
                         () => allRows.length,
                     );
-                    const smartRow = this.makeSmartRow(currentRows[idx], map, rowIndex, this.tableState.currentPageIndex, barrier);
+                    const smartRow = this.makeSmartRow(currentRows[idx], map, resolved?.index, this.tableState.currentPageIndex, barrier, resolved?.selector);
 
                     // findRows skips a still-loading row when no timeout is configured (legacy
                     // behavior) — see resolveRowLoading's `noTimeoutAction: 'skip'`.
@@ -237,7 +237,7 @@ export class RowFinder<T = any> {
         }
     }
 
-    private resolveRowIndex(rowLocator: Locator): Promise<number | undefined> {
+    private resolveRowIndex(rowLocator: Locator) {
         // Shared resolver: resolveRowIndex strategy first, else the DOM-position fallback.
         return resolveLogicalRowIndex(rowLocator, this.config, () => this.scanDomPosition(rowLocator));
     }
