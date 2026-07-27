@@ -166,7 +166,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
   // Helper factory
   const _makeSmart = (rowLocator: Locator, map: Map<string, number>, rowIndex?: number, tablePageIndex?: number, barrier?: NavigationBarrier, rowSelector?: string): SmartRowType => {
     const effectiveLocator = rowSelector
-      ? resolve(config.rowSelector, rootLocator).and(rootLocator.page().locator(rowSelector))
+      ? rootLocator.locator(rowSelector)
       : rowLocator;
     const sr = createSmartRow<T>(effectiveLocator, map, rowIndex, config, rootLocator, resolve, finalTable, tablePageIndex, barrier);
     if (rowSelector) (sr as any)._selfHealing = true;

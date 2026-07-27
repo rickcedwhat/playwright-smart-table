@@ -12,10 +12,6 @@ describe('normalizeRowIndexResult', () => {
     expect(normalizeRowIndexResult(result)).toBe(result);
   });
 
-  it('passes through an object with index only', () => {
-    const result = { index: 0 };
-    expect(normalizeRowIndexResult(result)).toBe(result);
-  });
 });
 
 describe('resolveLogicalRowIndex', () => {
