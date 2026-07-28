@@ -61,8 +61,8 @@
   },
   {
     "name": "countRows",
-    "signature": "countRows: () => Promise<number>",
-    "comment": "/**\n* Counts the number of rows currently on the page.\n* Does not paginate.\n*/"
+    "signature": "countRows: (filters?: Record<string, FilterValue>, options?: { exact?: boolean; maxPages?: number }) => Promise<number>",
+    "comment": "/**\n* Counts the number of rows, optionally filtered.\n* Without arguments, counts all rows. With filters, counts only matching rows.\n* Paginates when pagination is configured.\n*/"
   },
   {
     "name": "mapColumn",

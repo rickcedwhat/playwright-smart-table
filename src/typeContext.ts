@@ -866,10 +866,11 @@ export interface TableResult<T = any> extends AsyncIterable<{ row: SmartRow<T>; 
   scrollToColumn: (columnName: string) => Promise<void>;
 
   /**
-   * Counts the number of rows currently on the page.
-   * Does not paginate.
+   * Counts the number of rows, optionally filtered.
+   * Without arguments, counts all rows. With filters, counts only matching rows.
+   * Paginates when pagination is configured.
    */
-  countRows: () => Promise<number>;
+  countRows: (filters?: Record<string, FilterValue>, options?: { exact?: boolean; maxPages?: number }) => Promise<number>;
 
   /**
    * Iterates over rows and extracts the value of a single column.

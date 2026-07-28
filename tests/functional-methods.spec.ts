@@ -562,6 +562,61 @@ test.describe('new API additions', () => {
         expect(await page.locator('#current-page').innerText()).toBe('1');
     });
 
+    test('countRows with filters counts only matching rows across pages', async ({ page }) => {
+        await page.setContent(TABLE_HTML);
+        const table = useTable(page.locator('#tbl'), {
+            maxPages: 3,
+            strategies: {
+                pagination: Strategies.Pagination.click({
+                    next: () => page.locator('#next'),
+                    first: () => page.locator('#first'),
+                }),
+            },
+        });
+
+        expect(await table.countRows({ Status: 'Inactive' }, { exact: true })).toBe(3);
+        expect(await page.locator('#current-page').innerText()).toBe('1');
+    });
+
+    test('countRows with filters on single page (no pagination)', async ({ page }) => {
+        await page.setContent(TABLE_HTML);
+        const table = useTable(page.locator('#tbl'), {});
+
+        expect(await table.countRows({ Status: 'Inactive' }, { exact: true })).toBe(1);
+    });
+
+    test('countRows with maxPages option limits pagination depth', async ({ page }) => {
+        await page.setContent(TABLE_HTML);
+        const table = useTable(page.locator('#tbl'), {
+            maxPages: 3,
+            strategies: {
+                pagination: Strategies.Pagination.click({
+                    next: () => page.locator('#next'),
+                    first: () => page.locator('#first'),
+                }),
+            },
+        });
+
+        expect(await table.countRows({ Status: 'Inactive' }, { exact: true, maxPages: 2 })).toBe(2);
+        expect(await page.locator('#current-page').innerText()).toBe('1');
+    });
+
+    test('countRows with no matching filter returns 0', async ({ page }) => {
+        await page.setContent(TABLE_HTML);
+        const table = useTable(page.locator('#tbl'), {
+            maxPages: 3,
+            strategies: {
+                pagination: Strategies.Pagination.click({
+                    next: () => page.locator('#next'),
+                    first: () => page.locator('#first'),
+                }),
+            },
+        });
+
+        expect(await table.countRows({ Status: 'Deleted' })).toBe(0);
+        expect(await page.locator('#current-page').innerText()).toBe('1');
+    });
+
     test('mapColumn collects values for a single column', async ({ page }) => {
         await page.setContent(TABLE_HTML);
         const table = makeTable(page);
