@@ -1,5 +1,16 @@
 import type { Locator } from '@playwright/test';
-import type { FinalTableConfig, LoadingStrategy, SmartRow } from '../types';
+import type { FinalTableConfig, LoadingStrategy, RowIndexResult, SmartRow } from '../types';
+
+/** Normalized result from resolveRowIndex — always has `.index`, optionally `.selector`. */
+export interface ResolvedRowIndex {
+  index: number;
+  selector?: string;
+}
+
+/** Extract the numeric index from a {@link RowIndexResult}. */
+export function normalizeRowIndexResult(result: RowIndexResult): ResolvedRowIndex {
+  return typeof result === 'number' ? { index: result } : result;
+}
 
 /**
  * Single source of truth for "what is this row's logical index?" (#362 consolidation).
@@ -8,21 +19,21 @@ import type { FinalTableConfig, LoadingStrategy, SmartRow } from '../types';
  * otherwise, and when the strategy returns `undefined`, defers to the caller-provided
  * `fallback` — a running counter for iteration/`findRows`, or a DOM-position scan for `findRow`.
  *
- * This replaces the three inline variants that previously answered the index question
- * (findRow's private method, findRows' inline expression, and — later — map's counter).
+ * Returns a {@link ResolvedRowIndex} with the numeric index and, when the strategy provides
+ * one, a CSS selector for building a self-healing row locator.
  */
 export async function resolveLogicalRowIndex(
   row: Locator,
   config: Pick<FinalTableConfig, 'strategies'>,
   fallback: () => number | undefined | Promise<number | undefined>,
-): Promise<number | undefined> {
+): Promise<ResolvedRowIndex | undefined> {
   const strategy = config.strategies.resolveRowIndex;
   if (strategy) {
     const resolved = await strategy(row);
-    if (resolved !== undefined) return resolved;
-    // Strategy returned undefined — fall through to the caller's fallback.
+    if (resolved !== undefined) return normalizeRowIndexResult(resolved);
   }
-  return fallback();
+  const fb = await fallback();
+  return fb !== undefined ? { index: fb } : undefined;
 }
 
 /** What the caller should do with a row after checking its loading state. */

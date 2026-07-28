@@ -217,7 +217,8 @@ export function createMuiDataGrid(opts?: { buttonLabels?: MuiButtonLabels }): Pa
     strategies: {
         resolveRowIndex: async (row) => {
             const v = await row.getAttribute('data-rowindex').catch(() => null);
-            return v !== null && !isNaN(Number(v)) ? Number(v) : undefined;
+            if (v === null || isNaN(Number(v))) return undefined;
+            return { index: Number(v), selector: `[data-rowindex="${v}"]` };
         },
 
         pagination: {

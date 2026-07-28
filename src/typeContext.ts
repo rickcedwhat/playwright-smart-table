@@ -16,6 +16,13 @@ export const TYPE_CONTEXT = `
 export type Selector = string | ((root: Locator | Page) => Locator) | ((root: Locator) => Locator);
 
 /**
+ * Return type for \`resolveRowIndex\`. A plain number gives the logical index only;
+ * \`{ index, selector }\` additionally provides a CSS selector the library uses to
+ * build a self-healing row locator that survives virtual-scroll DOM recycling.
+ */
+export type RowIndexResult = number | { index: number; selector: string };
+
+/**
  * Value used to filter rows.
  * - string/number/RegExp: filter by text content of the cell.
  * - function: filter by custom locator logic within the cell.
@@ -611,14 +618,20 @@ export interface TableStrategies {
    *
    * Return \`undefined\` to fall back to DOM position.
    *
+   * When the index maps to a DOM attribute, return \`{ index, selector }\` instead of
+   * a plain number. The library uses the CSS selector to build a **self-healing row
+   * locator** that re-queries the DOM on every action — surviving virtual-scroll
+   * recycling for \`getCell\`, \`smartFill\`, and \`toJSON\` without manual re-pinning.
+   *
    * @example
-   * // MUI DataGrid: read the global monotone counter from the attribute
+   * // MUI DataGrid: self-healing via data-rowindex attribute
    * resolveRowIndex: async (row) => {
    *   const v = await row.getAttribute('data-rowindex').catch(() => null);
-   *   return v !== null && !isNaN(Number(v)) ? Number(v) : undefined;
+   *   if (v === null || isNaN(Number(v))) return undefined;
+   *   return { index: Number(v), selector: \`[data-rowindex="\${v}"]\` };
    * }
    */
-  resolveRowIndex?: (row: Locator) => Promise<number | undefined>;
+  resolveRowIndex?: (row: Locator) => Promise<RowIndexResult | undefined>;
 
   /**
    * Viewport oracle strategies for 2D virtualized tables (e.g. MUI DataGrid, AG Grid,

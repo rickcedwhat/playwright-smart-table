@@ -56,8 +56,8 @@
   },
   {
     "name": "resolveRowIndex",
-    "signature": "resolveRowIndex?: (row: Locator) => Promise<number | undefined>",
-    "comment": "/**\n* Resolve the stable data-model index for a row locator.\n*\n* Called by `findRow` / `findRows` to convert a DOM row into the index used for\n* virtual-scroll positioning. Useful for grids where DOM position resets to 0 on\n* each page while the grid itself maintains a monotone counter (e.g. MUI DataGrid's\n* `data-rowindex` attribute).\n*\n* Return `undefined` to fall back to DOM position.\n*\n* @example\n* // MUI DataGrid: read the global monotone counter from the attribute\n* resolveRowIndex: async (row) => {\n*   const v = await row.getAttribute('data-rowindex').catch(() => null);\n*   return v !== null && !isNaN(Number(v)) ? Number(v) : undefined;\n* }\n*/"
+    "signature": "resolveRowIndex?: (row: Locator) => Promise<RowIndexResult | undefined>",
+    "comment": "/**\n* Resolve the stable data-model index for a row locator.\n*\n* Called by `findRow` / `findRows` to convert a DOM row into the index used for\n* virtual-scroll positioning. Useful for grids where DOM position resets to 0 on\n* each page while the grid itself maintains a monotone counter (e.g. MUI DataGrid's\n* `data-rowindex` attribute).\n*\n* Return `undefined` to fall back to DOM position.\n*\n* When the index maps to a DOM attribute, return `{ index, selector }` instead of\n* a plain number. The library uses the CSS selector to build a **self-healing row\n* locator** that re-queries the DOM on every action — surviving virtual-scroll\n* recycling for `getCell`, `smartFill`, and `toJSON` without manual re-pinning.\n*\n* @example\n* // MUI DataGrid: self-healing via data-rowindex attribute\n* resolveRowIndex: async (row) => {\n*   const v = await row.getAttribute('data-rowindex').catch(() => null);\n*   if (v === null || isNaN(Number(v))) return undefined;\n*   return { index: Number(v), selector: `[data-rowindex=\"${v}\"]` };\n* }\n*/"
   },
   {
     "name": "viewport",

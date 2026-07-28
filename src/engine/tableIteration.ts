@@ -12,7 +12,7 @@ export interface TableIterationEnv<T = any> {
   getRowLocators: () => Locator;
   getMap: () => Map<string, number>;
   advancePage: (useBulk: boolean) => Promise<boolean>;
-  makeSmartRow: (rowLocator: Locator, map: Map<string, number>, rowIndex: number, tablePageIndex?: number, barrier?: NavigationBarrier) => SmartRow<T>;
+  makeSmartRow: (rowLocator: Locator, map: Map<string, number>, rowIndex: number, tablePageIndex?: number, barrier?: NavigationBarrier, rowSelector?: string) => SmartRow<T>;
   createSmartRowArray: (rows: SmartRow<T>[]) => SmartRowArray<T>;
   config: FinalTableConfig<T>;
   getPage: () => Page;
@@ -132,8 +132,9 @@ export async function runMap<T, R>(
         // resolveRowIndex strategy is configured (so bringIntoView and position math are
         // correct on virtualized tables); otherwise it equals the enumeration counter.
         const smartRows = await Promise.all(newIndices.map(async (idx, i) => {
-          const logicalIndex = await resolveLogicalRowIndex(pageRows[idx], env.config, () => positionBase + i) ?? (positionBase + i);
-          const sr = env.makeSmartRow(pageRows[idx], map, logicalIndex, env.getCurrentPageIndex(), barrier);
+          const resolved = await resolveLogicalRowIndex(pageRows[idx], env.config, () => positionBase + i);
+          const logicalIndex = resolved?.index ?? (positionBase + i);
+          const sr = env.makeSmartRow(pageRows[idx], map, logicalIndex, env.getCurrentPageIndex(), barrier, resolved?.selector);
           // Mark as part of an iteration batch so toJSON's #366 re-pin uses rescan-only recovery
           // (no scroll-back) — scrolling here would disrupt sibling rows' positional locators.
           (sr as any)._inBatch = true;
