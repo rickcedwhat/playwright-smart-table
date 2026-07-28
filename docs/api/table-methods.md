@@ -405,7 +405,7 @@ await table.scrollToColumn('Notes');
 ### Signature
 
 ```typescript
-countRows: () => Promise<number>
+countRows: (filters?: Record<string, FilterValue>, options?: { exact?: boolean; maxPages?: number }) => Promise<number>
 ```
 
 <!-- /api-signature: countRows -->

@@ -322,27 +322,41 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       return resolve(config.headerSelector as Selector, rootLocator).nth(idx);
     },
 
-    countRows: async (): Promise<number> => {
+    countRows: async (filters?: Record<string, FilterValue>, options?: { exact?: boolean; maxPages?: number }): Promise<number> => {
       if (tableState.empty) return 0;
       await _autoInit();
+      const filtersRecord = (filters ?? {}) as Record<string, FilterValue>;
+      const hasFilters = Object.keys(filtersRecord).length > 0;
+      const effectiveMaxPages = options?.maxPages ?? config.maxPages;
       const pag = config.strategies.pagination;
-      const hasPagination = config.maxPages > 1 && !!(pag?.goNext || pag?.goNextBulk);
+      const hasPagination = effectiveMaxPages > 1 && !!(pag?.goNext || pag?.goNextBulk);
+
+      const resolveRows = () => {
+        let rows = resolve(config.rowSelector, rootLocator);
+        if (hasFilters) {
+          const map = tableMapper.getMapSync();
+          if (!map) throw new Error('Initialization Error: Table map not available. Call "await table.init()" first.');
+          rows = filterEngine.applyFilters(rows, filtersRecord, map, options?.exact ?? false, rootLocator.page(), rootLocator);
+        }
+        return rows;
+      };
+
       if (!hasPagination) {
-        log("countRows: counting rows in current viewport (no pagination)");
-        return resolve(config.rowSelector, rootLocator).count();
+        log(`countRows: counting rows in current viewport (no pagination)${hasFilters ? ` filters=${safeStringify(filtersRecord)}` : ''}`);
+        return resolveRows().count();
       }
 
-      log(`countRows: paginating up to ${config.maxPages} page(s)`);
+      log(`countRows: paginating up to ${effectiveMaxPages} page(s)${hasFilters ? ` filters=${safeStringify(filtersRecord)}` : ''}`);
       const tracker = new ElementTracker('countRows');
       let total = 0;
       let pagesScanned = 1;
       let paginationError: unknown;
       try {
         while (true) {
-          const newIndices = await tracker.getUnseenIndices(resolve(config.rowSelector, rootLocator));
+          const newIndices = await tracker.getUnseenIndices(resolveRows());
           total += newIndices.length;
           log(`countRows: page ${pagesScanned} — ${newIndices.length} row(s) (running total: ${total})`);
-          if (pagesScanned >= config.maxPages) break;
+          if (pagesScanned >= effectiveMaxPages) break;
           if (!await _advancePage(false)) break;
           pagesScanned++;
         }
