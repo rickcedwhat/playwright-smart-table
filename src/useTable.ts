@@ -331,19 +331,67 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       const pag = config.strategies.pagination;
       const hasPagination = effectiveMaxPages > 1 && !!(pag?.goNext || pag?.goNextBulk);
 
+      const domFilters: Record<string, FilterValue> = {};
+      const overrideFilters: Record<string, FilterValue> = {};
+      if (hasFilters) {
+        for (const [key, value] of Object.entries(filtersRecord)) {
+          if (config.columnOverrides?.[key as keyof T]?.read) {
+            overrideFilters[key] = value;
+          } else {
+            domFilters[key] = value;
+          }
+        }
+      }
+      const hasOverrideFilters = Object.keys(overrideFilters).length > 0;
+
       const resolveRows = () => {
         let rows = resolve(config.rowSelector, rootLocator);
-        if (hasFilters) {
+        if (Object.keys(domFilters).length > 0) {
           const map = tableMapper.getMapSync();
           if (!map) throw new Error('Initialization Error: Table map not available. Call "await table.init()" first.');
-          rows = filterEngine.applyFilters(rows, filtersRecord, map, options?.exact ?? false, rootLocator.page(), rootLocator);
+          rows = filterEngine.applyFilters(rows, domFilters, map, options?.exact ?? false, rootLocator.page(), rootLocator);
         }
         return rows;
       };
 
+      const countOverrideMatches = async (rowLocators: import('@playwright/test').Locator, indices: number[]): Promise<number> => {
+        if (!hasOverrideFilters) return indices.length;
+        const map = tableMapper.getMapSync()!;
+        const candidates = await rowLocators.all();
+        let count = 0;
+        for (const idx of indices) {
+          const row = candidates[idx];
+          let match = true;
+          for (const [colName, filterValue] of Object.entries(overrideFilters)) {
+            const colIndex = map.get(colName);
+            if (colIndex === undefined) continue;
+            const override = config.columnOverrides![colName as keyof T]!;
+            const cell = resolve(config.cellSelector, row).nth(colIndex);
+            const getCell = (name: string) => {
+              const ci = map.get(name);
+              if (ci === undefined) throw new Error(`Column "${name}" not found`);
+              return resolve(config.cellSelector, row).nth(ci);
+            };
+            const ctx = { row: _makeSmart(row, map, undefined), columnName: colName, columnIndex: colIndex, getCell };
+            const readValue = String(await override.read!(cell, ctx));
+            if (typeof filterValue === 'string' || typeof filterValue === 'number') {
+              const target = String(filterValue);
+              if (options?.exact ? readValue !== target : !readValue.includes(target)) { match = false; break; }
+            } else if (filterValue instanceof RegExp) {
+              if (!filterValue.test(readValue)) { match = false; break; }
+            }
+          }
+          if (match) count++;
+        }
+        return count;
+      };
+
       if (!hasPagination) {
         log(`countRows: counting rows in current viewport (no pagination)${hasFilters ? ` filters=${safeStringify(filtersRecord)}` : ''}`);
-        return resolveRows().count();
+        if (!hasOverrideFilters) return resolveRows().count();
+        const rows = resolveRows();
+        const all = await rows.all();
+        return countOverrideMatches(rows, all.map((_, i) => i));
       }
 
       log(`countRows: paginating up to ${effectiveMaxPages} page(s)${hasFilters ? ` filters=${safeStringify(filtersRecord)}` : ''}`);
@@ -353,9 +401,11 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       let paginationError: unknown;
       try {
         while (true) {
-          const newIndices = await tracker.getUnseenIndices(resolveRows());
-          total += newIndices.length;
-          log(`countRows: page ${pagesScanned} — ${newIndices.length} row(s) (running total: ${total})`);
+          const rows = resolveRows();
+          const newIndices = await tracker.getUnseenIndices(rows);
+          const matched = await countOverrideMatches(rows, newIndices);
+          total += matched;
+          log(`countRows: page ${pagesScanned} — ${matched} row(s) (running total: ${total})`);
           if (pagesScanned >= effectiveMaxPages) break;
           if (!await _advancePage(false)) break;
           pagesScanned++;
