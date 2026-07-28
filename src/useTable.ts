@@ -566,12 +566,15 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
           await config.strategies.sorting.doSort({ columnName, direction, context });
 
           if (config.strategies.loading?.isTableLoading) {
-            const deadline = Date.now() + 10000;
+            const timeout = config.strategies.loading.sortStabilizationTimeout ?? 10_000;
+            const poll = config.strategies.loading.sortStabilizationPollInterval ?? 100;
+            const deadline = Date.now() + timeout;
             while (Date.now() < deadline && await config.strategies.loading.isTableLoading(context)) {
-              await rootLocator.page().waitForTimeout(100);
+              await rootLocator.page().waitForTimeout(poll);
             }
           } else {
-            await rootLocator.page().waitForTimeout(200);
+            const fallback = config.strategies.loading?.sortStabilizationFallbackDelay ?? 200;
+            await rootLocator.page().waitForTimeout(fallback);
           }
           await debugDelay(config, 'default');
 

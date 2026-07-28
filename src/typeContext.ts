@@ -568,6 +568,13 @@ export interface LoadingStrategy {
     | 'read-as-is'
     | 'throw'
     | ((cell: import('@playwright/test').Locator, columnName: string, row: SmartRow) => Promise<string>);
+
+  /** Max ms to wait for sort stabilization when isTableLoading is set. @default 10000 */
+  sortStabilizationTimeout?: number;
+  /** Polling interval (ms) while waiting for sort stabilization. @default 100 */
+  sortStabilizationPollInterval?: number;
+  /** Fallback delay (ms) after sort when no isTableLoading is configured. @default 200 */
+  sortStabilizationFallbackDelay?: number;
 }
 
 /**
