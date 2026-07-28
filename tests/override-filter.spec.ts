@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import { useTable } from '../src/index';
 
 const TABLE = `
@@ -13,7 +13,7 @@ const TABLE = `
 `;
 
 test.describe('findRow/findRows with columnOverride filters (#385)', () => {
-    const makeTable = (page: any) =>
+    const makeTable = (page: Page) =>
         useTable(page.locator('#t'), {
             columnOverrides: {
                 Link: {
@@ -41,8 +41,10 @@ test.describe('findRow/findRows with columnOverride filters (#385)', () => {
         await page.setContent(TABLE);
         const table = await makeTable(page).init();
 
-        const rows = await table.findRows({ Link: '/d/' });
-        expect(rows.length).toBe(3);
+        const rows = await table.findRows({ Link: '/d/beta' }, { exact: true });
+        expect(rows.length).toBe(1);
+        const data = await rows[0].toJSON() as Record<string, string>;
+        expect(data.Name).toBe('Beta');
     });
 
     test('findRow combines DOM filter + override filter', async ({ page }) => {

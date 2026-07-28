@@ -354,10 +354,11 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
         return rows;
       };
 
-      const countOverrideMatches = async (rowLocators: import('@playwright/test').Locator, indices: number[]): Promise<number> => {
+      const countOverrideMatches = async (candidates: import('@playwright/test').Locator[], indices: number[]): Promise<number> => {
         if (!hasOverrideFilters) return indices.length;
-        const map = tableMapper.getMapSync()!;
-        const candidates = await rowLocators.all();
+        const map = tableMapper.getMapSync();
+        if (!map) throw new Error('Initialization Error: Table map not available. Call "await table.init()" first.');
+        const exact = options?.exact ?? false;
         let count = 0;
         for (const idx of indices) {
           const row = candidates[idx];
@@ -374,12 +375,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
             };
             const ctx = { row: _makeSmart(row, map, undefined), columnName: colName, columnIndex: colIndex, getCell };
             const readValue = String(await override.read!(cell, ctx));
-            if (typeof filterValue === 'string' || typeof filterValue === 'number') {
-              const target = String(filterValue);
-              if (options?.exact ? readValue !== target : !readValue.includes(target)) { match = false; break; }
-            } else if (filterValue instanceof RegExp) {
-              if (!filterValue.test(readValue)) { match = false; break; }
-            }
+            if (!RowFinder.matchReadValue(readValue, filterValue, exact)) { match = false; break; }
           }
           if (match) count++;
         }
@@ -389,9 +385,8 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       if (!hasPagination) {
         log(`countRows: counting rows in current viewport (no pagination)${hasFilters ? ` filters=${safeStringify(filtersRecord)}` : ''}`);
         if (!hasOverrideFilters) return resolveRows().count();
-        const rows = resolveRows();
-        const all = await rows.all();
-        return countOverrideMatches(rows, all.map((_, i) => i));
+        const all = await resolveRows().all();
+        return countOverrideMatches(all, all.map((_, i) => i));
       }
 
       log(`countRows: paginating up to ${effectiveMaxPages} page(s)${hasFilters ? ` filters=${safeStringify(filtersRecord)}` : ''}`);
@@ -401,9 +396,10 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       let paginationError: unknown;
       try {
         while (true) {
-          const rows = resolveRows();
-          const newIndices = await tracker.getUnseenIndices(rows);
-          const matched = await countOverrideMatches(rows, newIndices);
+          const rowLocators = resolveRows();
+          const newIndices = await tracker.getUnseenIndices(rowLocators);
+          const candidates = await rowLocators.all();
+          const matched = await countOverrideMatches(candidates, newIndices);
           total += matched;
           log(`countRows: page ${pagesScanned} — ${matched} row(s) (running total: ${total})`);
           if (pagesScanned >= effectiveMaxPages) break;
