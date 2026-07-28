@@ -237,7 +237,11 @@ const RowContent = ({ index, data, columns, scrollerRef, onRowLoaded, isRowCache
             {columns.map((col, i) => {
                 const isVisible = i >= visibleRange.start && i < visibleRange.end;
                 if (!isVisible) {
-                    return <div key={col.id} style={{ width: col.width, flexShrink: 0 }} role="cell" />;
+                    return (
+                        <div key={col.id} style={{ width: col.width, flexShrink: 0 }} role="cell">
+                            <div data-testid="cell-loading" style={{ height: '12px', width: '80%', backgroundColor: '#edf2f7', borderRadius: '4px' }} />
+                        </div>
+                    );
                 }
 
                 let content = rowData[col.id];
