@@ -25,6 +25,67 @@ export class RowFinder<T = any> {
         this.resolve = resolve;
     }
 
+    private splitFilters(filters: Record<string, FilterValue>): {
+        domFilters: Record<string, FilterValue>;
+        overrideFilters: Record<string, FilterValue>;
+    } {
+        const domFilters: Record<string, FilterValue> = {};
+        const overrideFilters: Record<string, FilterValue> = {};
+        for (const [key, value] of Object.entries(filters)) {
+            if (this.config.columnOverrides?.[key as keyof T]?.read) {
+                overrideFilters[key] = value;
+            } else {
+                domFilters[key] = value;
+            }
+        }
+        return { domFilters, overrideFilters };
+    }
+
+    static matchReadValue(readValue: string, filterValue: FilterValue, exact: boolean): boolean {
+        if (typeof filterValue === 'function') {
+            throw new Error(
+                `[SmartTable] Function filters are not supported for columns with columnOverrides.read. ` +
+                `Use a string, number, or RegExp filter instead.`
+            );
+        }
+        if (typeof filterValue === 'string' || typeof filterValue === 'number') {
+            const target = String(filterValue);
+            return exact ? readValue === target : readValue.includes(target);
+        }
+        if (filterValue instanceof RegExp) {
+            return filterValue.test(readValue);
+        }
+        return true;
+    }
+
+    private async matchesOverrideFilters(
+        rowLocator: Locator,
+        overrideFilters: Record<string, FilterValue>,
+        map: Map<string, number>,
+        exact: boolean
+    ): Promise<boolean> {
+        for (const [colName, filterValue] of Object.entries(overrideFilters)) {
+            const colIndex = map.get(colName);
+            if (colIndex === undefined) continue;
+            const override = this.config.columnOverrides![colName as keyof T]!;
+            const cell = this.resolve(this.config.cellSelector, rowLocator).nth(colIndex);
+            const getCell = (name: string) => {
+                const idx = map.get(name);
+                if (idx === undefined) throw new Error(`Column "${name}" not found`);
+                return this.resolve(this.config.cellSelector, rowLocator).nth(idx);
+            };
+            const context = {
+                row: this.makeSmartRow(rowLocator, map, undefined),
+                columnName: colName,
+                columnIndex: colIndex,
+                getCell,
+            };
+            const readValue = String(await override.read!(cell, context));
+            if (!RowFinder.matchReadValue(readValue, filterValue, exact)) return false;
+        }
+        return true;
+    }
+
     public async findRow(
         filters: Record<string, FilterValue>,
         options: { exact?: boolean, maxPages?: number } = {}
@@ -68,13 +129,15 @@ export class RowFinder<T = any> {
         const tracker = new ElementTracker('findRows');
 
         try {
+            const { domFilters, overrideFilters } = this.splitFilters(filtersRecord);
+            const hasOverrideFilters = Object.keys(overrideFilters).length > 0;
+
             const collectMatches = async () => {
                 let rowLocators = this.resolve(this.config.rowSelector, this.rootLocator);
-                // Only apply filters if we have them
-                if (Object.keys(filtersRecord).length > 0) {
+                if (Object.keys(domFilters).length > 0) {
                     rowLocators = this.filterEngine.applyFilters(
                         rowLocators,
-                        filtersRecord,
+                        domFilters,
                         map,
                         options?.exact ?? false,
                         this.rootLocator.page(),
@@ -113,6 +176,11 @@ export class RowFinder<T = any> {
                             throw new Error(`[SmartTable] Row ${allRows.length} did not finish loading within ${this.config.strategies.loading?.rowLoadingTimeout}ms`);
                         }
                         continue; // 'skip'
+                    }
+
+                    if (hasOverrideFilters && !await this.matchesOverrideFilters(currentRows[idx], overrideFilters, map, options?.exact ?? false)) {
+                        barrier?.markFinished();
+                        continue;
                     }
 
                     allRows.push(smartRow);
@@ -181,37 +249,37 @@ export class RowFinder<T = any> {
             }
 
             const allRows = this.resolve(this.config.rowSelector, this.rootLocator);
-            const matchedRows = this.filterEngine.applyFilters(
-                allRows,
-                filters,
-                map,
-                options.exact || false,
-                this.rootLocator.page(),
-                this.rootLocator
-            );
+            const { domFilters, overrideFilters } = this.splitFilters(filters);
+            const hasOverrideFilters = Object.keys(overrideFilters).length > 0;
 
-            const count = await matchedRows.count();
-            logDebug(this.config, 'verbose',`Page ${this.tableState.currentPageIndex}: Found ${count} matches.`);
-
-            if (count > 1) {
-                const sampleData: string[] = [];
-                try {
-                    const firstFewRows = await matchedRows.all();
-                    const sampleCount = Math.min(firstFewRows.length, 3);
-                    for (let i = 0; i < sampleCount; i++) {
-                        const rowData = await this.makeSmartRow(firstFewRows[i], map, 0, this.tableState.currentPageIndex).toJSON();
-                        sampleData.push(JSON.stringify(rowData));
-                    }
-                } catch (e) { }
-                const sampleMsg = sampleData.length > 0 ? `\nSample matching rows:\n${sampleData.map((d, i) => `  ${i + 1}. ${d}`).join('\n')}` : '';
-
-                throw new Error(
-                    `Ambiguous Row: Found ${count} rows matching ${JSON.stringify(filters)} on page ${this.tableState.currentPageIndex}. ` +
-                    `Expected exactly one match. Try adding more filters to make your query unique.${sampleMsg}`
+            let matchedRows = allRows;
+            if (Object.keys(domFilters).length > 0) {
+                matchedRows = this.filterEngine.applyFilters(
+                    allRows,
+                    domFilters,
+                    map,
+                    options.exact || false,
+                    this.rootLocator.page(),
+                    this.rootLocator
                 );
             }
 
-            if (count === 1) return matchedRows.first();
+            if (!hasOverrideFilters) {
+                const count = await matchedRows.count();
+                logDebug(this.config, 'verbose',`Page ${this.tableState.currentPageIndex}: Found ${count} matches.`);
+                if (count > 1) await this.throwIfAmbiguous(await matchedRows.all(), filters, map);
+                if (count === 1) return matchedRows.first();
+            } else {
+                const candidates = await matchedRows.all();
+                logDebug(this.config, 'verbose',`Page ${this.tableState.currentPageIndex}: ${candidates.length} DOM candidate(s), post-filtering with override columns`);
+                const results = await Promise.all(
+                    candidates.map(c => this.matchesOverrideFilters(c, overrideFilters, map, options.exact || false))
+                );
+                const overrideMatches = candidates.filter((_, i) => results[i]);
+                logDebug(this.config, 'verbose',`Page ${this.tableState.currentPageIndex}: ${overrideMatches.length} match(es) after override filter`);
+                if (overrideMatches.length > 1) await this.throwIfAmbiguous(overrideMatches, filters, map);
+                if (overrideMatches.length === 1) return overrideMatches[0];
+            }
 
             if (pagesScanned < effectiveMaxPages) {
                 logDebug(this.config, 'verbose',`Page ${this.tableState.currentPageIndex}: Not found. Attempting pagination...`);
@@ -251,6 +319,22 @@ export class RowFinder<T = any> {
      * same selector/scope as everywhere else, so a string, function, or Locator rowSelector
      * all behave identically. (#350)
      */
+    private async throwIfAmbiguous(rows: Locator[], filters: Record<string, FilterValue>, map: Map<string, number>): Promise<never> {
+        const sampleData: string[] = [];
+        try {
+            const sampleCount = Math.min(rows.length, 3);
+            for (let i = 0; i < sampleCount; i++) {
+                const rowData = await this.makeSmartRow(rows[i], map, 0, this.tableState.currentPageIndex).toJSON();
+                sampleData.push(JSON.stringify(rowData));
+            }
+        } catch (e) { }
+        const sampleMsg = sampleData.length > 0 ? `\nSample matching rows:\n${sampleData.map((d, i) => `  ${i + 1}. ${d}`).join('\n')}` : '';
+        throw new Error(
+            `Ambiguous Row: Found ${rows.length} rows matching ${JSON.stringify(filters)} on page ${this.tableState.currentPageIndex}. ` +
+            `Expected exactly one match. Try adding more filters to make your query unique.${sampleMsg}`
+        );
+    }
+
     private async scanDomPosition(rowLocator: Locator): Promise<number | undefined> {
         const targetHandle = await rowLocator.elementHandle();
         if (!targetHandle) return undefined;
