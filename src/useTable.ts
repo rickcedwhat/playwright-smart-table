@@ -1,12 +1,8 @@
 import type { Locator, Page } from '@playwright/test';
 import { TableConfig, TableContext, Selector, TableResult, SmartRow as SmartRowType, FinalTableConfig, DedupeStrategy, PaginationStrategy, StrategyContext, TableStrategies as ITableStrategies, FilterValue } from './types';
-import { TYPE_CONTEXT } from './typeContext';
 import { MINIMAL_CONFIG_CONTEXT } from './minimalConfigContext';
-import { SortingStrategies as ImportedSortingStrategies } from './strategies/sorting';
-import { PaginationStrategies as ImportedPaginationStrategies } from './strategies/pagination';
 import { validatePaginationResult, validateSortingStrategy, validateFillStrategy } from './strategies/validation';
 
-import { DedupeStrategies as ImportedDedupeStrategies } from './strategies/dedupe';
 import { LoadingStrategies as ImportedLoadingStrategies } from './strategies/loading';
 import { FillStrategies } from './strategies/fill';
 import { HeaderStrategies } from './strategies/headers';

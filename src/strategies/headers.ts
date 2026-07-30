@@ -1,5 +1,6 @@
 // fallow-ignore-file circular-dependency
 import type { StrategyContext, Selector } from '../types';
+import { logDebug } from '../utils/debugUtils';
 
 /**
  * Defines the contract for a header retrieval strategy.
@@ -80,7 +81,7 @@ export const HeaderStrategies = {
                     }
                 }
             } else {
-                console.warn("HeaderStrategies.horizontalScroll: Could not find scroller. Returning visible headers.");
+                logDebug(config, 'info', "HeaderStrategies.horizontalScroll: Could not find scroller. Returning visible headers.");
             }
 
             await scrollerHandle.evaluate(el => el!.scrollLeft = 0);
