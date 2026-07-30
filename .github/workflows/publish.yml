@@ -31,38 +31,60 @@ jobs:
           PACKAGE_NAME=@rickcedwhat/playwright-smart-table
           LATEST_VERSION=$(npm view $PACKAGE_NAME version 2>/dev/null || echo "0.0.0")
           LOCAL_VERSION=$(node -p "require('./package.json').version")
-          
-          if [ "$LOCAL_VERSION" != "$LATEST_VERSION" ]; then
-            echo "✨ Version change detected!"
+          SHORT_SHA=${GITHUB_SHA::7}
+
+          IS_GREATER=$(node -e "
+            const semver = require('semver');
+            const local = '$LOCAL_VERSION', latest = '$LATEST_VERSION';
+            process.stdout.write(semver.valid(local) && semver.gt(local, latest) ? 'true' : 'false');
+          ")
+
+          if [ "$IS_GREATER" = "true" ]; then
+            echo "✨ Version change detected! Will publish $LOCAL_VERSION as latest."
             echo "changed=true" >> $GITHUB_OUTPUT
             echo "version=$LOCAL_VERSION" >> $GITHUB_OUTPUT
+            echo "tag=latest" >> $GITHUB_OUTPUT
           else
-            echo "💤 Version matches NPM. Skipping release."
+            NEXT_VERSION="${LOCAL_VERSION}-next.${SHORT_SHA}"
+            echo "📦 No version bump — will publish $NEXT_VERSION as next."
             echo "changed=false" >> $GITHUB_OUTPUT
+            echo "version=$NEXT_VERSION" >> $GITHUB_OUTPUT
+            echo "tag=next" >> $GITHUB_OUTPUT
           fi
 
       - name: Install Dependencies
-        if: steps.check_version.outputs.changed == 'true'
         run: pnpm install --frozen-lockfile
 
       - name: Build Project
-        if: steps.check_version.outputs.changed == 'true'
         run: pnpm run build
 
       - name: Run Unit Tests
-        if: steps.check_version.outputs.changed == 'true'
         run: pnpm exec vitest run --reporter=verbose --reporter=json --outputFile=test-results.json
 
       - name: Test Packaging
-        if: steps.check_version.outputs.changed == 'true'
         run: |
           chmod +x scripts/test-packaging.sh
           ./scripts/test-packaging.sh
 
+      - name: Stamp prerelease version
+        if: steps.check_version.outputs.changed == 'false'
+        run: npm version ${{ steps.check_version.outputs.version }} --no-git-tag-version
+
       - name: Publish to NPM
-        if: steps.check_version.outputs.changed == 'true'
-        run: npm publish --provenance --access public
-      
+        run: |
+          VERSION=${{ steps.check_version.outputs.version }}
+          TAG=${{ steps.check_version.outputs.tag }}
+          PACKAGE_NAME=@rickcedwhat/playwright-smart-table
+
+          if npm view "${PACKAGE_NAME}@${VERSION}" version &>/dev/null; then
+            echo "⏩ ${VERSION} already published — ensuring dist-tag ${TAG} is set."
+            npm dist-tag add "${PACKAGE_NAME}@${VERSION}" "$TAG"
+          else
+            npm publish --provenance --access public --tag "$TAG"
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
       - name: Prepare changelog for GitHub Release
         if: steps.check_version.outputs.changed == 'true'
         id: get_changelog
