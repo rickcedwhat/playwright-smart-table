@@ -54,8 +54,10 @@ export const scrollRightHeader = async (context: StrategyContext, options?: { li
         logDebug(config, 'info', "HeaderStrategies.scrollRight: Could not find scroller. Returning visible headers.");
     }
 
-    await scrollerHandle.evaluate(el => el!.scrollLeft = 0);
-    await page.waitForTimeout(200);
+    if (isScrollerFound) {
+        await scrollerHandle.evaluate(el => el!.scrollLeft = 0);
+        await page.waitForTimeout(200);
+    }
 
     return Array.from(collectedHeaders);
 };
