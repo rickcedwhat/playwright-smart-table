@@ -28,17 +28,21 @@ export class RowFinder<T = any> {
     private splitFilters(filters: Record<string, FilterValue>): {
         domFilters: Record<string, FilterValue>;
         overrideFilters: Record<string, FilterValue>;
+        syntheticFilters: Record<string, FilterValue>;
     } {
         const domFilters: Record<string, FilterValue> = {};
         const overrideFilters: Record<string, FilterValue> = {};
+        const syntheticFilters: Record<string, FilterValue> = {};
         for (const [key, value] of Object.entries(filters)) {
-            if (this.config.columnOverrides?.[key as keyof T]?.read) {
+            if (this.config.syntheticColumns?.[key]) {
+                syntheticFilters[key] = value;
+            } else if (this.config.columnOverrides?.[key as keyof T]?.read) {
                 overrideFilters[key] = value;
             } else {
                 domFilters[key] = value;
             }
         }
-        return { domFilters, overrideFilters };
+        return { domFilters, overrideFilters, syntheticFilters };
     }
 
     static matchReadValue(readValue: string, filterValue: FilterValue, exact: boolean): boolean {
@@ -86,6 +90,21 @@ export class RowFinder<T = any> {
         return true;
     }
 
+    private async matchesSyntheticFilters(
+        rowLocator: Locator,
+        syntheticFilters: Record<string, FilterValue>,
+        map: Map<string, number>,
+        exact: boolean
+    ): Promise<boolean> {
+        const smartRow = this.makeSmartRow(rowLocator, map, undefined);
+        for (const [colName, filterValue] of Object.entries(syntheticFilters)) {
+            const def = this.config.syntheticColumns![colName];
+            const computedValue = String(await def.compute(smartRow));
+            if (!RowFinder.matchReadValue(computedValue, filterValue, exact)) return false;
+        }
+        return true;
+    }
+
     public async findRow(
         filters: Record<string, FilterValue>,
         options: { exact?: boolean, maxPages?: number } = {}
@@ -129,8 +148,9 @@ export class RowFinder<T = any> {
         const tracker = new ElementTracker('findRows');
 
         try {
-            const { domFilters, overrideFilters } = this.splitFilters(filtersRecord);
+            const { domFilters, overrideFilters, syntheticFilters } = this.splitFilters(filtersRecord);
             const hasOverrideFilters = Object.keys(overrideFilters).length > 0;
+            const hasSyntheticFilters = Object.keys(syntheticFilters).length > 0;
 
             const collectMatches = async () => {
                 let rowLocators = this.resolve(this.config.rowSelector, this.rootLocator);
@@ -179,6 +199,11 @@ export class RowFinder<T = any> {
                     }
 
                     if (hasOverrideFilters && !await this.matchesOverrideFilters(currentRows[idx], overrideFilters, map, options?.exact ?? false)) {
+                        barrier?.markFinished();
+                        continue;
+                    }
+
+                    if (hasSyntheticFilters && !await this.matchesSyntheticFilters(currentRows[idx], syntheticFilters, map, options?.exact ?? false)) {
                         barrier?.markFinished();
                         continue;
                     }
@@ -249,8 +274,8 @@ export class RowFinder<T = any> {
             }
 
             const allRows = this.resolve(this.config.rowSelector, this.rootLocator);
-            const { domFilters, overrideFilters } = this.splitFilters(filters);
-            const hasOverrideFilters = Object.keys(overrideFilters).length > 0;
+            const { domFilters, overrideFilters, syntheticFilters } = this.splitFilters(filters);
+            const hasPostFilters = Object.keys(overrideFilters).length > 0 || Object.keys(syntheticFilters).length > 0;
 
             let matchedRows = allRows;
             if (Object.keys(domFilters).length > 0) {
@@ -264,21 +289,25 @@ export class RowFinder<T = any> {
                 );
             }
 
-            if (!hasOverrideFilters) {
+            if (!hasPostFilters) {
                 const count = await matchedRows.count();
                 logDebug(this.config, 'verbose',`Page ${this.tableState.currentPageIndex}: Found ${count} matches.`);
                 if (count > 1) await this.throwIfAmbiguous(await matchedRows.all(), filters, map);
                 if (count === 1) return matchedRows.first();
             } else {
                 const candidates = await matchedRows.all();
-                logDebug(this.config, 'verbose',`Page ${this.tableState.currentPageIndex}: ${candidates.length} DOM candidate(s), post-filtering with override columns`);
+                logDebug(this.config, 'verbose',`Page ${this.tableState.currentPageIndex}: ${candidates.length} DOM candidate(s), post-filtering with override/synthetic columns`);
                 const results = await Promise.all(
-                    candidates.map(c => this.matchesOverrideFilters(c, overrideFilters, map, options.exact || false))
+                    candidates.map(async c => {
+                        if (Object.keys(overrideFilters).length > 0 && !await this.matchesOverrideFilters(c, overrideFilters, map, options.exact || false)) return false;
+                        if (Object.keys(syntheticFilters).length > 0 && !await this.matchesSyntheticFilters(c, syntheticFilters, map, options.exact || false)) return false;
+                        return true;
+                    })
                 );
-                const overrideMatches = candidates.filter((_, i) => results[i]);
-                logDebug(this.config, 'verbose',`Page ${this.tableState.currentPageIndex}: ${overrideMatches.length} match(es) after override filter`);
-                if (overrideMatches.length > 1) await this.throwIfAmbiguous(overrideMatches, filters, map);
-                if (overrideMatches.length === 1) return overrideMatches[0];
+                const postFilterMatches = candidates.filter((_, i) => results[i]);
+                logDebug(this.config, 'verbose',`Page ${this.tableState.currentPageIndex}: ${postFilterMatches.length} match(es) after post-filter`);
+                if (postFilterMatches.length > 1) await this.throwIfAmbiguous(postFilterMatches, filters, map);
+                if (postFilterMatches.length === 1) return postFilterMatches[0];
             }
 
             if (pagesScanned < effectiveMaxPages) {

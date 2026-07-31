@@ -70,6 +70,16 @@ export class TableMapper {
 
                 // Success
                 this._headerMap = new Map(entries);
+
+                const syntheticNames = Object.keys(this.config.syntheticColumns ?? {});
+                const collisions = syntheticNames.filter(name => this._headerMap!.has(name));
+                if (collisions.length > 0) {
+                    throw new Error(
+                        `Synthetic column name(s) collide with real header(s): ${collisions.join(', ')}. ` +
+                        `Rename the synthetic column or use columnOverrides for columns that exist in the DOM.`
+                    );
+                }
+
                 this.log(`Mapped ${entries.length} columns: ${JSON.stringify(entries.map(e => e[0]))}`);
                 return this._headerMap;
 

@@ -305,6 +305,13 @@ export type SmartRow<T = any> = Locator & {
   smartFill: (data: Partial<T> | Record<string, any>, options?: FillOptions) => Promise<void>;
 
   /**
+   * Get the resolved value of any column — real, override, or synthetic.
+   * @param column - Column name (case-sensitive)
+   * @returns The column value as a string
+   */
+  getValue(column: string): Promise<string>;
+
+  /**
    * Returns whether the row exists in the DOM (i.e. is not a sentinel row).
    */
   wasFound(): boolean;
@@ -471,6 +478,10 @@ export interface ColumnOverrideReadContext {
    * }
    */
   getCell: (columnName: string) => Locator;
+}
+
+export interface SyntheticColumnDef<T = any> {
+  compute: (row: SmartRow<T>) => Promise<string | number> | string | number;
 }
 
 export interface ColumnOverride<TValue = any> {
@@ -684,6 +695,14 @@ export interface TableConfig<T = any> {
    * Overrides both default extraction (toJSON) and filling (smartFill) logic.
    */
   columnOverrides?: Partial<Record<keyof T, ColumnOverride<T[keyof T]>>>;
+
+  /**
+   * Computed columns with no DOM presence. Each key becomes a virtual column name
+   * available in \`toJSON()\`, \`getValue()\`, and \`findRow()\`/\`findRows()\` filters.
+   * The \`compute\` function receives the full SmartRow and must only read real or
+   * override columns (no chaining between synthetics).
+   */
+  syntheticColumns?: Record<string, SyntheticColumnDef<T>>;
 
   /**
    * Locator for an empty-state element that replaces the table when there are no results.

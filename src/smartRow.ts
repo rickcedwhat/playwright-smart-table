@@ -375,9 +375,12 @@ const createSmartRow = <T = any>(
 
     // Attach Methods
     smart.getCell = (colName: string): SmartCell => {
+        if (config.syntheticColumns?.[colName]) {
+            throw new Error(`Column "${colName}" is synthetic (no DOM cell) — use getValue("${colName}") or toJSON() instead`);
+        }
         const idx = map.get(colName);
         if (idx === undefined) {
-            throw new Error(buildColumnNotFoundError(colName, Array.from(map.keys())));
+            throw new Error(buildColumnNotFoundError(colName, [...map.keys(), ...Object.keys(config.syntheticColumns ?? {})]));
         }
 
         let baseLocator: Locator;
@@ -436,6 +439,50 @@ const createSmartRow = <T = any>(
 
     smart.wasFound = (): boolean => {
         return !(smart as any)[SENTINEL_ROW];
+    };
+
+    let _inSyntheticCompute = false;
+
+    smart.getValue = async (colName: string): Promise<string> => {
+        const syntheticDef = config.syntheticColumns?.[colName];
+        if (syntheticDef) {
+            if (_inSyntheticCompute) {
+                throw new Error(
+                    `[SmartTable] Synthetic column "${colName}" cannot be read from inside another synthetic column's compute(). ` +
+                    `Synthetic columns may only reference real or override columns.`
+                );
+            }
+            _inSyntheticCompute = true;
+            try {
+                return String(await syntheticDef.compute(smart));
+            } finally {
+                _inSyntheticCompute = false;
+            }
+        }
+
+        const idx = map.get(colName);
+        if (idx === undefined) {
+            throw new Error(buildColumnNotFoundError(colName, [...map.keys(), ...Object.keys(config.syntheticColumns ?? {})]));
+        }
+
+        const columnOverride = config.columnOverrides?.[colName as keyof T];
+        const cell = config.strategies.getCellLocator
+            ? config.strategies.getCellLocator({
+                row: rowLocator, root: rootLocator, columnName: colName,
+                columnIndex: idx, rowIndex, page: rootLocator.page(), config,
+            })
+            : resolve(config.cellSelector, rowLocator).nth(idx);
+
+        if (columnOverride?.read) {
+            const getCell = (name: string): Locator => {
+                const ci = map.get(name);
+                if (ci === undefined) throw new Error(`Column "${name}" not found`);
+                return resolve(config.cellSelector, rowLocator).nth(ci);
+            };
+            return String(await columnOverride.read(cell, { row: smart, columnName: colName, columnIndex: idx, getCell }));
+        }
+
+        return (await cell.innerText()).trim();
     };
 
     smart.toJSON = async (options?: { columns?: string[]; atomic?: boolean }): Promise<T> => {
@@ -527,6 +574,12 @@ const createSmartRow = <T = any>(
                         result[col] = snapshot.cells[idx].text;
                     }
                 }
+
+                for (const [name, def] of Object.entries(config.syntheticColumns ?? {})) {
+                    if (options?.columns && !options.columns.includes(name)) continue;
+                    result[name] = String(await def.compute(smart));
+                }
+
                 return result as unknown as T;
             } finally {
                 await cleanupSnapshot();
@@ -717,6 +770,12 @@ const createSmartRow = <T = any>(
                 result[col] = (text || '').trim();
             }
         }
+
+        for (const [name, def] of Object.entries(config.syntheticColumns ?? {})) {
+            if (options?.columns && !options.columns.includes(name)) continue;
+            result[name] = String(await def.compute(smart));
+        }
+
         return result as unknown as T;
     };
 
@@ -726,9 +785,13 @@ const createSmartRow = <T = any>(
         for (const [colName, value] of Object.entries(data)) {
             if (value === undefined) continue;
 
+            if (config.syntheticColumns?.[colName]) {
+                throw new Error(`Cannot fill synthetic column "${colName}" — it has no DOM cell`);
+            }
+
             const colIdx = map.get(colName);
             if (colIdx === undefined) {
-                throw new Error(buildColumnNotFoundError(colName, Array.from(map.keys())));
+                throw new Error(buildColumnNotFoundError(colName, [...map.keys(), ...Object.keys(config.syntheticColumns ?? {})]));
             }
 
             await _navigateToCell({
