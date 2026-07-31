@@ -1,6 +1,5 @@
 // src/strategies/pagination.ts
 import type { PaginationStrategy, Selector, TableContext } from '../types';
-import { waitForCondition } from '../utils';
 
 import { StabilizationStrategies, StabilizationStrategy } from './stabilization';
 

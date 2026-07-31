@@ -75,7 +75,7 @@ export const FillStrategies = {
         const inputType = await inputLocator.getAttribute('type').catch(() => null);
         const isContentEditable = await inputLocator.getAttribute('contenteditable').catch(() => null);
 
-        // console.log(`[SmartTable] Filling "${columnName}" with value "${value}" (input: ${inputTag}, type: ${inputType})`);
+
 
         if (inputType === 'checkbox' || inputType === 'radio') {
             // Boolean value for checkbox/radio

@@ -181,40 +181,6 @@ const _navigateToCell = async (params: {
             throw new Error('Row index is required for navigation');
         }
 
-        const navigateOnce = async () => {
-            // Get current position again to be sure
-            let currRow = 0;
-            let currCol = 0;
-            if (config.strategies.getActiveCell) {
-                const ac = await config.strategies.getActiveCell({ config, root: rootLocator, page, resolve });
-                if (ac) {
-                    currRow = ac.rowIndex;
-                    currCol = ac.columnIndex;
-                }
-            }
-
-            const rDiff = rowIndex - currRow;
-            const cDiff = index - currCol;
-
-            // Move one step vertically
-            if (rDiff > 0 && nav.goDown) {
-                logDebug(config, 'verbose', '_navigateToCell: moving down');
-                await nav.goDown(context);
-            } else if (rDiff < 0 && nav.goUp) {
-                logDebug(config, 'verbose', '_navigateToCell: moving up');
-                await nav.goUp(context);
-            }
-
-            // Move one step horizontally
-            if (cDiff > 0 && nav.goRight) {
-                logDebug(config, 'verbose', '_navigateToCell: moving right');
-                await nav.goRight(context);
-            } else if (cDiff < 0 && nav.goLeft) {
-                logDebug(config, 'verbose', '_navigateToCell: moving left');
-                await nav.goLeft(context);
-            }
-        };
-
         if (await targetReached()) {
             // Already there. If we have a barrier, check-in to stay in lock-step.
             if (barrier) await barrier.sync(index);
