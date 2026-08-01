@@ -775,7 +775,12 @@ const createSmartRow = <T = any>(
 
         for (const [name, def] of Object.entries(config.syntheticColumns ?? {})) {
             if (options?.columns && !options.columns.includes(name)) continue;
-            result[name] = String(await def.compute(smart));
+            const snapshotRow = Object.create(smart) as typeof smart;
+            snapshotRow.getValue = async (col: string): Promise<string> => {
+                if (col in result) return String(result[col]);
+                return smart.getValue(col);
+            };
+            result[name] = String(await def.compute(snapshotRow));
         }
 
         return result as unknown as T;
