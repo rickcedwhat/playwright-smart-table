@@ -55,6 +55,11 @@
     "comment": "/**\n* Unified interface for reading and writing data to specific columns.\n* Overrides both default extraction (toJSON) and filling (smartFill) logic.\n*/"
   },
   {
+    "name": "syntheticColumns",
+    "signature": "syntheticColumns?: Record<string, SyntheticColumnDef<T>>",
+    "comment": "/**\n* Computed columns with no DOM presence. Each key becomes a virtual column name\n* available in `toJSON()`, `getValue()`, and `findRow()`/`findRows()` filters.\n* The `compute` function receives the full SmartRow and must only read real or\n* override columns (no chaining between synthetics).\n*/"
+  },
+  {
     "name": "emptyState",
     "signature": "emptyState?: Locator",
     "comment": "/**\n* Locator for an empty-state element that replaces the table when there are no results.\n* If header resolution fails during init() and this locator is visible, init() succeeds\n* and isEmpty() returns true. All row operations still throw normally.\n*/"

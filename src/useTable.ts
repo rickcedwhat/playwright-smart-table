@@ -307,7 +307,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     getHeaders: async () => {
       log("getHeaders: fetching available columns");
       const map = await tableMapper.getMap();
-      return Array.from(map.keys());
+      return [...map.keys(), ...Object.keys(config.syntheticColumns ?? {})];
     },
 
     getHeaderCell: async (columnName: string) => {
@@ -329,16 +329,19 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
 
       const domFilters: Record<string, FilterValue> = {};
       const overrideFilters: Record<string, FilterValue> = {};
+      const syntheticFilters: Record<string, FilterValue> = {};
       if (hasFilters) {
         for (const [key, value] of Object.entries(filtersRecord)) {
-          if (config.columnOverrides?.[key as keyof T]?.read) {
+          if (config.syntheticColumns?.[key]) {
+            syntheticFilters[key] = value;
+          } else if (config.columnOverrides?.[key as keyof T]?.read) {
             overrideFilters[key] = value;
           } else {
             domFilters[key] = value;
           }
         }
       }
-      const hasOverrideFilters = Object.keys(overrideFilters).length > 0;
+      const hasPostFilters = Object.keys(overrideFilters).length > 0 || Object.keys(syntheticFilters).length > 0;
 
       const resolveRows = () => {
         let rows = resolve(config.rowSelector, rootLocator);
@@ -350,39 +353,28 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
         return rows;
       };
 
-      const countOverrideMatches = async (candidates: import('@playwright/test').Locator[], indices: number[]): Promise<number> => {
-        if (!hasOverrideFilters) return indices.length;
+      const countPostFilterMatches = async (candidates: import('@playwright/test').Locator[], indices: number[]): Promise<number> => {
+        if (!hasPostFilters) return indices.length;
         const map = tableMapper.getMapSync();
         if (!map) throw new Error('Initialization Error: Table map not available. Call "await table.init()" first.');
         const exact = options?.exact ?? false;
+        const hasOverrides = Object.keys(overrideFilters).length > 0;
+        const hasSynthetics = Object.keys(syntheticFilters).length > 0;
         let count = 0;
         for (const idx of indices) {
           const row = candidates[idx];
-          let match = true;
-          for (const [colName, filterValue] of Object.entries(overrideFilters)) {
-            const colIndex = map.get(colName);
-            if (colIndex === undefined) continue;
-            const override = config.columnOverrides![colName as keyof T]!;
-            const cell = resolve(config.cellSelector, row).nth(colIndex);
-            const getCell = (name: string) => {
-              const ci = map.get(name);
-              if (ci === undefined) throw new Error(`Column "${name}" not found`);
-              return resolve(config.cellSelector, row).nth(ci);
-            };
-            const ctx = { row: _makeSmart(row, map, undefined), columnName: colName, columnIndex: colIndex, getCell };
-            const readValue = String(await override.read!(cell, ctx));
-            if (!RowFinder.matchReadValue(readValue, filterValue, exact)) { match = false; break; }
-          }
-          if (match) count++;
+          if (hasOverrides && !await rowFinder.matchesOverrideFilters(row, overrideFilters, map, exact)) continue;
+          if (hasSynthetics && !await rowFinder.matchesSyntheticFilters(row, syntheticFilters, map, exact)) continue;
+          count++;
         }
         return count;
       };
 
       if (!hasPagination) {
         log(`countRows: counting rows in current viewport (no pagination)${hasFilters ? ` filters=${safeStringify(filtersRecord)}` : ''}`);
-        if (!hasOverrideFilters) return resolveRows().count();
+        if (!hasPostFilters) return resolveRows().count();
         const all = await resolveRows().all();
-        return countOverrideMatches(all, all.map((_, i) => i));
+        return countPostFilterMatches(all, all.map((_, i) => i));
       }
 
       log(`countRows: paginating up to ${effectiveMaxPages} page(s)${hasFilters ? ` filters=${safeStringify(filtersRecord)}` : ''}`);
@@ -395,7 +387,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
           const rowLocators = resolveRows();
           const newIndices = await tracker.getUnseenIndices(rowLocators);
           const candidates = await rowLocators.all();
-          const matched = await countOverrideMatches(candidates, newIndices);
+          const matched = await countPostFilterMatches(candidates, newIndices);
           total += matched;
           log(`countRows: page ${pagesScanned} — ${matched} row(s) (running total: ${total})`);
           if (pagesScanned >= effectiveMaxPages) break;
@@ -479,6 +471,13 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
 
     getRow: (filters: Partial<T> | Record<string, FilterValue>, options: { exact?: boolean } = { exact: false }): SmartRowType<T> => {
       log(`getRow: filters=${safeStringify(filters)} exact=${options.exact}`);
+      const syntheticKeys = Object.keys(filters).filter(k => config.syntheticColumns?.[k]);
+      if (syntheticKeys.length > 0) {
+        throw new Error(
+          `getRow() cannot filter by synthetic column(s): ${syntheticKeys.join(', ')}. ` +
+          `Use findRow() instead — synthetic columns require async evaluation.`
+        );
+      }
       const map = tableMapper.getMapSync();
       if (!map) throw new Error('Initialization Error: You attempted to access a row before the table structure was mapped. Please call "await table.init()" once before using synchronous row access.');
 
