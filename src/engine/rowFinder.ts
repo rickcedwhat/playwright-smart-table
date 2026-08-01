@@ -62,7 +62,7 @@ export class RowFinder<T = any> {
         return true;
     }
 
-    private async matchesOverrideFilters(
+    async matchesOverrideFilters(
         rowLocator: Locator,
         overrideFilters: Record<string, FilterValue>,
         map: Map<string, number>,
@@ -90,7 +90,7 @@ export class RowFinder<T = any> {
         return true;
     }
 
-    private async matchesSyntheticFilters(
+    async matchesSyntheticFilters(
         rowLocator: Locator,
         syntheticFilters: Record<string, FilterValue>,
         map: Map<string, number>,

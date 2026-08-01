@@ -68,11 +68,11 @@ export class TableMapper {
                 const rawHeaders = await strategy(context);
                 const entries = await this.processHeaders(rawHeaders);
 
-                // Success
-                this._headerMap = new Map(entries);
+                // Success — validate before caching so a collision doesn't leave stale state
+                const headerMap = new Map(entries);
 
                 const syntheticNames = Object.keys(this.config.syntheticColumns ?? {});
-                const collisions = syntheticNames.filter(name => this._headerMap!.has(name));
+                const collisions = syntheticNames.filter(name => headerMap.has(name));
                 if (collisions.length > 0) {
                     throw new Error(
                         `Synthetic column name(s) collide with real header(s): ${collisions.join(', ')}. ` +
@@ -80,6 +80,7 @@ export class TableMapper {
                     );
                 }
 
+                this._headerMap = headerMap;
                 this.log(`Mapped ${entries.length} columns: ${JSON.stringify(entries.map(e => e[0]))}`);
                 return this._headerMap;
 

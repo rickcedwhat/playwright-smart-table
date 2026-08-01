@@ -441,23 +441,20 @@ const createSmartRow = <T = any>(
         return !(smart as any)[SENTINEL_ROW];
     };
 
-    let _inSyntheticCompute = false;
-
     smart.getValue = async (colName: string): Promise<string> => {
         const syntheticDef = config.syntheticColumns?.[colName];
         if (syntheticDef) {
-            if (_inSyntheticCompute) {
-                throw new Error(
-                    `[SmartTable] Synthetic column "${colName}" cannot be read from inside another synthetic column's compute(). ` +
-                    `Synthetic columns may only reference real or override columns.`
-                );
-            }
-            _inSyntheticCompute = true;
-            try {
-                return String(await syntheticDef.compute(smart));
-            } finally {
-                _inSyntheticCompute = false;
-            }
+            const guardedRow = Object.create(smart) as typeof smart;
+            guardedRow.getValue = async (innerCol: string): Promise<string> => {
+                if (config.syntheticColumns?.[innerCol]) {
+                    throw new Error(
+                        `[SmartTable] Synthetic column "${innerCol}" cannot be read from inside another synthetic column's compute(). ` +
+                        `Synthetic columns may only reference real or override columns.`
+                    );
+                }
+                return smart.getValue(innerCol);
+            };
+            return String(await syntheticDef.compute(guardedRow));
         }
 
         const idx = map.get(colName);
@@ -577,7 +574,12 @@ const createSmartRow = <T = any>(
 
                 for (const [name, def] of Object.entries(config.syntheticColumns ?? {})) {
                     if (options?.columns && !options.columns.includes(name)) continue;
-                    result[name] = String(await def.compute(smart));
+                    const snapshotRow = Object.create(smart) as typeof smart;
+                    snapshotRow.getValue = async (col: string): Promise<string> => {
+                        if (col in result) return String(result[col]);
+                        return smart.getValue(col);
+                    };
+                    result[name] = String(await def.compute(snapshotRow));
                 }
 
                 return result as unknown as T;

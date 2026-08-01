@@ -358,33 +358,14 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
         const map = tableMapper.getMapSync();
         if (!map) throw new Error('Initialization Error: Table map not available. Call "await table.init()" first.');
         const exact = options?.exact ?? false;
+        const hasOverrides = Object.keys(overrideFilters).length > 0;
+        const hasSynthetics = Object.keys(syntheticFilters).length > 0;
         let count = 0;
         for (const idx of indices) {
           const row = candidates[idx];
-          let match = true;
-          for (const [colName, filterValue] of Object.entries(overrideFilters)) {
-            const colIndex = map.get(colName);
-            if (colIndex === undefined) continue;
-            const override = config.columnOverrides![colName as keyof T]!;
-            const cell = resolve(config.cellSelector, row).nth(colIndex);
-            const getCell = (name: string) => {
-              const ci = map.get(name);
-              if (ci === undefined) throw new Error(`Column "${name}" not found`);
-              return resolve(config.cellSelector, row).nth(ci);
-            };
-            const ctx = { row: _makeSmart(row, map, undefined), columnName: colName, columnIndex: colIndex, getCell };
-            const readValue = String(await override.read!(cell, ctx));
-            if (!RowFinder.matchReadValue(readValue, filterValue, exact)) { match = false; break; }
-          }
-          if (match) {
-            for (const [colName, filterValue] of Object.entries(syntheticFilters)) {
-              const def = config.syntheticColumns![colName];
-              const smartRow = _makeSmart(row, map, undefined);
-              const computedValue = String(await def.compute(smartRow));
-              if (!RowFinder.matchReadValue(computedValue, filterValue, exact)) { match = false; break; }
-            }
-          }
-          if (match) count++;
+          if (hasOverrides && !await rowFinder.matchesOverrideFilters(row, overrideFilters, map, exact)) continue;
+          if (hasSynthetics && !await rowFinder.matchesSyntheticFilters(row, syntheticFilters, map, exact)) continue;
+          count++;
         }
         return count;
       };
