@@ -70,5 +70,13 @@ export function mergeTableConfig<T = any>(
         } as TableConfig<T>['columnOverrides'];
     }
 
+    // Deep-merge syntheticColumns (override keys replace, preset keys retained)
+    if (base.syntheticColumns || overrides.syntheticColumns) {
+        result.syntheticColumns = {
+            ...base.syntheticColumns,
+            ...overrides.syntheticColumns,
+        };
+    }
+
     return result;
 }

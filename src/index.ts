@@ -20,6 +20,9 @@ export type {
     GetCellLocatorFn,
     GetActiveCellFn,
     DebugConfig,
+    SyntheticColumnDef,
+    ColumnOverride,
+    ColumnOverrideReadContext,
 } from './types';
 
 // Export namespace-like strategy collections

@@ -693,14 +693,9 @@ await table.generateConfigPrompt(); // Or see plugin docs
 
 ### 📚 Documentation
 
-- Added AI-optimized migration guide (MIGRATION_v4.md)
 - Updated all examples to use `Strategies` object
 - Added TypeScript generic usage examples
 - Documented `revalidate()` method
-
-### 🔧 Migration Guide
-
-See [MIGRATION_v4.md](./MIGRATION_v4.md) for detailed AI-assisted migration instructions.
 
 **Quick Reference:**
 ```typescript
@@ -730,7 +725,7 @@ const data = await row.toJSON(); // Type: User
 
 ---
 
-## [3.1.0] - 2024-12-XX
+## [3.1.0] - 2025-12-29
 
 ### 🚀 Major Changes
 
@@ -829,7 +824,7 @@ const table = await useTable(page.locator('#example')).init();
 
 ---
 
-## [3.0.0] - 2024-12-XX
+## [3.0.0] - 2025-12-29
 
 ### 🚀 Major Changes
 

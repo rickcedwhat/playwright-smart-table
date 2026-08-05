@@ -1,5 +1,5 @@
 // fallow-ignore-file circular-dependency
-import { Locator, Page } from '@playwright/test';
+import { Locator } from '@playwright/test';
 import { StrategyContext } from '../types';
 
 // fallow-ignore-next-line unused-type
