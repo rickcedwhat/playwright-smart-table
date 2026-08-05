@@ -1,5 +1,25 @@
 # Changelog
 
+## [6.20.0] - 2026-08-05
+
+### Added
+
+- **First-class synthetic columns** — computed columns with no DOM presence, defined via `syntheticColumns` config. Each synthetic column provides a `compute(row)` function that derives its value from other columns at runtime (e.g. `Total = Price × Qty`). Wired through `toJSON`, `findRow`/`findRows`, `countRows`, `getHeaders`, and `mergeTableConfig`. `getCell` and `smartFill` throw with clear guidance. `getRow` throws when filtering by synthetic columns (use `findRow` instead). No-chaining enforcement prevents synthetics from reading other synthetics. New `row.getValue(column)` universal accessor works for real, override, and synthetic columns. `SyntheticColumnDef` exported from public surface. Closes #391.
+- **`columnOverrides.read` supported in `findRow`/`findRows`/`countRows`** — override columns with a custom `read` hook are now evaluated during row search and counting. Previously, filters on override columns were silently ignored by the DOM-level filter engine; they are now routed through a post-evaluation path that calls `read()` per candidate row. Closes #398.
+- **`countRows(filters?, options?)` — optional filters and maxPages override** — `countRows` now accepts an optional filter object (same syntax as `findRow`) and an `options.maxPages` override. Without filters, behavior is unchanged. Closes #396.
+- **Self-healing row locators via `resolveRowIndex` selector** — when a `resolveRowIndex` strategy is configured, row locators returned by `findRow`/`findRows` are now scoped via the strategy's attribute selector (e.g. `[data-rowindex="5"]`) instead of positional `.nth()`. This makes row references survive DOM recycling on virtualized tables. Closes #392.
+
+### Fixed
+
+- **Overscan rows collected instead of deferred** — on virtualized tables, rows above the viewport's visible bounds were deferred to a later scroll pass, which could miss them entirely if the table scrolled forward. They are now collected immediately. Closes #384.
+- **Dedupe key registered after callback** — the iteration engine's dedupe strategy registered a row's key before the callback ran, so a callback that threw left a phantom key that prevented the row from being revisited. Key registration now happens after a successful callback. Closes #382.
+- **Final scan after `advancePage` returns false at EOF** — when `advancePage` returns `false` (no more pages), rows revealed by the final scroll were not scanned. The iteration engine now performs one last row collection pass. Closes #388.
+- **Cell-loading skeleton in playground** — off-screen column placeholders in the playground app now show a loading skeleton instead of empty cells. Closes #395.
+
+### Changed
+
+- **Dead code and unused imports removed** — `navigateOnce` (~30 lines, never called), 5 unused imports in useTable.ts/pagination.ts/resolution.ts, and stale CHANGELOG date placeholders cleaned up. Closes #401.
+
 ## [6.19.0] - 2026-07-21
 
 ### Added
