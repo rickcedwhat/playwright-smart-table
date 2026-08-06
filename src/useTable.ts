@@ -444,8 +444,6 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
 
     reset: async () => {
       log("Resetting table...");
-      await config.onReset(createStrategyContext());
-
       if (config.strategies.pagination?.goToFirst) {
         log("Auto-navigating to first page...");
         await config.strategies.pagination.goToFirst(createStrategyContext());
@@ -458,6 +456,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       tableMapper.clear();
       log("Table reset complete. Calling autoInit to restore state.");
       await _autoInit();
+      await config.onReset(createStrategyContext());
     },
 
     revalidate: async () => {

@@ -42,7 +42,7 @@
   {
     "name": "onReset",
     "signature": "onReset?: (context: TableContext) => Promise<void>",
-    "comment": "/** Reset hook */"
+    "comment": "/** Hook called after reset completes (after goToFirst, cache clear, and autoInit). */"
   },
   {
     "name": "strategies",
