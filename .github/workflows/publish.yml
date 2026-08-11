@@ -25,6 +25,9 @@ jobs:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
 
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
       - name: Check if version changed
         id: check_version
         run: |
@@ -34,9 +37,9 @@ jobs:
           SHORT_SHA=${GITHUB_SHA::7}
 
           IS_GREATER=$(node -e "
-            const semver = require('semver');
-            const local = '$LOCAL_VERSION', latest = '$LATEST_VERSION';
-            process.stdout.write(semver.valid(local) && semver.gt(local, latest) ? 'true' : 'false');
+            const [a, b] = ['$LOCAL_VERSION', '$LATEST_VERSION'].map(v => v.split('.').map(Number));
+            const gt = a[0] > b[0] || (a[0] === b[0] && a[1] > b[1]) || (a[0] === b[0] && a[1] === b[1] && a[2] > b[2]);
+            process.stdout.write(gt ? 'true' : 'false');
           ")
 
           if [ "$IS_GREATER" = "true" ]; then
@@ -51,9 +54,6 @@ jobs:
             echo "version=$NEXT_VERSION" >> $GITHUB_OUTPUT
             echo "tag=next" >> $GITHUB_OUTPUT
           fi
-
-      - name: Install Dependencies
-        run: pnpm install --frozen-lockfile
 
       - name: Build Project
         run: pnpm run build
