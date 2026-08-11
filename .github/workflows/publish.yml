@@ -37,7 +37,7 @@ jobs:
           SHORT_SHA=${GITHUB_SHA::7}
 
           IS_GREATER=$(node -e "
-            const [a, b] = ['$LOCAL_VERSION', '$LATEST_VERSION'].map(v => v.split('.').map(Number));
+            const [a, b] = ['$LOCAL_VERSION', '$LATEST_VERSION'].map(v => v.split('.').map(Number).concat(0, 0, 0).slice(0, 3));
             const gt = a[0] > b[0] || (a[0] === b[0] && a[1] > b[1]) || (a[0] === b[0] && a[1] === b[1] && a[2] > b[2]);
             process.stdout.write(gt ? 'true' : 'false');
           ")
