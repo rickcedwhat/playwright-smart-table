@@ -251,6 +251,50 @@ test.describe('Edge cases and missing coverage', () => {
     await expect(page.locator('#page')).toHaveText('1');
   });
 
+  test('onReset runs after goToFirst and autoInit (#404)', async ({ page }) => {
+    await page.setContent(`
+      <table id="t">
+        <thead><tr><th>ID</th></tr></thead>
+        <tbody id="tbody">
+          <tr><td>1</td></tr>
+          <tr><td>2</td></tr>
+        </tbody>
+        <tfoot><tr><td><button id="first">First</button><button id="next">Next</button></td></tr></tfoot>
+      </table>
+      <div id="page">1</div>
+      <script>
+        let p = 1;
+        function render() {
+          if (p === 1) {
+            document.getElementById('tbody').innerHTML = '<tr><td>1</td></tr><tr><td>2</td></tr>';
+            document.getElementById('page').textContent = '1';
+          } else {
+            document.getElementById('tbody').innerHTML = '<tr><td>3</td></tr><tr><td>4</td></tr>';
+            document.getElementById('page').textContent = '2';
+          }
+        }
+        document.getElementById('next').onclick = () => { if (p === 1) { p = 2; render(); } };
+        document.getElementById('first').onclick = () => { if (p === 2) { p = 1; render(); } };
+      </script>
+    `);
+
+    let pageTextDuringOnReset = '';
+    const table = useTable(page.locator('#t'), {
+      strategies: { pagination: Strategies.Pagination.click({ next: '#next', first: '#first' }) },
+      maxPages: 2,
+      onReset: async () => {
+        pageTextDuringOnReset = await page.locator('#page').textContent() ?? '';
+      },
+    });
+    await table.init();
+    await table.findRows({});
+    expect(table.currentPageIndex).toBe(1);
+    await expect(page.locator('#page')).toHaveText('2');
+
+    await table.reset();
+    expect(pageTextDuringOnReset).toBe('1');
+  });
+
   test('sorting.getState throws when no sorting strategy configured', async ({ page }) => {
     await page.setContent(`
       <table id="t"><thead><tr><th>Name</th></tr></thead><tbody><tr><td>Alice</td></tr></tbody></table>

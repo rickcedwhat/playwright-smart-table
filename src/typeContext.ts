@@ -685,7 +685,7 @@ export interface TableConfig<T = any> {
   autoScroll?: boolean;
   /** Debug options for development and troubleshooting */
   debug?: DebugConfig;
-  /** Reset hook */
+  /** Hook called after reset completes (after goToFirst, cache clear, and autoInit). */
   onReset?: (context: TableContext) => Promise<void>;
   /** All interaction strategies */
   strategies?: TableStrategies;
@@ -915,7 +915,7 @@ export interface TableResult<T = any> extends AsyncIterable<{ row: SmartRow<T>; 
 
 
   /**
-   * Resets the table state (clears cache, flags) and invokes the onReset strategy.
+   * Resets the table: calls goToFirst (if configured), clears cache, re-inits headers, then calls onReset.
    */
   reset: () => Promise<void>;
 
