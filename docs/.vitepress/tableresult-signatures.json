@@ -77,7 +77,7 @@
   {
     "name": "reset",
     "signature": "reset: () => Promise<void>",
-    "comment": "/**\n* Resets the table: navigates to page 1, clears cache, re-inits headers, then calls onReset.\n*/"
+    "comment": "/**\n* Resets the table: calls goToFirst (if configured), clears cache, re-inits headers, then calls onReset.\n*/"
   },
   {
     "name": "revalidate",

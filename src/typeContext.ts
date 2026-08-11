@@ -915,7 +915,7 @@ export interface TableResult<T = any> extends AsyncIterable<{ row: SmartRow<T>; 
 
 
   /**
-   * Resets the table: navigates to page 1, clears cache, re-inits headers, then calls onReset.
+   * Resets the table: calls goToFirst (if configured), clears cache, re-inits headers, then calls onReset.
    */
   reset: () => Promise<void>;
 
