@@ -4,7 +4,7 @@
 
 ### Fixed
 
-- **`@playwright/test` peer dependency now optional** — prevents npm from auto-installing a second copy of Playwright when the library is consumed alongside packages like `@qawolf/pom` that bring their own Playwright dependency. The library's compiled JS has zero runtime Playwright imports (all references are type-level), so every consumer already has `@playwright/test` installed as their test framework.
+- **`@playwright/test` peer dependency now optional** — prevents npm from auto-installing a second copy of Playwright when the library is consumed alongside other packages that bring their own Playwright dependency. The library's compiled JS has zero runtime Playwright imports (all references are type-level), so every consumer already has `@playwright/test` installed as their test framework.
 
 ## [6.20.0] - 2026-08-05
 
