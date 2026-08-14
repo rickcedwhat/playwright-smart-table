@@ -3,7 +3,7 @@ import { useTable, presets } from '../../src/index';
 
 const RDG_URL = 'https://comcast.github.io/react-data-grid/#/CommonFeatures';
 
-test.describe('React Data Grid 2D (rdg2D preset)', () => {
+test.describe.skip('React Data Grid 2D (rdg2D preset)', () => { // skip: external site layout changed (#413)
     test.setTimeout(90000);
 
     test('collects all headers including those beyond the initial viewport', async ({ page }) => {

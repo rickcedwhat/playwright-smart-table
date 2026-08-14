@@ -11,6 +11,7 @@ export default defineConfig({
     '**/integration/mui-data-grid.spec.ts',
     '**/integration/glide.spec.ts',
     '**/integration/rdg.spec.ts',
+    '**/integration/rdg-2d.spec.ts',
     '**/integration/mui-table.spec.ts',
     '**/integration/mui-datagrid-live*.spec.ts',
   ],

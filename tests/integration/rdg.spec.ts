@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { useTable, presets } from '../../src/index';
 import type { TableContext } from '../../src/types';
 
-test.describe('React Data Grid (RDG)', () => {
+test.describe.skip('React Data Grid (RDG)', () => { // skip: external site layout changed (#413)
     test.setTimeout(60000);
 
     test('should collect all headers from virtualized columns', async ({ page }) => {
