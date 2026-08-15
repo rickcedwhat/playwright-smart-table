@@ -128,7 +128,7 @@ jobs:
         run: pnpm run build
 
   test-b:
-    name: Integration Tests (external + MUI DataGrid)
+    name: Integration Tests (RDG + MUI DataGrid)
     needs: changes
     if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
@@ -168,6 +168,10 @@ jobs:
       - name: Install MUI DataGrid App
         run: npm ci
         working-directory: tests/apps/mui-datagrid
+
+      - name: Install RDG Grid App
+        run: npm install
+        working-directory: tests/apps/rdg-grid
 
       - name: Run Integration Tests
         run: npx playwright test --config playwright.config.ci-b.ts
