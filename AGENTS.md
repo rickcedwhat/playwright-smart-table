@@ -110,3 +110,13 @@ Types: `feat` `fix` `docs` `test` `refactor` `perf` `chore`
 - All public types exported from `src/types.ts`
 
 See `CONTRIBUTING.md` for full design philosophy.
+
+---
+
+## Agent Guides
+
+Hard-won patterns from real client configurations — read these before configuring a table type you haven't worked with before.
+
+| Guide | When to read |
+|---|---|
+| [`docs/agent-guides/virtualized-tables.md`](docs/agent-guides/virtualized-tables.md) | Any table using TanStack Virtual, react-window, Braintrust-style, or MUI DataGrid |
