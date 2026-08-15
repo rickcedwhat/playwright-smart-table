@@ -1,6 +1,6 @@
 // CI Group A: unit tests + all core/playground specs
 // Spins up the playground server only (port 3000).
-// Group B (playwright.config.ci-b.ts) handles external-URL and MUI DataGrid integration tests.
+// Group B (playwright.config.ci-b.ts) handles integration tests requiring dedicated app servers.
 import { defineConfig } from '@playwright/test';
 
 export default defineConfig({

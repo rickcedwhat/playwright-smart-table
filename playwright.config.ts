@@ -48,5 +48,12 @@ export default defineConfig({
       reuseExistingServer: !isCI,
       timeout: 120 * 1000,
     },
+    {
+      command: 'npm run dev',
+      cwd: 'tests/apps/rdg-grid',
+      port: 3060,
+      reuseExistingServer: !isCI,
+      timeout: 120 * 1000,
+    },
   ],
 });

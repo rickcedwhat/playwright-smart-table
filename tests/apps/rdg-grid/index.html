@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RDG-Style Grid Test App</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #1e1e2e; color: #cdd6f4; }
+    h1 { padding: 12px 16px; font-size: 18px; }
+
+    .rdg {
+      position: relative;
+      overflow: auto;
+      width: 100%;
+      height: 600px;
+      border: 1px solid #45475a;
+      background: #1e1e2e;
+      contain: strict;
+    }
+
+    .rdg-header-row {
+      position: sticky;
+      top: 0;
+      z-index: 3;
+      display: flex;
+      background: #313244;
+      border-bottom: 2px solid #585b70;
+    }
+
+    .rdg-header-row [role="columnheader"] {
+      flex: 0 0 auto;
+      width: 120px;
+      padding: 8px 10px;
+      font-weight: 600;
+      font-size: 13px;
+      border-right: 1px solid #45475a;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .rdg-header-row [role="columnheader"]:first-child {
+      width: 60px;
+    }
+
+    .rdg-row-container {
+      position: relative;
+    }
+
+    .rdg-row {
+      position: absolute;
+      left: 0;
+      display: flex;
+      width: max-content;
+      border-bottom: 1px solid #313244;
+    }
+
+    .rdg-row:hover {
+      background: #313244;
+    }
+
+    .rdg-row [role="gridcell"] {
+      flex: 0 0 auto;
+      width: 120px;
+      padding: 6px 10px;
+      font-size: 13px;
+      border-right: 1px solid #313244;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .rdg-row [role="gridcell"]:first-child {
+      width: 60px;
+    }
+
+    .rdg-summary-row {
+      position: sticky;
+      bottom: 0;
+      z-index: 2;
+      display: flex;
+      background: #45475a;
+      border-top: 2px solid #585b70;
+      font-weight: 600;
+    }
+
+    .rdg-summary-row [role="gridcell"] {
+      flex: 0 0 auto;
+      width: 120px;
+      padding: 6px 10px;
+      font-size: 13px;
+      border-right: 1px solid #585b70;
+      white-space: nowrap;
+    }
+
+    .rdg-summary-row [role="gridcell"]:first-child {
+      width: 60px;
+    }
+
+    input[type="checkbox"] { cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>RDG-Style Grid — Common Features</h1>
+  <div id="grid-container" class="rdg" role="grid" aria-colcount="16" aria-rowcount="1001">
+    <!-- Header row -->
+    <div class="rdg-header-row" role="row" aria-rowindex="1"></div>
+    <!-- Scrollable body -->
+    <div class="rdg-row-container"></div>
+    <!-- Summary row -->
+    <div class="rdg-summary-row" role="row"></div>
+  </div>
+
+  <script>
+    const ROW_COUNT = 1000;
+    const ROW_HEIGHT = 35;
+    const OVERSCAN = 5;
+
+    const COLUMNS = [
+      { name: '',          key: 'checkbox',   width: 60  },
+      { name: 'ID',        key: 'id',         width: 120 },
+      { name: 'Task',      key: 'task',       width: 120 },
+      { name: 'Client',    key: 'client',     width: 120 },
+      { name: 'Available', key: 'available',  width: 120 },
+      { name: 'Priority',  key: 'priority',   width: 120 },
+      { name: 'Contact',   key: 'contact',    width: 120 },
+      { name: 'Country',   key: 'country',    width: 120 },
+      { name: 'Assignee',  key: 'assignee',   width: 120 },
+      { name: 'Progress',  key: 'progress',   width: 120 },
+      { name: 'Start Date',key: 'startDate',  width: 120 },
+      { name: 'Due Date',  key: 'dueDate',    width: 120 },
+      { name: 'Timeline',  key: 'timeline',   width: 120 },
+      { name: 'Completion',key: 'completion',  width: 120 },
+      { name: 'Budget',    key: 'budget',     width: 120 },
+      { name: 'Department',key: 'department',  width: 120 },
+    ];
+
+    const CLIENTS = ['Quitzon and Sons','Rice-Bednar - Spencer','Schimmel LLC','Bins, Renner and Kiehn','Pagac LLC','Wyman-Ledner','Cremin Inc','Ebert-Renner','Johnston Group','Fay-Abbott'];
+    const PRIORITIES = ['Critical','High','Medium','Low'];
+    const COUNTRIES = ['USA','Canada','UK','Germany','France','Australia','Japan','Brazil','India','Mexico'];
+    const DEPARTMENTS = ['Engineering','Marketing','Sales','Support','Finance','HR','Legal','Design'];
+
+    function seededRandom(seed) {
+      let s = seed;
+      return () => { s = (s * 16807 + 0) % 2147483647; return (s - 1) / 2147483646; };
+    }
+
+    function generateRow(i) {
+      const rng = seededRandom(i + 1);
+      const pick = (arr) => arr[Math.floor(rng() * arr.length)];
+      return {
+        checkbox: rng() > 0.5,
+        id: String(i),
+        task: `Task #${i + 1}`,
+        client: pick(CLIENTS),
+        available: rng() > 0.5,
+        priority: pick(PRIORITIES),
+        contact: `contact${i}@example.com`,
+        country: pick(COUNTRIES),
+        assignee: `User ${Math.floor(rng() * 50) + 1}`,
+        progress: `${Math.floor(rng() * 100)}%`,
+        startDate: `2026-${String(Math.floor(rng() * 12) + 1).padStart(2, '0')}-${String(Math.floor(rng() * 28) + 1).padStart(2, '0')}`,
+        dueDate: `2027-${String(Math.floor(rng() * 12) + 1).padStart(2, '0')}-${String(Math.floor(rng() * 28) + 1).padStart(2, '0')}`,
+        timeline: `${Math.floor(rng() * 52) + 1} weeks`,
+        completion: `${Math.floor(rng() * 101)}%`,
+        budget: `$${(Math.floor(rng() * 100000) + 1000).toLocaleString()}`,
+        department: pick(DEPARTMENTS),
+      };
+    }
+
+    const grid = document.getElementById('grid-container');
+    const headerRow = grid.querySelector('.rdg-header-row');
+    const rowContainer = grid.querySelector('.rdg-row-container');
+    const summaryRow = grid.querySelector('.rdg-summary-row');
+
+    // Render header
+    COLUMNS.forEach((col, i) => {
+      const th = document.createElement('div');
+      th.setAttribute('role', 'columnheader');
+      th.setAttribute('aria-colindex', String(i + 1));
+      th.style.width = col.width + 'px';
+      th.textContent = col.name;
+      headerRow.appendChild(th);
+    });
+
+    // Set total row container height
+    rowContainer.style.height = ROW_COUNT * ROW_HEIGHT + 'px';
+
+    // Summary row
+    COLUMNS.forEach((col, i) => {
+      const cell = document.createElement('div');
+      cell.setAttribute('role', 'gridcell');
+      cell.setAttribute('aria-colindex', String(i + 1));
+      cell.style.width = col.width + 'px';
+      if (col.key === 'id') cell.textContent = 'Total';
+      else if (col.key === 'task') cell.textContent = `${ROW_COUNT} records`;
+      else if (col.key === 'completion') cell.textContent = '50%';
+      else cell.textContent = '';
+      summaryRow.appendChild(cell);
+    });
+
+    // Virtualization state
+    let renderedRange = { start: -1, end: -1 };
+    const rowElements = new Map();
+
+    function renderCell(col, data, colIndex) {
+      const cell = document.createElement('div');
+      cell.setAttribute('role', 'gridcell');
+      cell.setAttribute('aria-colindex', String(colIndex + 1));
+      cell.style.width = col.width + 'px';
+
+      if (col.key === 'checkbox' || col.key === 'available') {
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.checked = data[col.key];
+        cb.setAttribute('aria-label', col.key === 'checkbox' ? 'Select' : 'Available');
+        cell.appendChild(cb);
+      } else {
+        cell.textContent = data[col.key];
+      }
+      return cell;
+    }
+
+    function renderRow(i) {
+      const data = generateRow(i);
+      const row = document.createElement('div');
+      row.className = 'rdg-row';
+      row.setAttribute('role', 'row');
+      row.setAttribute('aria-rowindex', String(i + 2)); // 1-based, header is row 1
+      row.style.top = i * ROW_HEIGHT + 'px';
+      row.style.height = ROW_HEIGHT + 'px';
+
+      COLUMNS.forEach((col, ci) => {
+        row.appendChild(renderCell(col, data, ci));
+      });
+
+      return row;
+    }
+
+    function updateVirtualization() {
+      const scrollTop = grid.scrollTop;
+      const viewportHeight = grid.clientHeight;
+
+      const firstVisible = Math.floor(scrollTop / ROW_HEIGHT);
+      const lastVisible = Math.ceil((scrollTop + viewportHeight) / ROW_HEIGHT);
+
+      const start = Math.max(0, firstVisible - OVERSCAN);
+      const end = Math.min(ROW_COUNT - 1, lastVisible + OVERSCAN);
+
+      if (start === renderedRange.start && end === renderedRange.end) return;
+
+      // Remove rows outside new range
+      for (const [idx, el] of rowElements) {
+        if (idx < start || idx > end) {
+          el.remove();
+          rowElements.delete(idx);
+        }
+      }
+
+      // Add rows in new range
+      for (let i = start; i <= end; i++) {
+        if (!rowElements.has(i)) {
+          const row = renderRow(i);
+          rowContainer.appendChild(row);
+          rowElements.set(i, row);
+        }
+      }
+
+      renderedRange = { start, end };
+    }
+
+    grid.addEventListener('scroll', updateVirtualization);
+    updateVirtualization();
+  </script>
+</body>
+</html>
