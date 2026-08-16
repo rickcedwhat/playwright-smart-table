@@ -170,7 +170,7 @@ jobs:
         working-directory: tests/apps/mui-datagrid
 
       - name: Install RDG Grid App
-        run: npm install
+        run: npm ci
         working-directory: tests/apps/rdg-grid
 
       - name: Run Integration Tests
