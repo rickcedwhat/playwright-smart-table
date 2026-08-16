@@ -133,6 +133,21 @@ export class RowFinder<T = any> {
         return smartRow;
     }
 
+    private async waitForTableReady(): Promise<void> {
+        const isTableLoading = this.config.strategies.loading?.isTableLoading;
+        if (!isTableLoading) return;
+        const context = {
+            root: this.rootLocator,
+            config: this.config,
+            page: this.rootLocator.page(),
+            resolve: this.resolve
+        };
+        while (await isTableLoading(context)) {
+            logDebug(this.config, 'verbose', 'Table is loading... waiting');
+            await this.rootLocator.page().waitForTimeout(200);
+        }
+    }
+
     public async findRows(
         filters: Record<string, FilterValue> = {},
         options?: { exact?: boolean, maxPages?: number, useBulkPagination?: boolean }
@@ -148,6 +163,8 @@ export class RowFinder<T = any> {
         const tracker = new ElementTracker('findRows');
 
         try {
+            await this.waitForTableReady();
+
             const { domFilters, overrideFilters, syntheticFilters } = this.splitFilters(filtersRecord);
             const hasOverrideFilters = Object.keys(overrideFilters).length > 0;
             const hasSyntheticFilters = Object.keys(syntheticFilters).length > 0;
@@ -257,21 +274,7 @@ export class RowFinder<T = any> {
         logDebug(this.config, 'verbose',`Looking for row: ${JSON.stringify(filters)} (MaxPages: ${effectiveMaxPages})`);
 
         while (true) {
-            // Check Loading
-            if (this.config.strategies.loading?.isTableLoading) {
-                const isLoading = await this.config.strategies.loading.isTableLoading({
-                    root: this.rootLocator,
-                    config: this.config,
-                    page: this.rootLocator.page(),
-                    resolve: this.resolve
-                });
-
-                if (isLoading) {
-                    logDebug(this.config, 'verbose','Table is loading... waiting');
-                    await this.rootLocator.page().waitForTimeout(200);
-                    continue;
-                }
-            }
+            await this.waitForTableReady();
 
             const allRows = this.resolve(this.config.rowSelector, this.rootLocator);
             const { domFilters, overrideFilters, syntheticFilters } = this.splitFilters(filters);
