@@ -370,6 +370,16 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
         return count;
       };
 
+      // Wait for table to finish loading before counting
+      const isTableLoading = config.strategies.loading?.isTableLoading;
+      if (isTableLoading) {
+        const ctx = createStrategyContext();
+        while (await isTableLoading(ctx)) {
+          log('countRows: table is loading... waiting');
+          await rootLocator.page().waitForTimeout(200);
+        }
+      }
+
       if (!hasPagination) {
         log(`countRows: counting rows in current viewport (no pagination)${hasFilters ? ` filters=${safeStringify(filtersRecord)}` : ''}`);
         if (!hasPostFilters) return resolveRows().count();

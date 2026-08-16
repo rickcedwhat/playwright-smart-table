@@ -413,6 +413,9 @@ test.describe('Loading Strategy: row and cell timeout', () => {
             cellSelector: '[role="cell"]',
             strategies: {
                 loading: {
+                    isTableLoading: async ({ root }) => {
+                        return (await root.locator('[data-testid="cell-loading"]').count()) > 0;
+                    },
                     isCellLoading: async (cell) => {
                         return (await cell.locator('[data-testid="cell-loading"]').count()) > 0;
                     },
@@ -429,7 +432,6 @@ test.describe('Loading Strategy: row and cell timeout', () => {
         expect(rows.length).toBe(10);
         for (const row of rows) {
             const data = await row.toJSON() as Record<string, unknown>;
-            // All cells should have real non-empty string values
             for (const value of Object.values(data)) {
                 expect(typeof value).toBe('string');
                 if (typeof value === 'string') {
