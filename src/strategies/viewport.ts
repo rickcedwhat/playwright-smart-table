@@ -1,4 +1,5 @@
 import { ViewportStrategy } from '../types';
+import { logDebug } from '../utils/debugUtils';
 
 // fallow-ignore-next-line unused-type
 export type DataAttributeViewportOptions = {
@@ -60,6 +61,10 @@ export type DataAttributeViewportOptions = {
  *   - scrollToColumn       — aligns header's left edge to container left, waits for cell mount
  *   - scrollToRow          — scrolls row into view, waits for row mount
  *
+ * **Important:** `rowAttribute` must be present on the elements matched by `rowSelector`,
+ * not on child cells. If row elements lack the attribute, `getVisibleRowRange` returns
+ * `{first:0, last:0}` and logs a warning at the `error` log level.
+ *
  * @example
  * // TanStack / Braintrust (data-index, 0-based — default)
  * viewport: Strategies.Viewport.dataAttribute()
@@ -83,15 +88,20 @@ const dataAttribute = (options?: DataAttributeViewportOptions): ViewportStrategy
         getVisibleColumnRange: async ({ root, config }) => {
             const rowSel = config.rowSelector;
             const cellSel = typeof config.cellSelector === 'string' ? config.cellSelector : `[${colAttr}]`;
-            return root.evaluate((el, { rowSel, cellSel, colAttr, colOffset }) => {
+            const result = await root.evaluate((el, { rowSel, cellSel, colAttr, colOffset }) => {
                 const firstRow = el.querySelector(rowSel);
-                if (!firstRow) return { first: 0, last: 0 };
-                const indices = Array.from(firstRow.querySelectorAll(cellSel))
+                if (!firstRow) return { first: 0, last: 0, _cellCount: 0, _validCount: 0 };
+                const cells = Array.from(firstRow.querySelectorAll(cellSel));
+                const indices = cells
                     .map(c => Number(c.getAttribute(colAttr)) - colOffset)
                     .filter(n => !isNaN(n));
-                if (!indices.length) return { first: 0, last: 0 };
-                return { first: Math.min(...indices), last: Math.max(...indices) };
+                if (!indices.length) return { first: 0, last: 0, _cellCount: cells.length, _validCount: 0 };
+                return { first: Math.min(...indices), last: Math.max(...indices), _cellCount: cells.length, _validCount: indices.length };
             }, { rowSel, cellSel, colAttr, colOffset });
+            if (result._cellCount > 0 && result._validCount === 0) {
+                logDebug(config, 'error', `dataAttribute viewport: ${result._cellCount} cell(s) found but none have attribute "${colAttr}". Check that columnAttribute targets cell elements matched by cellSelector.`);
+            }
+            return { first: result.first, last: result.last };
         },
 
         getVisibleRowIndices: async ({ root, config }) => {
@@ -116,30 +126,27 @@ const dataAttribute = (options?: DataAttributeViewportOptions): ViewportStrategy
 
         getVisibleRowRange: async ({ root, config }) => {
             const rowSel = config.rowSelector;
-            return root.evaluate((el, { rowSel, rowAttr, rowOffset, containerSel }) => {
+            const result = await root.evaluate((el, { rowSel, rowAttr, rowOffset, containerSel }) => {
                 const rows = Array.from(el.querySelectorAll(rowSel));
-                // #353: report only rows actually within the scroll container's vertical
-                // bounds, not every mounted row. Previously overscan rows (kept mounted by
-                // the virtual scroller above/below the fold) were counted as "visible".
-                // Inclusive: a row with ANY vertical overlap counts as visible; only rows
-                // entirely above or below the container are dropped — so we never drop a
-                // partially-visible real row.
                 const container = el.closest(containerSel) as HTMLElement | null;
                 const containerRect = container ? container.getBoundingClientRect() : null;
-                const indices = rows
+                const visibleRows = rows
                     .filter(r => {
-                        // Container not resolvable — can't measure, so keep all rows (safe
-                        // fallback, preserves pre-#353 behavior rather than risk dropping real rows).
                         if (!containerRect) return true;
                         const rect = (r as HTMLElement).getBoundingClientRect();
-                        if (rect.height === 0) return false; // unrendered / detached
+                        if (rect.height === 0) return false;
                         return rect.bottom > containerRect.top && rect.top < containerRect.bottom;
-                    })
+                    });
+                const indices = visibleRows
                     .map(r => Number(r.getAttribute(rowAttr)) - rowOffset)
                     .filter(n => !isNaN(n));
-                if (!indices.length) return { first: 0, last: 0 };
-                return { first: Math.min(...indices), last: Math.max(...indices) };
+                if (!indices.length) return { first: 0, last: 0, _rowCount: visibleRows.length, _validCount: 0 };
+                return { first: Math.min(...indices), last: Math.max(...indices), _rowCount: visibleRows.length, _validCount: indices.length };
             }, { rowSel, rowAttr, rowOffset, containerSel });
+            if (result._rowCount > 0 && result._validCount === 0) {
+                logDebug(config, 'error', `dataAttribute viewport: ${result._rowCount} row(s) found but none have attribute "${rowAttr}". Check that rowAttribute targets row elements matched by rowSelector, not child cells. getVisibleRowRange returning {first:0, last:0}.`);
+            }
+            return { first: result.first, last: result.last };
         },
 
         scrollToColumn: async ({ root, config }, colIndex) => {
