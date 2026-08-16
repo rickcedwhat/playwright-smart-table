@@ -1,12 +1,13 @@
 import { test, expect } from '@playwright/test';
 import { useTable, presets } from '../../src/index';
-import type { TableContext } from '../../src/types';
 
-test.describe.skip('React Data Grid (RDG)', () => { // skip: external site layout changed (#413)
+const RDG_URL = 'http://localhost:3060';
+
+test.describe('React Data Grid (RDG)', () => {
     test.setTimeout(60000);
 
     test('should collect all headers from virtualized columns', async ({ page }) => {
-        await page.goto('https://comcast.github.io/react-data-grid/#/CommonFeatures', { waitUntil: 'domcontentloaded' });
+        await page.goto(RDG_URL, { waitUntil: 'domcontentloaded' });
 
         const grid = page.locator('[role="grid"]').first();
         await expect(grid).toBeAttached({ timeout: 10000 });
@@ -21,14 +22,13 @@ test.describe.skip('React Data Grid (RDG)', () => { // skip: external site layou
         console.log('Headers found:', headers);
         console.log('Total headers:', headers.length);
 
-        // The example has 16 columns
-        expect(headers.length).toBeGreaterThanOrEqual(15); // Allow 15 or 16
+        expect(headers.length).toBeGreaterThanOrEqual(15);
         expect(headers).toContain('ID');
         expect(headers).toContain('Task');
     });
 
     test('should read data from all columns including virtualized ones', async ({ page }) => {
-        await page.goto('https://comcast.github.io/react-data-grid/#/CommonFeatures', { waitUntil: 'domcontentloaded' });
+        await page.goto(RDG_URL, { waitUntil: 'domcontentloaded' });
 
         const grid = page.locator('[role="grid"]').first();
         await expect(grid).toBeAttached({ timeout: 10000 });
@@ -39,7 +39,6 @@ test.describe.skip('React Data Grid (RDG)', () => { // skip: external site layou
 
         await table.init();
 
-        // Get first few rows
         const rows = await table.findRows({}, { maxPages: 1 });
         const firstRow = rows[0];
 
@@ -47,14 +46,13 @@ test.describe.skip('React Data Grid (RDG)', () => { // skip: external site layou
         console.log('First row data:', rowData);
         console.log('Columns in row:', Object.keys(rowData).length);
 
-        // Should have 15+ columns
         expect(Object.keys(rowData).length).toBeGreaterThanOrEqual(15);
         expect(rowData).toHaveProperty('ID');
         expect(rowData).toHaveProperty('Task');
     });
 
     test('should paginate through virtualized rows', async ({ page }) => {
-        await page.goto('https://comcast.github.io/react-data-grid/#/CommonFeatures', { waitUntil: 'domcontentloaded' });
+        await page.goto(RDG_URL, { waitUntil: 'domcontentloaded' });
 
         const grid = page.locator('[role="grid"]').first();
         await expect(grid).toBeAttached({ timeout: 10000 });
@@ -65,7 +63,7 @@ test.describe.skip('React Data Grid (RDG)', () => { // skip: external site layou
                 ...presets.rdg.strategies,
                 dedupe: async (row) => row.getCell('ID').innerText()
             },
-            maxPages: 3  // Reduced to avoid virtualization issues
+            maxPages: 3
         });
 
         await table.init();
@@ -80,27 +78,15 @@ test.describe.skip('React Data Grid (RDG)', () => { // skip: external site layou
         const dataRows = flatData.filter((r: any) => r.ID !== 'Total');
         console.log(`Data rows: ${dataRows.length}`);
 
-        // Should have collected more than the initial viewport
         expect(dataRows.length).toBeGreaterThan(20);
 
-        // Verify we got unique IDs in the data rows
         const uniqueIds = new Set(dataRows.map((r: any) => r.ID));
         console.log(`Unique IDs: ${uniqueIds.size}`);
         expect(uniqueIds.size).toBe(dataRows.length);
     });
 
-    // ─── Issue #120: synchronized map must not fail on overscan rows ─────────────
-    //
-    // Virtual-scroll grids (RDG) render overscan rows beyond the visible viewport
-    // edge. In `synchronized` mode the peek/commit split in ElementTracker defers
-    // overscan rows that have been evicted before the horizontal scroll barrier
-    // fires. Without the fix those stale locators throw
-    // "could not reach cell … after exhausting navigation strategies".
-    //
-    // This test collects 50+ rows across multiple virtual pages using
-    // concurrency:'synchronized' and asserts no errors and no duplicate IDs.
     test('synchronized map collects 50+ unique rows without stale-locator errors (issue #120)', async ({ page }) => {
-        await page.goto('https://comcast.github.io/react-data-grid/#/CommonFeatures', { waitUntil: 'domcontentloaded' });
+        await page.goto(RDG_URL, { waitUntil: 'domcontentloaded' });
 
         const grid = page.locator('[role="grid"]').first();
         await expect(grid).toBeAttached({ timeout: 10000 });
@@ -124,16 +110,14 @@ test.describe.skip('React Data Grid (RDG)', () => { // skip: external site layou
 
         expect(dataRows.length).toBeGreaterThanOrEqual(50);
 
-        // All IDs must be valid positive integers (stale locators produce garbled data)
         expect(dataRows.every((r: any) => /^\d+$/.test(String(r.ID)))).toBe(true);
 
-        // No duplicates — overscan rows must not be processed twice
         const uniqueIds = new Set(dataRows.map((r: any) => r.ID));
         expect(uniqueIds.size).toBe(dataRows.length);
     });
 
     test('should handle reading specific columns from middle of table', async ({ page }) => {
-        await page.goto('https://comcast.github.io/react-data-grid/#/CommonFeatures', { waitUntil: 'domcontentloaded' });
+        await page.goto(RDG_URL, { waitUntil: 'domcontentloaded' });
 
         const grid = page.locator('[role="grid"]').first();
         await expect(grid).toBeAttached({ timeout: 10000 });
@@ -146,11 +130,9 @@ test.describe.skip('React Data Grid (RDG)', () => { // skip: external site layou
         const headers = await table.getHeaders();
         console.log('All headers:', headers);
 
-        // Get a row and read specific columns
         const rows = await table.findRows({}, { maxPages: 1 });
         const firstRow = rows[0];
 
-        // Read columns from different positions (left, middle, right)
         const selectedData = await firstRow.toJSON({
             columns: ['ID', 'Task', 'Completion']
         });
