@@ -21,7 +21,8 @@ export class ElementTracker {
             const newIndices: number[] = [];
 
             elements.forEach((el, index) => {
-                const signature = el.textContent || '';
+                const htmlEl = el as HTMLElement;
+                const signature = htmlEl.offsetTop + '|' + (el.textContent || '');
                 if (seenMap.get(el) !== signature) {
                     newIndices.push(index);
                 }
@@ -44,7 +45,10 @@ export class ElementTracker {
             const seenMap = win[trackerId] as WeakMap<Element, string>;
             for (const index of indicesToCommit) {
                 const el = elements[index];
-                if (el) seenMap.set(el, el.textContent || '');
+                if (el) {
+                    const htmlEl = el as HTMLElement;
+                    seenMap.set(el, htmlEl.offsetTop + '|' + (el.textContent || ''));
+                }
             }
         }, [this.id, indices] as [string, number[]]);
     }

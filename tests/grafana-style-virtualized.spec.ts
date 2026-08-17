@@ -308,6 +308,35 @@ test.describe('Grafana-style virtualized table (#417)', () => {
     expect(sortedNames).toEqual(unsortedNames);
   });
 
+  test('final scan collects overscan rows not deferred by viewport filter', async ({ page }) => {
+    // Use a small scrollAmount so at EOF some overscan rows may sit below
+    // the visible area. Without the final-scan fix, those rows would be
+    // deferred with no further page to pick them up.
+    const config = grafanaTableConfig();
+    const table = useTable(page.locator('#the-table'), {
+      ...config,
+      strategies: {
+        ...config.strategies,
+        pagination: PaginationStrategies.infiniteScroll({
+          action: 'js-scroll',
+          scrollTarget: (root: Locator) => root.locator('[role="rowgroup"] > div').first(),
+          scrollAmount: 50,
+          stabilization: StabilizationStrategies.contentChanged({
+            scope: 'all',
+            timeout: 2000,
+          }),
+        }),
+      },
+    });
+    await table.init();
+
+    const rows = await table.map(async ({ row }) => {
+      return await row.toJSON();
+    }, { concurrency: 'sequential' });
+
+    expect(rows.length).toBe(TOTAL_ROWS);
+  });
+
   test('scroll-position EOF detection continues past stabilization timeout', async ({ page }) => {
     const alwaysTimeoutStabilization: StabilizationStrategy = async (_ctx, action) => {
       await action();
