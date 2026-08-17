@@ -493,10 +493,70 @@ const createSmartRow = <T = any>(
             }
             const page = rootLocator.page();
 
+            // Re-pin: the row locator is a positional nth-child from the iteration loop.
+            // On recycling virtualizers, elements can shift between SmartRow creation and
+            // this clone — the nth element may now show a different row's content.
+            // Verify via resolveRowIndex and rescan if drifted.
+            let cloneTarget: Locator = rowLocator;
+            const resolveRI = config.strategies.resolveRowIndex;
+            if (resolveRI && typeof rowIndex === 'number') {
+                const isSelfHealing = (smart as any)._selfHealing === true;
+                if (!isSelfHealing) {
+                    let drifted = false;
+                    try {
+                        const curResult = await resolveRI(rowLocator);
+                        const curIndex = curResult !== undefined
+                            ? normalizeRowIndexResult(curResult).index
+                            : undefined;
+                        drifted = curIndex !== rowIndex;
+                    } catch {
+                        drifted = true;
+                    }
+                    if (drifted) {
+                        const inBatch = (smart as any)._inBatch === true || !!(smart as any)._barrier;
+
+                        const rescanForRow = async (): Promise<Locator | null> => {
+                            const rows = await resolve(config.rowSelector, rootLocator).all();
+                            for (const r of rows) {
+                                try {
+                                    const rResult = await resolveRI(r);
+                                    if (rResult !== undefined && normalizeRowIndexResult(rResult).index === rowIndex) return r;
+                                } catch { /* element may have detached during scan */ }
+                            }
+                            return null;
+                        };
+
+                        let recovered = await rescanForRow();
+
+                        if (!recovered && !inBatch && config.strategies.viewport?.scrollToRow) {
+                            await config.strategies.viewport.scrollToRow(
+                                { root: rootLocator, config, page, resolve } as any,
+                                rowIndex,
+                            );
+                            const deadline = Date.now() + 500;
+                            while (!recovered && Date.now() < deadline) {
+                                recovered = await rescanForRow();
+                                if (!recovered) await page.waitForTimeout(50);
+                            }
+                        }
+
+                        if (!recovered) {
+                            throw new Error(
+                                `[SmartTable] toJSON({ atomic: true }): row ${rowIndex} recycled out of the DOM and could not be recovered. ` +
+                                (inBatch
+                                    ? `(During a map/forEach batch, scroll-back recovery is disabled to avoid disrupting sibling rows.)`
+                                    : `Ensure a viewport.scrollToRow strategy can restore the row.`)
+                            );
+                        }
+                        cloneTarget = recovered;
+                    }
+                }
+            }
+
             // Step 1: clone row in browser memory (NOT in the DOM), extract text + row HTML.
             // Uses textContent (not innerText) because the clone is detached — innerText
             // falls back to textContent on detached nodes per HTML spec, so be explicit.
-            const cloneHandle = await rowLocator.evaluateHandle(el => el.cloneNode(true) as HTMLElement);
+            const cloneHandle = await cloneTarget.evaluateHandle(el => el.cloneNode(true) as HTMLElement);
             let snapshot: { rowHTML: string; cells: { text: string }[] };
             try {
                 snapshot = await cloneHandle.evaluate(
