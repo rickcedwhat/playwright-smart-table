@@ -270,6 +270,7 @@ test.describe('Grafana-style virtualized table (#417)', () => {
   });
 
   test('membership is consistent between unsorted and sorted snapshots', async ({ page }) => {
+    test.slow(); // two full iterations + sort on slow CI
     const table = useTable(page.locator('#the-table'), grafanaTableConfig() as any);
     await table.init();
 
