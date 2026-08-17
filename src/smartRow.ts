@@ -513,34 +513,34 @@ const createSmartRow = <T = any>(
                         drifted = true;
                     }
                     if (drifted) {
-                        const rows = await resolve(config.rowSelector, rootLocator).all();
-                        let recovered: Locator | null = null;
-                        for (const r of rows) {
-                            const rResult = await resolveRI(r);
-                            if (rResult !== undefined && normalizeRowIndexResult(rResult).index === rowIndex) {
-                                recovered = r;
-                                break;
-                            }
-                        }
-                        if (!recovered) {
-                            const inBatch = (smart as any)._inBatch === true || !!(smart as any)._barrier;
-                            if (!inBatch && config.strategies.viewport?.scrollToRow) {
-                                await config.strategies.viewport.scrollToRow(
-                                    { root: rootLocator, config, page, resolve } as any,
-                                    rowIndex,
-                                );
-                                const rows2 = await resolve(config.rowSelector, rootLocator).all();
-                                for (const r of rows2) {
+                        const inBatch = (smart as any)._inBatch === true || !!(smart as any)._barrier;
+
+                        const rescanForRow = async (): Promise<Locator | null> => {
+                            const rows = await resolve(config.rowSelector, rootLocator).all();
+                            for (const r of rows) {
+                                try {
                                     const rResult = await resolveRI(r);
-                                    if (rResult !== undefined && normalizeRowIndexResult(rResult).index === rowIndex) {
-                                        recovered = r;
-                                        break;
-                                    }
-                                }
+                                    if (rResult !== undefined && normalizeRowIndexResult(rResult).index === rowIndex) return r;
+                                } catch { /* element may have detached during scan */ }
+                            }
+                            return null;
+                        };
+
+                        let recovered = await rescanForRow();
+
+                        if (!recovered && !inBatch && config.strategies.viewport?.scrollToRow) {
+                            await config.strategies.viewport.scrollToRow(
+                                { root: rootLocator, config, page, resolve } as any,
+                                rowIndex,
+                            );
+                            const deadline = Date.now() + 500;
+                            while (!recovered && Date.now() < deadline) {
+                                recovered = await rescanForRow();
+                                if (!recovered) await page.waitForTimeout(50);
                             }
                         }
+
                         if (!recovered) {
-                            const inBatch = (smart as any)._inBatch === true || !!(smart as any)._barrier;
                             throw new Error(
                                 `[SmartTable] toJSON({ atomic: true }): row ${rowIndex} recycled out of the DOM and could not be recovered. ` +
                                 (inBatch
