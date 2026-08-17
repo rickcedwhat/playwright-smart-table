@@ -116,8 +116,10 @@ describe('overscan above visible range (#384)', () => {
     expect(results).toHaveLength(8);
   });
 
-  it('still filters out overscan rows below the visible range', async () => {
-    // Only one page. Overscan below should be deferred (not collected).
+  it('final scan collects overscan rows below visible range (#417)', async () => {
+    // Only one page. Overscan below is deferred on intermediate pages,
+    // but the final scan (reachedEnd=true) skips viewport filtering
+    // to collect all remaining unseen rows.
     const rows = [makeRow(0), makeRow(1), makeRow(2), makeRow(3), makeRow(4)];
     const visible = new Set([1, 2, 3]); // rows 0 above, 4 below
 
@@ -145,14 +147,11 @@ describe('overscan above visible range (#384)', () => {
 
     const results = await runMap(env, async ({ row }) => row.rowIndex, {});
 
-    // Row 0 (above) collected, rows 1,2,3 (visible) collected.
-    // Row 4 (below) deferred, then picked up by final scan (#383).
-    // Final scan: page hasn't changed, row 4 is still below visible → still deferred.
-    // So only 4 rows collected (0,1,2,3). Row 4 remains uncollected.
-    // BUT: #383 final scan runs, and row 4 is unseen. The final scan calls
-    // getVisibleRowIndices again — row 4 is still below → filtered out.
-    // Result: 4 rows.
-    expect(results).toHaveLength(4);
+    // Row 0 (above) collected, rows 1,2,3 (visible) collected on first scan.
+    // Row 4 (below) deferred on first scan.
+    // advancePage returns false → reachedEnd=true → final scan skips
+    // viewport filter → row 4 collected.
+    expect(results).toHaveLength(5);
   });
 
   it('no filtering without getVisibleRowIndices — all rows collected', async () => {
