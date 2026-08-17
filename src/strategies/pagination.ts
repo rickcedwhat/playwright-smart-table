@@ -122,6 +122,10 @@ export const PaginationStrategies = {  /**
           ? resolve(options.scrollTarget, root)
           : root;
 
+        const beforeScrollTop = await scrollTarget.evaluate(
+          (el: HTMLElement) => el.scrollTop
+        );
+
         const doScroll = async () => {
           const box = await scrollTarget.boundingBox();
           const scrollValue = amount * directionMultiplier;
@@ -138,8 +142,20 @@ export const PaginationStrategies = {  /**
           }
         };
 
-        // Stabilization: Wait
-        return await stabilization(context, doScroll);
+        // Stabilization: Wait for content to settle
+        const stabilizationResult = await stabilization(context, doScroll);
+
+        // EOF detection: use scroll position, not stabilization result.
+        // Stabilization may time out for recycling virtualizers when the scroll
+        // amount is small enough to stay within the overscan window (no new rows
+        // rendered), but the scroll position still changed — we haven't reached
+        // the end of the data.
+        const afterScrollTop = await scrollTarget.evaluate(
+          (el: HTMLElement) => el.scrollTop
+        );
+        const scrollMoved = Math.abs(afterScrollTop - beforeScrollTop) >= 1;
+
+        return scrollMoved || stabilizationResult;
       };
     };
 
