@@ -1,5 +1,7 @@
-import { test, expect } from '@playwright/test';
-import { useTable, Strategies } from '../src';
+import { test, expect, Locator } from '@playwright/test';
+import { useTable, Strategies, TableConfig, TableContext } from '../src';
+import type { ViewportStrategy, RowIndexResult } from '../src/types';
+import type { StabilizationStrategy } from '../src/strategies/stabilization';
 
 const PaginationStrategies = Strategies.Pagination;
 const StabilizationStrategies = Strategies.Stabilization;
@@ -190,41 +192,43 @@ function makeGrafanaTableHtml() {
   `;
 }
 
-function grafanaTableConfig() {
+function grafanaTableConfig(): TableConfig {
+  const viewport: ViewportStrategy = {
+    getVisibleRowIndices: async ({ root, config }: TableContext) => {
+      return root.evaluate((el: HTMLElement, rowSel: string) => {
+        const scroller = el.querySelector('[role="rowgroup"] > div');
+        const rows = Array.from(el.querySelectorAll(rowSel));
+        const scrollerRect = scroller?.getBoundingClientRect() ?? null;
+        const visible: number[] = [];
+        rows.forEach((row, index) => {
+          if (!scrollerRect) { visible.push(index); return; }
+          const rect = row.getBoundingClientRect();
+          if (rect.height === 0) return;
+          if (rect.bottom > scrollerRect.top && rect.top < scrollerRect.bottom) {
+            visible.push(index);
+          }
+        });
+        return visible;
+      }, config.rowSelector as string);
+    },
+    scrollToRow: async ({ root }: TableContext, rowIndex: number) => {
+      await root.evaluate((el: HTMLElement, args: { idx: number }) => {
+        const scroller = el.querySelector('[role="rowgroup"] > div') as HTMLElement;
+        if (!scroller) return;
+        scroller.scrollTop = Math.max(0, args.idx * 36 - 20);
+      }, { idx: rowIndex });
+      await root.page().waitForTimeout(50);
+    },
+  };
+
   return {
     rowSelector: '[role="rowgroup"] [role="row"]',
     cellSelector: '[role="cell"]',
     headerSelector: '[role="columnheader"]',
     maxPages: 500,
     strategies: {
-      viewport: {
-        getVisibleRowIndices: async ({ root, config }: any) => {
-          return root.evaluate((el: HTMLElement, rowSel: string) => {
-            const scroller = el.querySelector('[role="rowgroup"] > div');
-            const rows = Array.from(el.querySelectorAll(rowSel));
-            const scrollerRect = scroller?.getBoundingClientRect() ?? null;
-            const visible: number[] = [];
-            rows.forEach((row, index) => {
-              if (!scrollerRect) { visible.push(index); return; }
-              const rect = row.getBoundingClientRect();
-              if (rect.height === 0) return;
-              if (rect.bottom > scrollerRect.top && rect.top < scrollerRect.bottom) {
-                visible.push(index);
-              }
-            });
-            return visible;
-          }, config.rowSelector);
-        },
-        scrollToRow: async ({ root }: any, rowIndex: number) => {
-          await root.evaluate((el: HTMLElement, args: any) => {
-            const scroller = el.querySelector('[role="rowgroup"] > div') as HTMLElement;
-            if (!scroller) return;
-            scroller.scrollTop = Math.max(0, args.idx * 36 - 20);
-          }, { idx: rowIndex });
-          await root.page().waitForTimeout(50);
-        },
-      },
-      resolveRowIndex: async (row: any) => {
+      viewport,
+      resolveRowIndex: async (row: Locator): Promise<RowIndexResult | undefined> => {
         const top = await row.evaluate((el: HTMLElement) => parseFloat(el.style.top));
         if (!Number.isFinite(top)) return undefined;
         const height = await row.evaluate(
@@ -234,7 +238,7 @@ function grafanaTableConfig() {
       },
       pagination: PaginationStrategies.infiniteScroll({
         action: 'js-scroll',
-        scrollTarget: (root: any) => root.locator('[role="rowgroup"] > div').first(),
+        scrollTarget: (root: Locator) => root.locator('[role="rowgroup"] > div').first(),
         scrollAmount: 100,
         stabilization: StabilizationStrategies.contentChanged({
           scope: 'all',
@@ -252,7 +256,7 @@ test.describe('Grafana-style virtualized table (#417)', () => {
   });
 
   test('map() collects all rows from a recycling virtualized table', async ({ page }) => {
-    const table = useTable(page.locator('#the-table'), grafanaTableConfig() as any);
+    const table = useTable(page.locator('#the-table'), grafanaTableConfig());
     await table.init();
 
     const rows = await table.map(async ({ row }) => {
@@ -261,7 +265,7 @@ test.describe('Grafana-style virtualized table (#417)', () => {
 
     expect(rows.length).toBe(TOTAL_ROWS);
 
-    const names = rows.map((r: any) => r.Name);
+    const names = rows.map((r: Record<string, string>) => r.Name);
     const uniqueNames = new Set(names);
     expect(uniqueNames.size).toBe(TOTAL_ROWS);
 
@@ -271,26 +275,26 @@ test.describe('Grafana-style virtualized table (#417)', () => {
 
   test('membership is consistent between unsorted and sorted snapshots', async ({ page }) => {
     test.slow(); // two full iterations + sort on slow CI
-    const table = useTable(page.locator('#the-table'), grafanaTableConfig() as any);
+    const table = useTable(page.locator('#the-table'), grafanaTableConfig());
     await table.init();
 
     const unsortedRows = await table.map(async ({ row }) => {
       return await row.toJSON();
     }, { concurrency: 'sequential' });
 
-    // Reset scroll position
-    await page.evaluate(() => {
-      const scroller = document.getElementById('scroll-container')!;
-      scroller.scrollTop = 0;
-    });
-    await page.waitForTimeout(100);
+    // Reset scroll to top and wait for the virtualizer to render top-of-list rows
+    const scroller = page.locator('#scroll-container');
+    await scroller.evaluate((el: HTMLElement) => { el.scrollTop = 0; });
+    await expect(page.locator('[role="rowgroup"] [role="row"][data-logical-index="0"]'))
+      .toBeAttached();
 
-    // Sort by Name descending
-    await page.locator('[role="columnheader"][data-col="name"]').click();
-    await page.locator('[role="columnheader"][data-col="name"]').click();
-    await page.waitForTimeout(200);
+    // Sort by Name descending — click twice (first asc, then desc)
+    const nameHeader = page.locator('[role="columnheader"][data-col="name"]');
+    await nameHeader.click();
+    await nameHeader.click();
+    await expect(nameHeader).toHaveClass(/sorted-desc/);
 
-    const table2 = useTable(page.locator('#the-table'), grafanaTableConfig() as any);
+    const table2 = useTable(page.locator('#the-table'), grafanaTableConfig());
     await table2.init();
 
     const sortedRows = await table2.map(async ({ row }) => {
@@ -299,21 +303,18 @@ test.describe('Grafana-style virtualized table (#417)', () => {
 
     expect(sortedRows.length).toBe(unsortedRows.length);
 
-    const unsortedNames = new Set(unsortedRows.map((r: any) => r.Name));
-    const sortedNames = new Set(sortedRows.map((r: any) => r.Name));
+    const unsortedNames = new Set(unsortedRows.map((r: Record<string, string>) => r.Name));
+    const sortedNames = new Set(sortedRows.map((r: Record<string, string>) => r.Name));
     expect(sortedNames).toEqual(unsortedNames);
   });
 
   test('scroll-position EOF detection continues past stabilization timeout', async ({ page }) => {
-    // Use a stabilization that always returns false (simulates contentChanged timeout).
-    // Without the scroll-position EOF fix, the library would stop after the first scroll.
-    // With the fix, it continues scrolling as long as scrollTop changes.
-    const alwaysTimeoutStabilization = async (_ctx: any, action: () => Promise<void>) => {
+    const alwaysTimeoutStabilization: StabilizationStrategy = async (_ctx, action) => {
       await action();
-      return false; // simulate timeout — no content change detected
+      return false;
     };
 
-    const config = grafanaTableConfig() as any;
+    const config = grafanaTableConfig();
     const table = useTable(page.locator('#the-table'), {
       ...config,
       maxPages: 1000,
@@ -321,7 +322,7 @@ test.describe('Grafana-style virtualized table (#417)', () => {
         ...config.strategies,
         pagination: PaginationStrategies.infiniteScroll({
           action: 'js-scroll',
-          scrollTarget: (root: any) => root.locator('[role="rowgroup"] > div').first(),
+          scrollTarget: (root: Locator) => root.locator('[role="rowgroup"] > div').first(),
           scrollAmount: 200,
           stabilization: alwaysTimeoutStabilization,
         }),
