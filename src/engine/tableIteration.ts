@@ -64,6 +64,7 @@ export async function runMap<T, R>(
   log(env.config, `${label}: starting (maxPages=${effectiveMaxPages}, mode=${concurrency}, dedupe=${!!dedupeStrategy})`);
 
   const results: R[] = [];
+  const seenLogicalIndices = new Set<number>();
 
   try {
     let rowIndex = 0;
@@ -151,6 +152,14 @@ export async function runMap<T, R>(
               return SKIP;
             }
 
+            // When resolveRowIndex is configured, identical logical indices across pages
+            // indicate the same record (e.g. re-created DOM elements in recycling
+            // virtualizers whose WeakMap entry was GC'd). Skip without processing.
+            if (row.rowIndex !== undefined && seenLogicalIndices.has(row.rowIndex)) {
+              log(env.config, `${label}: skipping duplicate logical row ${row.rowIndex}`);
+              return SKIP;
+            }
+
             // Wait for the row to finish loading BEFORE evaluating its dedupe key (Bug #355).
             // map/forEach/filter process a still-loading row when no timeout is set (unlike
             // findRows, which skips) — see resolveRowLoading's `noTimeoutAction`.
@@ -187,6 +196,10 @@ export async function runMap<T, R>(
 
             if (dedupeKeys && dedupeKey !== undefined && result !== SKIP) {
               dedupeKeys.add(dedupeKey);
+            }
+
+            if (row.rowIndex !== undefined && result !== SKIP) {
+              seenLogicalIndices.add(row.rowIndex);
             }
 
             return result;
