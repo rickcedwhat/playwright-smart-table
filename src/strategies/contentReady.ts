@@ -14,12 +14,12 @@ export const ContentReadyStrategies = {
         const interval = options.interval ?? 50;
         return async (row: Locator, page: Page) => {
             const deadline = Date.now() + timeout;
-            let prev = await row.innerText();
-            while (Date.now() < deadline) {
-                const remaining = deadline - Date.now();
-                if (remaining <= 0) break;
-                await page.waitForTimeout(Math.min(interval, remaining));
-                const cur = await row.innerText();
+            const remaining = () => Math.max(0, deadline - Date.now());
+            let prev = await row.innerText({ timeout: remaining() || timeout });
+            while (remaining() > 0) {
+                await page.waitForTimeout(Math.min(interval, remaining()));
+                if (remaining() <= 0) break;
+                const cur = await row.innerText({ timeout: remaining() });
                 if (cur === prev) return;
                 prev = cur;
             }
