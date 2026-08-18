@@ -1,6 +1,7 @@
 import type { Locator, Page } from '@playwright/test';
+import type { ContentReadyStrategy } from '../types';
 
-export type ContentReadyStrategy = (row: Locator, page: Page) => Promise<void>;
+export type { ContentReadyStrategy };
 
 export const ContentReadyStrategies = {
     /**
@@ -12,11 +13,13 @@ export const ContentReadyStrategies = {
         const timeout = options.timeout ?? 500;
         const interval = options.interval ?? 50;
         return async (row: Locator, page: Page) => {
-            let prev = await row.innerText().catch(() => '');
             const deadline = Date.now() + timeout;
+            let prev = await row.innerText();
             while (Date.now() < deadline) {
-                await page.waitForTimeout(interval);
-                const cur = await row.innerText().catch(() => '');
+                const remaining = deadline - Date.now();
+                if (remaining <= 0) break;
+                await page.waitForTimeout(Math.min(interval, remaining));
+                const cur = await row.innerText();
                 if (cur === prev) return;
                 prev = cur;
             }

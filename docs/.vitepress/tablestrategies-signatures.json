@@ -61,7 +61,7 @@
   },
   {
     "name": "contentReady",
-    "signature": "contentReady?: (row: Locator, page: Page) => Promise<void>",
+    "signature": "contentReady?: ContentReadyStrategy",
     "comment": "/**\n* Waits until a row's content has stabilized before cloning in\n* `toJSON({ atomic: true })`. Needed for recycling virtualizers where the\n* framework updates element positions synchronously but renders cell content\n* asynchronously (e.g. react-window, react-virtuoso with React concurrent mode).\n*\n* Without this, the clone captures stale content from the previous occupant of the\n* DOM slot — the element is at the correct position but React hasn't re-rendered yet.\n*\n* Use `Strategies.ContentReady.textStable()` for the built-in text-polling strategy.\n*\n* @example\n* strategies: {\n*   contentReady: Strategies.ContentReady.textStable({ timeout: 500 }),\n* }\n*/"
   },
   {

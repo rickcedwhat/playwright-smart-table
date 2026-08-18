@@ -437,6 +437,8 @@ export type PaginationStrategy = PaginationPrimitives;
 
 export type DedupeStrategy = (row: SmartRow) => string | number | Promise<string | number>;
 
+export type ContentReadyStrategy = (row: Locator, page: Page) => Promise<void>;
+
 
 
 export type FillStrategy = (options: {
@@ -667,7 +669,7 @@ export interface TableStrategies {
    *   contentReady: Strategies.ContentReady.textStable({ timeout: 500 }),
    * }
    */
-  contentReady?: (row: Locator, page: Page) => Promise<void>;
+  contentReady?: ContentReadyStrategy;
 
   /**
    * Viewport oracle strategies for 2D virtualized tables (e.g. MUI DataGrid, AG Grid,
