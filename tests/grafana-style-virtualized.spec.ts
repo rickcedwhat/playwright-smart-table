@@ -385,6 +385,7 @@ function makeAsyncContentTableHtml() {
 }
 
 function asyncContentConfig(opts?: { contentReady?: boolean | 'mutationSettled' }): TableConfig {
+  const isMutation = opts?.contentReady === 'mutationSettled';
   const viewport: ViewportStrategy = {
     getVisibleRowIndices: async ({ root, config }: TableContext) => {
       return root.evaluate((el: HTMLElement, rowSel: string) => {
@@ -409,7 +410,12 @@ function asyncContentConfig(opts?: { contentReady?: boolean | 'mutationSettled' 
         if (!scroller) return;
         scroller.scrollTop = Math.max(0, args.idx * 36 - 20);
       }, { idx: rowIndex });
-      await root.page().waitForTimeout(50);
+      // For mutationSettled: keep the post-scroll wait short so the 30ms
+      // async content timeout hasn't fired yet — the MutationObserver in
+      // contentReady should catch the mutation, not miss it.
+      // For textStable: wait long enough for the render to land so the
+      // text-polling loop can detect the change.
+      await root.page().waitForTimeout(isMutation ? 5 : 50);
     },
   };
 
@@ -426,7 +432,7 @@ function asyncContentConfig(opts?: { contentReady?: boolean | 'mutationSettled' 
         return Math.round(top / ROW_HEIGHT);
       },
       ...(opts?.contentReady ? {
-        contentReady: opts.contentReady === 'mutationSettled'
+        contentReady: isMutation
           ? Strategies.ContentReady.mutationSettled({ timeout: 500, quietPeriod: 50 })
           : Strategies.ContentReady.textStable({ timeout: 500, interval: 30 }),
       } : {}),
