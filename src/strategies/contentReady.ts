@@ -6,8 +6,6 @@ export type { ContentReadyStrategy };
 export const ContentReadyStrategies = {
     /**
      * Polls the row's text content until two consecutive reads match.
-     * Handles recycling virtualizers where position updates synchronously
-     * but React renders cell content asynchronously.
      */
     textStable: (options: { timeout?: number; interval?: number } = {}): ContentReadyStrategy => {
         const timeout = options.timeout ?? 500;
@@ -23,6 +21,48 @@ export const ContentReadyStrategies = {
                 if (cur === prev) return;
                 prev = cur;
             }
+        };
+    },
+
+    /**
+     * Uses MutationObserver to wait for DOM mutations on the row's subtree
+     * to settle. Resolves when no mutations occur for `quietPeriod` ms, or
+     * when `timeout` expires.
+     */
+    mutationSettled: (options: { timeout?: number; quietPeriod?: number } = {}): ContentReadyStrategy => {
+        const timeout = options.timeout ?? 500;
+        const quietPeriod = options.quietPeriod ?? 100;
+        return async (row: Locator) => {
+            await row.evaluate(
+                (el, opts) => {
+                    return new Promise<void>((resolve) => {
+                        let quietTimer: ReturnType<typeof setTimeout>;
+                        let deadlineTimer: ReturnType<typeof setTimeout>;
+
+                        const done = () => {
+                            clearTimeout(quietTimer);
+                            clearTimeout(deadlineTimer);
+                            observer.disconnect();
+                            resolve();
+                        };
+
+                        const observer = new MutationObserver(() => {
+                            clearTimeout(quietTimer);
+                            quietTimer = setTimeout(done, opts.quietPeriod);
+                        });
+
+                        observer.observe(el, {
+                            childList: true,
+                            subtree: true,
+                            characterData: true,
+                        });
+
+                        quietTimer = setTimeout(done, opts.quietPeriod);
+                        deadlineTimer = setTimeout(done, opts.timeout);
+                    });
+                },
+                { timeout, quietPeriod },
+            );
         };
     },
 };

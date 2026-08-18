@@ -255,7 +255,8 @@ function grafanaTableConfig(): TableConfig {
  * react-window / react-virtuoso. Without contentReady, atomic toJSON captures
  * stale cell content from the previous occupant of the DOM slot.
  */
-function makeAsyncContentTableHtml() {
+function makeAsyncContentTableHtml(opts?: { contentDelay?: number }) {
+  const contentDelay = opts?.contentDelay ?? 30;
   return `
     <!DOCTYPE html>
     <html>
@@ -361,7 +362,7 @@ function makeAsyncContentTableHtml() {
             contentTimers.push(setTimeout(() => {
               cells[0].textContent = d.name;
               cells[1].textContent = d.value;
-            }, 30));
+            }, ${contentDelay}));
           }
         }
 
@@ -384,7 +385,11 @@ function makeAsyncContentTableHtml() {
   `;
 }
 
-function asyncContentConfig(opts?: { contentReady?: boolean }): TableConfig {
+function asyncContentConfig(opts?: {
+  contentReady?: boolean | 'mutationSettled';
+  positionOnlyStabilization?: boolean;
+}): TableConfig {
+  const isMutation = opts?.contentReady === 'mutationSettled';
   const viewport: ViewportStrategy = {
     getVisibleRowIndices: async ({ root, config }: TableContext) => {
       return root.evaluate((el: HTMLElement, rowSel: string) => {
@@ -413,6 +418,23 @@ function asyncContentConfig(opts?: { contentReady?: boolean }): TableConfig {
     },
   };
 
+  // For mutationSettled: wait just for rAF to update positions, not for
+  // content text. Returns false when scrollTop didn't move (EOF). This lets
+  // contentReady's MutationObserver catch the in-flight content mutation.
+  const stabilization: StabilizationStrategy = opts?.positionOnlyStabilization
+    ? async (ctx, action) => {
+        const pre = await ctx.root.locator('#scroll-container-async').evaluate(
+          (el: HTMLElement) => el.scrollTop,
+        );
+        await action();
+        await ctx.page.waitForTimeout(50);
+        const post = await ctx.root.locator('#scroll-container-async').evaluate(
+          (el: HTMLElement) => el.scrollTop,
+        );
+        return post !== pre;
+      }
+    : StabilizationStrategies.contentChanged({ scope: 'all', timeout: 5000 });
+
   return {
     rowSelector: '#inner-container-async [role="row"]',
     cellSelector: '[role="cell"]',
@@ -425,17 +447,16 @@ function asyncContentConfig(opts?: { contentReady?: boolean }): TableConfig {
         if (!Number.isFinite(top)) return undefined;
         return Math.round(top / ROW_HEIGHT);
       },
-      ...(opts?.contentReady ? {
+      ...(isMutation ? {
+        contentReady: Strategies.ContentReady.mutationSettled({ timeout: 500, quietPeriod: 50 }),
+      } : opts?.contentReady ? {
         contentReady: Strategies.ContentReady.textStable({ timeout: 500, interval: 30 }),
       } : {}),
       pagination: PaginationStrategies.infiniteScroll({
         action: 'js-scroll',
         scrollTarget: (root: Locator) => root.locator('#scroll-container-async').first(),
         scrollAmount: 100,
-        stabilization: StabilizationStrategies.contentChanged({
-          scope: 'all',
-          timeout: 5000,
-        }),
+        stabilization,
       }),
     },
   };
@@ -560,13 +581,37 @@ test.describe('Grafana-style virtualized table (#417)', () => {
 });
 
 test.describe('contentReady strategy (#417 content staleness)', () => {
-  test.beforeEach(async ({ page }) => {
+  test('textStable captures correct content from async-rendering virtualizer', async ({ page }) => {
     await page.setContent(makeAsyncContentTableHtml());
     await page.waitForSelector('[role="row"]');
+    const table = useTable(page.locator('#the-table'), asyncContentConfig({ contentReady: true }));
+    await table.init();
+
+    const rows = await table.map(async ({ row }) => {
+      return await row.toJSON({ atomic: true });
+    }, { concurrency: 'sequential' });
+
+    expect(rows.length).toBe(TOTAL_ROWS);
+
+    const names = rows.map((r: Record<string, string>) => r.Name);
+    const uniqueNames = new Set(names);
+    expect(uniqueNames.size).toBe(TOTAL_ROWS);
+
+    expect(names).toContain('Row-000');
+    expect(names).toContain('Row-099');
   });
 
-  test('atomic toJSON with contentReady captures correct content from async-rendering virtualizer', async ({ page }) => {
-    const table = useTable(page.locator('#the-table'), asyncContentConfig({ contentReady: true }));
+  test('mutationSettled captures correct content from async-rendering virtualizer', { timeout: 60000 }, async ({ page }) => {
+    // Use a 100ms content delay with position-only stabilization so the
+    // MutationObserver is installed while content is still pending (~40ms
+    // Playwright overhead < 100ms delay). The observer catches the actual
+    // DOM mutation rather than seeing "already settled".
+    await page.setContent(makeAsyncContentTableHtml({ contentDelay: 100 }));
+    await page.waitForSelector('[role="row"]');
+    const table = useTable(page.locator('#the-table'), asyncContentConfig({
+      contentReady: 'mutationSettled',
+      positionOnlyStabilization: true,
+    }));
     await table.init();
 
     const rows = await table.map(async ({ row }) => {
