@@ -553,6 +553,11 @@ const createSmartRow = <T = any>(
                 }
             }
 
+            // Wait for async content renders to settle before cloning.
+            if (config.strategies.contentReady) {
+                await config.strategies.contentReady(cloneTarget, page);
+            }
+
             // Step 1: clone row in browser memory (NOT in the DOM), extract text + row HTML.
             // Uses textContent (not innerText) because the clone is detached — innerText
             // falls back to textContent on detached nodes per HTML spec, so be explicit.

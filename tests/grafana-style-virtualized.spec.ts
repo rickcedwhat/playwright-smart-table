@@ -249,6 +249,198 @@ function grafanaTableConfig(): TableConfig {
   };
 }
 
+/**
+ * Builds a variant where scrolling updates style.top immediately but defers
+ * cell content via setTimeout — simulating React's async reconciliation in
+ * react-window / react-virtuoso. Without contentReady, atomic toJSON captures
+ * stale cell content from the previous occupant of the DOM slot.
+ */
+function makeAsyncContentTableHtml() {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: sans-serif; padding: 20px; }
+        .table-wrap { width: 900px; }
+        [role="columnheader"], [role="cell"] {
+          flex: 1; padding: 8px; overflow: hidden;
+          text-overflow: ellipsis; white-space: nowrap;
+        }
+        [role="columnheader"] { font-weight: bold; background: #f4f4f4; border-bottom: 2px solid #ddd; }
+        [role="cell"] { border-bottom: 1px solid #eee; }
+        [role="row"]:not(.header-row) { position: absolute; left: 0; width: 100%; display: flex; }
+        .header-row { display: flex; width: 100%; }
+        #scroll-container-async {
+          position: relative; height: ${VIEWPORT_HEIGHT}px; width: 100%;
+          overflow: hidden auto; will-change: transform; direction: ltr;
+        }
+        #inner-container-async { width: 100%; position: relative; }
+      </style>
+    </head>
+    <body>
+      <div class="table-wrap">
+        <div role="table" id="the-table">
+          <div role="row" class="header-row">
+            <div role="columnheader">Name</div>
+            <div role="columnheader">Value</div>
+          </div>
+          <div role="rowgroup">
+            <div id="scroll-container-async">
+              <div id="inner-container-async"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <script>
+        const ROW_HEIGHT = ${ROW_HEIGHT};
+        const TOTAL_ROWS = ${TOTAL_ROWS};
+        const VIEWPORT_HEIGHT = ${VIEWPORT_HEIGHT};
+        const OVERSCAN = ${OVERSCAN};
+
+        const data = [];
+        for (let i = 0; i < TOTAL_ROWS; i++) {
+          data.push({ name: 'Row-' + String(i).padStart(3, '0'), value: String(i) });
+        }
+
+        const scrollContainer = document.getElementById('scroll-container-async');
+        const innerContainer = document.getElementById('inner-container-async');
+        innerContainer.style.height = (TOTAL_ROWS * ROW_HEIGHT) + 'px';
+
+        // Pool of reusable row elements — simulates react-window's slot reuse
+        const pool = [];
+        const POOL_SIZE = Math.ceil(VIEWPORT_HEIGHT / ROW_HEIGHT) + 2 * OVERSCAN;
+        for (let i = 0; i < POOL_SIZE; i++) {
+          const row = document.createElement('div');
+          row.setAttribute('role', 'row');
+          row.style.position = 'absolute';
+          row.style.left = '0px';
+          row.style.height = ROW_HEIGHT + 'px';
+          row.style.width = '100%';
+          row.style.display = 'flex';
+          const nameCell = document.createElement('div');
+          nameCell.setAttribute('role', 'cell');
+          const valueCell = document.createElement('div');
+          valueCell.setAttribute('role', 'cell');
+          row.appendChild(nameCell);
+          row.appendChild(valueCell);
+          row.dataset.logicalIndex = String(i);
+          pool.push(row);
+          innerContainer.appendChild(row);
+        }
+
+        let contentTimers = [];
+
+        function render() {
+          // Cancel any pending content updates
+          contentTimers.forEach(t => clearTimeout(t));
+          contentTimers = [];
+
+          const scrollTop = scrollContainer.scrollTop;
+          const firstVisible = Math.floor(scrollTop / ROW_HEIGHT);
+          const startIdx = Math.max(0, firstVisible - OVERSCAN);
+
+          for (let slot = 0; slot < pool.length; slot++) {
+            const dataIdx = startIdx + slot;
+            const row = pool[slot];
+            if (dataIdx >= TOTAL_ROWS) {
+              row.style.display = 'none';
+              continue;
+            }
+            row.style.display = 'flex';
+
+            // Position updates SYNCHRONOUSLY (like react-window)
+            row.style.top = (dataIdx * ROW_HEIGHT) + 'px';
+            row.dataset.logicalIndex = String(dataIdx);
+
+            // Content updates ASYNCHRONOUSLY (like React reconciliation)
+            const d = data[dataIdx];
+            const cells = row.querySelectorAll('[role="cell"]');
+            contentTimers.push(setTimeout(() => {
+              cells[0].textContent = d.name;
+              cells[1].textContent = d.value;
+            }, 30));
+          }
+        }
+
+        scrollContainer.addEventListener('scroll', () => {
+          requestAnimationFrame(render);
+        });
+
+        // Initial render — synchronous content for first batch
+        for (let slot = 0; slot < pool.length && slot < TOTAL_ROWS; slot++) {
+          const row = pool[slot];
+          row.style.top = (slot * ROW_HEIGHT) + 'px';
+          row.dataset.logicalIndex = String(slot);
+          const cells = row.querySelectorAll('[role="cell"]');
+          cells[0].textContent = data[slot].name;
+          cells[1].textContent = data[slot].value;
+        }
+      </script>
+    </body>
+    </html>
+  `;
+}
+
+function asyncContentConfig(opts?: { contentReady?: boolean }): TableConfig {
+  const viewport: ViewportStrategy = {
+    getVisibleRowIndices: async ({ root, config }: TableContext) => {
+      return root.evaluate((el: HTMLElement, rowSel: string) => {
+        const scroller = el.querySelector('#scroll-container-async');
+        const rows = Array.from(el.querySelectorAll(rowSel));
+        const scrollerRect = scroller?.getBoundingClientRect() ?? null;
+        const visible: number[] = [];
+        rows.forEach((row, index) => {
+          if (!scrollerRect) { visible.push(index); return; }
+          const rect = row.getBoundingClientRect();
+          if (rect.height === 0) return;
+          if (rect.bottom > scrollerRect.top && rect.top < scrollerRect.bottom) {
+            visible.push(index);
+          }
+        });
+        return visible;
+      }, config.rowSelector as string);
+    },
+    scrollToRow: async ({ root }: TableContext, rowIndex: number) => {
+      await root.evaluate((el: HTMLElement, args: { idx: number }) => {
+        const scroller = el.querySelector('#scroll-container-async') as HTMLElement;
+        if (!scroller) return;
+        scroller.scrollTop = Math.max(0, args.idx * 36 - 20);
+      }, { idx: rowIndex });
+      await root.page().waitForTimeout(50);
+    },
+  };
+
+  return {
+    rowSelector: '#inner-container-async [role="row"]',
+    cellSelector: '[role="cell"]',
+    headerSelector: '[role="columnheader"]',
+    maxPages: 500,
+    strategies: {
+      viewport,
+      resolveRowIndex: async (row: Locator): Promise<RowIndexResult | undefined> => {
+        const top = await row.evaluate((el: HTMLElement) => parseFloat(el.style.top));
+        if (!Number.isFinite(top)) return undefined;
+        return Math.round(top / ROW_HEIGHT);
+      },
+      ...(opts?.contentReady ? {
+        contentReady: Strategies.ContentReady.textStable({ timeout: 500, interval: 30 }),
+      } : {}),
+      pagination: PaginationStrategies.infiniteScroll({
+        action: 'js-scroll',
+        scrollTarget: (root: Locator) => root.locator('#scroll-container-async').first(),
+        scrollAmount: 100,
+        stabilization: StabilizationStrategies.contentChanged({
+          scope: 'all',
+          timeout: 5000,
+        }),
+      }),
+    },
+  };
+}
+
 test.describe('Grafana-style virtualized table (#417)', () => {
   test.beforeEach(async ({ page }) => {
     await page.setContent(makeGrafanaTableHtml());
@@ -364,5 +556,30 @@ test.describe('Grafana-style virtualized table (#417)', () => {
     }, { concurrency: 'sequential' });
 
     expect(rows.length).toBe(TOTAL_ROWS);
+  });
+});
+
+test.describe('contentReady strategy (#417 content staleness)', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.setContent(makeAsyncContentTableHtml());
+    await page.waitForSelector('[role="row"]');
+  });
+
+  test('atomic toJSON with contentReady captures correct content from async-rendering virtualizer', async ({ page }) => {
+    const table = useTable(page.locator('#the-table'), asyncContentConfig({ contentReady: true }));
+    await table.init();
+
+    const rows = await table.map(async ({ row }) => {
+      return await row.toJSON({ atomic: true });
+    }, { concurrency: 'sequential' });
+
+    expect(rows.length).toBe(TOTAL_ROWS);
+
+    const names = rows.map((r: Record<string, string>) => r.Name);
+    const uniqueNames = new Set(names);
+    expect(uniqueNames.size).toBe(TOTAL_ROWS);
+
+    expect(names).toContain('Row-000');
+    expect(names).toContain('Row-099');
   });
 });
