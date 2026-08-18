@@ -384,7 +384,7 @@ function makeAsyncContentTableHtml() {
   `;
 }
 
-function asyncContentConfig(opts?: { contentReady?: boolean }): TableConfig {
+function asyncContentConfig(opts?: { contentReady?: boolean | 'mutationSettled' }): TableConfig {
   const viewport: ViewportStrategy = {
     getVisibleRowIndices: async ({ root, config }: TableContext) => {
       return root.evaluate((el: HTMLElement, rowSel: string) => {
@@ -426,7 +426,9 @@ function asyncContentConfig(opts?: { contentReady?: boolean }): TableConfig {
         return Math.round(top / ROW_HEIGHT);
       },
       ...(opts?.contentReady ? {
-        contentReady: Strategies.ContentReady.textStable({ timeout: 500, interval: 30 }),
+        contentReady: opts.contentReady === 'mutationSettled'
+          ? Strategies.ContentReady.mutationSettled({ timeout: 500, quietPeriod: 50 })
+          : Strategies.ContentReady.textStable({ timeout: 500, interval: 30 }),
       } : {}),
       pagination: PaginationStrategies.infiniteScroll({
         action: 'js-scroll',
@@ -565,8 +567,26 @@ test.describe('contentReady strategy (#417 content staleness)', () => {
     await page.waitForSelector('[role="row"]');
   });
 
-  test('atomic toJSON with contentReady captures correct content from async-rendering virtualizer', async ({ page }) => {
+  test('textStable captures correct content from async-rendering virtualizer', async ({ page }) => {
     const table = useTable(page.locator('#the-table'), asyncContentConfig({ contentReady: true }));
+    await table.init();
+
+    const rows = await table.map(async ({ row }) => {
+      return await row.toJSON({ atomic: true });
+    }, { concurrency: 'sequential' });
+
+    expect(rows.length).toBe(TOTAL_ROWS);
+
+    const names = rows.map((r: Record<string, string>) => r.Name);
+    const uniqueNames = new Set(names);
+    expect(uniqueNames.size).toBe(TOTAL_ROWS);
+
+    expect(names).toContain('Row-000');
+    expect(names).toContain('Row-099');
+  });
+
+  test('mutationSettled captures correct content from async-rendering virtualizer', { timeout: 60000 }, async ({ page }) => {
+    const table = useTable(page.locator('#the-table'), asyncContentConfig({ contentReady: 'mutationSettled' }));
     await table.init();
 
     const rows = await table.map(async ({ row }) => {
