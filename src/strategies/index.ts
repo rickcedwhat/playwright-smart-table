@@ -9,6 +9,7 @@ import { LoadingStrategies } from './loading';
 import { StabilizationStrategies } from './stabilization';
 import { FilterStrategies } from './filter';
 import { ViewportStrategies } from './viewport';
+import { ContentReadyStrategies } from './contentReady';
 
 export * from './pagination';
 export * from './sorting';
@@ -21,6 +22,7 @@ export * from './loading';
 export * from './stabilization';
 export * from './filter';
 export * from './viewport';
+export * from './contentReady';
 
 export const Strategies = {
     Pagination: PaginationStrategies,
@@ -34,4 +36,5 @@ export const Strategies = {
     Stabilization: StabilizationStrategies,
     Filter: FilterStrategies,
     Viewport: ViewportStrategies,
+    ContentReady: ContentReadyStrategies,
 };

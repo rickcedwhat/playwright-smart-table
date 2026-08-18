@@ -434,6 +434,8 @@ export type PaginationStrategy = PaginationPrimitives;
 
 export type DedupeStrategy = (row: SmartRow) => string | number | Promise<string | number>;
 
+export type ContentReadyStrategy = (row: Locator, page: Page) => Promise<void>;
+
 
 
 export type FillStrategy = (options: {
@@ -650,6 +652,24 @@ export interface TableStrategies {
    * }
    */
   resolveRowIndex?: (row: Locator) => Promise<RowIndexResult | undefined>;
+
+  /**
+   * Waits until a row's content has stabilized before cloning in
+   * `toJSON({ atomic: true })`. Needed for recycling virtualizers where the
+   * framework updates element positions synchronously but renders cell content
+   * asynchronously (e.g. react-window, react-virtuoso with React concurrent mode).
+   *
+   * Without this, the clone captures stale content from the previous occupant of the
+   * DOM slot — the element is at the correct position but React hasn't re-rendered yet.
+   *
+   * Use `Strategies.ContentReady.textStable()` for the built-in text-polling strategy.
+   *
+   * @example
+   * strategies: {
+   *   contentReady: Strategies.ContentReady.textStable({ timeout: 500 }),
+   * }
+   */
+  contentReady?: ContentReadyStrategy;
 
   /**
    * Viewport oracle strategies for 2D virtualized tables (e.g. MUI DataGrid, AG Grid,
