@@ -3,7 +3,21 @@
 Generated: 2026-08-22
 
 > Guiding light: [`PHILOSOPHY.md`](./PHILOSOPHY.md)
-> Review this file in the PR, leave comments on items you want addressed, then tell the agent which Bad/Ugly/test items to act on.
+> Follow-up issues: [#426](https://github.com/rickcedwhat/playwright-smart-table/issues/426)–[#434](https://github.com/rickcedwhat/playwright-smart-table/issues/434) · tracked on [`ROADMAP.md`](./ROADMAP.md)
+
+---
+
+## `_navigateToCell` — what if we removed it?
+
+`_navigateToCell` (`src/smartRow.ts`) is **not** a leftover unused helper: `toJSON`, `smartFill`, and `getCell().bringIntoView()` always call it (including for lock-step `synchronized` barriers).
+
+| Option | What happens |
+|---|---|
+| **A. Delete the whole function** | Breaks off-screen cell reads/fills for every virtualized table. Not viable without a replacement orchestrator. |
+| **B. Keep orchestrator; strip Glide-shaped core** (canvas / `Home` / “Midas Touch”) | **Recommended short-term.** Stock Glide already uses **viewport only** (no `strategies.navigation`). That canvas/`Home` block only runs when navigation primitives + `snapFirstColumnIntoView` are configured — legacy pre-viewport Glide path. |
+| **C. Drop `strategies.navigation` fallback; viewport-only** | Glide OK. **RDG breaks** until migrated (`presets.rdg` still ships arrow/scroll navigation; `rdg2D` is the viewport direction). Custom nav tests break. |
+
+See [#426](https://github.com/rickcedwhat/playwright-smart-table/issues/426) for the full decision write-up.
 
 ---
 
@@ -140,16 +154,22 @@ Generated: 2026-08-22
 - **Overall health score: 7.5/10** — production-capable, well-tested, architecture still strategy-shaped; core virtualization weight and public-surface debt hold it back from 9+.
 - **Philosophy alignment score: 7/10** — describe/strategy/preset model intact; Glide-in-core + framework CSS defaults + loop fan-out are the drift.
 - **Top 3 priorities** (philosophy-restoring first):
-  1. **Extract framework-shaped navigation** out of `_navigateToCell` into Glide/preset primitives; require explicit scroll containers on generic strategies.
-  2. **Unify page/scan loops** (or document iterator as unsafe) so overscan/loading/dedupe behavior cannot diverge again.
-  3. **Public-surface hygiene** — deprecate `getColumnValues`, stop teaching `Plugins`, prune dead `Strategies.*`, align ROADMAP with reality / add philosophy-debt items.
+  1. **[#426](https://github.com/rickcedwhat/playwright-smart-table/issues/426)** — slim `_navigateToCell` (prefer B; consider C after RDG→viewport)
+  2. **[#427](https://github.com/rickcedwhat/playwright-smart-table/issues/427)** — unify page/scan loops
+  3. **[#428](https://github.com/rickcedwhat/playwright-smart-table/issues/428)** — public-surface hygiene
 
----
+### Issue map (GBU → GitHub)
 
-## Next (needs your call)
+| Topic | Issue |
+|---|---|
+| Slim `_navigateToCell` / viewport-first | [#426](https://github.com/rickcedwhat/playwright-smart-table/issues/426) |
+| Unify scan loops | [#427](https://github.com/rickcedwhat/playwright-smart-table/issues/427) |
+| Plugins / getColumnValues / dead Strategies | [#428](https://github.com/rickcedwhat/playwright-smart-table/issues/428) |
+| FilterEngine + getRow/findRow parity | [#429](https://github.com/rickcedwhat/playwright-smart-table/issues/429) |
+| scroll helpers → viewport; getValue nav | [#430](https://github.com/rickcedwhat/playwright-smart-table/issues/430) |
+| Framework CSS out of generic strategies | [#431](https://github.com/rickcedwhat/playwright-smart-table/issues/431) |
+| Test suite cut/gaps | [#432](https://github.com/rickcedwhat/playwright-smart-table/issues/432) |
+| ROADMAP philosophy-debt section | [#433](https://github.com/rickcedwhat/playwright-smart-table/issues/433) |
+| Safer defaults & footguns | [#434](https://github.com/rickcedwhat/playwright-smart-table/issues/434) |
 
-Per `/gbu` Step 5 — **no code changes from this audit until you reply:**
-
-1. Which **Bad** or **Ugly** items do you want addressed first?
-2. Which **redundant tests** should we cut/merge?
-3. Which **missing tests** should we add?
+**Could not update existing issues** with this agent token (create works; comment/edit/close return 403). Please manually: close accidental [#425](https://github.com/rickcedwhat/playwright-smart-table/issues/425); comment on / reopen [#327](https://github.com/rickcedwhat/playwright-smart-table/issues/327) (v7 presets) and link [#386](https://github.com/rickcedwhat/playwright-smart-table/issues/386) as needed.
