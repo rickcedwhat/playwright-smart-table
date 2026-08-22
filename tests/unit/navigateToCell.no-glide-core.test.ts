@@ -1,6 +1,11 @@
 import { describe, it, expect, vi } from 'vitest';
+import type { Locator, Page } from '@playwright/test';
 import createSmartRow from '../../src/smartRow';
 import { FinalTableConfig } from '../../src/types';
+
+type MockCellLocator = Pick<Locator, 'count' | 'focus' | 'nth'>;
+type MockRowLocator = Pick<Locator, 'count' | 'nth' | 'page' | 'evaluate' | 'scrollIntoViewIfNeeded' | 'focus'>;
+type MockPage = Pick<Page, 'keyboard' | 'waitForTimeout'>;
 
 /**
  * #426 option B: core must not special-case Glide canvas / keyboard Home after
@@ -13,23 +18,25 @@ describe('Issue 426: no Glide canvas/Home in _navigateToCell', () => {
         const evaluate = vi.fn().mockResolvedValue(undefined);
 
         let snapped = false;
-        const cellLocator = {
+        const cellLocator: MockCellLocator = {
             count: vi.fn().mockImplementation(async () => (snapped ? 1 : 0)),
             focus: vi.fn().mockResolvedValue(undefined),
             nth: vi.fn().mockReturnThis(),
         };
 
-        const mockLocator = {
+        const mockPage: MockPage = {
+            keyboard: { press: keyboardPress },
+            waitForTimeout,
+        };
+
+        const mockLocator: MockRowLocator = {
             count: vi.fn().mockImplementation(async () => (snapped ? 1 : 0)),
             nth: vi.fn().mockReturnValue(cellLocator),
-            page: vi.fn().mockReturnValue({
-                keyboard: { press: keyboardPress },
-                waitForTimeout,
-            }),
+            page: vi.fn().mockReturnValue(mockPage as Page),
             evaluate,
             scrollIntoViewIfNeeded: vi.fn(),
             focus: vi.fn().mockResolvedValue(undefined),
-        } as any;
+        };
 
         const snapFirstColumnIntoView = vi.fn().mockImplementation(async () => {
             snapped = true;
@@ -39,16 +46,20 @@ describe('Issue 426: no Glide canvas/Home in _navigateToCell', () => {
         const getActiveCell = vi.fn().mockImplementation(async () => ({
             rowIndex: 2,
             columnIndex: snapped ? 0 : 5,
-            locator: cellLocator,
+            locator: cellLocator as unknown as Locator,
         }));
 
-        const mockConfig: FinalTableConfig<any> = {
+        const mockConfig: FinalTableConfig<Record<string, unknown>> = {
             rowSelector: 'tr',
             headerSelector: 'th',
             cellSelector: 'td',
+            maxPages: 1,
+            autoScroll: false,
+            headerTransformer: ({ text }) => text,
+            onReset: async () => {},
             strategies: {
                 getActiveCell,
-                getCellLocator: () => cellLocator as any,
+                getCellLocator: () => cellLocator as unknown as Locator,
                 navigation: {
                     snapFirstColumnIntoView,
                     goRight: vi.fn(),
@@ -60,16 +71,24 @@ describe('Issue 426: no Glide canvas/Home in _navigateToCell', () => {
                 },
             },
             debug: { logLevel: 'none' },
-        } as any;
+        };
 
         const rowMap = new Map([['First', 0]]);
+        const rowLocator = mockLocator as unknown as Locator;
+        const resolve = (_sel: string, parent: Locator | Page): Locator => {
+            if ('nth' in parent && typeof parent.nth === 'function') {
+                return parent.nth(0);
+            }
+            return rowLocator;
+        };
+
         const smartRow = createSmartRow(
-            mockLocator,
+            rowLocator,
             rowMap,
             2,
             mockConfig,
-            mockLocator,
-            (_sel, parent) => ((parent as any).nth ? (parent as any).nth(0) : mockLocator),
+            rowLocator,
+            resolve,
             null
         );
 
