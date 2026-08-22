@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **`_navigateToCell` no longer special-cases Glide canvas / keyboard `Home`** — after `snapFirstColumnIntoView`, core used to focus a `<canvas>` and press `Home` (pre-viewport Glide path). That behavior belongs in the navigation primitive or viewport strategy. Stock Glide already uses viewport-only. Closest: #426.
+
 ## [6.20.1] - 2026-08-14
 
 ### Fixed

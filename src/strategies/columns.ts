@@ -14,7 +14,9 @@ export interface NavigationPrimitives {
     goHome?: (context: StrategyContext) => Promise<void>;
     /**
      * After vertical moves, run before horizontal steps when the target column index is 0.
-     * Use for horizontally virtualized a11y tables (e.g. Glide) so `td[aria-colindex="1"]` exists again.
+     * Use for horizontally virtualized tables so the first column exists in the DOM again
+     * (e.g. set scrollLeft = 0). If the table needs keyboard `Home` or canvas focus, put that
+     * here — the core orchestrator does not special-case those behaviors.
      * Do not reset vertical scroll here — RDG-style `goHome` is often unsuitable.
      */
     snapFirstColumnIntoView?: (context: StrategyContext) => Promise<void>;
