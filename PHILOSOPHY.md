@@ -52,7 +52,7 @@ Anything that varies by table framework or DOM shape belongs in `src/strategies/
 | Official convenience for a library → `src/presets/` | Built-in knowledge of AgGrid/MUI/etc. in the engine |
 | User-specific quirk → their config / custom strategy | A new core API “just for this one app” |
 
-**Litmus:** Can a consumer achieve the same outcome by composing strategies without a library release? If yes, prefer that path over growing the core.
+**Litmus:** Can a consumer achieve the same outcome by composing strategies without a library release? If yes, prefer that path over growing the core. If re-useable, consider adding it as a preset at most.
 
 ### 2. Keep the core thin
 
