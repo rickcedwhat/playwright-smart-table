@@ -1,5 +1,21 @@
 # Roadmap
 
+## Short Term - Philosophy Debt
+
+Guiding light: [`PHILOSOPHY.md`](PHILOSOPHY.md). Filed from GBU 2026-08-22 (`GBU-REPORT.md`).
+
+- [ ] **Slim `_navigateToCell` / viewport-first** — [#426](https://github.com/rickcedwhat/playwright-smart-table/issues/426)
+- [ ] **Unify pagination/scan loops** — [#427](https://github.com/rickcedwhat/playwright-smart-table/issues/427)
+- [ ] **Public API hygiene (Plugins, `getColumnValues`, dead Strategies)** — [#428](https://github.com/rickcedwhat/playwright-smart-table/issues/428)
+- [ ] **FilterEngine + `getCellLocator`; getRow/findRow filter parity** — [#429](https://github.com/rickcedwhat/playwright-smart-table/issues/429)
+- [ ] **scrollToColumn / bringIntoView prefer viewport** — [#430](https://github.com/rickcedwhat/playwright-smart-table/issues/430)
+- [ ] **No framework CSS defaults in generic strategies** — [#431](https://github.com/rickcedwhat/playwright-smart-table/issues/431)
+- [ ] **Test suite cleanup (redundant + gaps)** — [#432](https://github.com/rickcedwhat/playwright-smart-table/issues/432)
+- [ ] **Safer defaults & footguns** — [#434](https://github.com/rickcedwhat/playwright-smart-table/issues/434)
+- [ ] **ROADMAP/philosophy tracking hygiene** — [#433](https://github.com/rickcedwhat/playwright-smart-table/issues/433)
+
+Related closed work to reopen/extend when picking these up: [#327](https://github.com/rickcedwhat/playwright-smart-table/issues/327) (v7 preset API), [#386](https://github.com/rickcedwhat/playwright-smart-table/issues/386) (Grafana-class patterns).
+
 ## Short Term - Quality of Life & Safety
 
 ### 🛡️ Safety & Stability
@@ -21,7 +37,7 @@
     - **Also adds**: Public `[Symbol.asyncIterator]` on `TableResult` — enables `for await (const { row } of table)`.
     - **Deprecates**:
       - `iterateThroughTable` (use `forEach`/`map`/`filter` instead).
-      - `getColumnValues` (use `map` instead).
+      - `getColumnValues` (use `map` instead) — **still present on `TableResult` without `@deprecated`; track removal in [#428](https://github.com/rickcedwhat/playwright-smart-table/issues/428)**.
  - [x] **Document `forEach`/`map`/`filter` in README**
  - [x] **JSDoc `@note` on `map`'s `concurrency: 'parallel'` default**
  - [x] **Add mutation testing (Stryker)**
@@ -37,7 +53,7 @@
 ### 🧹 Cleanup (completed in v6.7.0)
 - [x] **Remove Deprecated APIs**:
     - `iterateThroughTable` → replaced by `forEach`/`map`/`filter`.
-    - `getColumnValues` → replaced by `map`.
+    - `getColumnValues` → intended replacement `map` / `mapColumn` (API still shipped; see [#428](https://github.com/rickcedwhat/playwright-smart-table/issues/428)).
     - `dataMapper` → replaced by `columnOverrides.read`.
     - `clickNext` pagination strategy → replaced by `click({ next: ... })`.
 

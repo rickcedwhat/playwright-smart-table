@@ -78,7 +78,9 @@ Then create a Pull Request on GitHub.
 
 ## 🎨 Design Philosophy
 
-Understanding our design principles will help you contribute code that fits naturally with the library.
+**Source of truth:** [`PHILOSOPHY.md`](PHILOSOPHY.md) — the library’s north star (describe-your-table, strategy-first, thin core). Read it before non-trivial changes; GBU audits score the repo against it.
+
+The sections below are the practical contributor rules that follow from that document.
 
 ### 1. Scope: The Table Boundary
 **Rule**: The library manages interactions *within* the table and its direct controls (pagination, specific intra-header filters).
@@ -91,7 +93,8 @@ Understanding our design principles will help you contribute code that fits natu
 
 ### 3. Config over Convention
 **Rule**: Support standard HTML tables by default, but provide `strategies` for everything else.
-- **Anti-Pattern**: Hardcoding logic for specific libraries (AgGrid, MaterialUI) in the core `useTable.ts`. logic belongs in `strategies/`.
+- **Anti-Pattern**: Hardcoding logic for specific libraries (AgGrid, MaterialUI) in the core `useTable.ts`. That logic belongs in `strategies/` or `presets/`.
+- **See:** [`PHILOSOPHY.md`](PHILOSOPHY.md) — Strategy-first configuration & anti-patterns.
 
 ### 4. Stay Close to Native Playwright
 

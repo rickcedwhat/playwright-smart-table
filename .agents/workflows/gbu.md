@@ -9,12 +9,13 @@ This workflow performs a comprehensive health check of the `playwright-smart-tab
 ### Step 1: Understand the current codebase structure
 
 Read the following to get oriented:
+- **`PHILOSOPHY.md`** — guiding light; every finding below should be judged against it
 - `src/index.ts` - what is exported
 - `src/types.ts` - all public types and interfaces
 - `src/useTable.ts` - main entry point logic
 - `src/smartRow.ts` - SmartRow implementation
-- `src/plugins.ts` - plugin/preset exports
- - `src/plugins/index.ts` (or `src/plugins/`) - plugin/preset exports
+- `src/plugins/index.ts` (or `src/plugins/`) - plugin/preset exports
+- `src/presets/` - official library presets (strategy packs)
 - `src/strategies/` directory - all strategy implementations
 - `CHANGELOG.md` (last 3 versions) - recent changes
 - `ROADMAP.md` - planned work
@@ -22,22 +23,38 @@ Read the following to get oriented:
 
 ### Step 2: Audit the source code
 
-Evaluate the following dimensions and take notes:
+Evaluate the following dimensions and take notes. **Philosophy alignment is mandatory** — compare the library to `PHILOSOPHY.md` before scoring health.
+
+**PHILOSOPHY ALIGNMENT** 🧭
+Score the current design against each principle in `PHILOSOPHY.md`. Call out drift explicitly (even when the code “works”).
+
+Ask at least:
+- Is variation still expressed as strategies/presets, or is the core accumulating framework-specific branches?
+- Are new capabilities *describe-your-table* config, or encoded one-off behavior?
+- Do public APIs stay Playwright-native (Locators), scoped to the table boundary?
+- Would the decision checklist in `PHILOSOPHY.md` reject any recent or proposed changes?
+
+Map alignment into Good / Bad / Ugly:
+- Faithful to philosophy → Good
+- Soft drift, fixable without breaking changes → Bad
+- Core special-casing, fused framework knowledge, or growing un-pluggable surface → Ugly
 
 **THE GOOD** ✅
 - Well-designed APIs and abstractions
-- Clean separation of concerns
+- Clean separation of concerns (core thin, strategies pluggable)
 - Good TypeScript typing
-- Useful exports and presets
+- Useful exports and presets that remain configuration, not new engines
 - Smart defaults
+- Places where the library clearly lets users *describe* how their table works
 
 **THE BAD** ⚠️
 - Inconsistencies in naming conventions or API design
 - Deprecated code that hasn't been cleaned up
-- Overly complex implementations where simpler ones would work
+- Overly complex implementations where a strategy would be simpler
 - Missing documentation or confusing JSDoc
 - Exported things that probably shouldn't be public
 - Things that are close to good but need polish
+- Soft philosophy drift (config flags that should be strategies, core weight creeping up)
 
 **THE UGLY** 🚨
 - Technical debt that actively causes problems
@@ -45,6 +62,7 @@ Evaluate the following dimensions and take notes:
 - Broken or unreliable functionality
 - Security or performance concerns
 - Dead code that should be deleted
+- Hard philosophy violations (framework conditionals in core, non-removable special cases, APIs that abandon Locators)
 
 ### Step 3: Audit the test suite
 
@@ -73,14 +91,22 @@ Write a structured markdown report with these sections:
 # GBU Report - playwright-smart-table v{version}
 Generated: {date}
 
+## PHILOSOPHY ALIGNMENT 🧭
+(Reference: PHILOSOPHY.md)
+- Mission fit: [does the library still teach itself via description, or is it encoding table types?]
+- Strategy-first: [where variation lives today — strategies/presets vs core]
+- Core thinness: [notable growth or special-casing in useTable / rowFinder / engine]
+- Decision-checklist failures: [any recent patterns that would fail the checklist]
+- Score: X/10 alignment
+
 ## THE GOOD ✅
-[List of strengths with brief explanations]
+[List of strengths with brief explanations — include philosophy wins]
 
 ## THE BAD ⚠️
-[List of issues with brief explanations and suggested fixes]
+[List of issues with brief explanations and suggested fixes — include soft drift]
 
 ## THE UGLY 🚨
-[List of serious problems with recommended actions]
+[List of serious problems with recommended actions — include hard philosophy violations]
 
 ## TEST AUDIT
 
@@ -92,7 +118,8 @@ Generated: {date}
 
 ## SUMMARY
 - Overall health score: X/10
-- Top 3 priorities to address
+- Philosophy alignment score: X/10
+- Top 3 priorities to address (prefer fixes that restore describe/strategy-first design)
 ```
 
 Output this report to the user as a file that the user can review and add comments to.

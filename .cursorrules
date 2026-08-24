@@ -36,6 +36,7 @@ Key Constraints:
 - Code should follow AAA pattern (Arrange-Act-Assert) for clarity and maintainability.
 
 Development Philosophy:
+- Guiding light: `PHILOSOPHY.md` (describe-your-table via pluggable strategies; keep the core thin). Compare the library to it on PRs and during `/gbu` reports.
 - Features are driven by real-world use cases encountered in production testing.
 - The library is battle-tested across multiple projects with different table structures and frameworks.
 - New features are added iteratively as use cases are discovered in practice.

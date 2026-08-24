@@ -39,6 +39,7 @@ npx playwright test --config playwright.config.ci-b.ts       # integration tests
 
 | File | Purpose |
 |---|---|
+| `PHILOSOPHY.md` | Guiding light — strategy-first, describe-your-table, thin core; used in GBU audits |
 | `src/useTable.ts` | Core table factory — do not change signature |
 | `src/engine/rowFinder.ts` | `findRow` / `findRows` — pagination loop lives here |
 | `src/strategies/` | All pagination / loading / sorting / fill / stabilization strategies |
