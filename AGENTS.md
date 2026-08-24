@@ -109,7 +109,7 @@ Types: `feat` `fix` `docs` `test` `refactor` `perf` `chore`
 - Use `logDebug()` instead of `console.log()`
 - All public types exported from `src/types.ts`
 
-See `CONTRIBUTING.md` for full design philosophy.
+**Guiding light:** [`PHILOSOPHY.md`](PHILOSOPHY.md) — describe-your-table via pluggable strategies; keep the core thin. Use it on PRs and during `/gbu` audits. Practical contributor rules live in `CONTRIBUTING.md`.
 
 ---
 
