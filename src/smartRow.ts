@@ -232,6 +232,8 @@ const _navigateToCell = async (params: {
                 }
             }
 
+            // Column-0 snap is owned by the navigation primitive (scrollLeft=0, Home, etc.).
+            // Core must not special-case canvas/Home — that was pre-viewport Glide glue.
             if (index === 0 && nav.snapFirstColumnIntoView) {
                 logDebug(config, 'verbose', '_navigateToCell: snapFirstColumnIntoView for column index 0');
                 await nav.snapFirstColumnIntoView(context);
@@ -240,26 +242,6 @@ const _navigateToCell = async (params: {
                     if (ac) {
                         currRow = ac.rowIndex;
                         currCol = ac.columnIndex;
-                    }
-                }
-                // Home moves a11y focus within the current row to column 0. If focus row !== target row
-                // (e.g. still on previous row), Home jumps to grid origin and breaks `tr.nth(k)` reads.
-                if (typeof rowIndex === 'number' && currRow === rowIndex) {
-                    await rootLocator.evaluate((el) => {
-                        const canvas = el.closest('canvas') || el.parentElement?.querySelector('canvas');
-                        if (canvas instanceof HTMLCanvasElement) {
-                            canvas.tabIndex = 0;
-                            canvas.focus();
-                        }
-                    });
-                    await page.keyboard.press('Home');
-                    await page.waitForTimeout(120);
-                    if (config.strategies.getActiveCell) {
-                        const ac = await config.strategies.getActiveCell({ config, root: rootLocator, page, resolve });
-                        if (ac) {
-                            currRow = ac.rowIndex;
-                            currCol = ac.columnIndex;
-                        }
                     }
                 }
             }
@@ -289,8 +271,8 @@ const _navigateToCell = async (params: {
                 await page.waitForTimeout(settleMs);
             }
 
-            // Wait for active cell to match target: poll getActiveCell or fallback to fixed delay
-            // This is the "Midas Touch" buffer needed for Glide's async accessibility updates.
+            // After horizontal steps, poll until getActiveCell / DOM presence confirms the target
+            // (a11y trees and virtual mounts often lag the scroll). Tune via navigation.maxWaitMs.
             const pollIntervalMs = 10;
             const computedMax = Math.min(6000, 250 + horizontalSteps * 25);
             const maxWaitMs = (Number.isFinite(nav.maxWaitMs) && nav.maxWaitMs! >= 0) ? nav.maxWaitMs! : computedMax;
