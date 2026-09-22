@@ -73,4 +73,73 @@ test.describe('findRow/findRows with columnOverride filters (#385)', () => {
         expect(await table.countRows({ Link: '/d/' })).toBe(3);
         expect(await table.countRows({ Link: '/d/nonexistent' }, { exact: true })).toBe(0);
     });
+
+    test('getRow rejects columnOverrides.read filters (#429)', async ({ page }) => {
+        await page.setContent(TABLE);
+        const table = await makeTable(page).init();
+
+        expect(() => table.getRow({ Link: '/d/beta' } as any)).toThrow(
+            /columnOverrides\.read.*findRow/
+        );
+    });
+});
+
+test.describe('getRow/findRow with getCellLocator (#429)', () => {
+    // Column B is missing from the middle row's DOM order — nth(1) would hit the wrong cell.
+    const VIRTUALIZED = `
+        <table id="t">
+            <thead><tr><th>A</th><th>B</th><th>C</th></tr></thead>
+            <tbody>
+                <tr>
+                    <td aria-colindex="1">A0</td>
+                    <td aria-colindex="2">B0</td>
+                    <td aria-colindex="3">C0</td>
+                </tr>
+                <tr>
+                    <td aria-colindex="2">TargetB</td>
+                    <td aria-colindex="3">C1</td>
+                </tr>
+                <tr>
+                    <td aria-colindex="1">A2</td>
+                    <td aria-colindex="3">C2</td>
+                </tr>
+            </tbody>
+        </table>
+    `;
+
+    const makeTable = (page: Page) =>
+        useTable(page.locator('#t'), {
+            strategies: {
+                getCellLocator: ({ row, columnIndex }) =>
+                    row.locator(`[aria-colindex="${columnIndex + 1}"]`),
+            },
+        });
+
+    test('getRow matches aria-colindex cell, not nth DOM order', async ({ page }) => {
+        await page.setContent(VIRTUALIZED);
+        const table = await makeTable(page).init();
+
+        const row = table.getRow({ B: 'TargetB' }, { exact: true });
+        await expect(row).toBeVisible();
+        // Middle row has no mounted column A — assert only cells present in the window.
+        await expect(row.getCell('B')).toHaveText('TargetB');
+        await expect(row.getCell('C')).toHaveText('C1');
+    });
+
+    test('findRow matches aria-colindex cell, not nth DOM order', async ({ page }) => {
+        await page.setContent(VIRTUALIZED);
+        const table = await makeTable(page).init();
+
+        const row = await table.findRow({ B: 'TargetB' }, { exact: true });
+        await expect(row.getCell('B')).toHaveText('TargetB');
+        await expect(row.getCell('C')).toHaveText('C1');
+    });
+
+    test('nth-based filtering would miss TargetB (control)', async ({ page }) => {
+        await page.setContent(VIRTUALIZED);
+        // No getCellLocator — historic .nth(colIndex) path cannot find B=TargetB
+        // because TargetB sits at DOM position 0, not 1.
+        const table = await useTable(page.locator('#t')).init();
+        await expect(table.getRow({ B: 'TargetB' }, { exact: true })).not.toBeVisible();
+    });
 });

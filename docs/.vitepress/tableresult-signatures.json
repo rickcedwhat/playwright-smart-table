@@ -32,7 +32,7 @@
   {
     "name": "getRow",
     "signature": "getRow: (\n  filters: Record<string, FilterValue>,\n  options?: { exact?: boolean }",
-    "comment": "/**\n* Finds a row by filters on the current page only. Returns immediately (sync).\n* Throws error if table is not initialized.\n* @note The sync path cannot compute a real `rowIndex`, so the returned SmartRow's\n* `rowIndex` is `undefined` (virtual-scroll positioning via `bringIntoView()` is limited).\n* Use `findRow()` (async) when you need a row with an accurate `rowIndex`.\n*/"
+    "comment": "/**\n* Finds a row by filters on the current page only. Returns immediately (sync).\n* Throws error if table is not initialized.\n* @note The sync path cannot compute a real `rowIndex`, so the returned SmartRow's\n* `rowIndex` is `undefined` (virtual-scroll positioning via `bringIntoView()` is limited).\n* Use `findRow()` (async) when you need a row with an accurate `rowIndex`.\n* @note Cannot filter by `syntheticColumns` or `columnOverrides.read` keys — those need\n* async evaluation via `findRow()` / `findRows()`. DOM filters use `strategies.getCellLocator`\n* when configured (column-virtualized grids), otherwise `cellSelector` + column index.\n*/"
   },
   {
     "name": "getRowByIndex",

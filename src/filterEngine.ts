@@ -1,6 +1,7 @@
 import { Locator, Page } from "@playwright/test";
-import { FinalTableConfig, TableContext, FilterStrategy, FilterValue } from "./types";
+import { FinalTableConfig, TableContext, FilterValue } from "./types";
 import { buildColumnNotFoundError } from "./utils/stringUtils";
+import { resolveCellLocatorForFilter } from "./utils/resolveCellLocator";
 
 export class FilterEngine {
     constructor(
@@ -14,6 +15,10 @@ export class FilterEngine {
      * Note: `rootLocator` is optional for backward compatibility in call sites that already
      * pass only the page. When strategies.filter is present we construct a TableContext
      * using the provided `rootLocator`.
+     *
+     * When `strategies.getCellLocator` is set, cells are resolved through that strategy
+     * (via a `:scope` row stub) so column-virtualized grids that use `aria-colindex` / etc.
+     * are not filtered with fragile `.nth(colIndex)` DOM order.
      */
     applyFilters(
         baseRows: Locator,
@@ -53,11 +58,16 @@ export class FilterEngine {
                 continue;
             }
 
-            // Default Filter Logic
-            const cellTemplate = this.resolve(this.config.cellSelector, page);
-
-            // Playwright scoping: `cellTemplate.nth(colIndex)` will be re-based when used in filtered.filter({ has: ... })
-            const targetCell = cellTemplate.nth(colIndex);
+            // Prefer getCellLocator (column-virtualized presets); else cellSelector.nth.
+            // Playwright re-bases the `has` locator into each candidate row.
+            const targetCell = resolveCellLocatorForFilter({
+                config: this.config,
+                resolve: this.resolve,
+                page,
+                root: rootLocator,
+                columnName: colName,
+                columnIndex: colIndex,
+            });
 
             if (typeof filterVal === 'function') {
                 // Locator-based filter: (cell) => cell.locator(...)
