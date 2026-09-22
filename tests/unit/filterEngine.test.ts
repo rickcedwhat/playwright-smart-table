@@ -131,3 +131,55 @@ describe('FilterEngine pluggable strategy', () => {
         expect(out).toBe(fakeFiltered);
     });
 });
+
+describe('FilterEngine getCellLocator (#429)', () => {
+    const createRecursiveMockLocator = (name: string) => {
+        const mock: any = {
+            _name: name,
+            filter: vi.fn(),
+            nth: vi.fn(),
+            getByText: vi.fn(),
+            locator: vi.fn(),
+        };
+        mock.filter.mockReturnValue(mock);
+        mock.nth.mockReturnValue(mock);
+        mock.getByText.mockReturnValue(mock);
+        mock.locator.mockReturnValue(mock);
+        return mock as unknown as Locator;
+    };
+
+    it('uses getCellLocator with :scope row instead of cellSelector.nth', () => {
+        const scopeRow = createRecursiveMockLocator('scope');
+        const cellFromStrategy = createRecursiveMockLocator('ariaCell');
+        const getCellLocator = vi.fn().mockReturnValue(cellFromStrategy);
+        const mockPage = {
+            locator: vi.fn().mockReturnValue(scopeRow),
+        } as unknown as Page;
+        const root = createRecursiveMockLocator('root');
+
+        const config = {
+            cellSelector: 'td',
+            strategies: { getCellLocator },
+        } as FinalTableConfig;
+
+        const mockResolve = vi.fn();
+        const engine = new FilterEngine(config, mockResolve);
+        const baseRows = createRecursiveMockLocator('baseRows');
+        const map = new Map([['Name', 0], ['Role', 1]]);
+
+        engine.applyFilters(baseRows, { Role: 'Admin' }, map, true, mockPage, root);
+
+        expect(mockPage.locator).toHaveBeenCalledWith(':scope');
+        expect(getCellLocator).toHaveBeenCalledWith(expect.objectContaining({
+            row: scopeRow,
+            root,
+            columnName: 'Role',
+            columnIndex: 1,
+            page: mockPage,
+            config,
+        }));
+        expect(mockResolve).not.toHaveBeenCalled();
+        expect((cellFromStrategy as any).getByText).toHaveBeenCalledWith('Admin', { exact: true });
+        expect((baseRows as any).filter).toHaveBeenCalledTimes(1);
+    });
+});

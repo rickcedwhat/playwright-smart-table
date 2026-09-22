@@ -838,6 +838,9 @@ export interface TableResult<T = any> extends AsyncIterable<{ row: SmartRow<T>; 
    * @note The sync path cannot compute a real \`rowIndex\`, so the returned SmartRow's
    * \`rowIndex\` is \`undefined\` (virtual-scroll positioning via \`bringIntoView()\` is limited).
    * Use \`findRow()\` (async) when you need a row with an accurate \`rowIndex\`.
+   * @note Cannot filter by \`syntheticColumns\` or \`columnOverrides.read\` keys — those need
+   * async evaluation via \`findRow()\` / \`findRows()\`. DOM filters use \`strategies.getCellLocator\`
+   * when configured (column-virtualized grids), otherwise \`cellSelector\` + column index.
    */
   getRow: (
     filters: Record<string, FilterValue>,

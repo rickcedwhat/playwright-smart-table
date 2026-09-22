@@ -487,6 +487,13 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
           `Use findRow() instead — synthetic columns require async evaluation.`
         );
       }
+      const overrideKeys = Object.keys(filters).filter(k => config.columnOverrides?.[k as keyof T]?.read);
+      if (overrideKeys.length > 0) {
+        throw new Error(
+          `getRow() cannot filter by columnOverrides.read column(s): ${overrideKeys.join(', ')}. ` +
+          `Use findRow() instead — override columns require async evaluation.`
+        );
+      }
       const map = tableMapper.getMapSync();
       if (!map) throw new Error('Initialization Error: You attempted to access a row before the table structure was mapped. Please call "await table.init()" once before using synchronous row access.');
 

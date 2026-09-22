@@ -8,6 +8,7 @@ import { ElementTracker } from '../utils/elementTracker';
 import { SENTINEL_ROW } from '../utils/sentinel';
 import { NavigationBarrier } from '../utils/navigationBarrier';
 import { resolveLogicalRowIndex, resolveRowLoading } from './rowResolution';
+import { resolveCellLocator } from '../utils/resolveCellLocator';
 
 export class RowFinder<T = any> {
     private resolve: (item: Selector, parent: Locator | Page) => Locator;
@@ -72,11 +73,25 @@ export class RowFinder<T = any> {
             const colIndex = map.get(colName);
             if (colIndex === undefined) continue;
             const override = this.config.columnOverrides![colName as keyof T]!;
-            const cell = this.resolve(this.config.cellSelector, rowLocator).nth(colIndex);
+            const cell = resolveCellLocator({
+                config: this.config,
+                resolve: this.resolve,
+                row: rowLocator,
+                root: this.rootLocator,
+                columnName: colName,
+                columnIndex: colIndex,
+            });
             const getCell = (name: string) => {
                 const idx = map.get(name);
                 if (idx === undefined) throw new Error(`Column "${name}" not found`);
-                return this.resolve(this.config.cellSelector, rowLocator).nth(idx);
+                return resolveCellLocator({
+                    config: this.config,
+                    resolve: this.resolve,
+                    row: rowLocator,
+                    root: this.rootLocator,
+                    columnName: name,
+                    columnIndex: idx,
+                });
             };
             const context = {
                 row: this.makeSmartRow(rowLocator, map, undefined),
