@@ -4,6 +4,7 @@
 
 ### Changed
 
+- **Unified page-walk via `scanPages` (#427)** — map/forEach/filter, findRow(s), countRows, and the public async iterator share one pagination shell (maxPages, bulk accounting, EOF final scan, optional waitForReady). The async iterator now streams through `runMap` so it gets the same overscan / loading / dedupe / final-scan behavior as `map`.
 - **Public API hygiene (#428)** — `getColumnValues` marked `@deprecated` (use `mapColumn` / `map`); `Strategies.CellNavigation` / `Strategies.Resolution` / `Filter.spy` removed from the public `Strategies` namespace; preset JSDoc teaches `presets.*` only; `Plugins` shim clarified (`Plugins.MUI` = DataGrid only). Strategy contract types (`TableStrategies`, `ViewportStrategy`, …) exported from the main entry.
 - **`_navigateToCell` no longer special-cases Glide canvas / keyboard `Home`** — after `snapFirstColumnIntoView`, core used to focus a `<canvas>` and press `Home` (pre-viewport Glide path). That behavior belongs in the navigation primitive or viewport strategy. Stock Glide already uses viewport-only. Closest: #426.
 

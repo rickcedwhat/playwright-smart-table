@@ -9,6 +9,7 @@ import { SENTINEL_ROW } from '../utils/sentinel';
 import { NavigationBarrier } from '../utils/navigationBarrier';
 import { resolveLogicalRowIndex, resolveRowLoading } from './rowResolution';
 import { resolveCellLocator } from '../utils/resolveCellLocator';
+import { scanPages } from './scanPages';
 
 export class RowFinder<T = any> {
     private resolve: (item: Selector, parent: Locator | Page) => Locator;
@@ -171,110 +172,96 @@ export class RowFinder<T = any> {
         const map = await this.tableMapper.getMap();
         const allRows: SmartRow<T>[] = [];
         const effectiveMaxPages = options?.maxPages ?? this.config.maxPages ?? Infinity;
-        let pagesScanned = 1;
+        const useBulk = options?.useBulkPagination === true && !!this.config.strategies.pagination?.goNextBulk;
+        const hasPagination = !!this.config.strategies.pagination;
 
         logDebug(this.config, 'verbose',`findRows: starting (maxPages=${effectiveMaxPages}, filters=${JSON.stringify(filtersRecord)})`);
 
         const tracker = new ElementTracker('findRows');
 
         try {
-            await this.waitForTableReady();
-
             const { domFilters, overrideFilters, syntheticFilters } = this.splitFilters(filtersRecord);
             const hasOverrideFilters = Object.keys(overrideFilters).length > 0;
             const hasSyntheticFilters = Object.keys(syntheticFilters).length > 0;
 
-            const collectMatches = async () => {
-                let rowLocators = this.resolve(this.config.rowSelector, this.rootLocator);
-                if (Object.keys(domFilters).length > 0) {
-                    rowLocators = this.filterEngine.applyFilters(
-                        rowLocators,
-                        domFilters,
-                        map,
-                        options?.exact ?? false,
-                        this.rootLocator.page(),
-                        this.rootLocator
-                    );
-                }
+            const { pagesScanned } = await scanPages(
+                {
+                    advancePage: this.advancePage,
+                    getCurrentPageIndex: () => this.tableState.currentPageIndex,
+                    config: this.config,
+                    waitForReady: () => this.waitForTableReady(),
+                },
+                async () => {
+                    let rowLocators = this.resolve(this.config.rowSelector, this.rootLocator);
+                    if (Object.keys(domFilters).length > 0) {
+                        rowLocators = this.filterEngine.applyFilters(
+                            rowLocators,
+                            domFilters,
+                            map,
+                            options?.exact ?? false,
+                            this.rootLocator.page(),
+                            this.rootLocator
+                        );
+                    }
 
-                // Get only newly seen matched rows
-                const newIndices = await tracker.getUnseenIndices(rowLocators);
-                const currentRows = await rowLocators.all();
-                let added = 0;
+                    const newIndices = await tracker.getUnseenIndices(rowLocators);
+                    const currentRows = await rowLocators.all();
+                    let added = 0;
 
-                // One barrier per batch — synchronizes cell navigation across all rows in this page's results
-                const useBarrier = this.config.concurrency === 'synchronized' && newIndices.length > 1;
-                const barrier = useBarrier ? new NavigationBarrier(newIndices.length) : undefined;
+                    const useBarrier = this.config.concurrency === 'synchronized' && newIndices.length > 1;
+                    const barrier = useBarrier ? new NavigationBarrier(newIndices.length) : undefined;
 
-                for (const idx of newIndices) {
-                    const resolved = await resolveLogicalRowIndex(
-                        currentRows[idx],
-                        this.config,
-                        () => allRows.length,
-                    );
-                    const smartRow = this.makeSmartRow(currentRows[idx], map, resolved?.index, this.tableState.currentPageIndex, barrier, resolved?.selector);
+                    for (const idx of newIndices) {
+                        const resolved = await resolveLogicalRowIndex(
+                            currentRows[idx],
+                            this.config,
+                            () => allRows.length,
+                        );
+                        const smartRow = this.makeSmartRow(currentRows[idx], map, resolved?.index, this.tableState.currentPageIndex, barrier, resolved?.selector);
 
-                    // findRows skips a still-loading row when no timeout is configured (legacy
-                    // behavior) — see resolveRowLoading's `noTimeoutAction: 'skip'`.
-                    const loadingOutcome = await resolveRowLoading(
-                        smartRow,
-                        this.config.strategies.loading,
-                        'skip',
-                        (msg) => logDebug(this.config, 'verbose', `findRows: ${msg}`),
-                    );
-                    if (loadingOutcome !== 'process') {
-                        barrier?.markFinished();
-                        if (loadingOutcome === 'throw') {
-                            throw new Error(`[SmartTable] Row ${allRows.length} did not finish loading within ${this.config.strategies.loading?.rowLoadingTimeout}ms`);
+                        const loadingOutcome = await resolveRowLoading(
+                            smartRow,
+                            this.config.strategies.loading,
+                            'skip',
+                            (msg) => logDebug(this.config, 'verbose', `findRows: ${msg}`),
+                        );
+                        if (loadingOutcome !== 'process') {
+                            barrier?.markFinished();
+                            if (loadingOutcome === 'throw') {
+                                throw new Error(`[SmartTable] Row ${allRows.length} did not finish loading within ${this.config.strategies.loading?.rowLoadingTimeout}ms`);
+                            }
+                            continue;
                         }
-                        continue; // 'skip'
-                    }
 
-                    if (hasOverrideFilters && !await this.matchesOverrideFilters(currentRows[idx], overrideFilters, map, options?.exact ?? false)) {
-                        barrier?.markFinished();
-                        continue;
-                    }
+                        if (hasOverrideFilters && !await this.matchesOverrideFilters(currentRows[idx], overrideFilters, map, options?.exact ?? false)) {
+                            barrier?.markFinished();
+                            continue;
+                        }
 
-                    if (hasSyntheticFilters && !await this.matchesSyntheticFilters(currentRows[idx], syntheticFilters, map, options?.exact ?? false)) {
-                        barrier?.markFinished();
-                        continue;
-                    }
+                        if (hasSyntheticFilters && !await this.matchesSyntheticFilters(currentRows[idx], syntheticFilters, map, options?.exact ?? false)) {
+                            barrier?.markFinished();
+                            continue;
+                        }
 
-                    allRows.push(smartRow);
-                    added++;
+                        allRows.push(smartRow);
+                        added++;
+                    }
+                    logDebug(this.config, 'verbose',`findRows: page ${this.tableState.currentPageIndex} — ${added} new match(es) (total: ${allRows.length})`);
+                    return 'continue';
+                },
+                {
+                    maxPages: hasPagination ? effectiveMaxPages : 1,
+                    useBulk,
+                    label: 'findRows',
+                    finalScanOnEof: hasPagination,
                 }
-                logDebug(this.config, 'verbose',`findRows: page ${this.tableState.currentPageIndex} — ${added} new match(es) (total: ${allRows.length})`);
-            };
+            );
 
-            // Scan first page
-            await collectMatches();
-
-            // Pagination Loop
-            while (pagesScanned < effectiveMaxPages && this.config.strategies.pagination) {
-                // Default to single-step goNext; bulk is opt-in via useBulkPagination: true (#349).
-                // Bulk-by-default made findRows jump N pages per advance and silently skip the
-                // rows on intermediate pages. When only a bulk primitive exists, _advancePage
-                // still falls back to it.
-                const useBulk = options?.useBulkPagination === true && !!this.config.strategies.pagination?.goNextBulk;
-                const prevPage = this.tableState.currentPageIndex;
-                const didPaginate = await this.advancePage(useBulk);
-                if (!didPaginate) {
-                    logDebug(this.config, 'verbose',`findRows: pagination returned false — final scan`);
-                    await collectMatches();
-                    break;
-                }
-
-                const pagesJumped = this.tableState.currentPageIndex - prevPage;
-                pagesScanned += pagesJumped;
-                logDebug(this.config, 'verbose',`findRows: advanced ${pagesJumped} page(s), now at page ${this.tableState.currentPageIndex}`);
-                await debugDelay(this.config, 'pagination');
-                await collectMatches();
-            }
+            logDebug(this.config, 'verbose',`findRows: done — ${allRows.length} row(s) collected across ${pagesScanned} page(s)`);
         } finally {
             await tracker.cleanup(this.rootLocator.page());
         }
 
-        logDebug(this.config, 'verbose',`findRows: done — ${allRows.length} row(s) collected across ${pagesScanned} page(s)`);
         return createSmartRowArray(allRows);
     }
 
@@ -284,72 +271,73 @@ export class RowFinder<T = any> {
     ): Promise<Locator | null> {
         const map = await this.tableMapper.getMap();
         const effectiveMaxPages = options.maxPages ?? this.config.maxPages;
-        let pagesScanned = 1;
+        const useBulk = options.useBulkPagination === true && !!this.config.strategies.pagination?.goNextBulk;
+        let found: Locator | null = null;
 
         logDebug(this.config, 'verbose',`Looking for row: ${JSON.stringify(filters)} (MaxPages: ${effectiveMaxPages})`);
 
-        while (true) {
-            await this.waitForTableReady();
+        await scanPages(
+            {
+                advancePage: this.advancePage,
+                getCurrentPageIndex: () => this.tableState.currentPageIndex,
+                config: this.config,
+                waitForReady: () => this.waitForTableReady(),
+            },
+            async () => {
+                const allRows = this.resolve(this.config.rowSelector, this.rootLocator);
+                const { domFilters, overrideFilters, syntheticFilters } = this.splitFilters(filters);
+                const hasPostFilters = Object.keys(overrideFilters).length > 0 || Object.keys(syntheticFilters).length > 0;
 
-            const allRows = this.resolve(this.config.rowSelector, this.rootLocator);
-            const { domFilters, overrideFilters, syntheticFilters } = this.splitFilters(filters);
-            const hasPostFilters = Object.keys(overrideFilters).length > 0 || Object.keys(syntheticFilters).length > 0;
-
-            let matchedRows = allRows;
-            if (Object.keys(domFilters).length > 0) {
-                matchedRows = this.filterEngine.applyFilters(
-                    allRows,
-                    domFilters,
-                    map,
-                    options.exact || false,
-                    this.rootLocator.page(),
-                    this.rootLocator
-                );
-            }
-
-            if (!hasPostFilters) {
-                const count = await matchedRows.count();
-                logDebug(this.config, 'verbose',`Page ${this.tableState.currentPageIndex}: Found ${count} matches.`);
-                if (count > 1) await this.throwIfAmbiguous(await matchedRows.all(), filters, map);
-                if (count === 1) return matchedRows.first();
-            } else {
-                const candidates = await matchedRows.all();
-                logDebug(this.config, 'verbose',`Page ${this.tableState.currentPageIndex}: ${candidates.length} DOM candidate(s), post-filtering with override/synthetic columns`);
-                const results = await Promise.all(
-                    candidates.map(async c => {
-                        if (Object.keys(overrideFilters).length > 0 && !await this.matchesOverrideFilters(c, overrideFilters, map, options.exact || false)) return false;
-                        if (Object.keys(syntheticFilters).length > 0 && !await this.matchesSyntheticFilters(c, syntheticFilters, map, options.exact || false)) return false;
-                        return true;
-                    })
-                );
-                const postFilterMatches = candidates.filter((_, i) => results[i]);
-                logDebug(this.config, 'verbose',`Page ${this.tableState.currentPageIndex}: ${postFilterMatches.length} match(es) after post-filter`);
-                if (postFilterMatches.length > 1) await this.throwIfAmbiguous(postFilterMatches, filters, map);
-                if (postFilterMatches.length === 1) return postFilterMatches[0];
-            }
-
-            if (pagesScanned < effectiveMaxPages) {
-                logDebug(this.config, 'verbose',`Page ${this.tableState.currentPageIndex}: Not found. Attempting pagination...`);
-                // Default to single-step goNext; bulk is opt-in via useBulkPagination: true (#349).
-                // Bulk-by-default made findRow jump past the page holding the target row.
-                const useBulk = options.useBulkPagination === true && !!this.config.strategies.pagination?.goNextBulk;
-                const prevPage = this.tableState.currentPageIndex;
-                const didLoadMore = await this.advancePage(useBulk);
-
-                if (didLoadMore) {
-                    const pagesJumped = this.tableState.currentPageIndex - prevPage;
-                    pagesScanned += pagesJumped;
-                    logDebug(this.config, 'verbose', `findRowLocator: advanced ${pagesJumped} page(s), now at page ${this.tableState.currentPageIndex}`);
-                    await debugDelay(this.config, 'pagination');
-                    continue;
-                } else {
-                    logDebug(this.config, 'verbose',`Page ${this.tableState.currentPageIndex}: pagination returned false — final scan`);
-                    pagesScanned = effectiveMaxPages;
-                    continue;
+                let matchedRows = allRows;
+                if (Object.keys(domFilters).length > 0) {
+                    matchedRows = this.filterEngine.applyFilters(
+                        allRows,
+                        domFilters,
+                        map,
+                        options.exact || false,
+                        this.rootLocator.page(),
+                        this.rootLocator
+                    );
                 }
+
+                if (!hasPostFilters) {
+                    const count = await matchedRows.count();
+                    logDebug(this.config, 'verbose',`Page ${this.tableState.currentPageIndex}: Found ${count} matches.`);
+                    if (count > 1) await this.throwIfAmbiguous(await matchedRows.all(), filters, map);
+                    if (count === 1) {
+                        found = matchedRows.first();
+                        return 'stop';
+                    }
+                } else {
+                    const candidates = await matchedRows.all();
+                    logDebug(this.config, 'verbose',`Page ${this.tableState.currentPageIndex}: ${candidates.length} DOM candidate(s), post-filtering with override/synthetic columns`);
+                    const results = await Promise.all(
+                        candidates.map(async c => {
+                            if (Object.keys(overrideFilters).length > 0 && !await this.matchesOverrideFilters(c, overrideFilters, map, options.exact || false)) return false;
+                            if (Object.keys(syntheticFilters).length > 0 && !await this.matchesSyntheticFilters(c, syntheticFilters, map, options.exact || false)) return false;
+                            return true;
+                        })
+                    );
+                    const postFilterMatches = candidates.filter((_, i) => results[i]);
+                    logDebug(this.config, 'verbose',`Page ${this.tableState.currentPageIndex}: ${postFilterMatches.length} match(es) after post-filter`);
+                    if (postFilterMatches.length > 1) await this.throwIfAmbiguous(postFilterMatches, filters, map);
+                    if (postFilterMatches.length === 1) {
+                        found = postFilterMatches[0];
+                        return 'stop';
+                    }
+                }
+
+                return 'continue';
+            },
+            {
+                maxPages: effectiveMaxPages,
+                useBulk,
+                label: 'findRow',
+                finalScanOnEof: true,
             }
-            return null;
-        }
+        );
+
+        return found;
     }
 
     private resolveRowIndex(rowLocator: Locator) {

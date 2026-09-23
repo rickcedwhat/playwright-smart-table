@@ -5,7 +5,7 @@
 Guiding light: [`PHILOSOPHY.md`](PHILOSOPHY.md). Filed from GBU 2026-08-22 (`GBU-REPORT.md`).
 
 - [ ] **Slim `_navigateToCell` / viewport-first** — [#426](https://github.com/rickcedwhat/playwright-smart-table/issues/426)
-- [ ] **Unify pagination/scan loops** — [#427](https://github.com/rickcedwhat/playwright-smart-table/issues/427)
+- [x] **Unify pagination/scan loops** — [#427](https://github.com/rickcedwhat/playwright-smart-table/issues/427)
 - [x] **Public API hygiene (Plugins, `getColumnValues`, dead Strategies)** — [#428](https://github.com/rickcedwhat/playwright-smart-table/issues/428)
 - [x] **FilterEngine + `getCellLocator`; getRow/findRow filter parity** — [#429](https://github.com/rickcedwhat/playwright-smart-table/issues/429)
 - [ ] **scrollToColumn / bringIntoView prefer viewport** — [#430](https://github.com/rickcedwhat/playwright-smart-table/issues/430)

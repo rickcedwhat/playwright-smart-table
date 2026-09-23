@@ -7,6 +7,7 @@ import { logDebug } from '../utils/debugUtils';
 import { NavigationBarrier } from '../utils/navigationBarrier';
 import { Mutex } from '../utils/mutex';
 import { resolveLogicalRowIndex, resolveRowLoading } from './rowResolution';
+import { scanPages } from './scanPages';
 
 export interface TableIterationEnv<T = any> {
   getRowLocators: () => Locator;
@@ -39,6 +40,7 @@ export async function runForEach<T>(
 /**
  * Row iteration for map (and forEach/filter via label).
  * Concurrency: `parallel` | `synchronized` | `sequential` (see RowIterationOptions).
+ * Page walking is owned by {@link scanPages} (#427).
  */
 export async function runMap<T, R>(
   env: TableIterationEnv<T>,
@@ -70,8 +72,6 @@ export async function runMap<T, R>(
     let rowIndex = 0;
     let stopped = false;
     let stoppedIndex = Infinity;
-    let pagesScanned = 1;
-    let reachedEnd = false;
 
     const stop = (idx: number) => {
       if (!stopped) {
@@ -81,163 +81,171 @@ export async function runMap<T, R>(
       }
     };
 
-    while (!stopped) {
-      const rowLocators = env.getRowLocators();
-      const allIndices = await tracker.peekUnseenIndices(rowLocators);
-      const pageRows = await rowLocators.all();
+    const { pagesScanned } = await scanPages(
+      {
+        advancePage: env.advancePage,
+        getCurrentPageIndex: env.getCurrentPageIndex,
+        config: env.config,
+      },
+      async ({ pagesScanned: pageNum, isFinalScan }) => {
+        if (stopped) return 'stop';
 
-      // A2 (#353 part 2 / #357): when the viewport can report which rows are within the visible
-      // bounds, drop overscan rows from collection. They are left uncommitted (still unseen), so
-      // they're picked up on a later page once scrolled into view — preventing overscan from
-      // being ingested (#353) or double-collected via node recycling (#357). No-op when no
-      // viewport reports visible rows.
-      //
-      // #384: overscan rows ABOVE the visible range have already scrolled past and will never
-      // re-enter the viewport — collect them now. Only defer rows BELOW the visible range
-      // (they'll scroll into view on a later page).
-      //
-      // #417 follow-up: skip viewport filtering on the final scan — there are no more pages
-      // to defer to, so collect all remaining unseen rows regardless of visibility.
-      let candidateIndices = allIndices;
-      const getVisibleRowIndices = env.config.strategies.viewport?.getVisibleRowIndices;
-      if (getVisibleRowIndices && !reachedEnd) {
-        const visible = new Set(await getVisibleRowIndices(env.getContext()));
-        const minVisible = visible.size > 0 ? Math.min(...visible) : Infinity;
-        candidateIndices = allIndices.filter(idx => visible.has(idx) || idx < minVisible);
-        if (candidateIndices.length !== allIndices.length) {
-          log(env.config, `${label}: viewport visible filter — ${candidateIndices.length}/${allIndices.length} row(s) in view`);
+        const rowLocators = env.getRowLocators();
+        const allIndices = await tracker.peekUnseenIndices(rowLocators);
+        const pageRows = await rowLocators.all();
+
+        // A2 (#353 part 2 / #357): when the viewport can report which rows are within the visible
+        // bounds, drop overscan rows from collection. They are left uncommitted (still unseen), so
+        // they're picked up on a later page once scrolled into view — preventing overscan from
+        // being ingested (#353) or double-collected via node recycling (#357). No-op when no
+        // viewport reports visible rows.
+        //
+        // #384: overscan rows ABOVE the visible range have already scrolled past and will never
+        // re-enter the viewport — collect them now. Only defer rows BELOW the visible range
+        // (they'll scroll into view on a later page).
+        //
+        // #417 follow-up: skip viewport filtering on the final scan — there are no more pages
+        // to defer to, so collect all remaining unseen rows regardless of visibility.
+        let candidateIndices = allIndices;
+        const getVisibleRowIndices = env.config.strategies.viewport?.getVisibleRowIndices;
+        if (getVisibleRowIndices && !isFinalScan) {
+          const visible = new Set(await getVisibleRowIndices(env.getContext()));
+          const minVisible = visible.size > 0 ? Math.min(...visible) : Infinity;
+          candidateIndices = allIndices.filter(idx => visible.has(idx) || idx < minVisible);
+          if (candidateIndices.length !== allIndices.length) {
+            log(env.config, `${label}: viewport visible filter — ${candidateIndices.length}/${allIndices.length} row(s) in view`);
+          }
         }
-      }
 
-      // In synchronized mode, overscan rows rendered beyond the visible viewport by virtual
-      // scrollers can be evicted when the horizontal barrier fires snapFirstColumnIntoView.
-      // Filter them out before committing so they stay unseen and are picked up on the next page.
-      const newIndices = concurrency === 'synchronized'
-        ? (await Promise.all(
-            candidateIndices.map(async idx => ({ idx, present: pageRows[idx] != null && (await pageRows[idx].count()) > 0 }))
-          )).filter(r => r.present).map(r => r.idx)
-        : candidateIndices;
+        // In synchronized mode, overscan rows rendered beyond the visible viewport by virtual
+        // scrollers can be evicted when the horizontal barrier fires snapFirstColumnIntoView.
+        // Filter them out before committing so they stay unseen and are picked up on the next page.
+        const newIndices = concurrency === 'synchronized'
+          ? (await Promise.all(
+              candidateIndices.map(async idx => ({ idx, present: pageRows[idx] != null && (await pageRows[idx].count()) > 0 }))
+            )).filter(r => r.present).map(r => r.idx)
+          : candidateIndices;
 
-      await tracker.commitIndices(rowLocators, newIndices);
+        await tracker.commitIndices(rowLocators, newIndices);
 
-      const batchSize = newIndices.length;
-      if (batchSize === 0) {
-        log(env.config, `${label}: page ${pagesScanned} — no new row(s) found`);
-      } else {
-        log(env.config, `${label}: scanning page ${pagesScanned} — ${batchSize} new row(s)`);
-        
-        const barrier = useBarrier ? new NavigationBarrier(batchSize) : undefined;
-        const actionMutex = useMutex ? new Mutex() : null;
-        
-        // `index` (ctx.index) is the enumeration counter — the order rows are visited,
-        // contiguous and monotonic. It drives the internal stop()/ordering logic.
-        const positionBase = rowIndex;
-        // B-hybrid (#362): the row's rowIndex is its logical/data-model index when a
-        // resolveRowIndex strategy is configured (so bringIntoView and position math are
-        // correct on virtualized tables); otherwise it equals the enumeration counter.
-        const smartRows = await Promise.all(newIndices.map(async (idx, i) => {
-          const resolved = await resolveLogicalRowIndex(pageRows[idx], env.config, () => positionBase + i);
-          const logicalIndex = resolved?.index ?? (positionBase + i);
-          const sr = env.makeSmartRow(pageRows[idx], map, logicalIndex, env.getCurrentPageIndex(), barrier, resolved?.selector);
-          // Mark as part of an iteration batch so toJSON's #366 re-pin uses rescan-only recovery
-          // (no scroll-back) — scrolling here would disrupt sibling rows' positional locators.
-          (sr as any)._inBatch = true;
-          return sr;
-        }));
+        const batchSize = newIndices.length;
+        if (batchSize === 0) {
+          log(env.config, `${label}: page ${pageNum} — no new row(s) found`);
+        } else {
+          log(env.config, `${label}: scanning page ${pageNum} — ${batchSize} new row(s)`);
 
-        // enumIndex = visit-order counter (ctx.index); row.rowIndex = logical (ctx.rowIndex).
-        const processRow = async (row: SmartRow<T>, enumIndex: number) => {
-          try {
-            if (stopped && enumIndex > stoppedIndex) {
-              return SKIP;
-            }
+          const barrier = useBarrier ? new NavigationBarrier(batchSize) : undefined;
+          const actionMutex = useMutex ? new Mutex() : null;
 
-            // When resolveRowIndex is configured, identical logical indices across pages
-            // indicate the same record (e.g. re-created DOM elements in recycling
-            // virtualizers whose WeakMap entry was GC'd). Skip without processing.
-            if (row.rowIndex !== undefined && seenLogicalIndices.has(row.rowIndex)) {
-              log(env.config, `${label}: skipping duplicate logical row ${row.rowIndex}`);
-              return SKIP;
-            }
+          // `index` (ctx.index) is the enumeration counter — the order rows are visited,
+          // contiguous and monotonic. It drives the internal stop()/ordering logic.
+          const positionBase = rowIndex;
+          // B-hybrid (#362): the row's rowIndex is its logical/data-model index when a
+          // resolveRowIndex strategy is configured (so bringIntoView and position math are
+          // correct on virtualized tables); otherwise it equals the enumeration counter.
+          const smartRows = await Promise.all(newIndices.map(async (idx, i) => {
+            const resolved = await resolveLogicalRowIndex(pageRows[idx], env.config, () => positionBase + i);
+            const logicalIndex = resolved?.index ?? (positionBase + i);
+            const sr = env.makeSmartRow(pageRows[idx], map, logicalIndex, env.getCurrentPageIndex(), barrier, resolved?.selector);
+            // Mark as part of an iteration batch so toJSON's #366 re-pin uses rescan-only recovery
+            // (no scroll-back) — scrolling here would disrupt sibling rows' positional locators.
+            (sr as any)._inBatch = true;
+            return sr;
+          }));
 
-            // Wait for the row to finish loading BEFORE evaluating its dedupe key (Bug #355).
-            // map/forEach/filter process a still-loading row when no timeout is set (unlike
-            // findRows, which skips) — see resolveRowLoading's `noTimeoutAction`.
-            const loadingOutcome = await resolveRowLoading(
-              row,
-              env.config.strategies.loading,
-              'process',
-              (msg) => log(env.config, `${label}: ${msg}`),
-            );
-            if (loadingOutcome === 'skip') return SKIP;
-            if (loadingOutcome === 'throw') {
-              throw new Error(`[SmartTable] Row ${row.rowIndex} did not finish loading within ${env.config.strategies.loading?.rowLoadingTimeout}ms`);
-            }
-
-            let dedupeKey: string | number | undefined;
-            if (dedupeKeys && dedupeStrategy) {
-              dedupeKey = await dedupeStrategy(row);
-              if (dedupeKeys.has(dedupeKey)) {
-                log(env.config, `${label}: dedupe skip key="${dedupeKey}"`);
+          // enumIndex = visit-order counter (ctx.index); row.rowIndex = logical (ctx.rowIndex).
+          const processRow = async (row: SmartRow<T>, enumIndex: number) => {
+            try {
+              if (stopped && enumIndex > stoppedIndex) {
                 return SKIP;
               }
+
+              // When resolveRowIndex is configured, identical logical indices across pages
+              // indicate the same record (e.g. re-created DOM elements in recycling
+              // virtualizers whose WeakMap entry was GC'd). Skip without processing.
+              if (row.rowIndex !== undefined && seenLogicalIndices.has(row.rowIndex)) {
+                log(env.config, `${label}: skipping duplicate logical row ${row.rowIndex}`);
+                return SKIP;
+              }
+
+              // Wait for the row to finish loading BEFORE evaluating its dedupe key (Bug #355).
+              // map/forEach/filter process a still-loading row when no timeout is set (unlike
+              // findRows, which skips) — see resolveRowLoading's `noTimeoutAction`.
+              const loadingOutcome = await resolveRowLoading(
+                row,
+                env.config.strategies.loading,
+                'process',
+                (msg) => log(env.config, `${label}: ${msg}`),
+              );
+              if (loadingOutcome === 'skip') return SKIP;
+              if (loadingOutcome === 'throw') {
+                throw new Error(`[SmartTable] Row ${row.rowIndex} did not finish loading within ${env.config.strategies.loading?.rowLoadingTimeout}ms`);
+              }
+
+              let dedupeKey: string | number | undefined;
+              if (dedupeKeys && dedupeStrategy) {
+                dedupeKey = await dedupeStrategy(row);
+                if (dedupeKeys.has(dedupeKey)) {
+                  log(env.config, `${label}: dedupe skip key="${dedupeKey}"`);
+                  return SKIP;
+                }
+              }
+
+              // Execute callback (optionally serialized via mutex)
+              const runCallback = async () => {
+                if (stopped && enumIndex > stoppedIndex) return SKIP;
+                log(env.config, `${label}: processing row (index ${enumIndex}, rowIndex ${row.rowIndex})`);
+                return await callback({ row, index: enumIndex, rowIndex: row.rowIndex!, pageIndex: env.getCurrentPageIndex(), stop: () => stop(enumIndex) });
+              };
+
+              const result = actionMutex
+                ? await actionMutex.run(runCallback)
+                : await runCallback();
+
+              if (dedupeKeys && dedupeKey !== undefined && result !== SKIP) {
+                dedupeKeys.add(dedupeKey);
+              }
+
+              if (row.rowIndex !== undefined && result !== SKIP) {
+                seenLogicalIndices.add(row.rowIndex);
+              }
+
+              return result;
+            } finally {
+              // Ensure the barrier is notified once per row, even on error or skip.
+              barrier?.markFinished();
             }
+          };
 
-            // Execute callback (optionally serialized via mutex)
-            const runCallback = async () => {
-              if (stopped && enumIndex > stoppedIndex) return SKIP;
-              log(env.config, `${label}: processing row (index ${enumIndex}, rowIndex ${row.rowIndex})`);
-              return await callback({ row, index: enumIndex, rowIndex: row.rowIndex!, pageIndex: env.getCurrentPageIndex(), stop: () => stop(enumIndex) });
-            };
-
-            const result = actionMutex
-              ? await actionMutex.run(runCallback)
-              : await runCallback();
-
-            if (dedupeKeys && dedupeKey !== undefined && result !== SKIP) {
-              dedupeKeys.add(dedupeKey);
+          const pageResults: (R | typeof SKIP)[] = [];
+          if (concurrency === 'sequential') {
+            for (let i = 0; i < smartRows.length; i++) {
+              pageResults.push(await processRow(smartRows[i], positionBase + i));
             }
-
-            if (row.rowIndex !== undefined && result !== SKIP) {
-              seenLogicalIndices.add(row.rowIndex);
-            }
-
-            return result;
-          } finally {
-            // Ensure the barrier is notified once per row, even on error or skip.
-            barrier?.markFinished();
+          } else {
+            const batchResults = await Promise.all(smartRows.map((row, i) => processRow(row, positionBase + i)));
+            pageResults.push(...batchResults);
           }
-        };
 
-        const pageResults: (R | typeof SKIP)[] = [];
-        if (concurrency === 'sequential') {
-          for (let i = 0; i < smartRows.length; i++) {
-            pageResults.push(await processRow(smartRows[i], positionBase + i));
+          for (let i = 0; i < pageResults.length; i++) {
+            if (positionBase + i > stoppedIndex) break;
+            const r = pageResults[i];
+            if (r !== SKIP) results.push(r as R);
           }
-        } else {
-          const results = await Promise.all(smartRows.map((row, i) => processRow(row, positionBase + i)));
-          pageResults.push(...results);
+
+          rowIndex += batchSize;
         }
 
-        for (let i = 0; i < pageResults.length; i++) {
-          if (positionBase + i > stoppedIndex) break;
-          const r = pageResults[i];
-          if (r !== SKIP) results.push(r as R);
-        }
-
-        rowIndex += batchSize;
+        return stopped ? 'stop' : 'continue';
+      },
+      {
+        maxPages: effectiveMaxPages,
+        useBulk,
+        label,
+        finalScanOnEof: true,
       }
+    );
 
-      if (stopped || pagesScanned >= effectiveMaxPages || reachedEnd) break;
-
-      log(env.config, `${label}: advancing to next page (${pagesScanned} → ${pagesScanned + 1})`);
-      if (!await env.advancePage(useBulk)) {
-        log(env.config, `${label}: pagination returned false — final scan`);
-        reachedEnd = true;
-        continue;
-      }
-      pagesScanned++;
-    }
     log(env.config, `${label}: complete — ${results.length} result(s) across ${pagesScanned} page(s)`);
   } finally {
     await tracker.cleanup(env.getPage());
