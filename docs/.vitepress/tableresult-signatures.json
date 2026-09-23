@@ -57,7 +57,7 @@
   {
     "name": "scrollToColumn",
     "signature": "scrollToColumn: (columnName: string) => Promise<void>",
-    "comment": "/**\n* Navigates to a specific column using the configured CellNavigationStrategy.\n*/"
+    "comment": "/**\n* Navigates to a specific column. Prefers `strategies.viewport.scrollToColumn` when\n* configured; otherwise falls back to scrolling the header cell into view.\n*/"
   },
   {
     "name": "countRows",
@@ -72,7 +72,7 @@
   {
     "name": "getColumnValues",
     "signature": "getColumnValues(columnName: string, options?: RowIterationOptions): Promise<string[]>",
-    "comment": "/**\n* Iterates over rows and extracts the value of a single column as strings.\n* @param columnName - The name of the column to extract\n* @param options - Iteration options\n*/"
+    "comment": "/**\n* @deprecated Use `mapColumn` (or `map`) instead. Will be removed in v7.0.0.\n* Iterates over rows and extracts the value of a single column as strings.\n* @param columnName - The name of the column to extract\n* @param options - Iteration options\n*/"
   },
   {
     "name": "reset",
