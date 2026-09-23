@@ -184,10 +184,11 @@ describe('Iteration engine verbose logging', () => {
     expect(loggedMessages.some(m => m.includes('stop() called'))).toBe(true);
   });
 
-  it('runForEach emits "advancing to next page" when multiple pages configured', async () => {
+  it('runForEach emits page-advance verbose log when multiple pages configured', async () => {
     const env = makeEnv([], makeVerboseConfig({ maxPages: 2 } as any), 2);
     await runForEach(env, async () => { });
-    expect(loggedMessages.some(m => m.includes('advancing to next page'))).toBe(true);
+    // scanPages (#427) owns the walk; log shape is "forEach: advanced N page(s), ..."
+    expect(loggedMessages.some(m => m.includes('forEach: advanced') || m.includes('advancing to next page'))).toBe(true);
   });
 
   it('runMap logs no [SmartTable] messages under logLevel "none"', async () => {
