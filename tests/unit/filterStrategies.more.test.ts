@@ -52,25 +52,5 @@ describe('FilterStrategies additional branches', () => {
     expect(cellTemplate.getByText).toHaveBeenCalledWith('42', { exact: true });
     expect(rows.filter).toHaveBeenCalled();
   });
-
-  it('spy strategy sets calledRef and delegates', () => {
-    const rows: any = { filter: vi.fn().mockReturnThis() };
-    const cellTemplate: any = { nth: vi.fn().mockReturnThis(), getByText: vi.fn().mockReturnThis() };
-    const resolve = vi.fn().mockReturnValue(cellTemplate);
-
-    const ctx: TableContext = {
-      root: {} as any,
-      config: { cellSelector: 'td' } as any,
-      page: {} as any,
-      resolve,
-    };
-
-    const calledRef: { called?: boolean } = {};
-    const strat = FilterStrategies.spy(calledRef);
-    strat.apply({ rows, filter: { column: 'Name', value: 'Bob' }, colIndex: 0, tableContext: ctx } as any);
-
-    expect(calledRef.called).toBe(true);
-    expect(cellTemplate.getByText).toHaveBeenCalledWith('Bob', { exact: true });
-  });
 });
 

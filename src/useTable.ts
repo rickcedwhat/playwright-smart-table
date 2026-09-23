@@ -13,7 +13,6 @@ import { TableMapper } from './engine/tableMapper';
 import { RowFinder } from './engine/rowFinder';
 import { runForEach, runMap, runFilter } from './engine/tableIteration';
 import { resolveLogicalRowIndex, normalizeRowIndexResult } from './engine/rowResolution';
-import { ResolutionStrategies } from './strategies/resolution';
 import { debugDelay, logDebug, warnIfDebugInCI } from './utils/debugUtils';
 import { createSmartRowArray, SmartRowArray } from './utils/smartRowArray';
 import { ElementTracker } from './utils/elementTracker';
@@ -446,6 +445,10 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       }, options);
     },
 
+    /**
+     * @deprecated Use `mapColumn` (or `map`) instead. Will be removed in v7.0.0.
+     * Iterates over rows and extracts the value of a single column as strings.
+     */
     getColumnValues: async (columnName: string, options: import('./types').RowIterationOptions = {}): Promise<string[]> => {
       log(`getColumnValues: column="${columnName}" options=${safeStringify(options)}`);
       const values = await result.mapColumn<unknown>(columnName, options);
