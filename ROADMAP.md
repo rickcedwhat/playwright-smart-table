@@ -37,7 +37,7 @@ Related closed work to reopen/extend when picking these up: [#327](https://githu
     - **Also adds**: Public `[Symbol.asyncIterator]` on `TableResult` — enables `for await (const { row } of table)`.
     - **Deprecates**:
       - `iterateThroughTable` (use `forEach`/`map`/`filter` instead).
-      - `getColumnValues` (use `map` instead) — **still present on `TableResult` without `@deprecated`; track removal in [#428](https://github.com/rickcedwhat/playwright-smart-table/issues/428)**.
+      - `getColumnValues` (use `map` instead) — its deprecation is documented; removal remains planned for v7.0.0.
  - [x] **Document `forEach`/`map`/`filter` in README**
  - [x] **JSDoc `@note` on `map`'s `concurrency: 'parallel'` default**
  - [x] **Add mutation testing (Stryker)**

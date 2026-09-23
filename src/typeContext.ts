@@ -914,8 +914,7 @@ export interface TableResult<T = any> extends AsyncIterable<{ row: SmartRow<T>; 
   ) => Promise<SmartRowArray<T>>;
 
   /**
-   * Navigates to a specific column. Prefers \`strategies.viewport.scrollToColumn\` when
-   * configured; otherwise falls back to scrolling the header cell into view.
+   * Resolves the named column and scrolls its header cell into view.
    */
   scrollToColumn: (columnName: string) => Promise<void>;
 
