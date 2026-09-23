@@ -245,6 +245,56 @@ test.describe('filter', () => {
 
 // ─── Async iterator ──────────────────────────────────────────────────────────
 test.describe('async iterator [Symbol.asyncIterator]', () => {
+    async function makeTwoPageTable(page: import('@playwright/test').Page) {
+        await page.setContent('<table id="tbl"><thead><tr><th>ID</th></tr></thead><tbody><tr><td>1</td></tr></tbody></table>');
+        let advances = 0;
+        const table = useTable(page.locator('#tbl'), {
+            maxPages: 2,
+            strategies: {
+                pagination: {
+                    goNext: async () => {
+                        advances++;
+                        await page.locator('#tbl tbody').evaluate(tbody => {
+                            tbody.innerHTML = '<tr><td>2</td></tr>';
+                        });
+                        return true;
+                    },
+                },
+            },
+        });
+        return { table, getAdvances: () => advances };
+    }
+
+    test('waits for the next-item request before advancing to page two', async ({ page }) => {
+        const { table, getAdvances } = await makeTwoPageTable(page);
+        const iterator = table[Symbol.asyncIterator]();
+
+        const first = await iterator.next();
+        expect(first.done).toBe(false);
+        expect(await first.value.row.getCell('ID').innerText()).toBe('1');
+        await page.waitForTimeout(100);
+        expect(getAdvances()).toBe(0);
+        expect(table.currentPageIndex).toBe(0);
+
+        const second = await iterator.next();
+        expect(second.done).toBe(false);
+        expect(await second.value.row.getCell('ID').innerText()).toBe('2');
+        expect(getAdvances()).toBe(1);
+        expect(table.currentPageIndex).toBe(1);
+        expect((await iterator.next()).done).toBe(true);
+    });
+
+    test('does not advance after breaking on the first row', async ({ page }) => {
+        const { table, getAdvances } = await makeTwoPageTable(page);
+        for await (const { row } of table) {
+            expect(await row.getCell('ID').innerText()).toBe('1');
+            break;
+        }
+
+        expect(getAdvances()).toBe(0);
+        expect(table.currentPageIndex).toBe(0);
+    });
+
     test('for await...of iterates all rows across pages', async ({ page }) => {
         await page.setContent(TABLE_HTML);
         const table = makeTable(page);

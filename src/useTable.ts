@@ -690,7 +690,9 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       type Item = { row: SmartRowType<T>; index: number; rowIndex: number; pageIndex: number };
       const queue: Item[] = [];
       let notify: (() => void) | undefined;
+      let release: (() => void) | undefined;
       let finished = false;
+      let cancelled = false;
       let runError: unknown;
 
       const wake = () => {
@@ -718,6 +720,8 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
             pageIndex: ctx.pageIndex,
           });
           wake();
+          await new Promise<void>((resolve) => { release = resolve; });
+          if (cancelled) ctx.stop();
         },
         { concurrency: 'sequential' },
         'iterator'
@@ -733,10 +737,14 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
           }
           while (queue.length > 0) {
             yield queue.shift()!;
+            release?.();
+            release = undefined;
           }
           if (runError) throw runError;
         }
       } finally {
+        cancelled = true;
+        release?.();
         await runPromise.catch(() => {});
       }
     },
