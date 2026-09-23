@@ -143,8 +143,8 @@ export function createGlide(options: GlideOptions = {}): Partial<TableConfig> {
 
 /**
  * Full preset for Glide Data Grid (selectors + default strategies only).
- * Spread: useTable(loc, { ...Plugins.Glide, maxPages: 5 }).
- * Strategies only (including fillSimple): useTable(loc, { rowSelector: '...', strategies: Plugins.Glide.Strategies }).
+ * Spread: `useTable(loc, { ...presets.glide, maxPages: 5 })`.
+ * Strategies only (including fillSimple): `useTable(loc, { rowSelector: '...', strategies: presets.glide.Strategies })`.
  * For a non-64-column grid, use `createGlide({ columnCount })` instead.
  */
 const GlidePreset: Partial<TableConfig> = {

@@ -109,7 +109,7 @@ const rdgNavigation = {
     }
 };
 
-/** Default strategies for the RDG preset (used when you spread Plugins.RDG). */
+/** Default strategies for the RDG preset (used when you spread `presets.rdg`). */
 const RDGDefaultStrategies = {
     header: scrollRightHeaderRDG,
     getCellLocator: rdgGetCellLocator,
@@ -117,14 +117,14 @@ const RDGDefaultStrategies = {
     pagination: rdgPaginationStrategy
 };
 
-/** Full strategies for React Data Grid. Use when you want to supply your own selectors: strategies: Plugins.RDG.Strategies */
+/** Full strategies for React Data Grid. Use when you want to supply your own selectors: `strategies: presets.rdg.Strategies` */
 // fallow-ignore-next-line unused-export
 export const RDGStrategies = RDGDefaultStrategies;
 
 /**
  * Full preset for React Data Grid (selectors + default strategies).
- * Spread: useTable(loc, { ...Plugins.RDG, maxPages: 5 }).
- * Strategies only: useTable(loc, { rowSelector: '...', strategies: Plugins.RDG.Strategies }).
+ * Spread: `useTable(loc, { ...presets.rdg, maxPages: 5 })`.
+ * Strategies only: `useTable(loc, { rowSelector: '...', strategies: presets.rdg.Strategies })`.
  */
 const RDGPreset: Partial<TableConfig> = {
     rowSelector: '[role="row"].rdg-row',

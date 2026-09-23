@@ -508,6 +508,7 @@ export interface ColumnOverride<TValue = any> {
 }
 
 export type { HeaderStrategy } from './strategies/headers';
+export type { NavigationPrimitives, CellNavigationStrategy } from './strategies/columns';
 
 /**
  * Strategy to resolve column names (string or regex) to their index.
@@ -732,6 +733,9 @@ export interface TableConfig<T = any> {
   emptyState?: Locator;
 }
 
+/**
+ * @internal Resolved config after defaults are applied. Prefer {@link TableConfig} in public code.
+ */
 export interface FinalTableConfig<T = any> extends TableConfig<T> {
   headerSelector: string | ((root: Locator) => Locator);
   rowSelector: string;
@@ -910,7 +914,7 @@ export interface TableResult<T = any> extends AsyncIterable<{ row: SmartRow<T>; 
   ) => Promise<SmartRowArray<T>>;
 
   /**
-   * Navigates to a specific column using the configured CellNavigationStrategy.
+   * Resolves the named column and scrolls its header cell into view.
    */
   scrollToColumn: (columnName: string) => Promise<void>;
 
@@ -930,6 +934,7 @@ export interface TableResult<T = any> extends AsyncIterable<{ row: SmartRow<T>; 
   mapColumn<R = string>(columnName: string, options?: RowIterationOptions): Promise<R[]>;
 
   /**
+   * @deprecated Use \`mapColumn\` (or \`map\`) instead. Will be removed in v7.0.0.
    * Iterates over rows and extracts the value of a single column as strings.
    * @param columnName - The name of the column to extract
    * @param options - Iteration options

@@ -6,7 +6,7 @@ Guiding light: [`PHILOSOPHY.md`](PHILOSOPHY.md). Filed from GBU 2026-08-22 (`GBU
 
 - [ ] **Slim `_navigateToCell` / viewport-first** — [#426](https://github.com/rickcedwhat/playwright-smart-table/issues/426)
 - [ ] **Unify pagination/scan loops** — [#427](https://github.com/rickcedwhat/playwright-smart-table/issues/427)
-- [ ] **Public API hygiene (Plugins, `getColumnValues`, dead Strategies)** — [#428](https://github.com/rickcedwhat/playwright-smart-table/issues/428)
+- [x] **Public API hygiene (Plugins, `getColumnValues`, dead Strategies)** — [#428](https://github.com/rickcedwhat/playwright-smart-table/issues/428)
 - [x] **FilterEngine + `getCellLocator`; getRow/findRow filter parity** — [#429](https://github.com/rickcedwhat/playwright-smart-table/issues/429)
 - [ ] **scrollToColumn / bringIntoView prefer viewport** — [#430](https://github.com/rickcedwhat/playwright-smart-table/issues/430)
 - [ ] **No framework CSS defaults in generic strategies** — [#431](https://github.com/rickcedwhat/playwright-smart-table/issues/431)
@@ -37,7 +37,7 @@ Related closed work to reopen/extend when picking these up: [#327](https://githu
     - **Also adds**: Public `[Symbol.asyncIterator]` on `TableResult` — enables `for await (const { row } of table)`.
     - **Deprecates**:
       - `iterateThroughTable` (use `forEach`/`map`/`filter` instead).
-      - `getColumnValues` (use `map` instead) — **still present on `TableResult` without `@deprecated`; track removal in [#428](https://github.com/rickcedwhat/playwright-smart-table/issues/428)**.
+      - `getColumnValues` (use `map` instead) — its deprecation is documented; removal remains planned for v7.0.0.
  - [x] **Document `forEach`/`map`/`filter` in README**
  - [x] **JSDoc `@note` on `map`'s `concurrency: 'parallel'` default**
  - [x] **Add mutation testing (Stryker)**

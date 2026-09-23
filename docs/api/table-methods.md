@@ -446,6 +446,8 @@ const counts = await table.mapColumn<number>('Count');
 
 ### `getColumnValues`
 
+> **Deprecated** — use [`mapColumn`](#mapcolumn) (or `map`) instead. Will be removed in v7.0.0.
+
 <!-- api-signature: getColumnValues -->
 
 ### Signature
@@ -464,7 +466,10 @@ getColumnValues(columnName: string, options?: RowIterationOptions): Promise<stri
 Extracts all values for a single column as strings. Convenience wrapper around `mapColumn`.
 
 ```typescript
-const names = await table.getColumnValues('Name');
+// Preferred:
+const names = await table.mapColumn('Name');
+// Deprecated:
+const namesLegacy = await table.getColumnValues('Name');
 ```
 
 ---

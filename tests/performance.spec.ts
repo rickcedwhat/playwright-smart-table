@@ -33,6 +33,10 @@ test.describe('Performance Benchmark', () => {
     });
 
     test('should iterate 10,000 virtualized rows in a performant manner', async ({ page }) => {
+        // Playwright default timeout equals the performance budget below; under CI load the
+        // runner can kill the test mid-scroll before `duration < 30000` is evaluated. Give the
+        // runner headroom so the assertion (not the harness timeout) is the gate. (#428 CI flake)
+        test.setTimeout(90_000);
 
         await setPlaygroundConfig(page, {
             rowCount: 10000,

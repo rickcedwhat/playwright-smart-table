@@ -1,9 +1,7 @@
 import { PaginationStrategies } from './pagination';
 import { SortingStrategies } from './sorting';
-import { CellNavigationStrategies } from './columns';
 import { HeaderStrategies } from './headers';
 import { FillStrategies } from './fill';
-import { ResolutionStrategies } from './resolution';
 import { DedupeStrategies } from './dedupe';
 import { LoadingStrategies } from './loading';
 import { StabilizationStrategies } from './stabilization';
@@ -16,7 +14,8 @@ export * from './sorting';
 export * from './columns';
 export * from './headers';
 export * from './fill';
-export * from './resolution';
+// ColumnResolutionStrategy type only — ResolutionStrategies factory is unused in core (#428)
+export type { ColumnResolutionStrategy } from './resolution';
 export * from './dedupe';
 export * from './loading';
 export * from './stabilization';
@@ -24,13 +23,17 @@ export * from './filter';
 export * from './viewport';
 export * from './contentReady';
 
+/**
+ * Built-in strategy factories.
+ * @note `CellNavigation` / `Resolution` removed from this namespace in #428 (dead/no-op).
+ * Use `strategies.navigation` (NavigationPrimitives) and header maps instead.
+ * `Filter.spy` was test-only and is no longer shipped.
+ */
 export const Strategies = {
     Pagination: PaginationStrategies,
     Sorting: SortingStrategies,
-    CellNavigation: CellNavigationStrategies,
     Header: HeaderStrategies,
     Fill: FillStrategies,
-    Resolution: ResolutionStrategies,
     Dedupe: DedupeStrategies,
     Loading: LoadingStrategies,
     Stabilization: StabilizationStrategies,

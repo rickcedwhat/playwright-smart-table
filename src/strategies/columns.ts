@@ -38,7 +38,8 @@ export interface NavigationPrimitives {
 }
 
 /**
- * @deprecated Use NavigationPrimitives instead. This will be removed in a future version.
+ * @deprecated Use NavigationPrimitives (`strategies.navigation`) instead. Removed from
+ * the public `Strategies` namespace in #428; this type remains for transitional typings.
  * Defines the contract for a cell navigation strategy.
  */
 // fallow-ignore-next-line unused-type
@@ -49,12 +50,3 @@ export type CellNavigationStrategy = (context: StrategyContext & {
     activeCell?: { rowIndex: number; columnIndex: number; locator: Locator } | null;
 }) => Promise<void>;
 
-export const CellNavigationStrategies = {
-    /**
-     * Default strategy: Assumes column is accessible or standard scrolling works.
-     * No specific action taken other than what Playwright's default locator handling does.
-     */
-    default: async () => {
-        // No-op
-    }
-};
