@@ -13,6 +13,7 @@ import { TableMapper } from './engine/tableMapper';
 import { RowFinder } from './engine/rowFinder';
 import { runForEach, runMap, runFilter } from './engine/tableIteration';
 import { resolveLogicalRowIndex, normalizeRowIndexResult } from './engine/rowResolution';
+import { scanPages } from './engine/scanPages';
 import { debugDelay, logDebug, warnIfDebugInCI } from './utils/debugUtils';
 import { createSmartRowArray, SmartRowArray } from './utils/smartRowArray';
 import { ElementTracker } from './utils/elementTracker';
@@ -392,17 +393,37 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       let pagesScanned = 1;
       let paginationError: unknown;
       try {
-        while (true) {
-          const rowLocators = resolveRows();
-          const newIndices = await tracker.getUnseenIndices(rowLocators);
-          const candidates = await rowLocators.all();
-          const matched = await countPostFilterMatches(candidates, newIndices);
-          total += matched;
-          log(`countRows: page ${pagesScanned} — ${matched} row(s) (running total: ${total})`);
-          if (pagesScanned >= effectiveMaxPages) break;
-          if (!await _advancePage(false)) break;
-          pagesScanned++;
-        }
+        const scanned = await scanPages(
+          {
+            advancePage: _advancePage,
+            getCurrentPageIndex: () => tableState.currentPageIndex,
+            config,
+            waitForReady: async () => {
+              if (!isTableLoading) return;
+              const ctx = createStrategyContext();
+              while (await isTableLoading(ctx)) {
+                log('countRows: table is loading... waiting');
+                await rootLocator.page().waitForTimeout(200);
+              }
+            },
+          },
+          async ({ pagesScanned: pageNum }) => {
+            const rowLocators = resolveRows();
+            const newIndices = await tracker.getUnseenIndices(rowLocators);
+            const candidates = await rowLocators.all();
+            const matched = await countPostFilterMatches(candidates, newIndices);
+            total += matched;
+            log(`countRows: page ${pageNum} — ${matched} row(s) (running total: ${total})`);
+            return 'continue';
+          },
+          {
+            maxPages: effectiveMaxPages,
+            useBulk: false,
+            label: 'countRows',
+            finalScanOnEof: true,
+          }
+        );
+        pagesScanned = scanned.pagesScanned;
       } catch (e) {
         paginationError = e;
         throw e;
@@ -657,43 +678,74 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
 
     // ─── Shared async row iterator ───────────────────────────────────────────
 
+    /**
+     * Streams rows using the same page-walk + collection path as `map` / `forEach`
+     * (`scanPages` + runMap): overscan filtering, loading-before-dedupe, EOF final
+     * scan, and config dedupe. Concurrency is sequential so yields stay ordered. (#427)
+     */
     async *[Symbol.asyncIterator](): AsyncIterableIterator<{ row: SmartRowType<T>; index: number; rowIndex: number; pageIndex: number }> {
       await _autoInit();
-      const map = tableMapper.getMapSync()!;
-      const effectiveMaxPages = config.maxPages;
-      const tracker = new ElementTracker('iterator');
-      const useBulk = false; // iterator has no options; default goNext
+      log(`iterator: starting via runMap (maxPages=${config.maxPages})`);
 
-      log(`iterator: starting (maxPages=${effectiveMaxPages})`);
+      type Item = { row: SmartRowType<T>; index: number; rowIndex: number; pageIndex: number };
+      const queue: Item[] = [];
+      let notify: (() => void) | undefined;
+      let release: (() => void) | undefined;
+      let finished = false;
+      let cancelled = false;
+      let runError: unknown;
+
+      const wake = () => {
+        notify?.();
+        notify = undefined;
+      };
+
+      const runPromise = runMap(
+        {
+          getRowLocators: () => resolve(config.rowSelector, rootLocator),
+          getMap: () => tableMapper.getMapSync()!,
+          advancePage: _advancePage,
+          makeSmartRow: (loc, map, idx, pageIdx, barrier, sel) => _makeSmart(loc, map, idx, pageIdx, barrier, sel),
+          createSmartRowArray,
+          config,
+          getPage: () => rootLocator.page(),
+          getCurrentPageIndex: () => tableState.currentPageIndex,
+          getContext: () => createStrategyContext(),
+        },
+        async (ctx) => {
+          queue.push({
+            row: ctx.row,
+            index: ctx.index,
+            rowIndex: ctx.rowIndex,
+            pageIndex: ctx.pageIndex,
+          });
+          wake();
+          await new Promise<void>((resolve) => { release = resolve; });
+          if (cancelled) ctx.stop();
+        },
+        { concurrency: 'sequential' },
+        'iterator'
+      ).then(
+        () => { finished = true; wake(); },
+        (err) => { runError = err; finished = true; wake(); }
+      );
 
       try {
-        let rowIndex = 0;
-        let pagesScanned = 1;
-
-        while (true) {
-          const rowLocators = resolve(config.rowSelector, rootLocator);
-          const newIndices = await tracker.getUnseenIndices(rowLocators);
-          const pageRows = await rowLocators.all();
-          const barrier = new NavigationBarrier(newIndices.length);
-
-          for (const idx of newIndices) {
-            // index = visit-order counter; rowIndex = logical/data index (B-hybrid, #362).
-            const resolved = await resolveLogicalRowIndex(pageRows[idx], config, () => rowIndex);
-            const logical = resolved?.index ?? rowIndex;
-            const sr = _makeSmart(pageRows[idx], map, logical, tableState.currentPageIndex, barrier, resolved?.selector);
-            // Iterator rows share one per-page DOM snapshot (positional locators); disable
-            // toJSON's scroll-back recovery so reading one row can't invalidate the others (#366).
-            (sr as any)._inBatch = true;
-            yield { row: sr, index: rowIndex, rowIndex: logical, pageIndex: tableState.currentPageIndex };
-            rowIndex++;
+        while (!finished || queue.length > 0) {
+          if (queue.length === 0) {
+            await new Promise<void>((resolve) => { notify = resolve; });
           }
-
-          if (pagesScanned >= effectiveMaxPages) break;
-          if (!await _advancePage(useBulk)) break;
-          pagesScanned++;
+          while (queue.length > 0) {
+            yield queue.shift()!;
+            release?.();
+            release = undefined;
+          }
+          if (runError) throw runError;
         }
       } finally {
-        await tracker.cleanup(rootLocator.page());
+        cancelled = true;
+        release?.();
+        await runPromise.catch(() => {});
       }
     },
 

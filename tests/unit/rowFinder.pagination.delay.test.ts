@@ -1,8 +1,7 @@
 /**
- * Verifies that debugDelay is called with the 'pagination' action type after
- * each successful page advance in RowFinder.findRows and findRowLocator (via
- * findRow). Kept in its own file so we can mock debugUtils without affecting
- * tests that exercise the real debugDelay implementation.
+ * Verifies that pagination slow-mode delay fires after each successful page advance.
+ * Delay is owned by the `advancePage` primitive (mirrors `useTable._advancePage`);
+ * RowFinder walks pages via `scanPages` (#427) and must not double-delay.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Locator, Page } from '@playwright/test';
@@ -78,7 +77,7 @@ function makeRowFinder(config: FinalTableConfig) {
 
   const tableState = { currentPageIndex: 0 };
 
-  // Mirror _advancePage from useTable.ts so tests that configure goNext/goNextBulk work correctly
+  // Mirror useTable._advancePage — including pagination debugDelay (#427: delay lives here).
   const advancePage = async (useBulk: boolean): Promise<boolean> => {
     const pagination = config.strategies.pagination;
     const fakeContext = { root: rootLocator, config, page: rootLocator.page(), resolve: (_: any, p: any) => p } as any;
@@ -93,7 +92,10 @@ function makeRowFinder(config: FinalTableConfig) {
       return false;
     }
     const did = typeof rawResult === 'number' ? rawResult > 0 : !!rawResult;
-    if (did) tableState.currentPageIndex += typeof rawResult === 'number' ? rawResult : 1;
+    if (did) {
+      tableState.currentPageIndex += typeof rawResult === 'number' ? rawResult : 1;
+      await debugUtils.debugDelay(config, 'pagination');
+    }
     return did;
   };
 
@@ -109,7 +111,7 @@ function makeRowFinder(config: FinalTableConfig) {
   );
 }
 
-describe('RowFinder pagination delay call sites', () => {
+describe('RowFinder pagination delay via advancePage (#427)', () => {
   beforeEach(() => {
     debugDelaySpy.mockClear();
   });
@@ -118,9 +120,7 @@ describe('RowFinder pagination delay call sites', () => {
     vi.restoreAllMocks();
   });
 
-  // ─── findRows ──────────────────────────────────────────────────────────────
-
-  it('findRows calls debugDelay("pagination") once per page advance', async () => {
+  it('findRows triggers debugDelay("pagination") once per page advance', async () => {
     let advances = 0;
     const config = makeConfig({
       strategies: {
@@ -136,7 +136,7 @@ describe('RowFinder pagination delay call sites', () => {
     expect(calls.length).toBe(1);
   });
 
-  it('findRows calls debugDelay("pagination") for each of multiple page advances', async () => {
+  it('findRows triggers debugDelay("pagination") for each of multiple page advances', async () => {
     let advances = 0;
     const config = makeConfig({
       maxPages: 4,
@@ -153,7 +153,7 @@ describe('RowFinder pagination delay call sites', () => {
     expect(calls.length).toBe(2);
   });
 
-  it('findRows does not call debugDelay("pagination") when no pagination strategy', async () => {
+  it('findRows does not trigger pagination delay when no pagination strategy', async () => {
     const config = makeConfig({ strategies: {} as TableStrategies });
     await makeRowFinder(config).findRows({});
 
@@ -161,9 +161,7 @@ describe('RowFinder pagination delay call sites', () => {
     expect(calls.length).toBe(0);
   });
 
-  // ─── findRow (exercises findRowLocator) ────────────────────────────────────
-
-  it('findRow calls debugDelay("pagination") once when row not found after one page advance', async () => {
+  it('findRow triggers debugDelay("pagination") once when row not found after one page advance', async () => {
     let advances = 0;
     const config = makeConfig({
       strategies: {
@@ -179,7 +177,7 @@ describe('RowFinder pagination delay call sites', () => {
     expect(calls.length).toBe(1);
   });
 
-  it('findRow calls debugDelay("pagination") for each of multiple page advances', async () => {
+  it('findRow triggers debugDelay("pagination") for each of multiple page advances', async () => {
     let advances = 0;
     const config = makeConfig({
       maxPages: 4,
@@ -196,7 +194,7 @@ describe('RowFinder pagination delay call sites', () => {
     expect(calls.length).toBe(2);
   });
 
-  it('findRow does not call debugDelay("pagination") when no pagination strategy', async () => {
+  it('findRow does not trigger pagination delay when no pagination strategy', async () => {
     const config = makeConfig({ strategies: {} as TableStrategies });
     await makeRowFinder(config).findRow({});
 

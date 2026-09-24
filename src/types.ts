@@ -807,6 +807,11 @@ export type RowIterationOptions = {
   useBulkPagination?: boolean;
 };
 
+/**
+ * Result of {@link useTable}. Implements `AsyncIterable` — `for await (const { row } of table)`
+ * uses the same page-walk as `map` / `forEach` (`scanPages` + runMap): overscan, loading,
+ * dedupe, and EOF final scan (#427).
+ */
 export interface TableResult<T = any> extends AsyncIterable<{ row: SmartRow<T>; rowIndex: number; index: number; pageIndex: number }> {
   /**
    * Represents the current page index of the table's DOM.
