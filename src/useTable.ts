@@ -160,11 +160,11 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
   let finalTable: TableResult<T> = null as unknown as TableResult<T>;
 
   // Helper factory
-  const _makeSmart = (rowLocator: Locator, map: Map<string, number>, rowIndex?: number, tablePageIndex?: number, barrier?: NavigationBarrier, rowSelector?: string): SmartRowType => {
+  const _makeSmart = (rowLocator: Locator, map: Map<string, number>, rowIndex?: number, tablePageIndex?: number, barrier?: NavigationBarrier, rowSelector?: string, renderWindowPosition = false): SmartRowType => {
     const effectiveLocator = rowSelector
       ? rootLocator.locator(rowSelector)
       : rowLocator;
-    const sr = createSmartRow<T>(effectiveLocator, map, rowIndex, config, rootLocator, resolve, finalTable, tablePageIndex, barrier);
+    const sr = createSmartRow<T>(effectiveLocator, map, rowIndex, config, rootLocator, resolve, finalTable, tablePageIndex, barrier, renderWindowPosition);
     if (rowSelector) (sr as any)._selfHealing = true;
     return sr;
   };
@@ -546,7 +546,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       if (!map) throw new Error('Initialization Error: You attempted to access a row before the table structure was mapped. Please call "await table.init()" once before using synchronous row access.');
 
       const rowLocator = resolve(config.rowSelector, rootLocator).nth(index);
-      return _makeSmart(rowLocator, map, index);
+      return _makeSmart(rowLocator, map, index, undefined, undefined, undefined, true);
     },
 
     findRowByIndex: async (index: number, options?: { maxPages?: number }): Promise<SmartRowType<T>> => {

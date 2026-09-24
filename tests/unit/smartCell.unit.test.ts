@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import { errors } from '@playwright/test';
 import createSmartRow from '../../src/smartRow';
 import { FinalTableConfig } from '../../src/types';
 
@@ -171,6 +172,88 @@ describe('SmartCell', () => {
             const row = createSmartRow(loc, map, 0, config, loc, (_sel, parent) => loc as any, null);
             await expect(row.getValue('FarRight')).resolves.toBe('hidden-value');
             expect(scrollToColumn).toHaveBeenCalledWith(expect.anything(), 5);
+        });
+
+        it('navigates to an off-screen cell before calling its read override', async () => {
+            let attached = false;
+            const loc = makeMockLocator({
+                count: vi.fn().mockImplementation(async () => Number(attached)),
+                innerText: vi.fn().mockResolvedValue('cell-value'),
+            });
+            const scrollToColumn = vi.fn().mockImplementation(async () => { attached = true; });
+            const read = vi.fn(async (cell) => cell.innerText());
+            const config = makeConfig({
+                columnOverrides: { FarRight: { read } },
+                strategies: { viewport: {
+                    getVisibleColumnRange: vi.fn().mockResolvedValue({ first: 0, last: 1 }),
+                    scrollToColumn,
+                } },
+            });
+            const row = createSmartRow(loc, new Map([['FarRight', 5]]), 0, config, loc, () => loc as any, null);
+
+            await expect(row.getValue('FarRight')).resolves.toBe('cell-value');
+            expect(scrollToColumn).toHaveBeenCalledWith(expect.anything(), 5);
+            expect(read).toHaveBeenCalledWith(loc, expect.anything());
+        });
+
+        it('reads an attached cell when navigation has no row index', async () => {
+            const loc = makeMockLocator({ innerText: vi.fn().mockResolvedValue('Alice') });
+            const goRight = vi.fn();
+            const config = makeConfig({ strategies: { navigation: { goRight } } });
+            const row = createSmartRow(loc, new Map([['Name', 0]]), undefined, config, loc, () => loc as any, null);
+
+            await expect(row.getValue('Name')).resolves.toBe('Alice');
+            expect(goRight).not.toHaveBeenCalled();
+        });
+
+        it('requires a row index when navigation must reach a missing cell', async () => {
+            const loc = makeMockLocator({ count: vi.fn().mockResolvedValue(0) });
+            const config = makeConfig({ strategies: { navigation: { goRight: vi.fn() } } });
+            const row = createSmartRow(loc, new Map([['Name', 0]]), undefined, config, loc, () => loc as any, null);
+
+            await expect(row.getValue('Name')).rejects.toThrow('Row index is required for navigation');
+        });
+
+        it('waits for a visible-column cell to attach before scrolling', async () => {
+            let attached = false;
+            const loc = makeMockLocator({
+                count: vi.fn().mockImplementation(async () => Number(attached)),
+                waitFor: vi.fn().mockImplementation(async () => { attached = true; }),
+                innerText: vi.fn().mockResolvedValue('delayed'),
+            });
+            const scrollToColumn = vi.fn();
+            const config = makeConfig({ strategies: {
+                viewport: {
+                    getVisibleColumnRange: vi.fn().mockResolvedValue({ first: 0, last: 0 }),
+                    scrollToColumn,
+                },
+            } });
+            const row = createSmartRow(loc, new Map([['Name', 0]]), 0, config, loc, () => loc as any, null);
+
+            await expect(row.getValue('Name')).resolves.toBe('delayed');
+            expect(loc.waitFor).toHaveBeenCalledWith({ state: 'attached', timeout: 500 });
+            expect(scrollToColumn).not.toHaveBeenCalled();
+        });
+
+        it('passes a lazy cell locator to a row-derived override without a DOM cell', async () => {
+            const loc = makeMockLocator({
+                count: vi.fn().mockResolvedValue(0),
+                waitFor: vi.fn().mockRejectedValue(new errors.TimeoutError('timeout')),
+                evaluate: vi.fn().mockResolvedValue('row-42'),
+            });
+            const read = vi.fn(async (_cell, { row }) => row.evaluate(() => 'row-42'));
+            const config = makeConfig({
+                columnOverrides: { Identity: { read } },
+                strategies: { viewport: {
+                    getVisibleColumnRange: vi.fn().mockResolvedValue({ first: 0, last: 1 }),
+                    scrollToColumn: vi.fn(),
+                } },
+            });
+            const row = createSmartRow(loc, new Map([['Identity', 1]]), 0, config, loc, () => loc as any, null);
+
+            await expect(row.getValue('Identity')).resolves.toBe('row-42');
+            expect(read).toHaveBeenCalledWith(loc, expect.objectContaining({ row, columnIndex: 1 }));
+            expect(loc.innerText).not.toHaveBeenCalled();
         });
     });
 

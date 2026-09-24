@@ -72,4 +72,28 @@ test.describe('columnOverrides > read context (#365)', () => {
         const result = (await table.getRowByIndex(0).toJSON()) as Record<string, string>;
         expect(result.Name).toBe('ALPHA');
     });
+
+    test('row-derived read works for a header without a DOM cell', async ({ page }) => {
+        await page.setContent(`
+            <table id="t">
+                <thead><tr><th>Name</th><th>Identity</th></tr></thead>
+                <tbody><tr data-uid="row-42"><td>Alpha</td></tr></tbody>
+            </table>
+        `);
+        const table = await useTable(page.locator('#t'), {
+            columnOverrides: {
+                Identity: { read: async (_cell, { row }) => row.getAttribute('data-uid') },
+            },
+            strategies: {
+                viewport: {
+                    getVisibleColumnRange: async () => ({ first: 0, last: 1 }),
+                    scrollToColumn: async () => {},
+                },
+            },
+        }).init();
+        const row = table.getRowByIndex(0);
+
+        expect(await row.getValue('Identity')).toBe('row-42');
+        expect((await row.toJSON() as Record<string, string>).Identity).toBe('row-42');
+    });
 });

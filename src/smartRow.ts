@@ -1,6 +1,6 @@
-import type { Locator, Page } from '@playwright/test';
+import { errors, type Locator, type Page } from '@playwright/test';
 import { SmartRow as SmartRowType, FillOptions, FinalTableConfig, TableResult, SmartCell } from './types';
-import { normalizeRowIndexResult } from './engine/rowResolution';
+import { normalizeRowIndexResult, resolveLogicalRowIndex } from './engine/rowResolution';
 import { FillStrategies } from './strategies/fill';
 import { buildColumnNotFoundError } from './utils/stringUtils';
 import { debugDelay, logDebug } from './utils/debugUtils';
@@ -32,8 +32,9 @@ const _navigateToCell = async (params: {
     rowLocator: Locator;
     rowIndex?: number;
     barrier?: NavigationBarrier;
+    allowMissingCell?: boolean;
 }): Promise<Locator> => {
-    const { config, rootLocator, page, resolve, getHeaders, column, index, rowLocator, rowIndex, barrier } = params;
+    const { config, rootLocator, page, resolve, getHeaders, column, index, rowLocator, rowIndex, barrier, allowMissingCell } = params;
     const rowLabel = typeof rowIndex === 'number' ? `row ${rowIndex}` : 'row ?';
     logDebug(
         config,
@@ -94,7 +95,16 @@ const _navigateToCell = async (params: {
                     ? await viewport.getVisibleRowRange(context)
                     : null;
                 const rowVisible = !rowRange || (rowIndex >= rowRange.first && rowIndex <= rowRange.last);
-                if (rowVisible && await targetReached()) {
+                let cellAttached = rowVisible && await targetReached();
+                if (rowVisible && !cellAttached) {
+                    try {
+                        await getCellLocator().waitFor({ state: 'attached', timeout: 500 });
+                        cellAttached = true;
+                    } catch (error) {
+                        if (!(error instanceof errors.TimeoutError)) throw error;
+                    }
+                }
+                if (cellAttached) {
                     logDebug(config, 'verbose', `_navigateToCell: col ${index} in visible range [${knownColRange.first}-${knownColRange.last}], reading directly`);
                     // Check in to the barrier without a moveAction — peers that need the scroll
                     // still supply their own action and will trigger it when all rows arrive.
@@ -154,6 +164,7 @@ const _navigateToCell = async (params: {
 
         // Cell still not accessible — fall through to navigation primitives if configured.
         if (!config.strategies.navigation) {
+            if (allowMissingCell) return getCellLocator();
             const colRange = viewport.getVisibleColumnRange ? await viewport.getVisibleColumnRange(context) : null;
             const rowRange = viewport.getVisibleRowRange ? await viewport.getVisibleRowRange(context) : null;
             
@@ -177,14 +188,15 @@ const _navigateToCell = async (params: {
     if (config.strategies.navigation) {
         const nav = config.strategies.navigation;
 
-        if (typeof rowIndex !== 'number') {
-            throw new Error('Row index is required for navigation');
-        }
-
         if (await targetReached()) {
             // Already there. If we have a barrier, check-in to stay in lock-step.
             if (barrier) await barrier.sync(index);
             return getCellLocator();
+        }
+
+        if (typeof rowIndex !== 'number') {
+            if (allowMissingCell) return getCellLocator();
+            throw new Error('Row index is required for navigation');
         }
 
         // If getActiveCell is present but returns null (no focus), and cell is in DOM,
@@ -308,6 +320,7 @@ const _navigateToCell = async (params: {
         // Return final locator if reached
         const finalCell = getCellLocator();
         if (await finalCell.count() > 0) return finalCell;
+        if (allowMissingCell) return finalCell;
         
         const colRange = viewport && viewport.getVisibleColumnRange ? await viewport.getVisibleColumnRange(context) : null;
         const rowRange = viewport && viewport.getVisibleRowRange ? await viewport.getVisibleRowRange(context) : null;
@@ -345,7 +358,8 @@ const createSmartRow = <T = any>(
     resolve: (item: any, parent: Locator | Page) => Locator,
     table: TableResult<T> | null,
     tablePageIndex?: number,
-    barrier?: NavigationBarrier
+    barrier?: NavigationBarrier,
+    renderWindowPosition = false,
 ): SmartRowType<T> => {
     const smart = rowLocator as unknown as SmartRowType<T> & { _barrier?: NavigationBarrier };
 
@@ -444,10 +458,11 @@ const createSmartRow = <T = any>(
             throw new Error(buildColumnNotFoundError(colName, [...map.keys(), ...Object.keys(config.syntheticColumns ?? {})]));
         }
 
+        const columnOverride = config.columnOverrides?.[colName as keyof T];
         const page = rootLocator.page();
         // Same nav pipeline as toJSON / getCell().bringIntoView() (#430) so virtualized
         // off-screen columns don't return empty/stale text.
-        let cell = await _navigateToCell({
+        const cell = await _navigateToCell({
             config,
             rootLocator,
             page,
@@ -458,9 +473,9 @@ const createSmartRow = <T = any>(
             rowLocator,
             rowIndex,
             barrier: (smart as any)._barrier,
+            allowMissingCell: !!columnOverride?.read,
         });
 
-        const columnOverride = config.columnOverrides?.[colName as keyof T];
         if (columnOverride?.read) {
             const getCell = (name: string): Locator => {
                 const ci = map.get(name);
@@ -772,7 +787,8 @@ const createSmartRow = <T = any>(
                 index: idx,
                 rowLocator: stableRow,
                 rowIndex,
-                barrier: (smart as any)._barrier
+                barrier: (smart as any)._barrier,
+                allowMissingCell: !!mapper,
             });
 
             if (navigatedCell) {
@@ -976,12 +992,15 @@ const createSmartRow = <T = any>(
         // Prefer viewport.scrollToRow when configured (#430). scrollIntoViewIfNeeded adjusts
         // both axes and can evict sibling rows on recycling virtualizers.
         const viewport = config.strategies.viewport;
-        if (viewport?.scrollToRow && typeof rowIndex === 'number') {
+        const logicalRowIndex = viewport?.scrollToRow && renderWindowPosition
+            ? (await resolveLogicalRowIndex(rowLocator, config, () => undefined))?.index
+            : rowIndex;
+        if (viewport?.scrollToRow && typeof logicalRowIndex === 'number') {
             const page = rootLocator.page();
-            logDebug(config, 'verbose', `bringIntoView: viewport.scrollToRow(${rowIndex})`);
+            logDebug(config, 'verbose', `bringIntoView: viewport.scrollToRow(${logicalRowIndex})`);
             await viewport.scrollToRow(
                 { root: rootLocator, config, page, resolve, getHeaders: parentTable?.getHeaders },
-                rowIndex,
+                logicalRowIndex,
             );
         } else {
             await rowLocator.scrollIntoViewIfNeeded();
@@ -992,4 +1011,3 @@ const createSmartRow = <T = any>(
 };
 
 export default createSmartRow;
-
