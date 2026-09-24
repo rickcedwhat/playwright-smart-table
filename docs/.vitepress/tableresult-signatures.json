@@ -57,7 +57,7 @@
   {
     "name": "scrollToColumn",
     "signature": "scrollToColumn: (columnName: string) => Promise<void>",
-    "comment": "/**\n* Resolves the named column and scrolls its header cell into view.\n*/"
+    "comment": "/**\n* Resolves the named column and scrolls it into view.\n* Prefers `strategies.viewport.scrollToColumn` when configured; otherwise scrolls the\n* header cell via Playwright `scrollIntoViewIfNeeded()`.\n*/"
   },
   {
     "name": "countRows",
