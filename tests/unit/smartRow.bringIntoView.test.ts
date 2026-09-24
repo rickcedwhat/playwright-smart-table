@@ -123,4 +123,28 @@ describe('SmartRow.bringIntoView — cross-page navigation', () => {
 
         await expect(smart.bringIntoView()).rejects.toThrow(/Cannot bring row on page 1 into view/);
     });
+
+    it('prefers viewport.scrollToRow over scrollIntoViewIfNeeded when configured', async () => {
+        const row = makeRowLocator();
+        const scrollToRow = vi.fn().mockResolvedValue(undefined);
+        const config = makeConfig();
+        (config.strategies as any).viewport = { scrollToRow };
+        const smart = createSmartRow(row as any, emptyMap, 7, config, row as any, resolve, null);
+
+        await smart.bringIntoView();
+
+        expect(scrollToRow).toHaveBeenCalledWith(expect.anything(), 7);
+        expect(row.scrollIntoViewIfNeeded).not.toHaveBeenCalled();
+    });
+
+    it('falls back to scrollIntoViewIfNeeded when viewport has no scrollToRow', async () => {
+        const row = makeRowLocator();
+        const config = makeConfig();
+        (config.strategies as any).viewport = { getVisibleRowRange: vi.fn() };
+        const smart = createSmartRow(row as any, emptyMap, 0, config, row as any, resolve, null);
+
+        await smart.bringIntoView();
+
+        expect(row.scrollIntoViewIfNeeded).toHaveBeenCalledOnce();
+    });
 });

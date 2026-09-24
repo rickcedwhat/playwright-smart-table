@@ -140,6 +140,40 @@ describe('SmartCell', () => {
         });
     });
 
+    describe('getValue()', () => {
+        it('reads cell text without navigation when no viewport/navigation', async () => {
+            const loc = makeMockLocator({
+                innerText: vi.fn().mockResolvedValue('  Alice  '),
+            });
+            const config = makeConfig();
+            const map = new Map([['Name', 0]]);
+            const row = createSmartRow(loc, map, 0, config, loc, (_sel, parent) => loc as any, null);
+            await expect(row.getValue('Name')).resolves.toBe('Alice');
+        });
+
+        it('navigates via viewport.scrollToColumn before reading virtualized columns', async () => {
+            const scrollToColumn = vi.fn().mockResolvedValue(undefined);
+            const loc = makeMockLocator({
+                count: vi.fn()
+                    .mockResolvedValueOnce(0)
+                    .mockResolvedValue(1),
+                innerText: vi.fn().mockResolvedValue('hidden-value'),
+            });
+            const config = makeConfig({
+                strategies: {
+                    viewport: {
+                        getVisibleColumnRange: vi.fn().mockResolvedValue({ first: 0, last: 1 }),
+                        scrollToColumn,
+                    },
+                },
+            });
+            const map = new Map([['FarRight', 5]]);
+            const row = createSmartRow(loc, map, 0, config, loc, (_sel, parent) => loc as any, null);
+            await expect(row.getValue('FarRight')).resolves.toBe('hidden-value');
+            expect(scrollToColumn).toHaveBeenCalledWith(expect.anything(), 5);
+        });
+    });
+
     describe('SmartCell is a drop-in Locator replacement', () => {
         it('exposes standard Locator properties (innerText, count, nth, etc.)', () => {
             const loc = makeMockLocator();

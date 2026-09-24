@@ -390,7 +390,7 @@ scrollToColumn(columnName: string): Promise<void>
 
 <!-- /api-signature: scrollToColumn -->
 
-Scrolls horizontally to bring a column into view. Uses the configured navigation strategy.
+Scrolls horizontally to bring a column into view. Prefers `strategies.viewport.scrollToColumn` when configured; otherwise scrolls the header cell with Playwright's `scrollIntoViewIfNeeded()`.
 
 ```typescript
 await table.scrollToColumn('Notes');

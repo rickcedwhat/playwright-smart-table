@@ -137,7 +137,7 @@ bringIntoView(): Promise<void>
 
 <!-- /api-signature: bringIntoView -->
 
-Scrolls and/or paginates to make this row visible. Requires `rowIndex` to be set — works when the row was returned by `findRow`, `findRows`, `getRowByIndex`, `filter`, or async iteration.
+Scrolls and/or paginates to make this row visible. Requires `rowIndex` to be set — works when the row was returned by `findRow`, `findRows`, `getRowByIndex`, `filter`, or async iteration. Prefers `strategies.viewport.scrollToRow` when configured (avoids Y-axis eviction from `scrollIntoViewIfNeeded` on virtualized grids).
 
 ```typescript
 const rows = await table.findRows({ Status: 'Flagged' });

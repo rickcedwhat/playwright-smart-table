@@ -299,7 +299,14 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       const idx = map.get(columnName);
       if (idx === undefined) throw _createColumnError(columnName, map);
 
-      // Use header cell for scrolling
+      // Prefer viewport strategy when configured (#430). Raw scrollIntoViewIfNeeded on a
+      // header can shift Y and evict virtualized rows; viewport.scrollToColumn is X-aware.
+      const viewportScroll = config.strategies.viewport?.scrollToColumn;
+      if (viewportScroll) {
+        await viewportScroll(createStrategyContext(), idx);
+        return;
+      }
+
       const headerCell = resolve(config.headerSelector as Selector, rootLocator).nth(idx);
       await headerCell.scrollIntoViewIfNeeded();
     },

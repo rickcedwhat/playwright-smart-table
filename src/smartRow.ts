@@ -444,14 +444,23 @@ const createSmartRow = <T = any>(
             throw new Error(buildColumnNotFoundError(colName, [...map.keys(), ...Object.keys(config.syntheticColumns ?? {})]));
         }
 
-        const columnOverride = config.columnOverrides?.[colName as keyof T];
-        const cell = config.strategies.getCellLocator
-            ? config.strategies.getCellLocator({
-                row: rowLocator, root: rootLocator, columnName: colName,
-                columnIndex: idx, rowIndex, page: rootLocator.page(), config,
-            })
-            : resolve(config.cellSelector, rowLocator).nth(idx);
+        const page = rootLocator.page();
+        // Same nav pipeline as toJSON / getCell().bringIntoView() (#430) so virtualized
+        // off-screen columns don't return empty/stale text.
+        let cell = await _navigateToCell({
+            config,
+            rootLocator,
+            page,
+            resolve,
+            getHeaders: table?.getHeaders,
+            column: colName,
+            index: idx,
+            rowLocator,
+            rowIndex,
+            barrier: (smart as any)._barrier,
+        });
 
+        const columnOverride = config.columnOverrides?.[colName as keyof T];
         if (columnOverride?.read) {
             const getCell = (name: string): Locator => {
                 const ci = map.get(name);
@@ -964,8 +973,19 @@ const createSmartRow = <T = any>(
         // Delay after pagination/finding before scrolling
         await debugDelay(config, 'findRow');
 
-        // Scroll row into view using Playwright's built-in method
-        await rowLocator.scrollIntoViewIfNeeded();
+        // Prefer viewport.scrollToRow when configured (#430). scrollIntoViewIfNeeded adjusts
+        // both axes and can evict sibling rows on recycling virtualizers.
+        const viewport = config.strategies.viewport;
+        if (viewport?.scrollToRow && typeof rowIndex === 'number') {
+            const page = rootLocator.page();
+            logDebug(config, 'verbose', `bringIntoView: viewport.scrollToRow(${rowIndex})`);
+            await viewport.scrollToRow(
+                { root: rootLocator, config, page, resolve, getHeaders: parentTable?.getHeaders },
+                rowIndex,
+            );
+        } else {
+            await rowLocator.scrollIntoViewIfNeeded();
+        }
     };
 
     return smart;

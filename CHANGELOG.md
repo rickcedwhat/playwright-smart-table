@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **`scrollToColumn` / `bringIntoView` / `getValue` prefer viewport (#430)** — `table.scrollToColumn` and `SmartRow.bringIntoView` use `strategies.viewport.scrollToColumn` / `scrollToRow` when configured (fallback to `scrollIntoViewIfNeeded` only when no viewport). `getValue` runs the same cell-navigation pipeline as `toJSON` so virtualized off-screen columns are mounted before reading.
+
 ### Changed
 
 - **Unified page-walk via `scanPages` (#427)** — map/forEach/filter, findRow(s), countRows, and the public async iterator share one pagination shell (maxPages, bulk accounting, EOF final scan, optional waitForReady). The async iterator now streams through `runMap` so it gets the same overscan / loading / dedupe / final-scan behavior as `map`.

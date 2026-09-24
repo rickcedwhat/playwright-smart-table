@@ -80,7 +80,7 @@ If row elements (`rowSelector`) do not carry a numeric index attribute — only 
 // }
 ```
 
-Without a viewport strategy, the final-scan viewport filter is skipped, `bringIntoView` falls back to `element.scrollIntoView({ block: 'nearest' })`, and all discovered rows are accepted. This is correct and safe for single-axis scroll tables.
+Without a viewport strategy, the final-scan viewport filter is skipped, `bringIntoView` falls back to Playwright `scrollIntoViewIfNeeded()`, and all discovered rows are accepted. This is correct and safe for single-axis scroll tables. When a viewport with `scrollToRow` is configured, `bringIntoView` prefers that strategy instead (X/Y-safe for recycling virtualizers).
 
 ### How to check
 
