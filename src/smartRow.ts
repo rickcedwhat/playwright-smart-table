@@ -819,8 +819,22 @@ const createSmartRow = <T = any>(
                 : undefined;
             const onCellLoadingTimeout = config.strategies.loading?.onCellLoadingTimeout ?? 'read-as-is';
 
-            if (isCellLoading && await isCellLoading(targetCell, col, smart)) {
-                if (cellLoadingTimeout !== undefined) {
+            if (isCellLoading) {
+                let loading = await isCellLoading(targetCell, col, smart);
+                // First-paint race: the cell node can attach a tick before the loading
+                // indicator mounts. A single false-negative then reads "" and skips
+                // onCellLoadingTimeout. Only grace when the cell still looks empty.
+                if (!loading && cellLoadingTimeout !== undefined && cellLoadingTimeout > 0) {
+                    const peek = await targetCell.evaluate((el) => (el.textContent || '').trim()).catch(() => '');
+                    if (peek === '') {
+                        const graceDeadline = Date.now() + Math.min(250, cellLoadingTimeout);
+                        while (!loading && Date.now() < graceDeadline) {
+                            await page.waitForTimeout(25);
+                            loading = await isCellLoading(targetCell, col, smart);
+                        }
+                    }
+                }
+                if (loading && cellLoadingTimeout !== undefined) {
                     logDebug(config, 'verbose', `toJSON: cell "${col}" — waiting up to ${cellLoadingTimeout}ms`);
                     const deadline = Date.now() + cellLoadingTimeout;
                     let cellResolved = !(await isCellLoading(targetCell, col, smart)); // immediate check (handles timeout=0)

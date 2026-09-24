@@ -493,9 +493,10 @@ test.describe('Loading Strategy: row and cell timeout', () => {
             }
         });
 
-        // CI flake: toJSON can race the first paint and read empty text before the
-        // loading skeleton mounts (isCellLoading → false → "" instead of TIMEOUT).
-        await expect(page.locator('[data-testid="cell-loading"]').first()).toBeVisible({ timeout: 5000 });
+        // Ensure every visible cell is in the loading state before asserting timeout
+        // behavior (5 rows × 4 default columns). A single first() can pass while
+        // later cells have not painted their skeleton yet.
+        await expect(page.locator('.virtual-table-container [data-testid="cell-loading"]')).toHaveCount(20, { timeout: 5000 });
 
         const table = useTable(page.locator('.virtual-table-container'), {
             rowSelector: '.virtual-row',

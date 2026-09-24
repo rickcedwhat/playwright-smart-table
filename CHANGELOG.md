@@ -5,6 +5,7 @@
 ### Fixed
 
 - **`scrollToColumn` / `bringIntoView` / `getValue` prefer viewport (#430)** — `table.scrollToColumn` and `SmartRow.bringIntoView` use `strategies.viewport.scrollToColumn` / `scrollToRow` when configured (fallback to `scrollIntoViewIfNeeded` only when no viewport). `getValue` runs the same cell-navigation pipeline as `toJSON` so virtualized off-screen columns are mounted before reading.
+- **`toJSON` cell-loading first-paint race** — when `isCellLoading` briefly returns false before the loading indicator mounts, an empty cell no longer skips `onCellLoadingTimeout`. A short grace poll runs only when the cell still looks empty.
 
 ### Changed
 
