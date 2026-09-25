@@ -60,14 +60,17 @@ Use it when **row elements** carry a numeric index attribute:
 ```ts
 // MUI DataGrid — rows have aria-rowindex (1-based)
 viewport: Strategies.Viewport.dataAttribute({
+  scrollContainer: '.MuiDataGrid-virtualScroller',
   rowAttribute: 'aria-rowindex',
   columnAttribute: 'aria-colindex',
   rowOffset: 1,
   columnOffset: 1,
 })
 
-// TanStack Virtual rows with data-index on the row element itself
-viewport: Strategies.Viewport.dataAttribute()
+// TanStack Virtual / Braintrust — pass your scroll container explicitly
+viewport: Strategies.Viewport.dataAttribute({
+  scrollContainer: 'div[class*="overflow-auto"]',
+})
 ```
 
 ### When to remove it

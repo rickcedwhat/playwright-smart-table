@@ -29,6 +29,11 @@ export const HeaderStrategies = {
     /**
      * Physically scrolls the table horizontally to force virtualized columns to mount,
      * collecting their names along the way.
+     *
+     * **Requires `selector`** — the CSS selector for the horizontal scroll container
+     * (e.g. `.dvn-scroller` for Glide, `.rdg-viewport` for RDG). Framework class names
+     * belong in presets / your config, not in this generic factory. Without `selector`,
+     * only currently visible headers are returned (no scrolling).
      */
     horizontalScroll: (options?: { limit?: number, selector?: string, scrollAmount?: number }): HeaderStrategy => {
         return async (context: StrategyContext): Promise<string[]> => {
@@ -46,16 +51,24 @@ export const HeaderStrategies = {
             let currentHeaders = await getVisible();
             currentHeaders.forEach(h => collectedHeaders.add(h));
 
-            const scrollerHandle = await root.evaluateHandle((el, selector) => {
-                if (selector && el.matches(selector)) return el;
-                // Try finding common scrollable containers or fallback to root
-                const effectiveSelector = selector || '.dvn-scroller, .rdg-viewport, [role="grid"]';
-                const ancestor = el.closest(effectiveSelector);
+            const selector = options?.selector;
+            if (!selector) {
+                logDebug(
+                    config,
+                    'info',
+                    'HeaderStrategies.horizontalScroll: no selector provided — returning visible headers only. Pass { selector } for the scroll container (e.g. ".dvn-scroller").',
+                );
+                return Array.from(collectedHeaders);
+            }
+
+            const scrollerHandle = await root.evaluateHandle((el, sel) => {
+                if (el.matches(sel)) return el;
+                const ancestor = el.closest(sel);
                 if (ancestor) return ancestor;
-                const child = el.querySelector(effectiveSelector);
+                const child = el.querySelector(sel);
                 if (child) return child;
-                return el;
-            }, options?.selector);
+                return null;
+            }, selector);
 
             const isScrollerFound = await scrollerHandle.evaluate(el => !!el);
 
@@ -81,7 +94,7 @@ export const HeaderStrategies = {
                     }
                 }
             } else {
-                logDebug(config, 'info', "HeaderStrategies.horizontalScroll: Could not find scroller. Returning visible headers.");
+                logDebug(config, 'info', `HeaderStrategies.horizontalScroll: Could not find scroller matching "${selector}". Returning visible headers.`);
             }
 
             if (isScrollerFound) {

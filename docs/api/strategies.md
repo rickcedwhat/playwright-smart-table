@@ -123,7 +123,12 @@ Custom logic for discovering column names. Use when headers require scrolling or
 **Built-in factories** via `Strategies.Header`:
 
 - `Strategies.Header.visible` — reads headers currently in the DOM
-- `Strategies.Header.horizontalScroll` — scrolls horizontally to discover virtualized headers
+- `Strategies.Header.horizontalScroll` — scrolls horizontally to discover virtualized headers (requires `{ selector }` for the scroll container; omitting it returns visible headers only)
+
+```typescript
+// Discover virtualized headers by scrolling a known container
+header: Strategies.Header.horizontalScroll({ selector: '.dvn-scroller' })
+```
 
 ```typescript
 // Custom header strategy

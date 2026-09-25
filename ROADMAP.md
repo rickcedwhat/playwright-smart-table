@@ -9,7 +9,7 @@ Guiding light: [`PHILOSOPHY.md`](PHILOSOPHY.md). Filed from GBU 2026-08-22 (`GBU
 - [x] **Public API hygiene (Plugins, `getColumnValues`, dead Strategies)** — [#428](https://github.com/rickcedwhat/playwright-smart-table/issues/428)
 - [x] **FilterEngine + `getCellLocator`; getRow/findRow filter parity** — [#429](https://github.com/rickcedwhat/playwright-smart-table/issues/429)
 - [x] **scrollToColumn / bringIntoView prefer viewport** — [#430](https://github.com/rickcedwhat/playwright-smart-table/issues/430)
-- [ ] **No framework CSS defaults in generic strategies** — [#431](https://github.com/rickcedwhat/playwright-smart-table/issues/431)
+- [x] **No framework CSS defaults in generic strategies** — [#431](https://github.com/rickcedwhat/playwright-smart-table/issues/431)
 - [ ] **Test suite cleanup (redundant + gaps)** — [#432](https://github.com/rickcedwhat/playwright-smart-table/issues/432)
 - [ ] **Safer defaults & footguns** — [#434](https://github.com/rickcedwhat/playwright-smart-table/issues/434)
 - [ ] **ROADMAP/philosophy tracking hygiene** — [#433](https://github.com/rickcedwhat/playwright-smart-table/issues/433)

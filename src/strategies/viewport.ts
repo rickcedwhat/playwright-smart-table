@@ -6,7 +6,10 @@ export type DataAttributeViewportOptions = {
     /**
      * CSS selector for the scroll container (the element with overflow: auto/scroll).
      * Resolved with `closest()` from the root element, so ancestors are found automatically.
-     * Defaults to 'div[class*="overflow-auto"]'.
+     *
+     * **No framework default** — pass the selector for your table (e.g. Tailwind
+     * `div[class*="overflow-auto"]`, MUI `.MuiDataGrid-virtualScroller`). Omitting it
+     * means geometry filtering treats all mounted rows as visible and `scrollTo*` is a no-op.
      */
     scrollContainer?: string;
     /**
@@ -66,15 +69,24 @@ export type DataAttributeViewportOptions = {
  * `{first:0, last:0}` and logs a warning at the `error` log level.
  *
  * @example
- * // TanStack / Braintrust (data-index, 0-based — default)
- * viewport: Strategies.Viewport.dataAttribute()
+ * // TanStack / Braintrust — pass your scroll container explicitly (no Tailwind default)
+ * viewport: Strategies.Viewport.dataAttribute({
+ *   scrollContainer: 'div[class*="overflow-auto"]',
+ * })
  *
  * @example
  * // ARIA grid (aria-rowindex / aria-colindex, 1-based)
- * viewport: Strategies.Viewport.dataAttribute({ rowAttribute: 'aria-rowindex', columnAttribute: 'aria-colindex', rowOffset: 1, columnOffset: 1 })
+ * viewport: Strategies.Viewport.dataAttribute({
+ *   scrollContainer: '.MuiDataGrid-virtualScroller',
+ *   rowAttribute: 'aria-rowindex',
+ *   columnAttribute: 'aria-colindex',
+ *   rowOffset: 1,
+ *   columnOffset: 1,
+ * })
  */
 const dataAttribute = (options?: DataAttributeViewportOptions): ViewportStrategy => {
-    const containerSel = options?.scrollContainer ?? 'div[class*="overflow-auto"]';
+    // null = no container: geometry filter keeps all mounted rows; scrollTo* no-ops (#431)
+    const containerSel = options?.scrollContainer ?? null;
     const attachTimeout = options?.attachTimeout ?? 3000;
     const rowAttr = options?.rowAttribute ?? 'data-index';
     const colAttr = options?.columnAttribute ?? 'data-index';
@@ -110,7 +122,9 @@ const dataAttribute = (options?: DataAttributeViewportOptions): ViewportStrategy
             // the rows' DOM positions so the iteration engine can drop overscan rows (#353/#357).
             return root.evaluate((el, { rowSel, containerSel }) => {
                 const rows = Array.from(el.querySelectorAll(rowSel));
-                const container = el.closest(containerSel) as HTMLElement | null;
+                const container = containerSel
+                    ? (el.closest(containerSel) as HTMLElement | null)
+                    : null;
                 const containerRect = container ? container.getBoundingClientRect() : null;
                 const visible: number[] = [];
                 rows.forEach((r, i) => {
@@ -128,7 +142,9 @@ const dataAttribute = (options?: DataAttributeViewportOptions): ViewportStrategy
             const rowSel = config.rowSelector;
             const result = await root.evaluate((el, { rowSel, rowAttr, rowOffset, containerSel }) => {
                 const rows = Array.from(el.querySelectorAll(rowSel));
-                const container = el.closest(containerSel) as HTMLElement | null;
+                const container = containerSel
+                    ? (el.closest(containerSel) as HTMLElement | null)
+                    : null;
                 const containerRect = container ? container.getBoundingClientRect() : null;
                 const visibleRows = rows
                     .filter(r => {
@@ -153,8 +169,9 @@ const dataAttribute = (options?: DataAttributeViewportOptions): ViewportStrategy
             const headerSel = typeof config.headerSelector === 'string' ? config.headerSelector : null;
             const cellSel = typeof config.cellSelector === 'string' ? config.cellSelector : `[${colAttr}]`;
             await root.evaluate((el, { containerSel, headerSel, cellSel, idx, columnWidth, scrollPadding }) => {
-                const container = el.closest(containerSel) as HTMLElement;
-                if (!container || !headerSel) return;
+                if (!containerSel || !headerSel) return;
+                const container = el.closest(containerSel) as HTMLElement | null;
+                if (!container) return;
                 const headers = Array.from(el.querySelectorAll(headerSel));
                 const target = headers[idx] as HTMLElement | undefined;
                 if (!target) {
@@ -189,7 +206,8 @@ const dataAttribute = (options?: DataAttributeViewportOptions): ViewportStrategy
         scrollToRow: async ({ root, config }, rowIndex) => {
             const rowSel = config.rowSelector;
             await root.evaluate((el, { containerSel, rowSel, rowAttr, idx, rowOffset, rowHeight, scrollPadding }) => {
-                const container = el.closest(containerSel) as HTMLElement;
+                if (!containerSel) return;
+                const container = el.closest(containerSel) as HTMLElement | null;
                 if (!container) return;
                 const row = container.querySelector(`${rowSel}[${rowAttr}="${idx + rowOffset}"]`);
                 if (row) {
