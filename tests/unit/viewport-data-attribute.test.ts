@@ -143,4 +143,34 @@ describe('Strategies.Viewport.dataAttribute()', () => {
             expect(result).not.toHaveProperty('_validCount');
         });
     });
+
+    describe('scrollContainer (#431)', () => {
+        it('passes null containerSel when scrollContainer is omitted (no Tailwind default)', async () => {
+            const strategy = Strategies.Viewport.dataAttribute();
+            const root = mockRoot([0, 1, 2]);
+            const config = mockConfig();
+
+            await strategy.getVisibleRowIndices!({ root, config } as any);
+
+            expect(root.evaluate).toHaveBeenCalledWith(
+                expect.any(Function),
+                expect.objectContaining({ containerSel: null }),
+            );
+        });
+
+        it('passes the explicit scrollContainer selector', async () => {
+            const strategy = Strategies.Viewport.dataAttribute({
+                scrollContainer: 'div[class*="overflow-auto"]',
+            });
+            const root = mockRoot([0]);
+            const config = mockConfig();
+
+            await strategy.getVisibleRowIndices!({ root, config } as any);
+
+            expect(root.evaluate).toHaveBeenCalledWith(
+                expect.any(Function),
+                expect.objectContaining({ containerSel: 'div[class*="overflow-auto"]' }),
+            );
+        });
+    });
 });
