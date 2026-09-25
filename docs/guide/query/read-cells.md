@@ -50,7 +50,17 @@ await table.scrollToColumn('Notes')
 const cell = row.getCell('Notes')
 ```
 
-Scrolls the table horizontally to bring the named column's header into the viewport. Use it when you need the header itself visible — for example, to click it for sorting or assert its `aria-sort` attribute. Reading cell data via `toJSON()` scrolls columns into view internally, so you don't need to call this first when collecting row data.
+Scrolls the table horizontally to bring the named column into view. Prefers `strategies.viewport.scrollToColumn` when configured; otherwise scrolls the header cell. Use it when you need the header itself visible — for example, to click it for sorting or assert its `aria-sort` attribute. Reading cell data via `toJSON()` / `getValue()` scrolls columns into view internally when a viewport or navigation strategy is configured.
+
+---
+
+## Read a single column value
+
+```typescript
+const email = await row.getValue('Email')
+```
+
+Universal accessor for real, override, and synthetic columns. On virtualized tables (with `viewport` or `navigation`), mounts the cell via the same pipeline as `toJSON` before reading — so you do not get empty/stale text for off-screen columns.
 
 ---
 

@@ -281,6 +281,9 @@ export type SmartRow<T = any> = Locator & {
    * Scrolls/paginates to bring this row into view.
    * Works when row position metadata is known (e.g., from getRowByIndex, findRow,
    * findRows, filter, or async iteration).
+   *
+   * Prefers \`strategies.viewport.scrollToRow\` when configured; otherwise falls back to
+   * Playwright \`scrollIntoViewIfNeeded()\`.
    * @throws Error if row position metadata is unknown
    */
   bringIntoView(): Promise<void>;
@@ -306,6 +309,12 @@ export type SmartRow<T = any> = Locator & {
 
   /**
    * Get the resolved value of any column — real, override, or synthetic.
+   *
+   * When \`strategies.viewport\` or \`strategies.navigation\` is configured, runs the same
+   * cell-navigation pipeline as \`toJSON\` / \`getCell().bringIntoView()\` so off-screen
+   * virtualized cells are mounted before reading. Without those strategies, reads the
+   * current DOM cell (Playwright auto-wait).
+   *
    * @param column - Column name (case-sensitive)
    * @returns The column value as a string
    */
@@ -919,7 +928,9 @@ export interface TableResult<T = any> extends AsyncIterable<{ row: SmartRow<T>; 
   ) => Promise<SmartRowArray<T>>;
 
   /**
-   * Resolves the named column and scrolls its header cell into view.
+   * Resolves the named column and scrolls it into view.
+   * Prefers \`strategies.viewport.scrollToColumn\` when configured; otherwise scrolls the
+   * header cell via Playwright \`scrollIntoViewIfNeeded()\`.
    */
   scrollToColumn: (columnName: string) => Promise<void>;
 

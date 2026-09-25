@@ -27,7 +27,7 @@
   {
     "name": "bringIntoView",
     "signature": "bringIntoView(): Promise<void>",
-    "comment": "/**\n* Scrolls/paginates to bring this row into view.\n* Works when row position metadata is known (e.g., from getRowByIndex, findRow,\n* findRows, filter, or async iteration).\n* @throws Error if row position metadata is unknown\n*/"
+    "comment": "/**\n* Scrolls/paginates to bring this row into view.\n* Works when row position metadata is known (e.g., from getRowByIndex, findRow,\n* findRows, filter, or async iteration).\n*\n* Prefers `strategies.viewport.scrollToRow` when configured; otherwise falls back to\n* Playwright `scrollIntoViewIfNeeded()`.\n* @throws Error if row position metadata is unknown\n*/"
   },
   {
     "name": "smartFill",
@@ -37,7 +37,7 @@
   {
     "name": "getValue",
     "signature": "getValue(column: string): Promise<string>",
-    "comment": "/**\n* Get the resolved value of any column — real, override, or synthetic.\n* @param column - Column name (case-sensitive)\n* @returns The column value as a string\n*/"
+    "comment": "/**\n* Get the resolved value of any column — real, override, or synthetic.\n*\n* When `strategies.viewport` or `strategies.navigation` is configured, runs the same\n* cell-navigation pipeline as `toJSON` / `getCell().bringIntoView()` so off-screen\n* virtualized cells are mounted before reading. Without those strategies, reads the\n* current DOM cell (Playwright auto-wait).\n*\n* @param column - Column name (case-sensitive)\n* @returns The column value as a string\n*/"
   },
   {
     "name": "wasFound",

@@ -334,6 +334,28 @@ test.describe('Edge cases and missing coverage', () => {
     await expect(headerCell).toBeInViewport();
   });
 
+  test('scrollToColumn prefers viewport.scrollToColumn when configured (#430)', async ({ page }) => {
+    await page.setContent(`
+      <table id="t">
+        <thead><tr><th>Col1</th><th>Col2</th><th>Col3</th></tr></thead>
+        <tbody><tr><td>A</td><td>B</td><td>C</td></tr></tbody>
+      </table>
+    `);
+    const scrolled: number[] = [];
+    const table = useTable(page.locator('#t'), {
+      strategies: {
+        viewport: {
+          scrollToColumn: async (_ctx, colIndex) => {
+            scrolled.push(colIndex);
+          },
+        },
+      },
+    });
+    await table.init();
+    await table.scrollToColumn('Col3');
+    expect(scrolled).toEqual([2]);
+  });
+
   test('getRow with exact: true matches only exact cell text', async ({ page }) => {
     await page.setContent(`
       <table id="t">

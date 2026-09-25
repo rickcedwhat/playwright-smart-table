@@ -9,6 +9,8 @@ async function setPlaygroundConfig(page: Page, config: any) {
     await page.keyboard.press('ControlOrMeta+a');
     await page.keyboard.press('Backspace');
     await page.locator('textarea').fill(json);
+    // Ensure React onChange flushed before reload (CI race with controlled textarea).
+    await expect(page.locator('textarea')).toHaveValue(json);
     // Apply
     await page.getByRole('button', { name: 'Apply & Reload Table' }).click();
     // Wait for reload (spinner)
@@ -486,9 +488,15 @@ test.describe('Loading Strategy: row and cell timeout', () => {
                 tableInitDelay: 0,
                 rowDelay: 0,
                 cellDelay: 60000,
+                cellCache: false,
                 generator: 'simple'
             }
         });
+
+        // Ensure every visible cell is in the loading state before asserting timeout
+        // behavior (5 rows × 4 default columns). A single first() can pass while
+        // later cells have not painted their skeleton yet.
+        await expect(page.locator('.virtual-table-container [data-testid="cell-loading"]')).toHaveCount(20, { timeout: 5000 });
 
         const table = useTable(page.locator('.virtual-table-container'), {
             rowSelector: '.virtual-row',
@@ -499,7 +507,8 @@ test.describe('Loading Strategy: row and cell timeout', () => {
                     isCellLoading: async (cell) => {
                         return (await cell.locator('[data-testid="cell-loading"]').count()) > 0;
                     },
-                    cellLoadingTimeout: 100,
+                    // Slightly above one poll interval so the wait loop always re-checks on CI.
+                    cellLoadingTimeout: 250,
                     onCellLoadingTimeout: async (_cell, columnName) => `<TIMEOUT:${columnName}>`
                 }
             },

@@ -47,3 +47,60 @@ test.describe('findRowByIndex (#354)', () => {
         await expect(table.findRowByIndex(9999)).rejects.toThrow(/could not reach row 9999/);
     });
 });
+
+test.describe('getRowByIndex in a scrolled render window', () => {
+    const WINDOW = `
+      <div id="scroll" style="height: 30px; overflow-y: auto">
+        <table id="t" style="border-spacing: 0">
+          <thead><tr><th style="height: 30px">Name</th></tr></thead>
+          <tbody>
+            <tr data-ri="100"><td style="height: 30px">Alice</td></tr>
+            <tr data-ri="101"><td style="height: 30px">Bob</td></tr>
+            <tr data-ri="102"><td style="height: 30px">Carol</td></tr>
+          </tbody>
+        </table>
+      </div>
+    `;
+
+    test('resolves the logical index before viewport scrolling', async ({ page }) => {
+        await page.setContent(WINDOW);
+        const scrolledTo: number[] = [];
+        const table = await useTable(page.locator('#t'), {
+            strategies: {
+                resolveRowIndex,
+                viewport: {
+                    scrollToRow: async ({ page }, index) => {
+                        scrolledTo.push(index);
+                        await page.locator(`tr[data-ri="${index}"]`).scrollIntoViewIfNeeded();
+                    },
+                },
+            },
+        }).init();
+        await page.locator('#scroll').evaluate(el => { el.scrollTop = 30; });
+        const row = table.getRowByIndex(2); // render position 2 is logical row 102
+        await expect(row).not.toBeInViewport();
+
+        await row.bringIntoView();
+
+        expect(scrolledTo).toEqual([102]);
+        await expect(row).toBeInViewport();
+        await expect(row.getCell('Name')).toHaveText('Carol');
+    });
+
+    test('uses locator scrolling when no logical index resolver is configured', async ({ page }) => {
+        await page.setContent(WINDOW);
+        const scrolledTo: number[] = [];
+        const table = await useTable(page.locator('#t'), {
+            strategies: { viewport: { scrollToRow: async (_ctx, index) => { scrolledTo.push(index); } } },
+        }).init();
+        await page.locator('#scroll').evaluate(el => { el.scrollTop = 30; });
+        const row = table.getRowByIndex(2);
+        await expect(row).not.toBeInViewport();
+
+        await row.bringIntoView();
+
+        expect(scrolledTo).toEqual([]);
+        await expect(row).toBeInViewport();
+        await expect(row.getCell('Name')).toHaveText('Carol');
+    });
+});
