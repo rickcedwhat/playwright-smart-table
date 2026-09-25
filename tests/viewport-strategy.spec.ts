@@ -276,6 +276,38 @@ test.describe('Viewport strategy — synchronized map()', () => {
     });
 });
 
+test.describe('Viewport strategy — unavailable scrolling', () => {
+    for (const method of ['scrollToColumn', 'scrollToRow'] as const) {
+        for (const scrollContainer of [undefined, '', '#missing-scroller']) {
+            test(`${method} skips absent targets with container ${JSON.stringify(scrollContainer)}`, async ({ page }) => {
+                await page.setContent('<div id="grid"></div>');
+                const vp = Strategies.Viewport.dataAttribute({ scrollContainer, attachTimeout: 100 });
+                const context = {
+                    root: page.locator('#grid'),
+                    config: { rowSelector: '.row', headerSelector: '.header', cellSelector: '.cell' },
+                } as any;
+
+                // Neither target is mounted: waiting would time out instead of resolving.
+                await vp[method]!(context, 50);
+            });
+        }
+    }
+
+    for (const headerSelector of [undefined, '', () => { throw new Error('Header selector must not be called'); }]) {
+        test(`scrollToColumn skips absent targets with ${typeof headerSelector === 'function' ? 'function' : JSON.stringify(headerSelector)} header selector`, async ({ page }) => {
+            await page.setContent('<div id="scroller"><div id="grid"></div></div>');
+            const vp = Strategies.Viewport.dataAttribute({ scrollContainer: '#scroller', attachTimeout: 100 });
+            const context = {
+                root: page.locator('#grid'),
+                config: { rowSelector: '.row', headerSelector, cellSelector: '.cell' },
+            } as any;
+
+            await vp.scrollToColumn!(context, 50);
+            expect(await page.locator('#scroller').evaluate(el => el.scrollLeft)).toBe(0);
+        });
+    }
+});
+
 // ─── ViewportStrategies.dataAttribute estimated-width fallback ────────────────
 //
 // When scrollToColumn() is called for a column index whose header element is

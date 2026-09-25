@@ -167,11 +167,11 @@ const dataAttribute = (options?: DataAttributeViewportOptions): ViewportStrategy
 
         scrollToColumn: async ({ root, config }, colIndex) => {
             const headerSel = typeof config.headerSelector === 'string' ? config.headerSelector : null;
+            if (!containerSel || !headerSel) return;
             const cellSel = typeof config.cellSelector === 'string' ? config.cellSelector : `[${colAttr}]`;
-            await root.evaluate((el, { containerSel, headerSel, cellSel, idx, columnWidth, scrollPadding }) => {
-                if (!containerSel || !headerSel) return;
+            const canScroll = await root.evaluate((el, { containerSel, headerSel, cellSel, idx, columnWidth, scrollPadding }) => {
                 const container = el.closest(containerSel) as HTMLElement | null;
-                if (!container) return;
+                if (!container) return false;
                 const headers = Array.from(el.querySelectorAll(headerSel));
                 const target = headers[idx] as HTMLElement | undefined;
                 if (!target) {
@@ -183,7 +183,7 @@ const dataAttribute = (options?: DataAttributeViewportOptions): ViewportStrategy
                         ? widths.reduce((sum, width) => sum + width, 0) / widths.length
                         : 120);
                     container.scrollLeft = Math.max(0, idx * estimatedWidth - scrollPadding);
-                    return;
+                    return true;
                 }
                 const cRect = container.getBoundingClientRect();
                 const tRect = target.getBoundingClientRect();
@@ -194,7 +194,9 @@ const dataAttribute = (options?: DataAttributeViewportOptions): ViewportStrategy
                     // Scrolling right: reveal the target's right edge with padding.
                     container.scrollLeft += (tRect.right - cRect.right) + scrollPadding;
                 }
+                return true;
             }, { containerSel, headerSel, cellSel, idx: colIndex, columnWidth, scrollPadding });
+            if (!canScroll) return;
 
             // Wait for a cell at this column index to mount in any row
             await root
@@ -204,15 +206,15 @@ const dataAttribute = (options?: DataAttributeViewportOptions): ViewportStrategy
         },
 
         scrollToRow: async ({ root, config }, rowIndex) => {
+            if (!containerSel) return;
             const rowSel = config.rowSelector;
-            await root.evaluate((el, { containerSel, rowSel, rowAttr, idx, rowOffset, rowHeight, scrollPadding }) => {
-                if (!containerSel) return;
+            const canScroll = await root.evaluate((el, { containerSel, rowSel, rowAttr, idx, rowOffset, rowHeight, scrollPadding }) => {
                 const container = el.closest(containerSel) as HTMLElement | null;
-                if (!container) return;
+                if (!container) return false;
                 const row = container.querySelector(`${rowSel}[${rowAttr}="${idx + rowOffset}"]`);
                 if (row) {
                     row.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-                    return;
+                    return true;
                 }
                 const visibleRows = Array.from(container.querySelectorAll(rowSel)) as HTMLElement[];
                 const heights = visibleRows
@@ -222,7 +224,9 @@ const dataAttribute = (options?: DataAttributeViewportOptions): ViewportStrategy
                     ? heights.reduce((sum, height) => sum + height, 0) / heights.length
                     : 40);
                 container.scrollTop = Math.max(0, idx * estimatedHeight - scrollPadding);
+                return true;
             }, { containerSel, rowSel, rowAttr, idx: rowIndex, rowOffset, rowHeight, scrollPadding });
+            if (!canScroll) return;
 
             await root
                 .locator(`${rowSel}[${rowAttr}="${rowIndex + rowOffset}"]`)

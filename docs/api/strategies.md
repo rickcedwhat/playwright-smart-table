@@ -122,6 +122,10 @@ Custom logic for discovering column names. Use when headers require scrolling or
 
 **Built-in factories** via `Strategies.Header`:
 
+<!-- Manual-content exception: this prose and example are maintained here alongside
+src/strategies/headers.ts. generate-all-api-docs.mjs extracts signatures from
+src/types.ts; update-all-api-signatures.mjs only replaces api-signature blocks. -->
+
 - `Strategies.Header.visible` — reads headers currently in the DOM
 - `Strategies.Header.horizontalScroll` — scrolls horizontally to discover virtualized headers (requires `{ selector }` for the scroll container; omitting it returns visible headers only)
 
