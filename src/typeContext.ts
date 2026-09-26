@@ -592,9 +592,16 @@ export interface LoadingStrategy {
     | 'throw'
     | ((cell: import('@playwright/test').Locator, columnName: string, row: SmartRow) => Promise<string>);
 
-  /** Max ms to wait for sort stabilization when isTableLoading is set. @default 10000 */
+  /**
+   * Max ms to wait while \`isTableLoading\` returns true (countRows, findRow(s),
+   * page-ready gates, and sort when \`sortStabilizationTimeout\` is unset).
+   * @default 10000
+   */
+  loadingTimeout?: number;
+
+  /** Max ms to wait for sort stabilization when isTableLoading is set. Overrides \`loadingTimeout\` for sort only. @default 10000 */
   sortStabilizationTimeout?: number;
-  /** Polling interval (ms) while waiting for sort stabilization. @default 100 */
+  /** Polling interval (ms) while waiting for sort / table-ready stabilization. @default 100 (sort) / 200 (table-ready) */
   sortStabilizationPollInterval?: number;
   /** Fallback delay (ms) after sort when no isTableLoading is configured. @default 200 */
   sortStabilizationFallbackDelay?: number;
@@ -702,11 +709,17 @@ export interface TableConfig<T = any> {
   rowSelector?: string;
   /** Selector for the cells within a row */
   cellSelector?: string | ((row: Locator) => Locator);
-  /** Number of pages to scan for verification */
+  /**
+   * Number of pages to scan for verification / iteration.
+   * Defaults to \`1\` — set explicitly (e.g. \`maxPages: 5\`) when using a pagination
+   * strategy, or you will never leave page 1. Init logs a warning when pagination
+   * is configured and this is still \`1\`.
+   */
   maxPages?: number;
   /**
    * Default concurrency strategy for iteration methods.
    * Can be overridden by the options passed to forEach, map, or filter.
+   * Defaults to sequential when unset (safer for UI interactions).
    */
   concurrency?: RowIterationMode;
   /** Hook to rename columns dynamically */
@@ -823,8 +836,10 @@ export type RowIterationOptions = {
  */
 export interface TableResult<T = any> extends AsyncIterable<{ row: SmartRow<T>; rowIndex: number; index: number; pageIndex: number }> {
   /**
-   * Represents the current page index of the table's DOM.
-   * Starts at 0. Automatically maintained by the library during pagination and bringIntoView.
+   * Current DOM page index (0-based). Automatically maintained during pagination
+   * and \`bringIntoView\`. Treat as **read-only** — assigning manually can desync
+   * the path planner. Manual writes log a warning; prefer \`reset()\` / library
+   * navigation. Writable access may become read-only in v7.
    */
   currentPageIndex: number;
 
@@ -990,28 +1005,29 @@ export interface TableResult<T = any> extends AsyncIterable<{ row: SmartRow<T>; 
 
   /**
    * Transforms every row across all pages into a value. Returns a flat array.
-   * Execution is parallel within each page by default (safe for reads).
+   * Defaults to \`concurrency: 'sequential'\` (safe for clicks/fills). Pass
+   * \`concurrency: 'parallel'\` for read-only extraction, or \`'synchronized'\` when
+   * navigation must stay lock-step on virtualized grids.
    * Call \`stop()\` to halt after the current page finishes.
-   *
-   * > **⚠️ UI Interactions:** \`map\` defaults to \`concurrency: 'parallel'\`. If your callback opens popovers,
-   * > fills inputs, or otherwise mutates UI state, pass \`concurrency: 'sequential'\` (or \`'synchronized'\`
-   * > when navigation must stay lock-step) to avoid overlapping interactions.
    *
    * @param callback - Function receiving { row, rowIndex, stop }
    * @param options - maxPages, concurrency, dedupe, useBulkPagination
    *
    * @example
-   * // Data extraction — parallel is safe
-   * const emails = await table.map(({ row }) => row.getCell('Email').innerText());
-   *
-   * @example
-   * // UI interactions — use sequential (or synchronized) concurrency
+   * // Default sequential — safe for UI interactions
    * const assignees = await table.map(async ({ row }) => {
    *   await row.getCell('Assignee').locator('button').click();
    *   const name = await page.locator('.popover .name').innerText();
    *   await page.keyboard.press('Escape');
    *   return name;
-   * }, { concurrency: 'sequential' });
+   * });
+   *
+   * @example
+   * // Read-only extraction — opt into parallel
+   * const emails = await table.map(
+   *   ({ row }) => row.getCell('Email').innerText(),
+   *   { concurrency: 'parallel' }
+   * );
    */
   map<R>(
     callback: (ctx: RowIterationContext<T>) => R | Promise<R>,
