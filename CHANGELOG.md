@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [6.22.0] - 2026-09-26
+
+### Upgrade notes
+
+- **`map` / `toArray` now run callbacks sequentially by default.** Results are unchanged; read-heavy scrapes may be slower. Pass `{ concurrency: 'parallel' }` (or set `concurrency` in config) to restore the old speed.
+- **`isTableLoading` waits are bounded (default 10s).** Previously `countRows` / `findRow(s)` could poll forever. If your table legitimately loads longer, set `strategies.loading.loadingTimeout`.
+
 ### Changed
 
 - **Safer defaults & footguns (#434)** — `map`/`toArray` default to `concurrency: 'sequential'` (pass `parallel` for read-only extraction); init warns when `maxPages: 1` with a pagination strategy; `currentPageIndex` public writes warn (library uses an internal setter); `isTableLoading` polls share a bounded `loadingTimeout` (default 10s) across countRows/findRow(s)/sort; `generateConfig*` routes through `logDebug`; MUI `doSort` is trigger-only (core owns retries).
