@@ -2,7 +2,9 @@
 
 ## Short Term - Philosophy Debt
 
-Guiding light: [`PHILOSOPHY.md`](PHILOSOPHY.md). Filed from GBU 2026-08-22 (`GBU-REPORT.md`).
+Guiding light: [`PHILOSOPHY.md`](PHILOSOPHY.md) is the scoring rubric for every `/gbu` audit ([`.agents/workflows/gbu.md`](.agents/workflows/gbu.md)). Each audit should check items off this list and file new drift as linked issues here, rather than letting it accumulate in core.
+
+### Batch 1 — GBU 2026-08-22 ([`GBU-REPORT.md`](GBU-REPORT.md)) — shipped in v6.21.0 / v6.22.0
 
 - [x] **Slim `_navigateToCell` / viewport-first** — [#426](https://github.com/rickcedwhat/playwright-smart-table/issues/426)
 - [x] **Unify pagination/scan loops** — [#427](https://github.com/rickcedwhat/playwright-smart-table/issues/427)
@@ -12,9 +14,22 @@ Guiding light: [`PHILOSOPHY.md`](PHILOSOPHY.md). Filed from GBU 2026-08-22 (`GBU
 - [x] **No framework CSS defaults in generic strategies** — [#431](https://github.com/rickcedwhat/playwright-smart-table/issues/431)
 - [x] **Test suite cleanup (redundant + gaps)** — [#432](https://github.com/rickcedwhat/playwright-smart-table/issues/432)
 - [x] **Safer defaults & footguns** — [#434](https://github.com/rickcedwhat/playwright-smart-table/issues/434)
-- [ ] **ROADMAP/philosophy tracking hygiene** — [#433](https://github.com/rickcedwhat/playwright-smart-table/issues/433)
+- [x] **ROADMAP/philosophy tracking hygiene** — [#433](https://github.com/rickcedwhat/playwright-smart-table/issues/433)
 
-Related closed work to reopen/extend when picking these up: [#327](https://github.com/rickcedwhat/playwright-smart-table/issues/327) (v7 preset API), [#386](https://github.com/rickcedwhat/playwright-smart-table/issues/386) (Grafana-class patterns).
+### Open tech debt (next batch)
+
+- [ ] **Header scroll logic duplicated between `headers.ts` and `glide/headers.ts`** — [#439](https://github.com/rickcedwhat/playwright-smart-table/issues/439)
+- [ ] **Type SmartRow internal flags (`_selfHealing` / `_inBatch` / `_barrier`) instead of `as any`** — [#440](https://github.com/rickcedwhat/playwright-smart-table/issues/440)
+- [ ] **Document recent APIs; gate docs-check CI on `src/` changes** — [#441](https://github.com/rickcedwhat/playwright-smart-table/issues/441)
+- [ ] **Dependabot weekly npm group blocked by bundled major bumps** — [#442](https://github.com/rickcedwhat/playwright-smart-table/issues/442)
+
+### Deferred to v7
+
+- **Remove deprecated `getColumnValues`** — still public in v6 (marked `@deprecated` in #428); use `mapColumn` / `map`.
+- **Remove `generateConfigPrompt`** — use `generateConfig`.
+- **Make `table.currentPageIndex` read-only** — writes warn since v6.22.0 (#434).
+
+Related closed work to reopen/extend: [#327](https://github.com/rickcedwhat/playwright-smart-table/issues/327) (v7 preset API), [#386](https://github.com/rickcedwhat/playwright-smart-table/issues/386) (Grafana-class patterns).
 
 ## Short Term - Quality of Life & Safety
 
@@ -52,9 +67,9 @@ Related closed work to reopen/extend when picking these up: [#327](https://githu
 ### 🧹 Cleanup (completed in v6.7.0)
 - [x] **Remove Deprecated APIs**:
     - `iterateThroughTable` → replaced by `forEach`/`map`/`filter`.
-    - `getColumnValues` → intended replacement `map` / `mapColumn` (API still shipped; see [#428](https://github.com/rickcedwhat/playwright-smart-table/issues/428)).
     - `dataMapper` → replaced by `columnOverrides.read`.
     - `clickNext` pagination strategy → replaced by `click({ next: ... })`.
+    - *Not removed:* `getColumnValues` is still public (deprecated in [#428](https://github.com/rickcedwhat/playwright-smart-table/issues/428)); removal is deferred to v7 (see above).
 
 ### ⚡ Performance
 - [x] **Improve infinite scroll iteration** (done in v6.7.2):
