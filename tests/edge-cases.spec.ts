@@ -183,6 +183,87 @@ test.describe('Edge cases and missing coverage', () => {
     await expect(row.getCell('B')).toHaveText('2');
   });
 
+  test('revalidate() drops columns removed from the DOM', async ({ page }) => {
+    await page.setContent(`
+      <table id="t">
+        <thead><tr><th>A</th><th>B</th></tr></thead>
+        <tbody><tr><td>1</td><td>2</td></tr></tbody>
+      </table>
+    `);
+    const table = useTable(page.locator('#t'));
+    await table.init();
+    expect(await table.getHeaders()).toEqual(['A', 'B']);
+
+    await page.evaluate(() => {
+      document.querySelectorAll('#t thead th')[1].remove();
+      document.querySelectorAll('#t tbody tr').forEach((r) => {
+        const td = r.querySelectorAll('td')[1];
+        if (td) td.remove();
+      });
+    });
+
+    await table.revalidate();
+    expect(await table.getHeaders()).toEqual(['A']);
+  });
+
+  test('toArray() scrapes rows then resets page index (#432)', async ({ page }) => {
+    await page.setContent(`
+      <table id="t">
+        <thead><tr><th>Name</th></tr></thead>
+        <tbody>
+          <tr><td>Alice</td></tr>
+          <tr><td>Bob</td></tr>
+        </tbody>
+      </table>
+    `);
+    const table = useTable(page.locator('#t'));
+    await table.init();
+    table.currentPageIndex = 2;
+
+    const rows = await table.toArray();
+    expect(rows).toEqual([{ Name: 'Alice' }, { Name: 'Bob' }]);
+    expect(table.currentPageIndex).toBe(0);
+  });
+
+  test('function selectors resolve headers and cells (#432)', async ({ page }) => {
+    await page.setContent(`
+      <table id="t">
+        <thead><tr><th>ID</th><th>Name</th></tr></thead>
+        <tbody>
+          <tr><td>1</td><td>Alice</td></tr>
+          <tr><td>2</td><td>Bob</td></tr>
+        </tbody>
+      </table>
+    `);
+    const table = useTable(page.locator('#t'), {
+      headerSelector: (root) => root.locator('thead th'),
+      rowSelector: 'tbody tr',
+      cellSelector: (row) => row.locator('td'),
+    });
+    await table.init();
+    expect(await table.getHeaders()).toEqual(['ID', 'Name']);
+    const row = table.getRow({ Name: 'Bob' });
+    await expect(row.getCell('ID')).toHaveText('2');
+  });
+
+  test('getRow multi-match is a multi-element locator (#432)', async ({ page }) => {
+    await page.setContent(`
+      <table id="t">
+        <thead><tr><th>Status</th></tr></thead>
+        <tbody>
+          <tr><td>Active</td></tr>
+          <tr><td>Active</td></tr>
+        </tbody>
+      </table>
+    `);
+    const table = useTable(page.locator('#t'));
+    await table.init();
+    const row = table.getRow({ Status: 'Active' });
+    await expect(row).toHaveCount(2);
+    // Actions that require a single element surface Playwright's strict mode error
+    await expect(row.click()).rejects.toThrow(/strict mode violation/i);
+  });
+
   test('init({ timeout }) fails when headers stay loading within timeout', async ({ page }) => {
     await page.setContent(`
       <table id="t">
