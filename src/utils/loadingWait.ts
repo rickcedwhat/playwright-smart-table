@@ -7,8 +7,8 @@ import { logDebug } from './debugUtils';
  * Shared by countRows, findRow(s), and sort stabilization (#434).
  *
  * Timeout resolution (first defined wins):
- * 1. `loadingTimeout` — general gate for any isTableLoading poll
- * 2. `sortStabilizationTimeout` — sort-specific override (legacy)
+ * 1. Explicit `options.timeout` — e.g. the sort caller's stabilization timeout
+ * 2. `loadingTimeout` — general gate for any isTableLoading poll
  * 3. 10_000 ms default
  */
 export async function waitWhileTableLoading(
@@ -25,7 +25,6 @@ export async function waitWhileTableLoading(
   const timeout =
     options?.timeout ??
     loading.loadingTimeout ??
-    loading.sortStabilizationTimeout ??
     10_000;
   const poll =
     options?.pollInterval ??
@@ -33,8 +32,21 @@ export async function waitWhileTableLoading(
     200;
   const deadline = Date.now() + timeout;
 
-  while (Date.now() < deadline && (await isTableLoading(context))) {
+  while (Date.now() < deadline) {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      // A custom predicate may never settle. Stop waiting when the budget expires;
+      // Promise.race also handles any later rejection from that predicate.
+      const expired = new Promise<false>(resolve => {
+        timer = setTimeout(() => resolve(false), Math.max(0, deadline - Date.now()));
+      });
+      if (!(await Promise.race([isTableLoading(context), expired]))) return;
+    } finally {
+      clearTimeout(timer);
+    }
+    const remaining = deadline - Date.now();
+    if (remaining <= 0) return;
     logDebug(config, 'verbose', `${label}: table is loading... waiting`);
-    await page.waitForTimeout(poll);
+    await page.waitForTimeout(Math.min(poll, remaining));
   }
 }

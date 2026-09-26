@@ -249,10 +249,8 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
   const result: TableResult<T> = {
     get currentPageIndex() { return tableState.currentPageIndex; },
     set currentPageIndex(v: number) {
-      logDebug(
-        config,
-        'info',
-        'Manually assigning table.currentPageIndex can desync pagination path planning. Prefer reset() / library navigation; writable access may become read-only in v7.'
+      console.warn(
+        '[SmartTable] Manually assigning table.currentPageIndex can desync pagination path planning. Prefer reset() / library navigation; writable access may become read-only in v7.'
       );
       tableState.currentPageIndex = v;
     },
@@ -269,10 +267,8 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
         config.maxPages === 1 &&
         (config.strategies.pagination?.goNext || config.strategies.pagination?.goNextBulk)
       ) {
-        logDebug(
-          config,
-          'info',
-          'maxPages is 1 but a pagination strategy is configured — iteration/find will never leave page 1. Pass maxPages: N (or Infinity) to scan further pages.'
+        console.warn(
+          '[SmartTable] maxPages is 1 but a pagination strategy is configured — iteration/find will never leave page 1. Pass maxPages: N (or Infinity) to scan further pages.'
         );
       }
       let map: Map<string, number>;

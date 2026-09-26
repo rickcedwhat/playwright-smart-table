@@ -1,7 +1,9 @@
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { waitWhileTableLoading } from '../../src/utils/loadingWait';
 import { SET_CURRENT_PAGE_INDEX, setCurrentPageIndex } from '../../src/utils/pageIndex';
 import { muiDataGrid, muiTable } from '../../src/presets/mui';
+import { useTable } from '../../src/useTable';
+import { TableMapper } from '../../src/engine/tableMapper';
 
 vi.mock('../../src/utils/elementTracker', () => {
   return {
@@ -29,33 +31,70 @@ import { runMap } from '../../src/engine/tableIteration';
 
 describe('gbu #434 safer defaults', () => {
   describe('waitWhileTableLoading', () => {
-    it('stops polling after loadingTimeout even if still loading', async () => {
-      const waits: number[] = [];
-      const page = {
-        waitForTimeout: vi.fn(async (ms: number) => {
-          waits.push(ms);
-        }),
-      };
-      let calls = 0;
-      const config = {
-        strategies: {
-          loading: {
-            isTableLoading: async () => {
-              calls++;
-              return true;
-            },
-            loadingTimeout: 50,
-            sortStabilizationPollInterval: 20,
-          },
-        },
-        debug: { logLevel: 'none' as const },
-      } as any;
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => {
+      vi.useRealTimers();
+      vi.restoreAllMocks();
+    });
 
-      const started = Date.now();
-      await waitWhileTableLoading(config, {} as any, page as any, 'test');
-      expect(Date.now() - started).toBeLessThan(2000);
-      expect(calls).toBeGreaterThan(1);
-      expect(waits.length).toBeGreaterThan(0);
+    const page = {
+      waitForTimeout: (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms)),
+    };
+
+    it.each([
+      { loading: { sortStabilizationTimeout: 5 }, options: undefined, expected: 10_000 },
+      { loading: { loadingTimeout: 50, sortStabilizationTimeout: 5 }, options: undefined, expected: 50 },
+      { loading: { loadingTimeout: 50 }, options: { timeout: 25 }, expected: 25 },
+    ])('uses the correct timeout for $loading and $options', async ({ loading, options, expected }) => {
+      const done = vi.fn();
+      const config = { strategies: { loading: { ...loading, isTableLoading: async () => true } } };
+      const waiting = waitWhileTableLoading(config as any, {} as any, page as any, 'test', options).then(done);
+      await vi.advanceTimersByTimeAsync(expected - 1);
+      expect(done).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      await waiting;
+      expect(done).toHaveBeenCalledOnce();
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('bounds a pending predicate by the remaining budget after earlier polls', async () => {
+      const predicate = vi.fn()
+        .mockResolvedValueOnce(true)
+        .mockImplementation(() => new Promise(() => {}));
+      const config = { strategies: { loading: { isTableLoading: predicate, loadingTimeout: 50 } } };
+      const done = vi.fn();
+      const waiting = waitWhileTableLoading(config as any, {} as any, page as any, 'test', { pollInterval: 20 }).then(done);
+      await vi.advanceTimersByTimeAsync(49);
+      expect(predicate).toHaveBeenCalledTimes(2);
+      expect(done).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      await waiting;
+      expect(done).toHaveBeenCalledOnce();
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('caps a long poll by the budget left after a slow predicate', async () => {
+      const waitForTimeout = vi.spyOn(page, 'waitForTimeout');
+      const config = { strategies: { loading: {
+        isTableLoading: () => new Promise(resolve => setTimeout(() => resolve(true), 30)),
+        loadingTimeout: 50,
+      } } };
+      const waiting = waitWhileTableLoading(config as any, {} as any, page as any, 'test', { pollInterval: 1000 });
+      await vi.advanceTimersByTimeAsync(50);
+      await waiting;
+      expect(waitForTimeout).toHaveBeenCalledExactlyOnceWith(20);
+      expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it.each([false, new Error('predicate failed')])('clears the deadline timer when the predicate settles: %s', async result => {
+      const config = { strategies: { loading: { isTableLoading: async () => {
+        if (result instanceof Error) throw result;
+        return result;
+      } } } };
+      const waiting = waitWhileTableLoading(config as any, {} as any, page as any, 'test');
+      if (result instanceof Error) await expect(waiting).rejects.toBe(result);
+      else await waiting;
+      expect(vi.getTimerCount()).toBe(0);
     });
 
     it('returns immediately when isTableLoading is unset', async () => {
@@ -101,6 +140,28 @@ describe('gbu #434 safer defaults', () => {
       } finally {
         spy.mockRestore();
       }
+    });
+  });
+
+  describe('warnings with default logging', () => {
+    afterEach(() => vi.restoreAllMocks());
+
+    it('warns on manual page assignment but keeps internal navigation silent', () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const table = useTable({} as any);
+      setCurrentPageIndex(table, 2);
+      expect(warn).not.toHaveBeenCalled();
+      table.currentPageIndex = 3;
+      expect(warn).toHaveBeenCalledExactlyOnceWith(expect.stringContaining('Manually assigning table.currentPageIndex'));
+      expect(table.currentPageIndex).toBe(3);
+    });
+
+    it.each(['goNext', 'goNextBulk'])('warns when %s is configured with default maxPages', async method => {
+      vi.spyOn(TableMapper.prototype, 'getMap').mockResolvedValue(new Map([['Name', 0]]));
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const table = useTable({} as any, { strategies: { pagination: { [method]: async () => false } } });
+      await table.init();
+      expect(warn).toHaveBeenCalledExactlyOnceWith(expect.stringContaining('maxPages is 1'));
     });
   });
 
