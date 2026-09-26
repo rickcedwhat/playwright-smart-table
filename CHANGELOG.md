@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **GBU test suite cleanup (#432)** — cut redundant unit/E2E specs; demoted live HTMX `strategies.spec.ts` and slow `performance.spec.ts` from CI A; added coverage for `toArray`, function selectors, getRow strict mode, stabilization/`contentReady`, and `Pagination.click` disabled/windowed edges.
+
 ## [6.21.0] - 2026-09-25
 
 ### Fixed

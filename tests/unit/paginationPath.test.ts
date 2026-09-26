@@ -272,40 +272,6 @@ describe('executeNavigationWithGoToPageRetry', () => {
 });
 
 
-describe('planNavigationPath - comprehensive', () => {
-  it('returns empty for same page', () => {
-    expect(planNavigationPath(2, 2, {} as any)).toEqual([]);
-  });
-
-  it('prefers goToPage when available', () => {
-    const p: PaginationPrimitives = { goToPage: async () => true };
-    expect(planNavigationPath(0, 10, p)).toEqual([{ type: 'goToPage', pageIndex: 10 }]);
-  });
-
-  it('forward: uses goNext when no bulk', () => {
-    const p: PaginationPrimitives = { goNext: async () => true };
-    expect(planNavigationPath(0, 5, p)).toEqual([{ type: 'goNext', count: 5 }]);
-  });
-
-  it('forward: uses bulk+previous when overshoot cheaper', () => {
-    const p: PaginationPrimitives = {
-      goNextBulk: async () => 10,
-      nextBulkPages: 10,
-      goPrevious: async () => true,
-      goPreviousBulk: async () => 10,
-      previousBulkPages: 10,
-    };
-    const path = planNavigationPath(3, 12, p);
-    expect(path.length).toBeGreaterThan(0);
-    expect(path[0].type).toBe('goNextBulk');
-  });
-
-  it('backward: uses goPrevious when no bulk', () => {
-    const p: PaginationPrimitives = { goPrevious: async () => true };
-    expect(planNavigationPath(5, 0, p)).toEqual([{ type: 'goPrevious', count: 5 }]);
-  });
-});
-
 describe('executeNavigationWithGoToPageRetry - behaviors & edge cases', () => {
   const mockContext = {} as TableContext;
 
