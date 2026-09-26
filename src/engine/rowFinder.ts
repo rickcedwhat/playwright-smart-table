@@ -10,6 +10,7 @@ import { NavigationBarrier } from '../utils/navigationBarrier';
 import { resolveLogicalRowIndex, resolveRowLoading } from './rowResolution';
 import { resolveCellLocator } from '../utils/resolveCellLocator';
 import { scanPages } from './scanPages';
+import { waitWhileTableLoading } from '../utils/loadingWait';
 
 export class RowFinder<T = any> {
     private resolve: (item: Selector, parent: Locator | Page) => Locator;
@@ -158,10 +159,12 @@ export class RowFinder<T = any> {
             page: this.rootLocator.page(),
             resolve: this.resolve
         };
-        while (await isTableLoading(context)) {
-            logDebug(this.config, 'verbose', 'Table is loading... waiting');
-            await this.rootLocator.page().waitForTimeout(200);
-        }
+        await waitWhileTableLoading(
+            this.config,
+            context,
+            this.rootLocator.page(),
+            'waitForTableReady'
+        );
     }
 
     public async findRows(

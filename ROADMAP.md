@@ -11,7 +11,7 @@ Guiding light: [`PHILOSOPHY.md`](PHILOSOPHY.md). Filed from GBU 2026-08-22 (`GBU
 - [x] **scrollToColumn / bringIntoView prefer viewport** — [#430](https://github.com/rickcedwhat/playwright-smart-table/issues/430)
 - [x] **No framework CSS defaults in generic strategies** — [#431](https://github.com/rickcedwhat/playwright-smart-table/issues/431)
 - [x] **Test suite cleanup (redundant + gaps)** — [#432](https://github.com/rickcedwhat/playwright-smart-table/issues/432)
-- [ ] **Safer defaults & footguns** — [#434](https://github.com/rickcedwhat/playwright-smart-table/issues/434)
+- [x] **Safer defaults & footguns** — [#434](https://github.com/rickcedwhat/playwright-smart-table/issues/434)
 - [ ] **ROADMAP/philosophy tracking hygiene** — [#433](https://github.com/rickcedwhat/playwright-smart-table/issues/433)
 
 Related closed work to reopen/extend when picking these up: [#327](https://github.com/rickcedwhat/playwright-smart-table/issues/327) (v7 preset API), [#386](https://github.com/rickcedwhat/playwright-smart-table/issues/386) (Grafana-class patterns).
@@ -31,15 +31,14 @@ Related closed work to reopen/extend when picking these up: [#327](https://githu
     - **Purpose**: Introduce familiar, high-level array methods on the `TableResult` interface with a public async iterator as the engine.
     - **Callback**: `{ row, rowIndex, stop }` — call `stop()` to end iteration early.
     - **Options**: `{ concurrency?: 'parallel' | 'sequential' | 'synchronized', maxPages?: number, dedupe?: DedupeStrategy }`.
-      - `forEach` and `filter`: default `concurrency: 'sequential'` (interaction ordering matters).
-      - `map`: default `concurrency: 'parallel'` (reads are safely concurrent within a page).
+      - `forEach`, `filter`, and `map`: default `concurrency: 'sequential'` (safer for UI interactions; pass `parallel` for read-only maps).
       - `synchronized`: lock-step navigation with serialized callbacks (virtualized grids).
     - **Also adds**: Public `[Symbol.asyncIterator]` on `TableResult` — enables `for await (const { row } of table)`.
     - **Deprecates**:
       - `iterateThroughTable` (use `forEach`/`map`/`filter` instead).
       - `getColumnValues` (use `map` instead) — its deprecation is documented; removal remains planned for v7.0.0.
  - [x] **Document `forEach`/`map`/`filter` in README**
- - [x] **JSDoc `@note` on `map`'s `concurrency: 'parallel'` default**
+ - [x] **Safer `map` concurrency default (`sequential`; parallel opt-in)** — [#434](https://github.com/rickcedwhat/playwright-smart-table/issues/434)
  - [x] **Add mutation testing (Stryker)**
     - **Purpose**: Measure test effectiveness beyond coverage by introducing mutation testing using Stryker for Vitest.
     - **Goal**: Run locally and optionally as a scheduled CI job; aim for a high mutation score (>=80–90%).

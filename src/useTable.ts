@@ -18,6 +18,8 @@ import { debugDelay, logDebug, warnIfDebugInCI } from './utils/debugUtils';
 import { createSmartRowArray, SmartRowArray } from './utils/smartRowArray';
 import { ElementTracker } from './utils/elementTracker';
 import { NavigationBarrier } from './utils/navigationBarrier';
+import { waitWhileTableLoading } from './utils/loadingWait';
+import { SET_CURRENT_PAGE_INDEX } from './utils/pageIndex';
 
 // Helper to safely serialize objects containing functions for logging
 const safeStringify = (obj: any) => {
@@ -202,7 +204,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     let finalPrompt = content;
     finalPrompt += `\n\n👇 Useful TypeScript Definitions 👇\n\`\`\`typescript\n${MINIMAL_CONFIG_CONTEXT}\n\`\`\`\n`;
 
-    console.log(`⚠️ Throwing error to display [${promptName}] cleanly...`);
+    logDebug(config, 'info', `Throwing error to display [${promptName}] cleanly...`);
     throw new Error(finalPrompt);
   };
 
@@ -246,7 +248,12 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
 
   const result: TableResult<T> = {
     get currentPageIndex() { return tableState.currentPageIndex; },
-    set currentPageIndex(v: number) { tableState.currentPageIndex = v; },
+    set currentPageIndex(v: number) {
+      console.warn(
+        '[SmartTable] Manually assigning table.currentPageIndex can desync pagination path planning. Prefer reset() / library navigation; writable access may become read-only in v7.'
+      );
+      tableState.currentPageIndex = v;
+    },
     init: async (options?: { timeout?: number }): Promise<TableResult<T>> => {
       if (tableMapper.isInitialized() || tableState.empty) return result;
 
@@ -256,6 +263,14 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       warnIfDebugInCI(config);
       logDebug(config, 'info', 'Initializing table');
 
+      if (
+        config.maxPages === 1 &&
+        (config.strategies.pagination?.goNext || config.strategies.pagination?.goNextBulk)
+      ) {
+        console.warn(
+          '[SmartTable] maxPages is 1 but a pagination strategy is configured — iteration/find will never leave page 1. Pass maxPages: N (or Infinity) to scan further pages.'
+        );
+      }
       let map: Map<string, number>;
       try {
         map = await tableMapper.getMap(options?.timeout);
@@ -381,10 +396,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       const isTableLoading = config.strategies.loading?.isTableLoading;
       if (isTableLoading) {
         const ctx = createStrategyContext();
-        while (await isTableLoading(ctx)) {
-          log('countRows: table is loading... waiting');
-          await rootLocator.page().waitForTimeout(200);
-        }
+        await waitWhileTableLoading(config, ctx, rootLocator.page(), 'countRows');
       }
 
       if (!hasPagination) {
@@ -408,10 +420,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
             waitForReady: async () => {
               if (!isTableLoading) return;
               const ctx = createStrategyContext();
-              while (await isTableLoading(ctx)) {
-                log('countRows: table is loading... waiting');
-                await rootLocator.page().waitForTimeout(200);
-              }
+              await waitWhileTableLoading(config, ctx, rootLocator.page(), 'countRows');
             },
           },
           async ({ pagesScanned: pageNum }) => {
@@ -654,12 +663,15 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
           await config.strategies.sorting.doSort({ columnName, direction, context });
 
           if (config.strategies.loading?.isTableLoading) {
-            const timeout = config.strategies.loading.sortStabilizationTimeout ?? 10_000;
+            const timeout =
+              config.strategies.loading.sortStabilizationTimeout ??
+              config.strategies.loading.loadingTimeout ??
+              10_000;
             const poll = config.strategies.loading.sortStabilizationPollInterval ?? 100;
-            const deadline = Date.now() + timeout;
-            while (Date.now() < deadline && await config.strategies.loading.isTableLoading(context)) {
-              await rootLocator.page().waitForTimeout(poll);
-            }
+            await waitWhileTableLoading(config, context, rootLocator.page(), 'sorting.apply', {
+              timeout,
+              pollInterval: poll,
+            });
           } else {
             const fallback = config.strategies.loading?.sortStabilizationFallbackDelay ?? 200;
             await rootLocator.page().waitForTimeout(fallback);
@@ -846,10 +858,19 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     },
 
     generateConfigPrompt: async () => {
-      console.warn('⚠️ [playwright-smart-table] generateConfigPrompt() is deprecated and will be removed in v7.0.0. Please use generateConfig() instead.');
+      logDebug(
+        config,
+        'error',
+        'generateConfigPrompt() is deprecated and will be removed in v7.0.0. Please use generateConfig() instead.'
+      );
       return result.generateConfig();
     },
   };
+
+  Object.defineProperty(result, SET_CURRENT_PAGE_INDEX, {
+    value: (v: number) => { tableState.currentPageIndex = v; },
+    enumerable: false,
+  });
 
   createStrategyContext = () => ({
     root: rootLocator,

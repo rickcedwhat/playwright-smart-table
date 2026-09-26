@@ -7,6 +7,7 @@ import { debugDelay, logDebug } from './utils/debugUtils';
 import { planNavigationPath, executeNavigationPath, executeNavigationWithGoToPageRetry } from './utils/paginationPath';
 import { SENTINEL_ROW } from './utils/sentinel';
 import { NavigationBarrier } from './utils/navigationBarrier';
+import { setCurrentPageIndex } from './utils/pageIndex';
 
 type StrategyContext = {
     config: FinalTableConfig<any>;
@@ -970,7 +971,7 @@ const createSmartRow = <T = any>(
             const primitives = config.strategies.pagination as import('./types').PaginationPrimitives;
             const context = { root: rootLocator, config, page: rootLocator.page(), resolve };
             const getCurrent = () => parentTable.currentPageIndex;
-            const setCurrent = (n: number) => { parentTable.currentPageIndex = n; };
+            const setCurrent = (n: number) => { setCurrentPageIndex(parentTable, n); };
 
             if (primitives.goToPage) {
                 logDebug(config, 'info', `bringIntoView: Navigating to page ${tablePageIndex} (goToPage retry loop)`);
@@ -992,7 +993,7 @@ const createSmartRow = <T = any>(
                         const ok = await primitives.goNext(context);
                         if (!ok) throw new Error(`bringIntoView: goNext failed before reaching page ${tablePageIndex}.`);
                     }
-                    parentTable.currentPageIndex = tablePageIndex;
+                    setCurrentPageIndex(parentTable, tablePageIndex);
                 } else {
                     logDebug(config, 'error', `Cannot bring row on page ${tablePageIndex} into view. No backwards pagination strategies (goToPage, goPrevious, goPreviousBulk, or goToFirst+goNext) provided.`);
                     throw new Error(`Cannot bring row on page ${tablePageIndex} into view: Row is on a different page and no backward pagination primitive found.`);

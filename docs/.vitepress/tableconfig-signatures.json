@@ -17,12 +17,12 @@
   {
     "name": "maxPages",
     "signature": "maxPages?: number",
-    "comment": "/** Number of pages to scan for verification */"
+    "comment": "/**\n* Number of pages to scan for verification / iteration.\n* Defaults to `1` — set explicitly (e.g. `maxPages: 5`) when using a pagination\n* strategy, or you will never leave page 1. Init logs a warning when pagination\n* is configured and this is still `1`.\n*/"
   },
   {
     "name": "concurrency",
     "signature": "concurrency?: RowIterationMode",
-    "comment": "/**\n* Default concurrency strategy for iteration methods.\n* Can be overridden by the options passed to forEach, map, or filter.\n*/"
+    "comment": "/**\n* Default concurrency strategy for iteration methods.\n* Can be overridden by the options passed to forEach, map, or filter.\n* Defaults to sequential when unset (safer for UI interactions).\n*/"
   },
   {
     "name": "headerTransformer",

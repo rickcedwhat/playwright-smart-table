@@ -4,6 +4,7 @@
 
 ### Changed
 
+- **Safer defaults & footguns (#434)** — `map`/`toArray` default to `concurrency: 'sequential'` (pass `parallel` for read-only extraction); init warns when `maxPages: 1` with a pagination strategy; `currentPageIndex` public writes warn (library uses an internal setter); `isTableLoading` polls share a bounded `loadingTimeout` (default 10s) across countRows/findRow(s)/sort; `generateConfig*` routes through `logDebug`; MUI `doSort` is trigger-only (core owns retries).
 - **GBU test suite cleanup (#432)** — cut redundant unit/E2E specs; demoted live HTMX `strategies.spec.ts` and slow `performance.spec.ts` from CI A; added coverage for `toArray`, function selectors, getRow strict mode, stabilization/`contentReady`, and `Pagination.click` disabled/windowed edges.
 
 ## [6.21.0] - 2026-09-25

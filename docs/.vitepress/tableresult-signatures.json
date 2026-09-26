@@ -2,7 +2,7 @@
   {
     "name": "currentPageIndex",
     "signature": "currentPageIndex: number",
-    "comment": "/**\n* Represents the current page index of the table's DOM.\n* Starts at 0. Automatically maintained by the library during pagination and bringIntoView.\n*/"
+    "comment": "/**\n* Current DOM page index (0-based). Automatically maintained during pagination\n* and `bringIntoView`. Treat as **read-only** — assigning manually can desync\n* the path planner. Manual writes log a warning; prefer `reset()` / library\n* navigation. Writable access may become read-only in v7.\n*/"
   },
   {
     "name": "init",
@@ -92,7 +92,7 @@
   {
     "name": "map",
     "signature": "map<R>(\n  callback: (ctx: RowIterationContext<T>) => R | Promise<R>,\n  options?: RowIterationOptions\n  ): Promise<R[]>",
-    "comment": "/**\n* Transforms every row across all pages into a value. Returns a flat array.\n* Execution is parallel within each page by default (safe for reads).\n* Call `stop()` to halt after the current page finishes.\n*\n* > **⚠️ UI Interactions:** `map` defaults to `concurrency: 'parallel'`. If your callback opens popovers,\n* > fills inputs, or otherwise mutates UI state, pass `concurrency: 'sequential'` (or `'synchronized'`\n* > when navigation must stay lock-step) to avoid overlapping interactions.\n*\n* @param callback - Function receiving { row, rowIndex, stop }\n* @param options - maxPages, concurrency, dedupe, useBulkPagination\n*\n* @example\n* // Data extraction — parallel is safe\n* const emails = await table.map(({ row }) => row.getCell('Email').innerText());\n*\n* @example\n* // UI interactions — use sequential (or synchronized) concurrency\n* const assignees = await table.map(async ({ row }) => {\n*   await row.getCell('Assignee').locator('button').click();\n*   const name = await page.locator('.popover .name').innerText();\n*   await page.keyboard.press('Escape');\n*   return name;\n* }, { concurrency: 'sequential' });\n*/"
+    "comment": "/**\n* Transforms every row across all pages into a value. Returns a flat array.\n* Defaults to `concurrency: 'sequential'` (safe for clicks/fills). Pass\n* `concurrency: 'parallel'` for read-only extraction, or `'synchronized'` when\n* navigation must stay lock-step on virtualized grids.\n* Call `stop()` to halt after the current page finishes.\n*\n* @param callback - Function receiving { row, rowIndex, stop }\n* @param options - maxPages, concurrency, dedupe, useBulkPagination\n*\n* @example\n* // Default sequential — safe for UI interactions\n* const assignees = await table.map(async ({ row }) => {\n*   await row.getCell('Assignee').locator('button').click();\n*   const name = await page.locator('.popover .name').innerText();\n*   await page.keyboard.press('Escape');\n*   return name;\n* });\n*\n* @example\n* // Read-only extraction — opt into parallel\n* const emails = await table.map(\n*   ({ row }) => row.getCell('Email').innerText(),\n*   { concurrency: 'parallel' }\n* );\n*/"
   },
   {
     "name": "callback",

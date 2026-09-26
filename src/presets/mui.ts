@@ -161,21 +161,13 @@ export function createMuiTable(opts?: { buttonLabels?: MuiButtonLabels }): Parti
 
                 return 'none';
             },
-            doSort: async ({ columnName, direction, context }) => {
+            doSort: async ({ columnName, context }) => {
+                // Trigger-only: core `sorting.apply` owns retries + state checks (#434).
                 if (!context.getHeaderCell) return;
                 const header = await context.getHeaderCell(columnName);
                 const sortLabel = header.locator('.MuiTableSortLabel-root').first();
                 const target = await sortLabel.isVisible().catch(() => false) ? sortLabel : header;
-
-                let current = await context.config.strategies.sorting?.getSortState({ columnName, context }) || 'none';
-                let attempts = 0;
-                // Click until the state matches the target direction, max 3 times (none -> asc -> desc)
-                while (current !== direction && attempts < 3) {
-                    await target.click();
-                    await context.page.waitForTimeout(100);
-                    current = await context.config.strategies.sorting?.getSortState({ columnName, context }) || 'none';
-                    attempts++;
-                }
+                await target.click();
             }
         },
         dedupe: async (row) => {
@@ -323,28 +315,22 @@ export function createMuiDataGrid(opts?: { buttonLabels?: MuiButtonLabels }): Pa
                 if (sortAttr === 'descending') return 'desc';
                 return 'none';
             },
-            doSort: async ({ columnName, direction, context }) => {
+            doSort: async ({ columnName, context }) => {
+                // Trigger-only: core `sorting.apply` owns retries + state checks (#434).
                 if (!context.getHeaderCell) return;
                 const header = await context.getHeaderCell(columnName);
 
-                let current = await context.config.strategies.sorting?.getSortState({ columnName, context }) || 'none';
-                let attempts = 0;
-                while (current !== direction && attempts < 3) {
-                    const clickTarget = header.locator('.MuiDataGrid-columnHeaderTitleContainer').first();
-                    if (await clickTarget.isVisible()) {
-                        await clickTarget.click({ force: true });
-                    } else {
-                        await header.click({ force: true });
-                    }
-                    
-                    // Wait for stabilization (using DataGrid specific overlay check inside helper)
-                    const displayedRows = context.root.locator('.MuiTablePagination-displayedRows');
-                    const text = await displayedRows.innerText().catch(() => '');
-                    await waitForMuiPaginationStabilization(context, displayedRows, text);
-
-                    current = await context.config.strategies.sorting?.getSortState({ columnName, context }) || 'none';
-                    attempts++;
+                const clickTarget = header.locator('.MuiDataGrid-columnHeaderTitleContainer').first();
+                if (await clickTarget.isVisible()) {
+                    await clickTarget.click({ force: true });
+                } else {
+                    await header.click({ force: true });
                 }
+
+                // One stabilization wait after the click; core also polls isTableLoading.
+                const displayedRows = context.root.locator('.MuiTablePagination-displayedRows');
+                const text = await displayedRows.innerText().catch(() => '');
+                await waitForMuiPaginationStabilization(context, displayedRows, text);
             }
         },
         dedupe: async (row) => {

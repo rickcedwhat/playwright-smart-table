@@ -52,9 +52,9 @@ export async function runMap<T, R>(
   const effectiveMaxPages = options.maxPages ?? env.config.maxPages;
   const dedupeStrategy = options.dedupe ?? env.config.strategies.dedupe;
   const dedupeKeys = dedupeStrategy ? new Set<string | number>() : null;
-  const defaultMode = label === 'map' ? 'parallel' : 'sequential';
+  // Sequential by default for all iteration labels (#434) — parallel is opt-in for read-only maps.
   const concurrency =
-    options.concurrency ?? env.config.concurrency ?? defaultMode;
+    options.concurrency ?? env.config.concurrency ?? 'sequential';
   const useBarrier = concurrency === 'synchronized';
   // Mutex must not pair with the navigation barrier: synchronized mode needs every row
   // to enter barrier.sync concurrently; serializing callbacks here deadlocks (first row waits
