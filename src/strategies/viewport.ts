@@ -207,7 +207,10 @@ const dataAttribute = (options?: DataAttributeViewportOptions): ViewportStrategy
             if (!canScroll) return;
 
             // Wait for a cell at this column index to mount in any row
-            await resolve(config.rowSelector, root)
+            const rows = typeof config.rowSelector === 'string'
+                ? root.locator(config.rowSelector)
+                : resolve(config.rowSelector, root);
+            await rows
                 .locator(`[${colAttr}="${colIndex + colOffset}"]`)
                 .first()
                 .waitFor({ state: 'attached', timeout: attachTimeout });
