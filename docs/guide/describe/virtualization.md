@@ -86,7 +86,7 @@ If your grid stamps each row with its real position (`data-rowindex`, `aria-rowi
 strategies: {
   resolveRowIndex: async (row) => {
     const v = await row.getAttribute('data-rowindex')
-    if (v === null) return undefined
+    if (!v?.trim() || !Number.isFinite(Number(v))) return undefined // not a real data row yet
     return { index: Number(v), selector: `[data-rowindex="${v}"]` }
   }
 }

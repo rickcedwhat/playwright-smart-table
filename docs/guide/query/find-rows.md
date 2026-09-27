@@ -36,9 +36,9 @@ Returns every match across pages. Add a pagination strategy to search beyond pag
 const row = await table.findRowByIndex(250, { maxPages: 50 })
 ```
 
-Row 250 of the dataset — not the 250th element on the page. On a virtualized or paginated table, we'll scroll or page until that row is rendered, then hand it back. If it can't be reached within `maxPages`, it throws rather than giving you some other row.
+Row 250 of the dataset — not the 250th element on the page. If it's already rendered, you get it straight away. If not, we jump to it with your viewport's `scrollToRow`, or page forward with your pagination strategy until it shows up. If it can't be reached — no way to move, or not found within `maxPages` — it throws rather than giving you some other row.
 
-Needs a [`resolveRowIndex`](/guide/describe/virtualization#which-row-is-which) strategy so we can tell which rendered row is which. For the Nth row currently on screen, use `getRowByIndex(n)` instead — synchronous, no scrolling.
+Needs a [`resolveRowIndex`](/guide/describe/virtualization#which-row-is-which) strategy so we can tell which rendered row is which. That only identifies rows; it doesn't move the table. For the Nth row currently on screen, use `getRowByIndex(n)` instead — synchronous, no scrolling.
 
 ---
 

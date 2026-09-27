@@ -70,7 +70,7 @@ for await (const { row } of table) {
 await table.map(async ({ row }) => row.toJSON(), { concurrency: 'parallel' })
 ```
 
-- **`sequential`** — one row at a time, in order. The default for everything.
+- **`sequential`** — one row at a time, in order. The default for everything, unless you set `concurrency` in your table config — then that's the default, and a per-call option still wins.
 - **`parallel`** — all row callbacks on a page run concurrently. Fastest, but only safe when your callback just reads.
 - **`synchronized`** — row callbacks run in parallel, but the library waits for all rows on the current page to finish before advancing to the next page. Use when your callbacks interact with the table and page navigation needs to be coordinated.
 
