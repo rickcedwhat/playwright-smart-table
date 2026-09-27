@@ -22,33 +22,34 @@ const signatureFiles = {
     tablestrategies: 'tablestrategies-signatures.json'
 };
 
-// Combine all signatures into one map
-const allSignatures = new Map();
+// One signature map per interface. Names overlap across interfaces
+// (e.g. `filter` / `sorting` are both TableResult members and strategies),
+// so each doc page only looks up its own interface.
+const signaturesByType = {};
 
 Object.entries(signatureFiles).forEach(([type, filename]) => {
     const filepath = path.join(signaturesDir, filename);
+    const map = new Map();
     if (fs.existsSync(filepath)) {
         const sigs = JSON.parse(fs.readFileSync(filepath, 'utf-8'));
-        sigs.forEach(sig => {
-            allSignatures.set(sig.name, sig);
-        });
+        sigs.forEach(sig => map.set(sig.name, sig));
         console.log(`📖 Loaded ${sigs.length} signatures from ${type}`);
     }
+    signaturesByType[type] = map;
 });
 
-console.log(`\n✅ Total signatures loaded: ${allSignatures.size}\n`);
-
-// Files to process
-const docsFiles = [
-    'docs/api/table-methods.md',
-    'docs/api/table-config.md',
-    'docs/api/smart-row.md',
-    'docs/api/strategies.md'
-];
+const docsFiles = {
+    'docs/api/table-methods.md': 'tableresult',
+    'docs/api/table-config.md': 'tableconfig',
+    'docs/api/smart-row.md': 'smartrow',
+    'docs/api/strategies.md': 'tablestrategies'
+};
 
 let totalUpdates = 0;
+let missing = 0;
 
-docsFiles.forEach(relPath => {
+Object.entries(docsFiles).forEach(([relPath, type]) => {
+    const allSignatures = signaturesByType[type];
     const filepath = path.join(rootDir, relPath);
 
     if (!fs.existsSync(filepath)) {
@@ -66,7 +67,8 @@ docsFiles.forEach(relPath => {
         const sig = allSignatures.get(name);
 
         if (!sig) {
-            console.log(`   ⚠️  Signature not found: ${name}`);
+            console.log(`   ❌ ${path.basename(filepath)}: signature not found in ${type}: ${name}`);
+            missing++;
             return fullMatch;
         }
 
@@ -99,41 +101,20 @@ docsFiles.forEach(relPath => {
 
 console.log(`\n📊 Total signatures updated: ${totalUpdates}`);
 
+if (missing > 0) {
+    console.error(`\n❌ ${missing} api-signature tag(s) reference names that don't exist in src/types.ts.`);
+    process.exit(1);
+}
+
 // Helper functions
-function formatSignature(name, sig) {
-    // Clean up signature for better display
-    const cleanSig = sig.replace(/^\s+/, '').replace(/;$/, '');
 
-    // Special formatting for known methods
-    const formatters = {
-        init: () => 'init(options?: { timeout?: number }): Promise<TableResult>',
-        isInitialized: () => 'isInitialized(): boolean',
-        getHeaders: () => 'getHeaders(): Promise<string[]>',
-        getHeaderCell: () => 'getHeaderCell(columnName: string): Promise<Locator>',
-        getRow: () => 'getRow(\n  filters: Record<string, FilterValue>,\n  options?: { exact?: boolean }\n): SmartRow',
-        getRowByIndex: () => 'getRowByIndex(index: number): SmartRow',
-        findRow: () => 'findRow(\n  filters: Record<string, FilterValue>,\n  options?: { exact?: boolean, maxPages?: number }\n): Promise<SmartRow>',
-        findRows: () => 'findRows(\n  filters?: Record<string, FilterValue>,\n  options?: { exact?: boolean, maxPages?: number }\n): Promise<SmartRowArray<T>>',
-        forEach: () => 'forEach(\n  callback: (ctx: RowIterationContext<T>) => void | Promise<void>,\n  options?: RowIterationOptions\n): Promise<void>',
-        map: () => 'map<R>(\n  callback: (ctx: RowIterationContext<T>) => R | Promise<R>,\n  options?: RowIterationOptions\n): Promise<R[]>',
-        filter: () => 'filter(\n  predicate: (ctx: RowIterationContext<T>) => boolean | Promise<boolean>,\n  options?: RowIterationOptions\n): Promise<SmartRowArray<T>>',
-        reset: () => 'reset(): Promise<void>',
-        revalidate: () => 'revalidate(): Promise<void>',
-        scrollToColumn: () => 'scrollToColumn(columnName: string): Promise<void>',
-        getCell: () => 'getCell(columnName: string): Locator',
-        toJSON: () => 'toJSON(options?: { columns?: string[] }): Promise<T>',
-        bringIntoView: () => 'bringIntoView(): Promise<void>',
-        smartFill: () => 'smartFill(\n  data: Partial<T>,\n  options?: FillOptions\n): Promise<void>',
-        headerSelector: () => 'headerSelector?: Selector',
-        rowSelector: () => 'rowSelector?: Selector',
-        cellSelector: () => 'cellSelector?: Selector',
-        maxPages: () => 'maxPages?: number',
-        headerTransformer: () => 'headerTransformer?: (args: {\n  text: string,\n  index: number,\n  locator: Locator\n}) => string | Promise<string>',
-        debug: () => 'debug?: boolean | DebugConfig',
-        strategies: () => 'strategies?: Partial<TableStrategies>'
-    };
-
-    return formatters[name] ? formatters[name]() : cleanSig;
+// Signatures always come from src/types.ts — never hardcode them here, or the
+// published docs drift from the real API (see #441).
+function formatSignature(_name, sig) {
+    const lines = sig.replace(/;$/, '').split('\n').map(l => l.trim()).filter(Boolean);
+    return lines
+        .map((line, i) => (i === 0 || /^[)}\]]/.test(line) ? line : `  ${line}`))
+        .join('\n');
 }
 
 function extractParams(comment) {

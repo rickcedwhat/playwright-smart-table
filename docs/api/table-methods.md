@@ -19,7 +19,7 @@ const table = await useTable(page.locator('#my-table'), config).init();
 ### Signature
 
 ```typescript
-init(options?: { timeout?: number }): Promise<TableResult>
+init(options?: { timeout?: number }): Promise<TableResult<T>>
 ```
 
 ### Parameters
@@ -53,6 +53,53 @@ Returns `true` if `init()` has completed successfully.
 
 ```typescript
 if (!table.isInitialized()) await table.init();
+```
+
+---
+
+### `isEmpty`
+
+<!-- api-signature: isEmpty -->
+
+### Signature
+
+```typescript
+isEmpty(): boolean
+```
+
+<!-- /api-signature: isEmpty -->
+
+Returns `true` when `init()` succeeded through the [`emptyState`](/api/table-config#emptystate) path: header resolution failed, but the configured empty-state locator was visible. Row operations still throw on an empty table, so check this before calling them.
+
+```typescript
+await table.init();
+if (table.isEmpty()) {
+  await expect(page.getByText('No results')).toBeVisible();
+  return;
+}
+```
+
+---
+
+### `currentPageIndex`
+
+<!-- api-signature: currentPageIndex -->
+
+### Signature
+
+```typescript
+currentPageIndex: number
+```
+
+<!-- /api-signature: currentPageIndex -->
+
+0-based index of the page currently rendered in the DOM. Maintained by the library during pagination, `bringIntoView()`, and `reset()`.
+
+Treat it as read-only. Assigning it manually can desync the pagination path planner, and logs a warning (since v6.22.0). It may become read-only in v7.
+
+```typescript
+await table.findRows({ Status: 'Active' }, { maxPages: 3 });
+console.log(table.currentPageIndex); // e.g. 2
 ```
 
 ---
@@ -109,7 +156,7 @@ await table.revalidate();
 getRow(
   filters: Record<string, FilterValue>,
   options?: { exact?: boolean }
-): SmartRow
+): SmartRow<T>
 ```
 
 <!-- /api-signature: getRow -->
@@ -136,7 +183,9 @@ const email = await row.getCell('Email').innerText();
 ### Signature
 
 ```typescript
-getRowByIndex(index: number): SmartRow
+getRowByIndex(
+  index: number
+): SmartRow<T>
 ```
 
 ### Parameters
@@ -158,6 +207,43 @@ const firstRow = table.getRowByIndex(0);
 
 ---
 
+### `findRowByIndex`
+
+<!-- api-signature: findRowByIndex -->
+
+### Signature
+
+```typescript
+findRowByIndex(
+  index: number,
+  options?: { maxPages?: number }
+): Promise<SmartRow<T>>
+```
+
+### Parameters
+
+- `index` - 0-based logical/data-model row index
+- `options` - `maxPages` bounds how far to scroll/paginate (defaults to config.maxPages)
+
+<!-- /api-signature: findRowByIndex -->
+
+Returns the row with a specific **logical (data-model) index**, scrolling or paginating to reach it. Unlike [`getRowByIndex`](#getrowbyindex), which returns whatever sits at a DOM position, this finds the true row `index` in the dataset on virtualized tables.
+
+The row is reached by, in order:
+
+1. a currently-mounted row whose logical index matches
+2. `strategies.viewport.scrollToRow` (random-access jump), if configured
+3. advancing pages (on infinite-scroll tables, a "page" is a scroll step), up to `maxPages`
+
+Requires [`strategies.resolveRowIndex`](/api/strategies#resolverowindex); throws if it isn't configured. Also throws if the row can't be reached — it never falls back to a different row.
+
+```typescript
+const row = await table.findRowByIndex(250, { maxPages: 50 });
+await expect(row.getCell('ID')).toHaveText('250');
+```
+
+---
+
 ### `findRow`
 
 <!-- api-signature: findRow -->
@@ -168,7 +254,7 @@ const firstRow = table.getRowByIndex(0);
 findRow(
   filters: Record<string, FilterValue>,
   options?: { exact?: boolean, maxPages?: number }
-): Promise<SmartRow>
+): Promise<SmartRow<T>>
 ```
 
 ### Parameters
@@ -198,7 +284,7 @@ const row = await table.findRow({ Status: 'Active' }, { maxPages: 10 });
 ```typescript
 findRows(
   filters?: Record<string, FilterValue>,
-  options?: { exact?: boolean, maxPages?: number }
+  options?: { exact?: boolean, maxPages?: number, useBulkPagination?: boolean }
 ): Promise<SmartRowArray<T>>
 ```
 
@@ -276,16 +362,54 @@ map<R>(
 
 <!-- /api-signature: map -->
 
-Transforms every row across all pages into a value. Runs in parallel by default (safe for reads). Use `concurrency: 'sequential'` when callbacks interact with UI.
+Transforms every row across all pages into a value. Runs **sequentially** by default (since v6.22.0), which is safe for callbacks that click, fill, or open popovers. Pass `concurrency: 'parallel'` for read-only extraction when speed matters.
 
 ```typescript
-const emails = await table.map(({ row }) => row.getCell('Email').innerText());
-
-// UI interactions — use sequential
+// Default (sequential) — safe for UI interactions
 const results = await table.map(async ({ row }) => {
   await row.getCell('Actions').locator('button').click();
   return page.locator('.dialog .title').innerText();
-}, { concurrency: 'sequential' });
+});
+
+// Read-only — opt into parallel
+const emails = await table.map(
+  ({ row }) => row.getCell('Email').innerText(),
+  { concurrency: 'parallel' }
+);
+```
+
+→ [Guide: Iterate Rows](/guide/query/iterate)
+
+---
+
+### `toArray`
+
+<!-- api-signature: toArray -->
+
+### Signature
+
+```typescript
+toArray<R = Record<string, unknown>>(
+  callback?: (ctx: RowIterationContext<T>) => R | Promise<R>,
+  options?: RowIterationOptions
+): Promise<R[]>
+```
+
+### Parameters
+
+- `callback` - Optional map function. Defaults to `({ row }) => row.toJSON()`.
+- `options` - Same options as `map()`.
+
+<!-- /api-signature: toArray -->
+
+Shorthand for `map()` followed by `reset()`. Iterates every row across all pages, applies the callback (defaults to `row.toJSON()`), then resets the table to page 1 — even if the callback throws. Accepts the same options as `map`.
+
+```typescript
+// Every row as JSON
+const rows = await table.toArray();
+
+// Custom callback
+const names = await table.toArray(({ row }) => row.getCell('Name').innerText());
 ```
 
 → [Guide: Iterate Rows](/guide/query/iterate)
@@ -304,6 +428,11 @@ filter(
   options?: RowIterationOptions
 ): Promise<SmartRowArray<T>>
 ```
+
+### Parameters
+
+- `predicate` - Function receiving { row, rowIndex, stop }
+- `options` - maxPages, concurrency, dedupe, useBulkPagination
 
 <!-- /api-signature: filter -->
 
@@ -405,7 +534,7 @@ await table.scrollToColumn('Notes');
 ### Signature
 
 ```typescript
-countRows: (filters?: Record<string, FilterValue>, options?: { exact?: boolean; maxPages?: number }) => Promise<number>
+countRows(filters?: Record<string, FilterValue>, options?: { exact?: boolean; maxPages?: number }): Promise<number>
 ```
 
 <!-- /api-signature: countRows -->
@@ -483,8 +612,15 @@ const namesLegacy = await table.getColumnValues('Name');
 ### Signature
 
 ```typescript
-sorting?: SortingStrategy
+sorting: {
+  apply(columnName: string, direction: 'asc' | 'desc'): Promise<void>;
+  getState(columnName: string): Promise<'asc' | 'desc' | 'none'>;
+}
 ```
+
+### Parameters
+
+- `columnName` - The name of the column to check.
 
 <!-- /api-signature: sorting -->
 
@@ -508,7 +644,7 @@ await table.sorting.apply('Created At', 'desc');
 ### Signature
 
 ```typescript
-generateConfig: () => Promise<void>
+generateConfig(): Promise<void>
 ```
 
 <!-- /api-signature: generateConfig -->
