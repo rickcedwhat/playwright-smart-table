@@ -21,47 +21,47 @@
   },
   {
     "name": "getHeaders",
-    "signature": "getHeaders: () => Promise<string[]>",
+    "signature": "getHeaders(): Promise<string[]>",
     "comment": ""
   },
   {
     "name": "getHeaderCell",
-    "signature": "getHeaderCell: (columnName: string) => Promise<Locator>",
+    "signature": "getHeaderCell(columnName: string): Promise<Locator>",
     "comment": ""
   },
   {
     "name": "getRow",
-    "signature": "getRow: (\n  filters: Record<string, FilterValue>,\n  options?: { exact?: boolean }",
+    "signature": "getRow(\n  filters: Record<string, FilterValue>,\n  options?: { exact?: boolean }\n  ): SmartRow<T>",
     "comment": "/**\n* Finds a row by filters on the current page only. Returns immediately (sync).\n* Throws error if table is not initialized.\n* @note The sync path cannot compute a real `rowIndex`, so the returned SmartRow's\n* `rowIndex` is `undefined` (virtual-scroll positioning via `bringIntoView()` is limited).\n* Use `findRow()` (async) when you need a row with an accurate `rowIndex`.\n* @note Cannot filter by `syntheticColumns` or `columnOverrides.read` keys — those need\n* async evaluation via `findRow()` / `findRows()`. DOM filters use `strategies.getCellLocator`\n* when configured (column-virtualized grids), otherwise `cellSelector` + column index.\n*/"
   },
   {
     "name": "getRowByIndex",
-    "signature": "getRowByIndex: (\n  index: number\n  ) => SmartRow<T>",
+    "signature": "getRowByIndex(\n  index: number\n  ): SmartRow<T>",
     "comment": "/**\n* Gets a row by its 0-based position in the currently-rendered DOM (sync, no scroll).\n* Throws if the table is not initialized.\n*\n* For button-paginated tables this is the i-th row on the current page. For virtualized\n* tables the render window shifts as you scroll, so `getRowByIndex(i)` returns whatever\n* row currently sits at DOM position `i` — NOT the logical/absolute row `i` in the dataset\n* once the list has scrolled. For the row with a specific logical/data-model index on a\n* virtualized table, use the async `findRowByIndex(i)` instead (it scrolls to the row);\n* to iterate by logical identity, use `map` / `findRows` (with a `dedupe` strategy).\n*\n* Resolution is lazy: an out-of-range index yields a SmartRow whose operations fail when\n* it is used, rather than throwing here.\n*\n* @param index 0-based position within the current render window\n*/"
   },
   {
     "name": "findRowByIndex",
-    "signature": "findRowByIndex: (\n  index: number,\n  options?: { maxPages?: number }",
+    "signature": "findRowByIndex(\n  index: number,\n  options?: { maxPages?: number }\n  ): Promise<SmartRow<T>>",
     "comment": "/**\n* ASYNC: Returns the row with a specific logical/data-model index, scrolling/paginating to\n* reach it. Unlike the sync `getRowByIndex` (render-window position), this resolves the true\n* data-model row `index` on virtualized tables.\n*\n* Reaches the row via, in order: a currently-mounted match, the viewport's random-access\n* `scrollToRow` fast path, then advancing pages (on infinite-scroll tables a \"page\" is a\n* scroll step) up to `maxPages`.\n*\n* Requires a `strategies.resolveRowIndex` to identify rows by logical index — throws if one\n* is not configured. Also throws if the row cannot be reached (no silent wrong-row fallback).\n*\n* @param index 0-based logical/data-model row index\n* @param options - `maxPages` bounds how far to scroll/paginate (defaults to config.maxPages)\n*/"
   },
   {
     "name": "findRow",
-    "signature": "findRow: (\n  filters: Record<string, FilterValue>,\n  options?: { exact?: boolean, maxPages?: number }",
+    "signature": "findRow(\n  filters: Record<string, FilterValue>,\n  options?: { exact?: boolean, maxPages?: number }\n  ): Promise<SmartRow<T>>",
     "comment": "/**\n* ASYNC: Searches for a single row across pages using pagination.\n* Auto-initializes the table if not already initialized.\n* @param filters - The filter criteria to match\n* @param options - Search options including exact match and max pages\n*/"
   },
   {
     "name": "findRows",
-    "signature": "findRows: (\n  filters?: Record<string, FilterValue>,\n  options?: { exact?: boolean, maxPages?: number, useBulkPagination?: boolean }",
+    "signature": "findRows(\n  filters?: Record<string, FilterValue>,\n  options?: { exact?: boolean, maxPages?: number, useBulkPagination?: boolean }\n  ): Promise<SmartRowArray<T>>",
     "comment": "/**\n* ASYNC: Searches for all matching rows across pages using pagination.\n* Auto-initializes the table if not already initialized.\n* @param filters - The filter criteria to match (omit or pass {} for all rows)\n* @param options - Search options (exact, maxPages). `useBulkPagination` defaults to `false`: pages advance one at a time via `goNext` so no intermediate page is skipped. Set it to `true` to opt into `goNextBulk` (faster, but skips the rows on jumped-over pages).\n*/"
   },
   {
     "name": "scrollToColumn",
-    "signature": "scrollToColumn: (columnName: string) => Promise<void>",
+    "signature": "scrollToColumn(columnName: string): Promise<void>",
     "comment": "/**\n* Resolves the named column and scrolls it into view.\n* Prefers `strategies.viewport.scrollToColumn` when configured; otherwise scrolls the\n* header cell via Playwright `scrollIntoViewIfNeeded()`.\n*/"
   },
   {
     "name": "countRows",
-    "signature": "countRows: (filters?: Record<string, FilterValue>, options?: { exact?: boolean; maxPages?: number }) => Promise<number>",
+    "signature": "countRows(filters?: Record<string, FilterValue>, options?: { exact?: boolean; maxPages?: number }): Promise<number>",
     "comment": "/**\n* Counts the number of rows, optionally filtered.\n* Without arguments, counts all rows. With filters, counts only matching rows.\n* Paginates when pagination is configured.\n*/"
   },
   {
@@ -76,12 +76,12 @@
   },
   {
     "name": "reset",
-    "signature": "reset: () => Promise<void>",
+    "signature": "reset(): Promise<void>",
     "comment": "/**\n* Resets the table: calls goToFirst (if configured), clears cache, re-inits headers, then calls onReset.\n*/"
   },
   {
     "name": "revalidate",
-    "signature": "revalidate: () => Promise<void>",
+    "signature": "revalidate(): Promise<void>",
     "comment": "/**\n* Revalidates the table's structure (headers, columns) without resetting pagination or state.\n* Useful when columns change visibility or order dynamically.\n*/"
   },
   {
@@ -95,8 +95,8 @@
     "comment": "/**\n* Transforms every row across all pages into a value. Returns a flat array.\n* Defaults to `concurrency: 'sequential'` (safe for clicks/fills). Pass\n* `concurrency: 'parallel'` for read-only extraction, or `'synchronized'` when\n* navigation must stay lock-step on virtualized grids.\n* Call `stop()` to halt after the current page finishes.\n*\n* @param callback - Function receiving { row, rowIndex, stop }\n* @param options - maxPages, concurrency, dedupe, useBulkPagination\n*\n* @example\n* // Default sequential — safe for UI interactions\n* const assignees = await table.map(async ({ row }) => {\n*   await row.getCell('Assignee').locator('button').click();\n*   const name = await page.locator('.popover .name').innerText();\n*   await page.keyboard.press('Escape');\n*   return name;\n* });\n*\n* @example\n* // Read-only extraction — opt into parallel\n* const emails = await table.map(\n*   ({ row }) => row.getCell('Email').innerText(),\n*   { concurrency: 'parallel' }\n* );\n*/"
   },
   {
-    "name": "callback",
-    "signature": "callback?: (ctx: RowIterationContext<T>) => R | Promise<R>,\n  options?: RowIterationOptions\n  ): Promise<R[]>",
+    "name": "toArray",
+    "signature": "toArray<R = Record<string, unknown>>(\n  callback?: (ctx: RowIterationContext<T>) => R | Promise<R>,\n  options?: RowIterationOptions\n  ): Promise<R[]>",
     "comment": "/**\n* Shorthand for `map()` + `reset()`. Iterates every row across all pages, applies the\n* callback (defaults to `row.toJSON()`), then resets the table back to page 1 — even if\n* the callback throws.\n*\n* @param callback - Optional map function. Defaults to `({ row }) => row.toJSON()`.\n* @param options - Same options as `map()`.\n*\n* @example\n* // Zero-arg: returns toJSON() for every row\n* const rows = await table.toArray();\n*\n* @example\n* // Custom callback\n* const names = await table.toArray(({ row }) => row.getCell('Name').innerText());\n*\n* @example\n* // With options\n* const rows = await table.toArray(({ row }) => row.toJSON(), { concurrency: 'parallel' });\n*/"
   },
   {
@@ -111,12 +111,12 @@
   },
   {
     "name": "generateConfig",
-    "signature": "generateConfig: () => Promise<void>",
+    "signature": "generateConfig(): Promise<void>",
     "comment": "/**\n* Generate an AI-friendly configuration prompt for debugging.\n* Outputs table HTML and TypeScript definitions to help AI assistants generate config.\n* Automatically throws an Error containing the prompt.\n*/"
   },
   {
     "name": "generateConfigPrompt",
-    "signature": "generateConfigPrompt: () => Promise<void>",
+    "signature": "generateConfigPrompt(): Promise<void>",
     "comment": "/**\n* @deprecated Use `generateConfig()` instead. Will be removed in v7.0.0.\n*/"
   }
 ]

@@ -25,7 +25,7 @@ const table = await useTable(page.locator('#my-table'), {
 ### Signature
 
 ```typescript
-headerSelector?: Selector
+headerSelector?: string | ((root: Locator) => Locator)
 ```
 
 <!-- /api-signature: headerSelector -->
@@ -51,7 +51,7 @@ headerSelector: (root) => root.locator('[role="columnheader"]')
 ### Signature
 
 ```typescript
-rowSelector?: Selector
+rowSelector?: string
 ```
 
 <!-- /api-signature: rowSelector -->
@@ -74,7 +74,7 @@ rowSelector: '[role="row"].data-row'
 ### Signature
 
 ```typescript
-cellSelector?: Selector
+cellSelector?: string | ((row: Locator) => Locator)
 ```
 
 <!-- /api-signature: cellSelector -->
@@ -109,6 +109,8 @@ maxPages?: number
 
 Maximum number of pages to scan during iteration and search operations. Prevents runaway pagination on unexpectedly large tables.
 
+Defaults to `1`. If you configure a pagination strategy, set this explicitly or iteration and search will never leave page 1 — `init()` logs a warning when it sees a pagination strategy with `maxPages: 1`.
+
 ```typescript
 maxPages: 50
 ```
@@ -127,14 +129,14 @@ concurrency?: RowIterationMode
 
 <!-- /api-signature: concurrency -->
 
-Default concurrency mode for `forEach`, `map`, and `filter`. Can be overridden per-call.
+Default concurrency mode for `forEach`, `map`, `filter`, and `toArray`. Can be overridden per-call.
 
-- **`'sequential'`** — one row at a time, in order. Default for `forEach` and `filter`.
-- **`'parallel'`** — all rows on the current page run concurrently. Default for `map`.
+- **`'sequential'`** — one row at a time, in order. Default for all iteration methods (since v6.22.0).
+- **`'parallel'`** — all rows on the current page run concurrently. Faster for read-only callbacks.
 - **`'synchronized'`** — rows run in parallel but page navigation waits for all callbacks to finish.
 
 ```typescript
-concurrency: 'sequential'
+concurrency: 'parallel'
 ```
 
 → [Guide: Iterate Rows](/guide/query/iterate)
@@ -170,11 +172,7 @@ autoScroll: true
 ### Signature
 
 ```typescript
-headerTransformer?: (args: {
-  text: string,
-  index: number,
-  locator: Locator
-}) => string | Promise<string>
+headerTransformer?: (args: { text: string, index: number, locator: Locator, seenHeaders: Set<string> }) => string | Promise<string>
 ```
 
 <!-- /api-signature: headerTransformer -->
@@ -248,6 +246,72 @@ columnOverrides: {
 
 ---
 
+### `syntheticColumns`
+
+<!-- api-signature: syntheticColumns -->
+
+### Signature
+
+```typescript
+syntheticColumns?: Record<string, SyntheticColumnDef<T>>
+```
+
+<!-- /api-signature: syntheticColumns -->
+
+Computed columns with no DOM presence. Each key becomes a virtual column whose value comes from `compute(row)`.
+
+Synthetic columns are available in `toJSON()`, `row.getValue()`, `getHeaders()`, and `findRow` / `findRows` / `countRows` filters. They are **not** available in:
+
+- `getRow()` filters — use `findRow()` (synthetics need async evaluation)
+- `row.getCell()` or `smartFill()` — there's no cell to return or fill
+
+`compute` may read real columns and `columnOverrides`, but not other synthetic columns.
+
+```typescript
+syntheticColumns: {
+  Total: {
+    compute: async (row) => {
+      const price = Number(await row.getValue('Price'));
+      const qty = Number(await row.getValue('Qty'));
+      return price * qty;
+    },
+  },
+}
+
+// Computed values are stringified before matching
+const row = await table.findRow({ Total: '40' }, { exact: true });
+```
+
+→ [Guide: Column Overrides](/guide/describe/column-overrides)
+
+---
+
+### `emptyState`
+
+<!-- api-signature: emptyState -->
+
+### Signature
+
+```typescript
+emptyState?: Locator
+```
+
+<!-- /api-signature: emptyState -->
+
+Locator for the element that replaces the table when there are no results. If header resolution fails during `init()` and this locator is visible, `init()` succeeds and [`isEmpty()`](/api/table-methods#isempty) returns `true`. Without it, an empty table makes `init()` throw.
+
+Row operations still throw on an empty table — check `isEmpty()` first.
+
+```typescript
+const table = await useTable(page.locator('#orders'), {
+  emptyState: page.getByText('No orders found'),
+}).init();
+
+if (table.isEmpty()) return;
+```
+
+---
+
 ### `debug`
 
 <!-- api-signature: debug -->
@@ -255,17 +319,20 @@ columnOverrides: {
 ### Signature
 
 ```typescript
-debug?: boolean | DebugConfig
+debug?: DebugConfig
 ```
 
 <!-- /api-signature: debug -->
 
-Enable verbose logging for development. Pass `true` for default verbosity or a config object for fine-grained control.
+Development aids: internal logging and slow-motion delays. Remove before committing — `debug.slow` warns when it detects CI.
+
+- **`logLevel`** — `'none'` (default) · `'error'` · `'info'` · `'verbose'`
+- **`slow`** — delay in ms for every operation, or per type: `{ pagination, getCell, findRow, default }`
 
 ```typescript
-debug: true
-
 debug: { logLevel: 'verbose' }
+
+debug: { logLevel: 'info', slow: { pagination: 500 } }
 ```
 
 ---
@@ -277,7 +344,7 @@ debug: { logLevel: 'verbose' }
 ### Signature
 
 ```typescript
-strategies?: Partial<TableStrategies>
+strategies?: TableStrategies
 ```
 
 <!-- /api-signature: strategies -->

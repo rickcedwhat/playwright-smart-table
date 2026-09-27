@@ -4,12 +4,15 @@ on:
   pull_request:
     paths:
       - 'docs/**'
+      - 'src/types.ts'
       - 'package.json'
       - 'pnpm-lock.yaml'
       - '.github/workflows/docs-check.yml'
       - '.github/workflows/deploy-docs.yml'
       - 'scripts/docs-build-prod.mjs'
       - 'scripts/verify-vitepress-links.mjs'
+      - 'scripts/generate-all-api-docs.mjs'
+      - 'scripts/update-all-api-signatures.mjs'
 
 jobs:
   docs-validation:
@@ -31,6 +34,15 @@ jobs:
 
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Verify API signatures match src/types.ts
+        run: |
+          pnpm run generate-all-api-docs
+          pnpm run update-all-api-signatures
+          if ! git diff --exit-code -- docs/; then
+            echo "::error::API docs are out of date with src/types.ts. Run 'pnpm run build' (or the two generate scripts) and commit the result."
+            exit 1
+          fi
 
       - name: Build Documentation
         run: pnpm run docs:build

@@ -97,6 +97,20 @@ strategies: {
 }
 ```
 
+**Timeouts:**
+
+- **`loadingTimeout`** — max ms to wait while `isTableLoading` returns `true` (before counting, finding, and between pages). Default `10000`. The wait gives up and continues when the budget runs out — it never hangs.
+- **`sortStabilizationTimeout`** — overrides `loadingTimeout` for the wait after `sorting.apply()` only.
+- **`rowLoadingTimeout`** / **`onRowLoadingTimeout`** — how long to wait for a loading row, then `'skip'` · `'read-as-is'` · `'throw'`.
+- **`cellLoadingTimeout`** / **`onCellLoadingTimeout`** — same for cells, or pass a callback that returns the value to use.
+
+```typescript
+loading: {
+  isTableLoading: async ({ root }) => root.locator('.spinner').isVisible(),
+  loadingTimeout: 30_000, // slow backend
+}
+```
+
 **Built-in presets** via `Strategies.Loading`:
 
 - `Strategies.Loading.Table.never` — table is never loading
@@ -300,6 +314,63 @@ dedupe: async (row) =>
 
 ---
 
+## Row Index
+
+### `resolveRowIndex`
+
+<!-- api-signature: resolveRowIndex -->
+
+### Signature
+
+```typescript
+resolveRowIndex?: (row: Locator) => Promise<RowIndexResult | undefined>
+```
+
+<!-- /api-signature: resolveRowIndex -->
+
+Converts a DOM row into its **logical (data-model) index**. Used by `findRow` / `findRows` / iteration for `rowIndex`, by `bringIntoView` for virtual-scroll positioning, and required by [`findRowByIndex`](/api/table-methods#findrowbyindex).
+
+Return `undefined` to fall back to DOM position.
+
+Return `{ index, selector }` instead of a plain number when the index lives in a DOM attribute. The library then builds a **self-healing row locator** from `selector` that re-queries the DOM on every action, so `getCell`, `smartFill`, and `toJSON` keep pointing at the right row even after the virtualizer recycles DOM nodes.
+
+```typescript
+// MUI DataGrid: self-healing via data-rowindex
+resolveRowIndex: async (row) => {
+  const v = await row.getAttribute('data-rowindex').catch(() => null);
+  if (v === null || isNaN(Number(v))) return undefined;
+  return { index: Number(v), selector: `[data-rowindex="${v}"]` };
+}
+```
+
+→ [Guide: Virtualization](/guide/describe/virtualization)
+
+---
+
+## Content Ready
+
+### `contentReady`
+
+<!-- api-signature: contentReady -->
+
+### Signature
+
+```typescript
+contentReady?: ContentReadyStrategy
+```
+
+<!-- /api-signature: contentReady -->
+
+Waits until a row's content has stabilized before `toJSON({ atomic: true })` snapshots it. Needed for recycling virtualizers (react-window, react-virtuoso with React concurrent mode) where the row moves into position before its cells re-render — without it, the snapshot can capture the previous row's text.
+
+```typescript
+strategies: {
+  contentReady: Strategies.ContentReady.textStable(),
+}
+```
+
+---
+
 ## Cell Locator
 
 ### `getCellLocator`
@@ -376,10 +447,7 @@ Primitive navigation functions used internally for keyboard-based cell navigatio
 ### Signature
 
 ```typescript
-filter(
-  predicate: (ctx: RowIterationContext<T>) => boolean | Promise<boolean>,
-  options?: RowIterationOptions
-): Promise<SmartRowArray<T>>
+filter?: FilterStrategy
 ```
 
 <!-- /api-signature: filter -->
