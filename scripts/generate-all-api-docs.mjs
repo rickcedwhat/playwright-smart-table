@@ -36,6 +36,30 @@ Object.entries(interfaces).forEach(([name, pattern]) => {
     }
 });
 
+// Nesting depth across braces AND parens, so a multi-line `name: (\n  a: { x }\n) => R`
+// isn't cut off at the inner `}`.
+function depthDelta(line) {
+    const count = re => (line.match(re) || []).length;
+    return count(/[{(]/g) - count(/[})]/g);
+}
+
+// `name: (args) => R` → `name(args): R`, so arrow-typed members read like methods.
+function arrowToMethod(sig) {
+    const head = sig.match(/^(\w+)(\??):\s*\(/);
+    if (!head) return sig;
+    const open = head[0].length - 1;
+    let depth = 0;
+    for (let i = open; i < sig.length; i++) {
+        if (sig[i] === '(') depth++;
+        else if (sig[i] === ')' && --depth === 0) {
+            const rest = sig.slice(i + 1).match(/^\s*=>\s*([\s\S]+)$/);
+            if (!rest) return sig;
+            return `${head[1]}${head[2]}${sig.slice(open, i + 1)}: ${rest[1]}`;
+        }
+    }
+    return sig;
+}
+
 function extractMethods(content, interfaceName) {
     const methods = [];
     const lines = content.split('\n');
@@ -66,7 +90,7 @@ function extractMethods(content, interfaceName) {
         if (!line || line.startsWith('//')) continue;
 
         // Multi-line method: forEach( / map<R>( / filter( — first line has no `name:` before `(`
-        const multiMethod = line.match(/^([a-zA-Z_]\w*)(<[^>]+>)?\(\s*$/);
+        const multiMethod = line.match(/^([a-zA-Z_]\w*)(<.+>)?\(\s*$/);
         if (multiMethod && !currentSignature) {
             const methodName = multiMethod[1];
             currentSignature = line;
@@ -90,7 +114,7 @@ function extractMethods(content, interfaceName) {
 
         if (line.includes(':') && !currentSignature) {
             currentSignature = line;
-            braceDepth = (line.match(/\{/g) || []).length - (line.match(/\}/g) || []).length;
+            braceDepth = depthDelta(line);
 
             if ((line.endsWith(';') || line.endsWith('}')) && braceDepth === 0) {
                 const methodName = line.split(':')[0].trim();
@@ -104,7 +128,7 @@ function extractMethods(content, interfaceName) {
             }
         } else if (currentSignature) {
             currentSignature += '\n  ' + line;
-            braceDepth += (line.match(/\{/g) || []).length - (line.match(/\}/g) || []).length;
+            braceDepth += depthDelta(line);
 
             if ((line.endsWith(';') || line.endsWith('}')) && braceDepth === 0) {
                 const methodName = currentSignature.split(':')[0].trim();
@@ -125,11 +149,15 @@ function extractMethods(content, interfaceName) {
 // Write separate JSON files for each interface
 Object.entries(allSignatures).forEach(([interfaceName, methods]) => {
     const outputPath = path.join(rootDir, `docs/.vitepress/${interfaceName.toLowerCase()}-signatures.json`);
-    const formatted = methods.map(m => ({
-        name: m.name.replace(/[<(].*$/, '').replace(/\?$/, '').trim(),
-        signature: m.signature.replace(/;$/, '').trim(),
-        comment: m.comment
-    }));
+    const methodStyle = interfaceName === 'TableResult' || interfaceName === 'SmartRow';
+    const formatted = methods.map(m => {
+        const signature = m.signature.replace(/;$/, '').trim();
+        return {
+            name: m.name.replace(/[<(].*$/, '').replace(/\?$/, '').trim(),
+            signature: methodStyle ? arrowToMethod(signature) : signature,
+            comment: m.comment
+        };
+    });
 
     fs.writeFileSync(outputPath, JSON.stringify(formatted, null, 2));
     console.log(`✅ Generated ${interfaceName} signatures (${methods.length} methods)`);

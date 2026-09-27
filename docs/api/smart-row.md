@@ -72,7 +72,7 @@ Reference back to the parent `TableResult`. Useful when passing rows between hel
 ### Signature
 
 ```typescript
-getCell(columnName: string): Locator
+getCell(column: string): SmartCell
 ```
 
 ### Parameters
@@ -102,7 +102,7 @@ await row.getCell('Notes').bringIntoView();
 ### Signature
 
 ```typescript
-toJSON(options?: { columns?: string[] }): Promise<T>
+toJSON(options?: { columns?: string[]; atomic?: boolean }): Promise<T>
 ```
 
 ### Parameters
@@ -111,7 +111,10 @@ toJSON(options?: { columns?: string[] }): Promise<T>
 
 <!-- /api-signature: toJSON -->
 
-Reads all (or specified) columns and returns a plain object.
+Reads all (or specified) columns and returns a plain object. Includes `columnOverrides.read` values and [`syntheticColumns`](/api/table-config#syntheticcolumns).
+
+- **`columns`** — only read these columns.
+- **`atomic`** — snapshot every cell in a single browser evaluate, so no column is read at a different moment than another (useful for live-updating rows). Requires `cellSelector` to be a CSS string, not a function. Column overrides still run, against a frozen off-screen copy of the row. Non-override columns are read with `textContent` rather than `innerText`.
 
 ```typescript
 const data = await row.toJSON();
@@ -119,6 +122,37 @@ const data = await row.toJSON();
 
 const partial = await row.toJSON({ columns: ['Name', 'Status'] });
 // { Name: 'John', Status: 'Active' }
+
+const coherent = await row.toJSON({ atomic: true });
+```
+
+→ [Guide: Read Cells](/guide/query/read-cells)
+
+---
+
+### `getValue`
+
+<!-- api-signature: getValue -->
+
+### Signature
+
+```typescript
+getValue(column: string): Promise<string>
+```
+
+### Parameters
+
+- `column` - Column name (case-sensitive)
+
+<!-- /api-signature: getValue -->
+
+Returns the resolved value of one column as a string — works for real DOM columns, `columnOverrides.read` columns, and `syntheticColumns`.
+
+When `strategies.viewport` or `strategies.navigation` is configured, it runs the same cell-navigation pipeline as `toJSON()`, so off-screen virtualized cells are mounted before reading. Without those strategies it reads the current DOM cell.
+
+```typescript
+const email = await row.getValue('Email');
+const total = await row.getValue('Total'); // synthetic column
 ```
 
 → [Guide: Read Cells](/guide/query/read-cells)
@@ -160,10 +194,7 @@ Throws if `rowIndex` is unknown (e.g., rows from `getRow`).
 ### Signature
 
 ```typescript
-smartFill(
-  data: Partial<T>,
-  options?: FillOptions
-): Promise<void>
+smartFill(data: Partial<T> | Record<string, any>, options?: FillOptions): Promise<void>
 ```
 
 ### Parameters
