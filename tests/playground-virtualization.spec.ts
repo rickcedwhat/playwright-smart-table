@@ -314,13 +314,14 @@ test.describe('Loading Strategy: row and cell timeout', () => {
         });
 
         await table.init();
+        // Virtuoso mounts rows after its first measurement pass; searching before then sees 1 row.
+        await expect(page.locator('.virtual-table-container .virtual-row')).toHaveCount(10);
         const rows = await table.findRows({}, { maxPages: 1 });
 
         expect(rows.length).toBe(10);
-        // No skeleton rows — they should have resolved
+        // Retrying: a Virtuoso remount resets a row's loaded state and briefly re-shows its skeleton.
         for (const row of rows) {
-            const skeletonCount = await row.locator('.skeleton-row').count();
-            expect(skeletonCount).toBe(0);
+            await expect(row.locator('.skeleton-row')).toHaveCount(0);
         }
     });
 
