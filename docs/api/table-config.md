@@ -298,9 +298,9 @@ emptyState?: Locator
 
 <!-- /api-signature: emptyState -->
 
-Locator for the element that replaces the table when there are no results. If header resolution fails during `init()` and this locator is visible, `init()` succeeds and [`isEmpty()`](/api/table-methods#isempty) returns `true`. Without it, an empty table makes `init()` throw.
+Locator for the element that replaces the table when there are no results. If header resolution fails during `init()`, a visible configured `emptyState` locator lets `init()` succeed and [`isEmpty()`](/api/table-methods#isempty) returns `true`; otherwise, `init()` throws the header resolution error. A table with resolvable headers and zero rows can initialize successfully without `emptyState`.
 
-Row operations still throw on an empty table — check `isEmpty()` first.
+Row lookup operations still throw when `isEmpty()` is `true` — check it first.
 
 ```typescript
 const table = await useTable(page.locator('#orders'), {
