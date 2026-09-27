@@ -18,6 +18,14 @@ const table = await useTable(page.locator('#my-table'), {
 
 ## Selectors
 
+All three selectors share one type:
+
+```typescript
+type TableSelector = string | ((parent: Locator) => Locator)
+```
+
+A string is resolved relative to the parent; a function receives the parent Locator — the table root for headers and rows, the row for cells.
+
 ### `headerSelector`
 
 <!-- api-signature: headerSelector -->
@@ -25,12 +33,12 @@ const table = await useTable(page.locator('#my-table'), {
 ### Signature
 
 ```typescript
-headerSelector?: string | ((root: Locator) => Locator)
+headerSelector?: TableSelector
 ```
 
 <!-- /api-signature: headerSelector -->
 
-Selector for the column header elements. Accepts a CSS string or a function returning a Locator.
+Selector for the column header elements, relative to the table root. Accepts a CSS string or a function that receives the root Locator. Default: `'thead th'`.
 
 ```typescript
 // CSS string
@@ -38,7 +46,14 @@ headerSelector: 'thead th'
 
 // Locator function
 headerSelector: (root) => root.locator('[role="columnheader"]')
+
+// Headers rendered as a separate table outside the root
+headerSelector: (root) => root.page().locator('#header-table th')
 ```
+
+::: tip String-only features
+The `dataAttribute` viewport strategy reads headers in the browser and needs a CSS string for `scrollToColumn`. Given a function, it logs a one-time warning and skips the horizontal scroll. The MUI DataGrid preset falls back to `.MuiDataGrid-columnHeader`.
+:::
 
 → [Guide: Identify Your Table](/guide/describe/identify)
 
@@ -51,17 +66,24 @@ headerSelector: (root) => root.locator('[role="columnheader"]')
 ### Signature
 
 ```typescript
-rowSelector?: string
+rowSelector?: TableSelector
 ```
 
 <!-- /api-signature: rowSelector -->
 
-CSS selector for the table rows. Scoped to the table locator.
+Selector for the table rows, relative to the table root. Accepts a CSS string or a function that receives the root Locator. Default: `'tbody tr'`.
 
 ```typescript
 rowSelector: 'tbody tr'
 rowSelector: '[role="row"].data-row'
+
+// Locator function — e.g. skip group-header rows
+rowSelector: (root) => root.locator('tbody tr').filter({ hasNot: root.page().locator('td[colspan]') })
 ```
+
+::: tip String-only features
+The `dataAttribute` viewport strategy measures rows in the browser and needs a CSS string. Given a function, it logs a one-time warning, treats every mounted row as possibly visible (no overscan filtering, no row-range shortcut), and skips `scrollToRow`. The MUI DataGrid preset falls back to `[data-rowindex]` for scrolling and ranges, and only loses overscan filtering.
+:::
 
 → [Guide: Identify Your Table](/guide/describe/identify)
 
@@ -74,12 +96,12 @@ rowSelector: '[role="row"].data-row'
 ### Signature
 
 ```typescript
-cellSelector?: string | ((row: Locator) => Locator)
+cellSelector?: TableSelector
 ```
 
 <!-- /api-signature: cellSelector -->
 
-Selector for cells within a row. Accepts a CSS string or a function returning a Locator.
+Selector for cells within a row. Accepts a CSS string or a function that receives the row Locator. Default: `'td'`.
 
 ```typescript
 // CSS string

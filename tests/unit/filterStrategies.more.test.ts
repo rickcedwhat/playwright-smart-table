@@ -11,7 +11,7 @@ describe('FilterStrategies additional branches', () => {
     const ctx: TableContext = {
       root: {} as any,
       config: { cellSelector: 'td' } as any,
-      page: {} as any,
+      page: { locator: vi.fn().mockReturnValue({}) } as any,
       resolve,
     };
 
@@ -37,7 +37,7 @@ describe('FilterStrategies additional branches', () => {
     const ctx: TableContext = {
       root: {} as any,
       config: { cellSelector: 'td' } as any,
-      page: {} as any,
+      page: { locator: vi.fn().mockReturnValue({}) } as any,
       resolve,
     };
 

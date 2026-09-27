@@ -1,5 +1,6 @@
 import { ViewportStrategy } from '../types';
 import { logDebug } from '../utils/debugUtils';
+import { cssSelectorOrWarn, UNKNOWN_RANGE } from '../utils/cssSelector';
 
 // fallow-ignore-next-line unused-type
 export type DataAttributeViewportOptions = {
@@ -98,7 +99,8 @@ const dataAttribute = (options?: DataAttributeViewportOptions): ViewportStrategy
 
     return {
         getVisibleColumnRange: async ({ root, config }) => {
-            const rowSel = config.rowSelector;
+            const rowSel = cssSelectorOrWarn(config, 'rowSelector', 'dataAttribute viewport column range');
+            if (!rowSel) return UNKNOWN_RANGE;
             const cellSel = typeof config.cellSelector === 'string' ? config.cellSelector : `[${colAttr}]`;
             const result = await root.evaluate((el, { rowSel, cellSel, colAttr, colOffset }) => {
                 const firstRow = el.querySelector(rowSel);
@@ -116,8 +118,12 @@ const dataAttribute = (options?: DataAttributeViewportOptions): ViewportStrategy
             return { first: result.first, last: result.last };
         },
 
-        getVisibleRowIndices: async ({ root, config }) => {
-            const rowSel = config.rowSelector;
+        getVisibleRowIndices: async ({ root, config, resolve }) => {
+            const rowSel = cssSelectorOrWarn(config, 'rowSelector', 'dataAttribute viewport overscan filtering');
+            if (!rowSel) {
+                const count = await resolve(config.rowSelector, root).count();
+                return Array.from({ length: count }, (_, i) => i);
+            }
             // Geometry-based (mirrors getVisibleRowRange's inclusive intersection), but returns
             // the rows' DOM positions so the iteration engine can drop overscan rows (#353/#357).
             return root.evaluate((el, { rowSel, containerSel }) => {
@@ -139,7 +145,8 @@ const dataAttribute = (options?: DataAttributeViewportOptions): ViewportStrategy
         },
 
         getVisibleRowRange: async ({ root, config }) => {
-            const rowSel = config.rowSelector;
+            const rowSel = cssSelectorOrWarn(config, 'rowSelector', 'dataAttribute viewport row range');
+            if (!rowSel) return UNKNOWN_RANGE;
             const result = await root.evaluate((el, { rowSel, rowAttr, rowOffset, containerSel }) => {
                 const rows = Array.from(el.querySelectorAll(rowSel));
                 const container = containerSel
@@ -165,9 +172,10 @@ const dataAttribute = (options?: DataAttributeViewportOptions): ViewportStrategy
             return { first: result.first, last: result.last };
         },
 
-        scrollToColumn: async ({ root, config }, colIndex) => {
-            const headerSel = typeof config.headerSelector === 'string' ? config.headerSelector : null;
-            if (!containerSel || !headerSel) return;
+        scrollToColumn: async ({ root, config, resolve }, colIndex) => {
+            if (!containerSel) return;
+            const headerSel = cssSelectorOrWarn(config, 'headerSelector', 'dataAttribute viewport scrollToColumn');
+            if (!headerSel) return;
             const cellSel = typeof config.cellSelector === 'string' ? config.cellSelector : `[${colAttr}]`;
             const canScroll = await root.evaluate((el, { containerSel, headerSel, cellSel, idx, columnWidth, scrollPadding }) => {
                 const container = el.closest(containerSel) as HTMLElement | null;
@@ -199,15 +207,16 @@ const dataAttribute = (options?: DataAttributeViewportOptions): ViewportStrategy
             if (!canScroll) return;
 
             // Wait for a cell at this column index to mount in any row
-            await root
-                .locator(`${config.rowSelector} [${colAttr}="${colIndex + colOffset}"]`)
+            await resolve(config.rowSelector, root)
+                .locator(`[${colAttr}="${colIndex + colOffset}"]`)
                 .first()
                 .waitFor({ state: 'attached', timeout: attachTimeout });
         },
 
         scrollToRow: async ({ root, config }, rowIndex) => {
             if (!containerSel) return;
-            const rowSel = config.rowSelector;
+            const rowSel = cssSelectorOrWarn(config, 'rowSelector', 'dataAttribute viewport scrollToRow');
+            if (!rowSel) return;
             const canScroll = await root.evaluate((el, { containerSel, rowSel, rowAttr, idx, rowOffset, rowHeight, scrollPadding }) => {
                 const container = el.closest(containerSel) as HTMLElement | null;
                 if (!container) return false;

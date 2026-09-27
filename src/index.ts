@@ -8,6 +8,7 @@ export type {
     SmartRow,
     SmartCell,
     Selector,
+    TableSelector,
     FilterValue,
     PaginationPrimitives,
     SortingStrategy,

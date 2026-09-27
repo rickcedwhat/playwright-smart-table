@@ -39,8 +39,8 @@ export function resolveCellLocator(args: {
  * `filter({ has })`. Using the rows collection or a document-rooted parent nests
  * the row selector and matches nothing.
  *
- * Without `getCellLocator`, keeps the historical page-scoped `cellSelector.nth(i)`
- * template that Playwright re-bases into each row.
+ * Without `getCellLocator`, resolves `cellSelector` against the same `:scope` row so a
+ * function `cellSelector` receives a Locator, and Playwright re-bases it into each row.
  */
 export function resolveCellLocatorForFilter(args: {
     config: FinalTableConfig;
@@ -51,8 +51,8 @@ export function resolveCellLocatorForFilter(args: {
     columnIndex: number;
 }): Locator {
     const { config, resolve, page, root, columnName, columnIndex } = args;
+    const scopeRow = page.locator(':scope');
     if (config.strategies?.getCellLocator) {
-        const scopeRow = page.locator(':scope');
         return config.strategies.getCellLocator({
             row: scopeRow,
             root: root ?? scopeRow,
@@ -62,5 +62,5 @@ export function resolveCellLocatorForFilter(args: {
             config,
         });
     }
-    return resolve(config.cellSelector, page).nth(columnIndex);
+    return resolve(config.cellSelector, scopeRow).nth(columnIndex);
 }

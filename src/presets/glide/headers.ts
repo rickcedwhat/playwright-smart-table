@@ -1,4 +1,4 @@
-import { StrategyContext, Selector } from '../../types';
+import { StrategyContext } from '../../types';
 import { logDebug } from '../../utils/debugUtils';
 
 /**
@@ -11,7 +11,7 @@ export const scrollRightHeader = async (context: StrategyContext, options?: { li
     const collectedHeaders = new Set<string>();
 
     const getVisible = async () => {
-        const headerLoc = resolve(config.headerSelector as Selector, root);
+        const headerLoc = resolve(config.headerSelector, root);
         const texts = await headerLoc.allInnerTexts();
         return texts.map(t => t.trim());
     };

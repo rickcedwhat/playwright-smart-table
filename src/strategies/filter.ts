@@ -13,9 +13,8 @@ export const FilterStrategies = {
       colIndex: number;
       tableContext: TableContext;
     }) {
-      const page = tableContext.page;
-      const resolve = tableContext.resolve;
-      const cellTemplate = resolve(tableContext.config.cellSelector as any, page);
+      const scopeRow = tableContext.page.locator(':scope');
+      const cellTemplate = tableContext.resolve(tableContext.config.cellSelector, scopeRow);
       const targetCell = cellTemplate.nth(colIndex);
       if (typeof filter.value === 'function') {
         return rows.filter({ has: (filter.value as any)(targetCell) });

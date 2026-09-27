@@ -8,6 +8,7 @@ import { planNavigationPath, executeNavigationPath, executeNavigationWithGoToPag
 import { SENTINEL_ROW } from './utils/sentinel';
 import { NavigationBarrier } from './utils/navigationBarrier';
 import { setCurrentPageIndex } from './utils/pageIndex';
+import type { SmartRowInternals } from './utils/smartRowInternals';
 
 type StrategyContext = {
     config: FinalTableConfig<any>;
@@ -362,7 +363,7 @@ const createSmartRow = <T = any>(
     barrier?: NavigationBarrier,
     renderWindowPosition = false,
 ): SmartRowType<T> => {
-    const smart = rowLocator as unknown as SmartRowType<T> & { _barrier?: NavigationBarrier };
+    const smart = rowLocator as unknown as SmartRowType<T> & SmartRowInternals;
 
     // Attach State
     smart.rowIndex = rowIndex;
@@ -408,7 +409,7 @@ const createSmartRow = <T = any>(
                 index: idx,
                 rowLocator,
                 rowIndex,
-                barrier: (smart as any)._barrier
+                barrier: smart._barrier
             });
             // Run beforeCellRead hook (same as toJSON does after navigation).
             if (config.strategies.beforeCellRead) {
@@ -417,7 +418,7 @@ const createSmartRow = <T = any>(
                     : async (colNameArg: string) => {
                         const i = map.get(colNameArg);
                         if (i === undefined) throw new Error(`Column "${colNameArg}" not found`);
-                        return resolve(config.headerSelector as any, rootLocator).nth(i);
+                        return resolve(config.headerSelector, rootLocator).nth(i);
                     };
                 await config.strategies.beforeCellRead({
                     cell: navigatedCell ?? baseLocator,
@@ -473,7 +474,7 @@ const createSmartRow = <T = any>(
             index: idx,
             rowLocator,
             rowIndex,
-            barrier: (smart as any)._barrier,
+            barrier: smart._barrier,
             allowMissingCell: !!columnOverride?.read,
         });
 
@@ -506,7 +507,7 @@ const createSmartRow = <T = any>(
             // Verify via resolveRowIndex and rescan if drifted.
             let cloneTarget: Locator = rowLocator;
             const resolveRI = config.strategies.resolveRowIndex;
-            const isSelfHealing = (smart as any)._selfHealing === true;
+            const isSelfHealing = smart._selfHealing === true;
 
             const rescanForRow = resolveRI && typeof rowIndex === 'number' && !isSelfHealing
                 ? async (): Promise<Locator | null> => {
@@ -533,7 +534,7 @@ const createSmartRow = <T = any>(
                     drifted = true;
                 }
                 if (drifted) {
-                    const inBatch = (smart as any)._inBatch === true || !!(smart as any)._barrier;
+                    const inBatch = smart._inBatch === true || !!smart._barrier;
 
                     let recovered = await rescanForRow();
 
@@ -683,7 +684,7 @@ const createSmartRow = <T = any>(
             : async (colName: string) => {
                 const idx = map.get(colName);
                 if (idx === undefined) throw new Error(`Column "${colName}" not found`);
-                return resolve(config.headerSelector as any, rootLocator).nth(idx);
+                return resolve(config.headerSelector, rootLocator).nth(idx);
             };
 
         // #366 / #392: on virtualized tables the row's DOM node can recycle between the
@@ -693,9 +694,9 @@ const createSmartRow = <T = any>(
         // selector), fall back to the original rescan-then-scrollToRow approach.
         const resolveRI = config.strategies.resolveRowIndex;
         const canPin = !!resolveRI && typeof rowIndex === 'number';
-        const isSelfHealing = (smart as any)._selfHealing === true;
+        const isSelfHealing = smart._selfHealing === true;
         const stableCtx = { root: rootLocator, config, page, resolve } as any;
-        const inBatch = (smart as any)._inBatch === true || !!(smart as any)._barrier;
+        const inBatch = smart._inBatch === true || !!smart._barrier;
         let lastGood = rowLocator;
 
         const resolveStableRow = async (): Promise<Locator> => {
@@ -788,7 +789,7 @@ const createSmartRow = <T = any>(
                 index: idx,
                 rowLocator: stableRow,
                 rowIndex,
-                barrier: (smart as any)._barrier,
+                barrier: smart._barrier,
                 allowMissingCell: !!mapper,
             });
 
@@ -911,7 +912,7 @@ const createSmartRow = <T = any>(
                 index: colIdx,
                 rowLocator,
                 rowIndex,
-                barrier: (smart as any)._barrier
+                barrier: smart._barrier
             });
 
             const columnOverride = config.columnOverrides?.[colName as keyof T];

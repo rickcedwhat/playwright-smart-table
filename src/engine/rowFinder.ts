@@ -21,7 +21,7 @@ export class RowFinder<T = any> {
         resolve: (item: Selector, parent: Locator | Page) => Locator,
         private filterEngine: FilterEngine,
         private tableMapper: TableMapper,
-        private makeSmartRow: (loc: Locator, map: Map<string, number>, index: number | undefined, tablePageIndex?: number, barrier?: NavigationBarrier, rowSelector?: string) => SmartRow<T>,
+        private makeSmartRow: (loc: Locator, map: Map<string, number>, index: number | undefined, tablePageIndex?: number, barrier?: NavigationBarrier, healSelector?: string) => SmartRow<T>,
         private tableState: { currentPageIndex: number } = { currentPageIndex: 0 },
         private advancePage: (useBulk: boolean) => Promise<boolean> = async () => false
     ) {
@@ -354,8 +354,8 @@ export class RowFinder<T = any> {
      * every row calling elementHandle() + evaluate() per row (O(n) CDP roundtrips, and
      * elementHandle() is soft-deprecated). We resolve the target once and let evaluateAll
      * compare it against the full row set in the browser. The row set is resolved through the
-     * same selector/scope as everywhere else, so a string, function, or Locator rowSelector
-     * all behave identically. (#350)
+     * same selector/scope as everywhere else, so a string or function rowSelector behave
+     * identically. (#350)
      */
     private async throwIfAmbiguous(rows: Locator[], filters: Record<string, FilterValue>, map: Map<string, number>): Promise<never> {
         const sampleData: string[] = [];

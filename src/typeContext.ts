@@ -5,15 +5,29 @@
  */
 export const TYPE_CONTEXT = `
 /**
- * Flexible selector type - can be a CSS string, function returning a Locator, or Locator itself.
+ * Selector used by strategies (e.g. pagination buttons, spinners): a CSS string resolved
+ * relative to the parent, or a function that receives the parent and returns a Locator.
  * @example
- * // String selector
- * rowSelector: 'tbody tr'
- * 
- * // Function selector
- * headerSelector: (root) => root.locator('[role="columnheader"]')
+ * nextButton: 'button.next'
+ * nextButton: (root) => root.getByRole('button', { name: 'Next' })
  */
 export type Selector = string | ((root: Locator | Page) => Locator) | ((root: Locator) => Locator);
+
+/**
+ * Selector for \`headerSelector\`, \`rowSelector\`, and \`cellSelector\`: a CSS string resolved
+ * relative to the parent, or a function that receives the parent Locator (the table root for
+ * headers/rows, the row for cells) and returns a Locator.
+ *
+ * Some features evaluate selectors in the browser and need a CSS string — notably the
+ * \`dataAttribute\` viewport strategy and the MUI DataGrid viewport. Given a function, those
+ * features warn once and skip the step that needs the string.
+ * @example
+ * rowSelector: 'tbody tr'
+ * rowSelector: (root) => root.getByRole('row').filter({ has: root.getByRole('cell') })
+ * // Headers rendered as a separate table outside the root:
+ * headerSelector: (root) => root.page().locator('#header-table th')
+ */
+export type TableSelector = string | ((parent: Locator) => Locator);
 
 /**
  * Return type for \`resolveRowIndex\`. A plain number gives the logical index only;
@@ -703,12 +717,16 @@ export interface TableStrategies {
 
 
 export interface TableConfig<T = any> {
-  /** Selector for the table headers */
-  headerSelector?: string | ((root: Locator) => Locator);
-  /** Selector for the table rows */
-  rowSelector?: string;
-  /** Selector for the cells within a row */
-  cellSelector?: string | ((row: Locator) => Locator);
+  /**
+   * Selector for the header cells, relative to the table root. Default \`'thead th'\`.
+   * Use a function to reach headers outside the root, e.g.
+   * \`(root) => root.page().locator('#header-table th')\`.
+   */
+  headerSelector?: TableSelector;
+  /** Selector for the rows, relative to the table root. Default \`'tbody tr'\`. */
+  rowSelector?: TableSelector;
+  /** Selector for the cells, relative to a row. Default \`'td'\`. */
+  cellSelector?: TableSelector;
   /**
    * Number of pages to scan for verification / iteration.
    * Defaults to \`1\` — set explicitly (e.g. \`maxPages: 5\`) when using a pagination
@@ -759,9 +777,9 @@ export interface TableConfig<T = any> {
  * @internal Resolved config after defaults are applied. Prefer {@link TableConfig} in public code.
  */
 export interface FinalTableConfig<T = any> extends TableConfig<T> {
-  headerSelector: string | ((root: Locator) => Locator);
-  rowSelector: string;
-  cellSelector: string | ((row: Locator) => Locator);
+  headerSelector: TableSelector;
+  rowSelector: TableSelector;
+  cellSelector: TableSelector;
   maxPages: number;
   autoScroll: boolean;
   concurrency?: RowIterationMode;

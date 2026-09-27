@@ -2,6 +2,13 @@ import { Locator } from '@playwright/test';
 import { TableConfig, TableContext } from '../types';
 import { PaginationStrategies } from '../strategies';
 import { logDebug } from '../utils/debugUtils';
+import { cssSelectorOrWarn } from '../utils/cssSelector';
+
+// Fallbacks for in-browser queries when the configured selector is a function.
+// Only DataGrid rows carry data-rowindex, so this can't match cells or headers.
+const MUI_ROW_CSS = '[data-rowindex]';
+const MUI_HEADER_CSS = '.MuiDataGrid-columnHeader';
+const cssOr = (selector: unknown, fallback: string) => typeof selector === 'string' ? selector : fallback;
 
 /** Aria-labels for MUI pagination buttons. Override for non-English locales. */
 export interface MuiButtonLabels {
@@ -350,7 +357,7 @@ export function createMuiDataGrid(opts?: { buttonLabels?: MuiButtonLabels }): Pa
         // scroll methods use querySelector rather than closest().
         viewport: {
             getVisibleRowRange: async ({ root, config }) => {
-                const rowSel = config.rowSelector;
+                const rowSel = cssOr(config.rowSelector, MUI_ROW_CSS);
                 return root.evaluate((el, rowSel) => {
                     const indices = Array.from(el.querySelectorAll(rowSel))
                         .map(r => Number(r.getAttribute('data-rowindex')))
@@ -363,8 +370,13 @@ export function createMuiDataGrid(opts?: { buttonLabels?: MuiButtonLabels }): Pa
             // the DOM positions of rows overlapping the virtualScroller's bounds so map/forEach
             // skip the overscan rows MUI keeps mounted above/below the fold. The scroller is a
             // descendant of root, so querySelector (not closest).
-            getVisibleRowIndices: async ({ root, config }) => {
-                const rowSel = config.rowSelector;
+            getVisibleRowIndices: async ({ root, config, resolve }) => {
+                // Positions must index into the configured row set, so no CSS fallback here.
+                const rowSel = cssSelectorOrWarn(config, 'rowSelector', 'MUI DataGrid overscan filtering');
+                if (!rowSel) {
+                    const count = await resolve(config.rowSelector, root).count();
+                    return Array.from({ length: count }, (_, i) => i);
+                }
                 return root.evaluate((el, rowSel) => {
                     const scroller = el.querySelector('.MuiDataGrid-virtualScroller') as HTMLElement | null;
                     const rows = Array.from(el.querySelectorAll(rowSel));
@@ -380,7 +392,7 @@ export function createMuiDataGrid(opts?: { buttonLabels?: MuiButtonLabels }): Pa
                 }, rowSel);
             },
             getVisibleColumnRange: async ({ root, config }) => {
-                const rowSel = config.rowSelector;
+                const rowSel = cssOr(config.rowSelector, MUI_ROW_CSS);
                 const cellSel = typeof config.cellSelector === 'string' ? config.cellSelector : '[aria-colindex]';
                 return root.evaluate((el, { rowSel, cellSel }) => {
                     const scroller = el.querySelector('.MuiDataGrid-virtualScroller') as HTMLElement | null;
@@ -418,7 +430,7 @@ export function createMuiDataGrid(opts?: { buttonLabels?: MuiButtonLabels }): Pa
                 }, { rowSel, cellSel });
             },
             scrollToRow: async ({ root, config }, rowIndex) => {
-                const rowSel = config.rowSelector;
+                const rowSel = cssOr(config.rowSelector, MUI_ROW_CSS);
                 await root.evaluate((el, { rowSel, idx }) => {
                     const scroller = el.querySelector('.MuiDataGrid-virtualScroller') as HTMLElement;
                     if (!scroller) return;
@@ -470,10 +482,10 @@ export function createMuiDataGrid(opts?: { buttonLabels?: MuiButtonLabels }): Pa
                     .catch(() => {});
             },
             scrollToColumn: async ({ root, config, page }, colIndex) => {
-                const headerSel = typeof config.headerSelector === 'string' ? config.headerSelector : null;
+                const headerSel = cssOr(config.headerSelector, MUI_HEADER_CSS);
                 await root.evaluate((el, { headerSel, idx }) => {
                     const scroller = el.querySelector('.MuiDataGrid-virtualScroller') as HTMLElement;
-                    if (!scroller || !headerSel) return;
+                    if (!scroller) return;
                     const headers = Array.from(el.querySelectorAll(headerSel)) as HTMLElement[];
                     const targetAriaIdx = idx + 1; // aria-colindex is 1-based
 
