@@ -76,4 +76,28 @@ _Config: `strategies.viewport`_
 
 ---
 
-→ [API Reference: Strategies — viewport](/api/strategies#viewport)
+## Which row is which?
+
+In a virtualized table, the 3rd `<tr>` in the DOM isn't row 3 — it's whatever happens to be rendered in that slot right now. Scroll a little and the same element can be holding a completely different row.
+
+If your grid stamps each row with its real position (`data-rowindex`, `aria-rowindex`, and so on), tell us how to read it:
+
+```typescript
+strategies: {
+  resolveRowIndex: async (row) => {
+    const v = await row.getAttribute('data-rowindex')
+    if (!v?.trim() || !Number.isFinite(Number(v))) return undefined // not a real data row yet
+    return { index: Number(v), selector: `[data-rowindex="${v}"]` }
+  }
+}
+```
+
+Returning a `selector` alongside the index makes the row self-healing. Instead of holding onto whichever element it found, the row re-finds itself by that attribute every time you use it — so `getCell()`, `toJSON()`, and `smartFill()` keep pointing at the right row even after the grid recycles its DOM. Return just a number if you only need the index.
+
+This is also what lets you ask for a row by its real position with [`findRowByIndex`](/guide/query/find-rows#get-a-row-by-its-position-in-the-data).
+
+_Config: `strategies.resolveRowIndex`_
+
+---
+
+→ [API Reference: Strategies — viewport](/api/strategies#viewport) · [Strategies — resolveRowIndex](/api/strategies#resolverowindex)

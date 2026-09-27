@@ -43,6 +43,35 @@ useTable(locator, {
 
 _Config: `columnOverrides`_
 
+---
+
+## Columns that aren't in the table
+
+Sometimes the value you want to check isn't on screen at all — it's something you'd work out from other columns. A line total, a full name, a "days overdue". Define it once as a synthetic column and treat it like any other:
+
+```typescript
+useTable(locator, {
+  syntheticColumns: {
+    Total: {
+      compute: async (row) => {
+        const price = Number(await row.getValue('Price'))
+        const qty = Number(await row.getValue('Qty'))
+        return price * qty
+      },
+    },
+  }
+})
+
+const row = await table.findRow({ Total: '40' }, { exact: true })
+const data = await row.toJSON() // { Price: '10', Qty: '4', Total: '40' }
+```
+
+It shows up in `toJSON()`, `getValue()`, and `findRow` / `findRows` filters. Since there's no cell behind it, `getCell()` and `smartFill()` won't work on it, and `getRow()` can't filter by it — use `findRow()` instead.
+
+One rule: a synthetic column can read real columns and overrides, but not other synthetic columns.
+
+_Config: `syntheticColumns`_
+
 
 ---
 

@@ -814,7 +814,7 @@ export type RowIterationOptions = {
    * - 'parallel': Full parallel execution of both navigation and actions.
    * - 'synchronized': Parallel navigation (lock-step) with serial actions.
    * - 'sequential': Strictly serial one-at-a-time execution. No parallel navigation.
-   * @default 'parallel' (for map), 'sequential' (for forEach/filter)
+   * @default config.concurrency, then 'sequential'
    */
   concurrency?: RowIterationMode;
   /**

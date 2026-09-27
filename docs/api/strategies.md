@@ -338,7 +338,7 @@ Return `{ index, selector }` instead of a plain number when the index lives in a
 // MUI DataGrid: self-healing via data-rowindex
 resolveRowIndex: async (row) => {
   const v = await row.getAttribute('data-rowindex').catch(() => null);
-  if (v === null || isNaN(Number(v))) return undefined;
+  if (!v?.trim() || !Number.isFinite(Number(v))) return undefined;
   return { index: Number(v), selector: `[data-rowindex="${v}"]` };
 }
 ```
