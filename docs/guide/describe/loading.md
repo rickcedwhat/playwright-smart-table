@@ -9,20 +9,37 @@ Some tables show loading indicators while data fetches — a spinner overlay, sk
 Each loading strategy is a function that returns `true` while loading and `false` when ready. The library provides built-in helpers for common patterns (spinners, skeleton class names, header stability), or you can pass your own function:
 
 ```typescript
-import { LoadingStrategies } from 'playwright-smart-table'
+import { Strategies } from '@rickcedwhat/playwright-smart-table'
 
 const table = useTable(locator, {
   strategies: {
     loading: {
-      table: LoadingStrategies.Table.hasSpinner('.loading-overlay'),
-      row: LoadingStrategies.Row.hasClass('skeleton'),
-      headers: LoadingStrategies.Headers.stable(300),
+      isTableLoading: Strategies.Loading.Table.hasSpinner('.loading-overlay'),
+      isRowLoading: Strategies.Loading.Row.hasClass('skeleton'),
+      isHeaderLoading: Strategies.Loading.Headers.stable(300),
     }
   }
 })
 ```
 
 See the [API reference](/api/strategies#loading) for the full list of built-in helpers and the function signatures for each level.
+
+---
+
+## How long do we wait?
+
+When the table says it's loading, we wait — but not forever. After 10 seconds we give up and read what's there. If your backend is genuinely slow, give it more time:
+
+```typescript
+strategies: {
+  loading: {
+    isTableLoading: Strategies.Loading.Table.hasSpinner('.loading-overlay'),
+    loadingTimeout: 30_000,
+  }
+}
+```
+
+_Config: `strategies.loading.loadingTimeout`_
 
 ---
 

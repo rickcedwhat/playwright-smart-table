@@ -28,7 +28,18 @@ const activeUsers = await table.findRows({ Status: 'Active' }, { maxPages: 10 })
 
 Returns every match across pages. Add a pagination strategy to search beyond page one.
 
+---
+
+## Get a row by its position in the data
+
+```typescript
+const row = await table.findRowByIndex(250, { maxPages: 50 })
+```
+
+Row 250 of the dataset — not the 250th element on the page. On a virtualized or paginated table, we'll scroll or page until that row is rendered, then hand it back. If it can't be reached within `maxPages`, it throws rather than giving you some other row.
+
+Needs a [`resolveRowIndex`](/guide/describe/virtualization#which-row-is-which) strategy so we can tell which rendered row is which. For the Nth row currently on screen, use `getRowByIndex(n)` instead — synchronous, no scrolling.
 
 ---
 
-→ [API Reference: Table Methods — findRow](/api/table-methods#findrow) · [Table Methods — findRows](/api/table-methods#findrows)
+→ [API Reference: Table Methods — findRow](/api/table-methods#findrow) · [Table Methods — findRows](/api/table-methods#findrows) · [Table Methods — findRowByIndex](/api/table-methods#findrowbyindex)
