@@ -15,9 +15,11 @@ export type Selector = string | ((root: Locator | Page) => Locator) | ((root: Lo
  * relative to the parent, or a function that receives the parent Locator (the table root for
  * headers/rows, the row for cells) and returns a Locator.
  *
- * Some features evaluate selectors in the browser and need a CSS string — notably the
- * `dataAttribute` viewport strategy and the MUI DataGrid viewport. Given a function, those
- * features warn once and skip the step that needs the string.
+ * Some features evaluate selectors in the browser and need a CSS string. Given a function,
+ * the `dataAttribute` viewport strategy warns once and skips the step that needs the string.
+ * The MUI DataGrid viewport instead uses `[data-rowindex]` for row scrolling and ranges,
+ * and `.MuiDataGrid-columnHeader` for header scrolling. Its overscan filtering warns and
+ * includes every mounted row because it needs the configured row selector.
  * @example
  * rowSelector: 'tbody tr'
  * rowSelector: (root) => root.getByRole('row').filter({ has: root.getByRole('cell') })

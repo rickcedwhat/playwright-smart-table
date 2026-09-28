@@ -33,10 +33,16 @@ const _navigateToCell = async (params: {
     index: number;
     rowLocator: Locator;
     rowIndex?: number;
+    renderWindowPosition?: boolean;
     barrier?: NavigationBarrier;
     allowMissingCell?: boolean;
 }): Promise<Locator> => {
-    const { config, rootLocator, page, resolve, getHeaders, column, index, rowLocator, rowIndex, barrier, allowMissingCell } = params;
+    const { config, rootLocator, page, resolve, getHeaders, column, index, rowLocator, barrier, allowMissingCell } = params;
+    // getRowByIndex supplies a position in the mounted row set. Resolve it while the
+    // selected row is still mounted, before horizontal scrolling can evict it.
+    const rowIndex = params.renderWindowPosition && config.strategies.viewport && config.strategies.resolveRowIndex
+        ? (await resolveLogicalRowIndex(rowLocator, config, () => undefined))?.index
+        : params.rowIndex;
     const rowLabel = typeof rowIndex === 'number' ? `row ${rowIndex}` : 'row ?';
     logDebug(
         config,
@@ -409,6 +415,7 @@ const createSmartRow = <T = any>(
                 index: idx,
                 rowLocator,
                 rowIndex,
+                renderWindowPosition,
                 barrier: smart._barrier
             });
             // Run beforeCellRead hook (same as toJSON does after navigation).
@@ -474,6 +481,7 @@ const createSmartRow = <T = any>(
             index: idx,
             rowLocator,
             rowIndex,
+            renderWindowPosition,
             barrier: smart._barrier,
             allowMissingCell: !!columnOverride?.read,
         });
@@ -789,6 +797,7 @@ const createSmartRow = <T = any>(
                 index: idx,
                 rowLocator: stableRow,
                 rowIndex,
+                renderWindowPosition,
                 barrier: smart._barrier,
                 allowMissingCell: !!mapper,
             });
@@ -912,6 +921,7 @@ const createSmartRow = <T = any>(
                 index: colIdx,
                 rowLocator,
                 rowIndex,
+                renderWindowPosition,
                 barrier: smart._barrier
             });
 
