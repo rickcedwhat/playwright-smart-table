@@ -1,5 +1,5 @@
 // src/utils.ts
-import { Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
 
 /**
  * Internal helper to wait for a condition to be met.
