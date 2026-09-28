@@ -6,7 +6,7 @@ Pick the one that looks most like your table and steal it.
 
 ## Standard HTML table
 
-A plain `<table>` with `<thead>` and `<tbody>`. This is the easy case — you mostly just point `useTable()` at it.
+A plain `<table>` with `<thead>` and `<tbody>`. This is the easy case. You mostly just point `useTable()` at it.
 
 ```typescript
 // https://datatables.net/examples/data_sources/dom
@@ -28,7 +28,7 @@ const data = await row.toJSON();
 
 ### Add pagination
 
-Same table, but the row you want is on page 2. Tell the library where the Next button is and switch from `getRow()` to `findRow()` — `getRow()` only looks at the current page, `findRow()` goes looking.
+Same table, but the row you want is on page 2. Tell the library where the Next button is and switch from `getRow()` to `findRow()`. `getRow()` only looks at the current page; `findRow()` goes looking.
 
 ```typescript
 const table = await useTable(page.locator('#example'), {
@@ -62,7 +62,7 @@ const table = await useTable(page.locator('[role="grid"]').first(), presets.muiD
 // Sort through the grid's own header UI
 await table.sorting.apply('Desk', 'asc');
 
-// Row lives on page 2 — findRow pages through the footer to get there
+// Row lives on page 2, so findRow pages through the footer to get there
 const row = await table.findRow({ Desk: 'D-1011' }, { maxPages: 10 });
 expect(table.currentPageIndex).toBe(1);
 
@@ -70,7 +70,7 @@ expect(table.currentPageIndex).toBe(1);
 const row25 = await table.findRowByIndex(25, { maxPages: 10 });
 await expect(row25.getCell('Desk')).toHaveText('D-1025');
 
-// Scrape everything — including columns that start off-screen
+// Scrape everything, including columns that start off-screen
 const rows = await table.map(({ row }) => row.toJSON(), { maxPages: 5 });
 ```
 
@@ -80,7 +80,7 @@ If your grid is the plain MUI `<Table>` component rather than DataGrid, use `pre
 
 ## Infinite scroll
 
-No Next button — more rows show up when you scroll. Two things change: the pagination strategy scrolls instead of clicking, and you'll usually want a `dedupe` so rows that stay on screen between scrolls don't get counted twice.
+No Next button. More rows show up when you scroll. Two things change: the pagination strategy scrolls instead of clicking, and you'll usually want a `dedupe` so rows that stay on screen between scrolls don't get counted twice.
 
 ```typescript
 // https://htmx.org/examples/infinite-scroll/
@@ -98,7 +98,7 @@ const table = await useTable(page.locator('table'), {
 const allData = await table.map(({ row }) => row.toJSON());
 ```
 
-`dedupe` returns a key per row. Pick something actually unique — an ID column is ideal.
+`dedupe` returns a key per row. Pick something actually unique. An ID column is ideal.
 
 ### Infinite scroll on top of a preset
 
@@ -117,12 +117,12 @@ const config = mergeTableConfig(presets.muiDataGrid, {
   },
 });
 
-// The demo page has several grids — grab the 100k one
+// The demo page has several grids, so grab the 100k one
 const grid = page.locator('.MuiDataGrid-root:has([aria-rowcount="100001"])').first();
 const table = await useTable(grid, config).init();
 ```
 
-`scrollTarget` matters here — the element that actually scrolls is usually not the table root. If scrolling does nothing, that's the first thing to check.
+`scrollTarget` matters here. The element that actually scrolls is usually not the table root. If scrolling does nothing, that's the first thing to check.
 
 → [Virtualization](/guide/describe/virtualization) for rows that get recycled out of the DOM as you scroll.
 
@@ -135,9 +135,9 @@ There are presets for a few more:
 
 ### AG Grid, TanStack Table, and friends
 
-No preset or worked example yet. If you already test one of these with Playwright, I'd love a PR — see [#133](https://github.com/rickcedwhat/playwright-smart-table/issues/133). It's config and docs work, no need to dig into the source.
+No preset or worked example yet. If you already test one of these with Playwright, I'd love a PR (see [#133](https://github.com/rickcedwhat/playwright-smart-table/issues/133)). It's config and docs work, no need to dig into the source.
 
-In the meantime, [Describe Your Table](/guide/describe/) walks through building a config from scratch. Or cheat: `await table.generateConfig()` throws on purpose with your table's HTML plus the library's types, formatted as a prompt — paste it into your AI assistant of choice and let it take the first pass.
+In the meantime, [Describe Your Table](/guide/describe/) walks through building a config from scratch. Or cheat: `await table.generateConfig()` throws on purpose with your table's HTML plus the library's types, formatted as a prompt. Paste it into your AI assistant of choice and let it take the first pass.
 
 ---
 
