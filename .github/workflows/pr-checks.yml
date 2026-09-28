@@ -175,3 +175,31 @@ jobs:
 
       - name: Run Integration Tests
         run: npx playwright test --config playwright.config.ci-b.ts
+
+  packaging:
+    name: Packaging Smoke Test
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v7
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: 10.33.2 # keep in sync with packageManager; latest pnpm (v11) audit hits npm's retired endpoint (410)
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Pack, load without Playwright, and type-check on TS latest/5/6
+        run: bash scripts/test-packaging.sh

@@ -1,72 +1,98 @@
 #!/bin/bash
-set -e
+# Consumer smoke test for the packed tarball:
+#   1. runtime — require() the package in a project WITHOUT @playwright/test (optional peer, 6.20.1)
+#   2. types   — compile a consumer file against the published .d.ts with the latest TypeScript
+#   3. compat  — repeat the type check with older TypeScript majors (TS_COMPAT_VERSIONS)
+# Set SKIP_BUILD=1 when dist/ was already built in the same job.
+set -euo pipefail
 
-echo "📦 Testing packaging..."
+TS_COMPAT_VERSIONS="${TS_COMPAT_VERSIONS:-5 6}"
+REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+WORK_DIR="$(mktemp -d)"
+trap 'rm -rf "$WORK_DIR"' EXIT
 
-# 1. Build the library
-echo "🔨 Building library..."
-npm run build
+cd "$REPO_DIR"
+EXPECTED_VERSION="$(node -p "require('./package.json').version")"
 
-# 2. Pack the library
+if [ "${SKIP_BUILD:-0}" != "1" ]; then
+    echo "🔨 Building library..."
+    pnpm run build
+fi
+
 echo "📦 Packing library..."
-npm pack
-TARBALL=$(ls *.tgz)
+pnpm pack --pack-destination "$WORK_DIR" >/dev/null
+TARBALL="$(ls "$WORK_DIR"/*.tgz)"
 
-# 3. Create temp directory
-echo "📂 Creating temp directory..."
-mkdir -p temp-test
-cd temp-test
+# ── 1. Runtime load without Playwright ────────────────────────────────────────
+echo "🚀 Runtime: loading the package without @playwright/test..."
+mkdir "$WORK_DIR/runtime" && cd "$WORK_DIR/runtime"
+npm init -y >/dev/null
+npm install --no-audit --no-fund "$TARBALL" >/dev/null
+if [ -d node_modules/@playwright/test ]; then
+    echo "❌ @playwright/test was installed — the runtime check would not prove anything."
+    exit 1
+fi
+EXPECTED_VERSION="$EXPECTED_VERSION" node -e "
+const m = require('@rickcedwhat/playwright-smart-table');
+if (typeof m.useTable !== 'function') throw new Error('useTable is not exported as a function');
+if (m.PLAYWRIGHT_SMART_TABLE_VERSION !== process.env.EXPECTED_VERSION) {
+  throw new Error('PLAYWRIGHT_SMART_TABLE_VERSION is ' + m.PLAYWRIGHT_SMART_TABLE_VERSION + ', expected ' + process.env.EXPECTED_VERSION);
+}
+console.log('   loaded ' + m.PLAYWRIGHT_SMART_TABLE_VERSION + ' (useTable, presets: ' + Object.keys(m.presets).length + ')');
+"
 
-# 4. Init temp project
-echo "🛠️ Initializing temp project..."
-npm init -y
-# Install dependencies needed for compilation (playwright types)
-npm install typescript @types/node @playwright/test --save-dev
+# ── 2. Types with the latest TypeScript ───────────────────────────────────────
+echo "📝 Types: compiling a consumer against the published .d.ts..."
+mkdir "$WORK_DIR/types" && cd "$WORK_DIR/types"
+npm init -y >/dev/null
+npm install --no-audit --no-fund typescript @types/node @playwright/test "$TARBALL" >/dev/null
 
-# 5. Install the tarball
-echo "📥 Installing tarball..."
-npm install ../$TARBALL
+cat <<'EOF' > smoke-test.ts
+import { useTable, presets, PLAYWRIGHT_SMART_TABLE_VERSION } from '@rickcedwhat/playwright-smart-table';
+import type { TableConfig, TableSelector, SmartRow } from '@rickcedwhat/playwright-smart-table';
+import type { Page } from '@playwright/test';
 
-# 6. Smoke test + local tsconfig. TypeScript 5.8+ TS5112: if you pass .ts files on the tsc CLI while
-#    any tsconfig.json is discoverable (e.g. repo ../tsconfig.json), tsc errors. Use -p and a tiny
-#    project in this folder instead — do not "fix" that by repointing npm at the wrong dist path.
-echo "📝 Creating smoke test..."
-cat <<EOF > smoke-test.ts
-import { useTable } from '@rickcedwhat/playwright-smart-table';
-import { Page } from '@playwright/test';
+const version: string = PLAYWRIGHT_SMART_TABLE_VERSION;
+const rowSelector: TableSelector = (root) => root.locator('tbody tr');
+const config: TableConfig = { rowSelector, headerSelector: 'thead th', maxPages: 2 };
 
-// Just verify types are exported and usable
-const test = async (page: Page) => {
-    const table = useTable(page.locator('table'));
+export const smoke = async (page: Page) => {
+    const table = useTable(page.locator('table'), { ...presets.muiDataGrid, ...config });
     await table.init();
-
-    // Check if types are correct
     const headers: string[] = await table.getHeaders();
-    console.log('Headers:', headers);
+    const row: SmartRow = await table.findRow({ Name: 'Alice' });
+    const data: Record<string, unknown> = await row.toJSON();
+    return { version, headers, data };
 };
 EOF
 
+# TypeScript 5.8+ (TS5112): passing .ts files on the CLI errors when any tsconfig.json is
+# discoverable, so compile via a local project instead.
 cat <<'EOF' > tsconfig.json
 {
   "compilerOptions": {
     "strict": true,
     "noEmit": true,
     "target": "ES2022",
+    "lib": ["ES2022", "ESNext.Disposable", "DOM"],
+    "types": ["node"],
     "module": "Node16",
     "moduleResolution": "Node16",
     "esModuleInterop": true,
-    "skipLibCheck": true
+    "skipLibCheck": false
   },
   "include": ["smoke-test.ts"]
 }
 EOF
 
-# 7. Compile smoke test
-echo "Running tsc..."
+echo "   typescript $(npx tsc --version)"
 npx tsc --project tsconfig.json
 
-echo "✅ Packaging test passed! Types are correctly exported."
+# ── 3. Older TypeScript majors ────────────────────────────────────────────────
+for ts in $TS_COMPAT_VERSIONS; do
+    npm install --no-audit --no-fund --no-save "typescript@$ts" >/dev/null
+    echo "   typescript $(npx tsc --version)"
+    npx tsc --project tsconfig.json
+done
 
-# Cleanup
-cd ..
-rm -rf temp-test $TARBALL
+echo "✅ Packaging test passed: runtime load without Playwright, types on latest + TS [$TS_COMPAT_VERSIONS]."

@@ -5,6 +5,7 @@
 ### Changed
 
 - **Shared header scroll loop (#439)** — `Strategies.Header.horizontalScroll` and the Glide preset's header discovery now share one scroll-and-collect implementation. Each keeps its own scroller lookup (Glide's `.dvn-scroller` is a sibling of the canvas, so it still searches the document). No behavior change.
+- **Packaging smoke test on every PR (#462)** — `scripts/test-packaging.sh` now packs with pnpm, `require()`s the tarball in a project without `@playwright/test` and checks that `PLAYWRIGHT_SMART_TABLE_VERSION` matches `package.json`, then type-checks a consumer file against the published `.d.ts` on the latest TypeScript plus TS 5 and 6. It runs as a PR check, not just at publish time.
 
 ## [6.23.1] - 2026-09-28
 
