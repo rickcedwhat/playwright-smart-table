@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [6.23.1] - 2026-09-28
+
+### Fixed
+
+- **Runtime `@playwright/test` require removed again** — 6.21.0 (#447) changed `smartRow` to import `errors` from `@playwright/test` as a value, so `dist/smartRow.js` required Playwright at runtime and broke consumers that can't resolve the optional peer dependency (`Cannot find module '@playwright/test'`). Timeout detection now checks `error.name === 'TimeoutError'`, and all Playwright imports in `src/` are `import type`. `pnpm run build` now fails if any compiled file in `dist/` requires Playwright, so this can't regress silently.
+
 ## [6.23.0] - 2026-09-27
 
 ### Added

@@ -1,4 +1,4 @@
-import { errors, type Locator, type Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { SmartRow as SmartRowType, FillOptions, FinalTableConfig, TableResult, SmartCell } from './types';
 import { normalizeRowIndexResult, resolveLogicalRowIndex } from './engine/rowResolution';
 import { FillStrategies } from './strategies/fill';
@@ -109,7 +109,7 @@ const _navigateToCell = async (params: {
                         await getCellLocator().waitFor({ state: 'attached', timeout: 500 });
                         cellAttached = true;
                     } catch (error) {
-                        if (!(error instanceof errors.TimeoutError)) throw error;
+                        if ((error as Error | undefined)?.name !== 'TimeoutError') throw error;
                     }
                 }
                 if (cellAttached) {

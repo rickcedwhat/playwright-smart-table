@@ -1,4 +1,4 @@
-import { Locator, Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import { FinalTableConfig, TableContext, FilterValue } from "./types";
 import { buildColumnNotFoundError } from "./utils/stringUtils";
 import { resolveCellLocatorForFilter } from "./utils/resolveCellLocator";
