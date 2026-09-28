@@ -18,7 +18,7 @@ Guiding light: [`PHILOSOPHY.md`](PHILOSOPHY.md) is the scoring rubric for every 
 
 ### Open tech debt (next batch)
 
-- [ ] **Header scroll logic duplicated between `headers.ts` and `glide/headers.ts`** — [#439](https://github.com/rickcedwhat/playwright-smart-table/issues/439)
+- [x] **Header scroll logic duplicated between `headers.ts` and `glide/headers.ts`** — [#439](https://github.com/rickcedwhat/playwright-smart-table/issues/439)
 - [x] **Type SmartRow internal flags (`_selfHealing` / `_inBatch` / `_barrier`) instead of `as any`** — [#440](https://github.com/rickcedwhat/playwright-smart-table/issues/440)
 - [x] **Document recent APIs; gate docs-check CI on `src/` changes** — [#441](https://github.com/rickcedwhat/playwright-smart-table/issues/441)
 - [x] **Unify `headerSelector` / `rowSelector` / `cellSelector` types; warn when string-only features get a function** — [#457](https://github.com/rickcedwhat/playwright-smart-table/issues/457)
