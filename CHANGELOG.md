@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [6.23.0] - 2026-09-27
+
 ### Added
 
 - **Function `rowSelector` (#457)** — `rowSelector` now accepts `(root) => Locator` like `headerSelector` and `cellSelector`. All three share the new exported `TableSelector` type.
@@ -11,6 +13,10 @@
 - **String-only features say so (#457)** — the `dataAttribute` viewport warns once and degrades (no overscan filtering / row-range shortcut / `scrollToRow` / header `scrollToColumn`) instead of silently no-oping when given a function selector. The MUI DataGrid viewport falls back to its own `[data-rowindex]` / `.MuiDataGrid-columnHeader` selectors.
 - **Function `cellSelector` always receives a Locator (#457)** — row filters previously passed the `Page`.
 - **Typed SmartRow internals (#440)** — `_selfHealing` / `_inBatch` / `_barrier` live on an internal `SmartRowInternals` type instead of `as any`.
+
+### Docs
+
+- **API reference derived from source (#441)** — signatures are generated from `src/types.ts` and CI fails on drift. Documented `isEmpty`, `currentPageIndex`, `findRowByIndex`, `toArray`, `getValue`, `toJSON({ columns, atomic })`, `syntheticColumns`, `emptyState`, `loadingTimeout`, `resolveRowIndex`, and `contentReady`; guide pages cover them too.
 
 ## [6.22.0] - 2026-09-26
 
