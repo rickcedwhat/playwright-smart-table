@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **Shared header scroll loop (#439)** — `Strategies.Header.horizontalScroll` and the Glide preset's header discovery now share one scroll-and-collect implementation. Each keeps its own scroller lookup (Glide's `.dvn-scroller` is a sibling of the canvas, so it still searches the document). No behavior change.
+
 ## [6.23.1] - 2026-09-28
 
 ### Fixed

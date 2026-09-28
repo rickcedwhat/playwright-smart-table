@@ -1,6 +1,7 @@
 // fallow-ignore-file circular-dependency
 import type { StrategyContext } from '../types';
 import { logDebug } from '../utils/debugUtils';
+import { readVisibleHeaders, scrollAndCollectHeaders } from '../utils/headerScroll';
 
 /**
  * Defines the contract for a header retrieval strategy.
@@ -37,72 +38,25 @@ export const HeaderStrategies = {
      */
     horizontalScroll: (options?: { limit?: number, selector?: string, scrollAmount?: number }): HeaderStrategy => {
         return async (context: StrategyContext): Promise<string[]> => {
-            const { resolve, config, root, page } = context;
-            const limit = options?.limit ?? 20;
-            const scrollAmount = options?.scrollAmount ?? 300;
-            const collectedHeaders = new Set<string>();
-
-            const getVisible = async () => {
-                const headerLoc = resolve(config.headerSelector, root);
-                const texts = await headerLoc.allInnerTexts();
-                return texts.map(t => t.trim());
-            };
-
-            let currentHeaders = await getVisible();
-            currentHeaders.forEach(h => collectedHeaders.add(h));
-
             const selector = options?.selector;
             if (!selector) {
                 logDebug(
-                    config,
+                    context.config,
                     'info',
                     'HeaderStrategies.horizontalScroll: no selector provided — returning visible headers only. Pass { selector } for the scroll container (e.g. ".dvn-scroller").',
                 );
-                return Array.from(collectedHeaders);
+                return readVisibleHeaders(context);
             }
 
-            const scrollerHandle = await root.evaluateHandle((el, sel) => {
-                if (el.matches(sel)) return el;
-                const ancestor = el.closest(sel);
-                if (ancestor) return ancestor;
-                const child = el.querySelector(sel);
-                if (child) return child;
-                return null;
-            }, selector);
+            // Self, then ancestor, then descendant — scoped to the table, never document-wide.
+            const findScroller = () => context.root.evaluateHandle((el, sel) =>
+                el.matches(sel) ? el : el.closest(sel) ?? el.querySelector(sel), selector);
 
-            const isScrollerFound = await scrollerHandle.evaluate(el => !!el);
-
-            if (isScrollerFound) {
-                await scrollerHandle.evaluate(el => el!.scrollLeft = 0);
-                await page.waitForTimeout(200);
-
-                for (let i = 0; i < limit; i++) {
-                    const sizeBefore = collectedHeaders.size;
-
-                    await scrollerHandle.evaluate((el, amount) => el!.scrollLeft += amount, scrollAmount);
-                    await page.waitForTimeout(300);
-
-                    const newHeaders = await getVisible();
-                    newHeaders.forEach(h => collectedHeaders.add(h));
-
-                    if (collectedHeaders.size === sizeBefore) {
-                        await scrollerHandle.evaluate((el, amount) => el!.scrollLeft += amount, scrollAmount);
-                        await page.waitForTimeout(300);
-                        const retryHeaders = await getVisible();
-                        retryHeaders.forEach(h => collectedHeaders.add(h));
-                        if (collectedHeaders.size === sizeBefore) break;
-                    }
-                }
-            } else {
-                logDebug(config, 'info', `HeaderStrategies.horizontalScroll: Could not find scroller matching "${selector}". Returning visible headers.`);
-            }
-
-            if (isScrollerFound) {
-                await scrollerHandle.evaluate(el => el!.scrollLeft = 0);
-                await page.waitForTimeout(200);
-            }
-
-            return Array.from(collectedHeaders);
+            return scrollAndCollectHeaders(context, findScroller, {
+                limit: options?.limit,
+                scrollAmount: options?.scrollAmount,
+                notFoundMessage: `HeaderStrategies.horizontalScroll: Could not find scroller matching "${selector}". Returning visible headers.`,
+            });
         };
     }
 };
