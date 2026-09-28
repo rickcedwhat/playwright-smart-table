@@ -1,63 +1,21 @@
 import { StrategyContext } from '../../types';
-import { logDebug } from '../../utils/debugUtils';
+import { scrollAndCollectHeaders } from '../../utils/headerScroll';
 
 /**
- * Scans for headers by finding a scrollable container and setting scrollLeft.
+ * Glide header discovery. Same scroll loop as `HeaderStrategies.horizontalScroll`, but the
+ * `.dvn-scroller` is a sibling of the canvas root rather than an ancestor/descendant, so the
+ * lookup falls back to a document-wide search.
  */
 export const scrollRightHeader = async (context: StrategyContext, options?: { limit?: number, selector?: string, scrollAmount?: number }): Promise<string[]> => {
-    const { resolve, config, root, page } = context;
-    const limit = options?.limit ?? 20;
-    const scrollAmount = options?.scrollAmount ?? 300;
-    const collectedHeaders = new Set<string>();
-
-    const getVisible = async () => {
-        const headerLoc = resolve(config.headerSelector, root);
-        const texts = await headerLoc.allInnerTexts();
-        return texts.map(t => t.trim());
-    };
-
-    let currentHeaders = await getVisible();
-    currentHeaders.forEach(h => collectedHeaders.add(h));
-
-    const scrollerHandle = await root.evaluateHandle((el, selector) => {
+    const findScroller = () => context.root.evaluateHandle((el, selector) => {
         if (selector && el.matches(selector)) return el;
         const effectiveSelector = selector || '.dvn-scroller';
-        const ancestor = el.closest(effectiveSelector);
-        if (ancestor) return ancestor;
-        return document.querySelector(effectiveSelector);
+        return el.closest(effectiveSelector) ?? document.querySelector(effectiveSelector);
     }, options?.selector);
 
-    const isScrollerFound = await scrollerHandle.evaluate(el => !!el);
-
-    if (isScrollerFound) {
-        await scrollerHandle.evaluate(el => el!.scrollLeft = 0);
-        await page.waitForTimeout(200);
-
-        for (let i = 0; i < limit; i++) {
-            const sizeBefore = collectedHeaders.size;
-
-            await scrollerHandle.evaluate((el, amount) => el!.scrollLeft += amount, scrollAmount);
-            await page.waitForTimeout(300);
-
-            const newHeaders = await getVisible();
-            newHeaders.forEach(h => collectedHeaders.add(h));
-
-            if (collectedHeaders.size === sizeBefore) {
-                await scrollerHandle.evaluate((el, amount) => el!.scrollLeft += amount, scrollAmount);
-                await page.waitForTimeout(300);
-                const retryHeaders = await getVisible();
-                retryHeaders.forEach(h => collectedHeaders.add(h));
-                if (collectedHeaders.size === sizeBefore) break;
-            }
-        }
-    } else {
-        logDebug(config, 'info', "HeaderStrategies.scrollRight: Could not find scroller. Returning visible headers.");
-    }
-
-    if (isScrollerFound) {
-        await scrollerHandle.evaluate(el => el!.scrollLeft = 0);
-        await page.waitForTimeout(200);
-    }
-
-    return Array.from(collectedHeaders);
+    return scrollAndCollectHeaders(context, findScroller, {
+        limit: options?.limit,
+        scrollAmount: options?.scrollAmount,
+        notFoundMessage: 'HeaderStrategies.scrollRight: Could not find scroller. Returning visible headers.',
+    });
 };
