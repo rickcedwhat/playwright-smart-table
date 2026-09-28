@@ -8,12 +8,13 @@ import { NavigationBarrier } from '../utils/navigationBarrier';
 import { Mutex } from '../utils/mutex';
 import { resolveLogicalRowIndex, resolveRowLoading } from './rowResolution';
 import { scanPages } from './scanPages';
+import { internals } from '../utils/smartRowInternals';
 
 export interface TableIterationEnv<T = any> {
   getRowLocators: () => Locator;
   getMap: () => Map<string, number>;
   advancePage: (useBulk: boolean) => Promise<boolean>;
-  makeSmartRow: (rowLocator: Locator, map: Map<string, number>, rowIndex: number, tablePageIndex?: number, barrier?: NavigationBarrier, rowSelector?: string) => SmartRow<T>;
+  makeSmartRow: (rowLocator: Locator, map: Map<string, number>, rowIndex: number, tablePageIndex?: number, barrier?: NavigationBarrier, healSelector?: string) => SmartRow<T>;
   createSmartRowArray: (rows: SmartRow<T>[]) => SmartRowArray<T>;
   config: FinalTableConfig<T>;
   getPage: () => Page;
@@ -149,7 +150,7 @@ export async function runMap<T, R>(
             const sr = env.makeSmartRow(pageRows[idx], map, logicalIndex, env.getCurrentPageIndex(), barrier, resolved?.selector);
             // Mark as part of an iteration batch so toJSON's #366 re-pin uses rescan-only recovery
             // (no scroll-back) — scrolling here would disrupt sibling rows' positional locators.
-            (sr as any)._inBatch = true;
+            internals(sr)._inBatch = true;
             return sr;
           }));
 

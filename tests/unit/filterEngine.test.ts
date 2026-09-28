@@ -44,8 +44,9 @@ describe('FilterEngine', () => {
     };
 
     // Mock Page
+    const mockScopeRow = { scope: true };
     const mockPage = {
-        locator: vi.fn()
+        locator: vi.fn().mockReturnValue(mockScopeRow)
     } as unknown as Page;
 
     // Mock Resolve
@@ -86,7 +87,8 @@ describe('FilterEngine', () => {
             const result = engine.applyFilters(baseRows, { 'Name': 'John', 'Role': 'Admin' }, map, true, mockPage);
 
             // Verify resolve called for cell template
-            expect(mockResolve).toHaveBeenCalledWith(mockConfig.cellSelector, mockPage);
+            expect(mockPage.locator).toHaveBeenCalledWith(':scope');
+            expect(mockResolve).toHaveBeenCalledWith(mockConfig.cellSelector, mockScopeRow);
 
             // Verify filter called twice
             const baseMock = baseRows as any;

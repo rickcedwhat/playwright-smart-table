@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Function `rowSelector` (#457)** — `rowSelector` now accepts `(root) => Locator` like `headerSelector` and `cellSelector`. All three share the new exported `TableSelector` type.
+
+### Changed
+
+- **String-only features say so (#457)** — the `dataAttribute` viewport warns once and degrades (no overscan filtering / row-range shortcut / `scrollToRow` / header `scrollToColumn`) instead of silently no-oping when given a function selector. The MUI DataGrid viewport falls back to its own `[data-rowindex]` / `.MuiDataGrid-columnHeader` selectors.
+- **Function `cellSelector` always receives a Locator (#457)** — row filters previously passed the `Page`.
+- **Typed SmartRow internals (#440)** — `_selfHealing` / `_inBatch` / `_barrier` live on an internal `SmartRowInternals` type instead of `as any`.
+
 ## [6.22.0] - 2026-09-26
 
 ### Upgrade notes

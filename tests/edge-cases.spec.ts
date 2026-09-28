@@ -246,6 +246,45 @@ test.describe('Edge cases and missing coverage', () => {
     await expect(row.getCell('ID')).toHaveText('2');
   });
 
+  test('function rowSelector drives find, count, and iteration (#457)', async ({ page }) => {
+    await page.setContent(`
+      <table id="t">
+        <thead><tr><th>ID</th><th>Name</th></tr></thead>
+        <tbody>
+          <tr class="group"><td colspan="2">Group A</td></tr>
+          <tr><td>1</td><td>Alice</td></tr>
+          <tr><td>2</td><td>Bob</td></tr>
+        </tbody>
+      </table>
+    `);
+    const table = useTable(page.locator('#t'), {
+      rowSelector: (root) => root.locator('tbody tr').filter({ hasNot: root.page().locator('td[colspan]') }),
+    });
+    await table.init();
+    expect(await table.countRows()).toBe(2);
+    const bob = await table.findRow({ Name: 'Bob' });
+    await expect(bob.getCell('ID')).toHaveText('2');
+    expect(await table.map(({ row }) => row.getValue('Name'))).toEqual(['Alice', 'Bob']);
+  });
+
+  test('headerSelector can reach headers rendered as a separate table (#457)', async ({ page }) => {
+    await page.setContent(`
+      <table id="head"><thead><tr><th>ID</th><th>Name</th></tr></thead></table>
+      <table id="body">
+        <tbody>
+          <tr><td>1</td><td>Alice</td></tr>
+          <tr><td>2</td><td>Bob</td></tr>
+        </tbody>
+      </table>
+    `);
+    const table = useTable(page.locator('#body'), {
+      headerSelector: (root) => root.page().locator('#head th'),
+    });
+    await table.init();
+    expect(await table.getHeaders()).toEqual(['ID', 'Name']);
+    await expect(table.getRow({ Name: 'Alice' }).getCell('ID')).toHaveText('1');
+  });
+
   test('getRow multi-match is a multi-element locator (#432)', async ({ page }) => {
     await page.setContent(`
       <table id="t">

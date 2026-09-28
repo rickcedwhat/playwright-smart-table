@@ -1,5 +1,5 @@
 import type { Locator } from '@playwright/test';
-import { TableContext, Selector, TableConfig, ViewportStrategy, StrategyContext } from '../types';
+import { TableContext, TableConfig, ViewportStrategy, StrategyContext } from '../types';
 import { PaginationStrategies } from '../strategies/pagination';
 import { StabilizationStrategies } from '../strategies/stabilization';
 
@@ -20,7 +20,7 @@ const scrollRightHeaderRDG = async (context: TableContext) => {
     );
 
     const getVisible = async () => {
-        const headerLoc = resolve(config.headerSelector as Selector, root);
+        const headerLoc = resolve(config.headerSelector, root);
         const texts = await headerLoc.allInnerTexts();
         return texts.map(t => {
             const trimmed = t.trim();

@@ -1,5 +1,5 @@
 // fallow-ignore-file circular-dependency
-import type { StrategyContext, Selector } from '../types';
+import type { StrategyContext } from '../types';
 import { logDebug } from '../utils/debugUtils';
 
 /**
@@ -14,7 +14,7 @@ export const HeaderStrategies = {
      * This is fast but won't find virtualized columns off-screen.
      */
     visible: async ({ config, resolve, root }: StrategyContext): Promise<string[]> => {
-        const headerLoc = resolve(config.headerSelector as Selector, root);
+        const headerLoc = resolve(config.headerSelector, root);
         try {
             // Wait for at least one header to be visible
             await headerLoc.first().waitFor({ state: 'visible', timeout: 3000 });
@@ -43,7 +43,7 @@ export const HeaderStrategies = {
             const collectedHeaders = new Set<string>();
 
             const getVisible = async () => {
-                const headerLoc = resolve(config.headerSelector as Selector, root);
+                const headerLoc = resolve(config.headerSelector, root);
                 const texts = await headerLoc.allInnerTexts();
                 return texts.map(t => t.trim());
             };

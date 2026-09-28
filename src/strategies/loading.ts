@@ -1,4 +1,4 @@
-import { SmartRow, TableContext, Selector } from '../types';
+import { SmartRow, TableContext } from '../types';
 
 /**
  * Strategies for detecting loading states.
@@ -94,7 +94,7 @@ export const LoadingStrategies = {
                 const { pollMs, timeoutMs } = options;
 
                 const getSignature = async (): Promise<string> => {
-                    const headers = await resolve(config.headerSelector as Selector, root).all();
+                    const headers = await resolve(config.headerSelector, root).all();
                     const texts = await Promise.all(headers.map(h => h.innerText()));
                     return texts.join('\x00');
                 };

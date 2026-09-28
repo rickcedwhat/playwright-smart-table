@@ -1,18 +1,18 @@
 [
   {
     "name": "headerSelector",
-    "signature": "headerSelector?: string | ((root: Locator) => Locator)",
-    "comment": "/** Selector for the table headers */"
+    "signature": "headerSelector?: TableSelector",
+    "comment": "/**\n* Selector for the header cells, relative to the table root. Default `'thead th'`.\n* Use a function to reach headers outside the root, e.g.\n* `(root) => root.page().locator('#header-table th')`.\n*/"
   },
   {
     "name": "rowSelector",
-    "signature": "rowSelector?: string",
-    "comment": "/** Selector for the table rows */"
+    "signature": "rowSelector?: TableSelector",
+    "comment": "/** Selector for the rows, relative to the table root. Default `'tbody tr'`. */"
   },
   {
     "name": "cellSelector",
-    "signature": "cellSelector?: string | ((row: Locator) => Locator)",
-    "comment": "/** Selector for the cells within a row */"
+    "signature": "cellSelector?: TableSelector",
+    "comment": "/** Selector for the cells, relative to a row. Default `'td'`. */"
   },
   {
     "name": "maxPages",

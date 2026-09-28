@@ -20,6 +20,7 @@ import { ElementTracker } from './utils/elementTracker';
 import { NavigationBarrier } from './utils/navigationBarrier';
 import { waitWhileTableLoading } from './utils/loadingWait';
 import { SET_CURRENT_PAGE_INDEX } from './utils/pageIndex';
+import { internals } from './utils/smartRowInternals';
 
 // Helper to safely serialize objects containing functions for logging
 const safeStringify = (obj: any) => {
@@ -162,12 +163,13 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
   let finalTable: TableResult<T> = null as unknown as TableResult<T>;
 
   // Helper factory
-  const _makeSmart = (rowLocator: Locator, map: Map<string, number>, rowIndex?: number, tablePageIndex?: number, barrier?: NavigationBarrier, rowSelector?: string, renderWindowPosition = false): SmartRowType => {
-    const effectiveLocator = rowSelector
-      ? rootLocator.locator(rowSelector)
+  // healSelector: the per-row selector returned by resolveRowIndex (not config.rowSelector).
+  const _makeSmart = (rowLocator: Locator, map: Map<string, number>, rowIndex?: number, tablePageIndex?: number, barrier?: NavigationBarrier, healSelector?: string, renderWindowPosition = false): SmartRowType => {
+    const effectiveLocator = healSelector
+      ? rootLocator.locator(healSelector)
       : rowLocator;
     const sr = createSmartRow<T>(effectiveLocator, map, rowIndex, config, rootLocator, resolve, finalTable, tablePageIndex, barrier, renderWindowPosition);
-    if (rowSelector) (sr as any)._selfHealing = true;
+    if (healSelector) internals(sr)._selfHealing = true;
     return sr;
   };
 
@@ -322,7 +324,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
         return;
       }
 
-      const headerCell = resolve(config.headerSelector as Selector, rootLocator).nth(idx);
+      const headerCell = resolve(config.headerSelector, rootLocator).nth(idx);
       await headerCell.scrollIntoViewIfNeeded();
     },
 
@@ -337,7 +339,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       const map = await tableMapper.getMap();
       const idx = map.get(columnName);
       if (idx === undefined) throw _createColumnError(columnName, map, 'header cell');
-      return resolve(config.headerSelector as Selector, rootLocator).nth(idx);
+      return resolve(config.headerSelector, rootLocator).nth(idx);
     },
 
     countRows: async (filters?: Record<string, FilterValue>, options?: { exact?: boolean; maxPages?: number }): Promise<number> => {
