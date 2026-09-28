@@ -1,4 +1,4 @@
-import type { SortingStrategy, Selector } from '../types';
+import type { SortingStrategy } from '../types';
 
 /**
  * A collection of pre-built sorting strategies.
@@ -11,7 +11,7 @@ export const SortingStrategies = {
    */
   AriaSort: (): SortingStrategy => {
     return {
-      async doSort({ columnName, direction, context }) {
+      async doSort({ columnName, context }) {
         // getHeaderCell is always present on TableContext after table is initialized
         const targetHeader = await context.getHeaderCell!(columnName);
         // The table engine handles verify-and-retry. We only provide the trigger here.

@@ -1,5 +1,5 @@
 import type { Locator, Page } from '@playwright/test';
-import { TableConfig, TableContext, Selector, TableResult, SmartRow as SmartRowType, FinalTableConfig, DedupeStrategy, PaginationStrategy, StrategyContext, TableStrategies as ITableStrategies, FilterValue } from './types';
+import { TableConfig, TableContext, Selector, TableResult, SmartRow as SmartRowType, FinalTableConfig, StrategyContext, TableStrategies as ITableStrategies, FilterValue } from './types';
 import { MINIMAL_CONFIG_CONTEXT } from './minimalConfigContext';
 import { validatePaginationResult, validateSortingStrategy, validateFillStrategy } from './strategies/validation';
 
@@ -12,7 +12,7 @@ import { FilterEngine } from './filterEngine';
 import { TableMapper } from './engine/tableMapper';
 import { RowFinder } from './engine/rowFinder';
 import { runForEach, runMap, runFilter } from './engine/tableIteration';
-import { resolveLogicalRowIndex, normalizeRowIndexResult } from './engine/rowResolution';
+import { normalizeRowIndexResult } from './engine/rowResolution';
 import { scanPages } from './engine/scanPages';
 import { debugDelay, logDebug, warnIfDebugInCI } from './utils/debugUtils';
 import { createSmartRowArray, SmartRowArray } from './utils/smartRowArray';
@@ -25,7 +25,7 @@ import { internals } from './utils/smartRowInternals';
 // Helper to safely serialize objects containing functions for logging
 const safeStringify = (obj: any) => {
   try {
-    return JSON.stringify(obj, (key: string, value: any) => {
+    return JSON.stringify(obj, (_key: string, value: any) => {
       if (typeof value === 'function') {
         return '[Function]';
       }
