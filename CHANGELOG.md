@@ -6,6 +6,7 @@
 
 - **Shared header scroll loop (#439)** — `Strategies.Header.horizontalScroll` and the Glide preset's header discovery now share one scroll-and-collect implementation. Each keeps its own scroller lookup (Glide's `.dvn-scroller` is a sibling of the canvas, so it still searches the document). No behavior change.
 - **Packaging smoke test on every PR (#462)** — `scripts/test-packaging.sh` now packs with pnpm, `require()`s the tarball in a project without `@playwright/test` and checks that `PLAYWRIGHT_SMART_TABLE_VERSION` matches `package.json`, then type-checks a consumer file against the published `.d.ts` on the latest TypeScript plus TS 5 and 6. It runs as a PR check, not just at publish time.
+- **No unused locals (#463)** — removed leftover unused imports and parameters in `src/`, including the MUI preset's unused `PaginationStrategies` import. `tsconfig.json` now enables `noUnusedLocals` and `noUnusedParameters`, so the lint job's `tsc` fails on new ones. Unused value imports matter here because an unused runtime `@playwright/test` import is what caused the 6.21.0–6.23.0 regression.
 
 ## [6.23.1] - 2026-09-28
 

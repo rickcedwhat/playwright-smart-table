@@ -1,6 +1,5 @@
 import type { Locator } from '@playwright/test';
 import { TableConfig, TableContext } from '../types';
-import { PaginationStrategies } from '../strategies';
 import { logDebug } from '../utils/debugUtils';
 import { cssSelectorOrWarn } from '../utils/cssSelector';
 

@@ -531,9 +531,8 @@ export interface ColumnOverride<TValue = any> {
 
 import { HeaderStrategy } from './strategies/headers';
 export type { HeaderStrategy } from './strategies/headers';
-import { CellNavigationStrategy, NavigationPrimitives } from './strategies/columns';
+import { NavigationPrimitives } from './strategies/columns';
 export type { NavigationPrimitives, CellNavigationStrategy } from './strategies/columns';
-import { ColumnResolutionStrategy } from './strategies/resolution';
 
 /**
  * Strategy to resolve column names (string or regex) to their index.

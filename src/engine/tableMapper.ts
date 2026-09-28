@@ -1,5 +1,5 @@
 import type { Locator, Page } from '@playwright/test';
-import { FinalTableConfig, TableContext, Selector, HeaderStrategy, TableStrategies } from '../types';
+import { FinalTableConfig, TableContext, Selector } from '../types';
 import { HeaderStrategies } from '../strategies/headers';
 import { logDebug } from '../utils/debugUtils';
 
