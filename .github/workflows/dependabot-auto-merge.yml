@@ -26,22 +26,20 @@ jobs:
               pull_number: context.payload.pull_request.number,
             });
             const body = pr.data.body || '';
-            // Scoped to Dependabot's own update summary line ("Updates `pkg` from X to Y"
-            // or "Bumps `pkg` from X to Y"). Handles both semver (1.2.3) and major-only
-            // (5) tags used by GitHub Actions Dependabot. Avoids matching changelog text
-            // in the PR body which contains many unrelated version numbers.
-            const regex = /(?:Updates|Bumps)\s+`[^`]+`\s+from\s+([0-9]+)(?:\.[0-9]+)*\s+to\s+([0-9]+)(?:\.[0-9]+)*/ig;
-            let m;
-            let foundMatch = false;
-            while ((m = regex.exec(body)) !== null) {
-              foundMatch = true;
-              const fromMajor = parseInt(m[1], 10);
-              const toMajor = parseInt(m[2], 10);
-              if (toMajor > fromMajor) {
+            // Scoped to Dependabot's own summary lines so changelog text (full of unrelated
+            // version numbers) is ignored. Handles semver (1.2.3) and major-only (5) tags.
+            // Grouped PRs: one "Updates `pkg` from X to Y" line per package.
+            // Single PRs: the body starts with "Bumps [pkg](url) from X to Y." — anchored to the
+            // start because quoted upstream changelogs often contain "Bumps [...]" lines.
+            const matches = [...body.matchAll(/Updates\s+`[^`]+`\s+from\s+(\d+)(?:\.\d+)*\s+to\s+(\d+)(?:\.\d+)*/ig)];
+            const single = body.match(/^\s*Bumps\s+(?:\[[^\]]+\]\([^)]*\)|`[^`]+`)\s+from\s+(\d+)(?:\.\d+)*\s+to\s+(\d+)(?:\.\d+)*/i);
+            if (single) matches.push(single);
+            for (const m of matches) {
+              if (parseInt(m[2], 10) > parseInt(m[1], 10)) {
                 core.setFailed(`Contains a major version bump: ${m[0]}`);
               }
             }
-            if (!foundMatch) {
+            if (matches.length === 0) {
               core.setFailed('No version bump patterns found in PR body — Dependabot format may have changed');
             }
 
