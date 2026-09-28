@@ -62,9 +62,9 @@ jobs:
         run: pnpm exec vitest run --reporter=verbose --reporter=json --outputFile=test-results.json
 
       - name: Test Packaging
-        run: |
-          chmod +x scripts/test-packaging.sh
-          ./scripts/test-packaging.sh
+        run: bash scripts/test-packaging.sh
+        env:
+          SKIP_BUILD: '1'
 
       - name: Stamp prerelease version
         if: steps.check_version.outputs.changed == 'false'
