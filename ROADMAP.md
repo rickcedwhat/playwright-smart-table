@@ -24,11 +24,23 @@ Guiding light: [`PHILOSOPHY.md`](PHILOSOPHY.md) is the scoring rubric for every 
 - [x] **Unify `headerSelector` / `rowSelector` / `cellSelector` types; warn when string-only features get a function** — [#457](https://github.com/rickcedwhat/playwright-smart-table/issues/457)
 - [x] **Dependabot weekly npm group blocked by bundled major bumps** — [#442](https://github.com/rickcedwhat/playwright-smart-table/issues/442)
 
+### Batch 2 — GBU 2026-09-30 ([`GBU-REPORT.md`](GBU-REPORT.md))
+
+- [ ] **`infiniteScroll` silently skips rows when the step exceeds the rendered window** — [#473](https://github.com/rickcedwhat/playwright-smart-table/issues/473) (then verify Grafana-class tables, [#417](https://github.com/rickcedwhat/playwright-smart-table/issues/417))
+- [ ] **Take live third-party sites off the PR critical path** — [#474](https://github.com/rickcedwhat/playwright-smart-table/issues/474)
+- [ ] **Cut redundant/tautological tests; rename bug-numbered test files** — [#475](https://github.com/rickcedwhat/playwright-smart-table/issues/475)
+- [ ] **Cover untested public options (MUI `buttonLabels`, `detectCurrentPage`, `numberOfPages`, …)** — [#476](https://github.com/rickcedwhat/playwright-smart-table/issues/476)
+- [ ] **Move `countRows` / `sorting.apply` / `findRowByIndex` out of `useTable.ts`** — [#477](https://github.com/rickcedwhat/playwright-smart-table/issues/477)
+- [ ] **Move cell navigation and `toJSON` snapshot/re-pin logic out of `smartRow.ts`** — [#478](https://github.com/rickcedwhat/playwright-smart-table/issues/478)
+- [ ] **Quick wins (CONTRIBUTING pnpm, dead `ResolutionStrategies`, orphan `#endregion`, `./types` export)** — [#479](https://github.com/rickcedwhat/playwright-smart-table/issues/479)
+- [ ] **Decide the fate of the README snippet generator** — [#480](https://github.com/rickcedwhat/playwright-smart-table/issues/480)
+
 ### Deferred to v7
 
 - **Remove deprecated `getColumnValues`** — still public in v6 (marked `@deprecated` in #428); use `mapColumn` / `map`.
 - **Remove `generateConfigPrompt`** — use `generateConfig`.
 - **Make `table.currentPageIndex` read-only** — writes warn since v6.22.0 (#434).
+- **Remove unused public types `ColumnResolutionStrategy` and deprecated `CellNavigationStrategy`** — [#479](https://github.com/rickcedwhat/playwright-smart-table/issues/479).
 
 Related closed work to reopen/extend: [#327](https://github.com/rickcedwhat/playwright-smart-table/issues/327) (v7 preset API), [#386](https://github.com/rickcedwhat/playwright-smart-table/issues/386) (Grafana-class patterns).
 
