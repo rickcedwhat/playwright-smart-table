@@ -1,23 +1,25 @@
-# GBU Report - playwright-smart-table v6.20.1
+# GBU Report - playwright-smart-table v6.23.1
 
-Generated: 2026-08-22
+Generated: 2026-09-30 (main @ `a231fb32`)
 
 > Guiding light: [`PHILOSOPHY.md`](./PHILOSOPHY.md)
-> Follow-up issues: [#426](https://github.com/rickcedwhat/playwright-smart-table/issues/426)–[#434](https://github.com/rickcedwhat/playwright-smart-table/issues/434) · tracked on [`ROADMAP.md`](./ROADMAP.md)
+> Previous audit: 2026-08-22 (v6.20.1). All of its issues ([#426](https://github.com/rickcedwhat/playwright-smart-table/issues/426)–[#434](https://github.com/rickcedwhat/playwright-smart-table/issues/434)) plus the follow-up batch ([#439](https://github.com/rickcedwhat/playwright-smart-table/issues/439)–[#442](https://github.com/rickcedwhat/playwright-smart-table/issues/442), [#457](https://github.com/rickcedwhat/playwright-smart-table/issues/457)) have shipped. It's in git history.
 
 ---
 
-## `_navigateToCell` — what if we removed it?
+## What changed since the last audit
 
-`_navigateToCell` (`src/smartRow.ts`) is **not** a leftover unused helper: `toJSON`, `smartFill`, and `getCell().bringIntoView()` always call it (including for lock-step `synchronized` barriers).
-
-| Option | What happens |
+| August finding | Status now |
 |---|---|
-| **A. Delete the whole function** | Breaks off-screen cell reads/fills for every virtualized table. Not viable without a replacement orchestrator. |
-| **B. Keep orchestrator; strip Glide-shaped core** (canvas / `Home` / “Midas Touch”) | **Recommended short-term.** Stock Glide already uses **viewport only** (no `strategies.navigation`). That canvas/`Home` block only runs when navigation primitives + `snapFirstColumnIntoView` are configured — legacy pre-viewport Glide path. |
-| **C. Drop `strategies.navigation` fallback; viewport-only** | Glide OK. **RDG breaks** until migrated (`presets.rdg` still ships arrow/scroll navigation; `rdg2D` is the viewport direction). Custom nav tests break. |
-
-See [#426](https://github.com/rickcedwhat/playwright-smart-table/issues/426) for the full decision write-up.
+| Glide canvas/`Home` logic in core `_navigateToCell` | ✅ Gone. Only a generic `snapFirstColumnIntoView` navigation hook remains; a unit test guards it (`navigateToCell.no-glide-core`) |
+| Generic strategies shipping framework CSS defaults | ✅ Gone. No MUI/RDG/Glide/Tailwind selectors outside `src/presets/` (one example string in a warning message) |
+| 7 divergent page/scan loops | ✅ Mostly fixed. `scanPages` serves `findRow`, `findRows`, `map`/`forEach`/`filter` and `countRows`, and the async iterator reuses `runMap`. ⚠️ `findRowByIndex` still has its own `_advancePage` loop |
+| Dead `Strategies.Resolution` / `CellNavigation` / `Filter.spy` | ✅ Removed from the namespace. ⚠️ The `ResolutionStrategies` factory file and its unit tests still exist (see Bad #2) |
+| `Plugins` / `getColumnValues` undead | ✅ Marked `@deprecated`, with parity tests; removal is scheduled for v7 in ROADMAP |
+| Unbounded `isTableLoading`, parallel `map` default, double sort retry | ✅ Fixed in 6.22.0 (#434) |
+| `console.*` in `generateConfig` | ✅ Routed through `logDebug`. The remaining `console.warn`s are deliberate one-time footgun warnings |
+| Stale `CONTRIBUTING.md` (npm) | ❌ **Not fixed.** It still says `npm install` / `npm test` |
+| `useTable.ts` ~797 / `smartRow.ts` ~993 lines | ❌ **Grew** to 889 / 1,039 |
 
 ---
 
@@ -25,151 +27,149 @@ See [#426](https://github.com/rickcedwhat/playwright-smart-table/issues/426) for
 
 (Reference: PHILOSOPHY.md)
 
-- **Mission fit:** Architecture still matches “describe your table” — `TableConfig` + `TableStrategies` + `src/presets/` packs. Consumers can compose strategies without a release. Drift is in *where* hard virtualization behavior lives: too much of it is fused into `smartRow._navigateToCell` / `useTable`, not only presets.
-- **Strategy-first:** Rich, real hook surface (`pagination`, `loading`, `viewport`, `contentReady`, `resolveRowIndex`, …). Presets hold MUI/RDG/Glide knowledge. Soft/hard drift: Glide canvas/`Home` in core; generic strategy defaults that smuggle `.dvn-scroller` / `.rdg-viewport` / Tailwind overflow class names; dead `Resolution` / no-op `CellNavigation` still on `Strategies`.
-- **Core thinness:** No `if (isMui)` in the engine (good). But `useTable.ts` (~797) and `smartRow.ts` (~993) are heavy; ~7 pagination/scan loops share `_advancePage` with inconsistent features (e.g. async iterator vs `runMap`). Center of gravity has shifted toward a virtualization special-case machine in core.
-- **Decision-checklist failures:** Recent 6.18–6.20 work is production-driven (Principle 6 ✅) but often landed as core growth rather than new strategy hooks (Principle 2 ⚠️). `Plugins` still exported; `getColumnValues` claimed removed in ROADMAP but still public.
-- **Score: 7/10 alignment** — shape is right; core weight and a few framework-shaped defaults are the drift to watch.
+- **Mission fit:** Strong. The August drift (framework knowledge in the core) is gone. Everything framework-specific lives in `src/presets/` or is a user strategy, and `TableConfig` + `TableStrategies` + presets is still the only way to teach the library a table. The Grafana work (#417) was done entirely in test-side strategies (`resolveRowIndex`, custom viewport); the core didn't learn about Grafana.
+- **Strategy-first:** Rich hook surface (`pagination`, `loading` incl. row/cell timeouts, `viewport`, `contentReady`, `resolveRowIndex`, `dedupe`, `columnOverrides`, `syntheticColumns`). Presets are `Partial<TableConfig>` built by factories (`createMuiDataGrid({ buttonLabels })`, `createGlide`). There are no `if (isMui)` checks anywhere in the engine.
+- **Core thinness:** The weak spot. The engine was split out (`src/engine/`: `rowFinder`, `tableIteration`, `scanPages`, `tableMapper`, `rowResolution`), but `useTable.ts` still grew by about 90 lines. It inlines three engines that belong in `src/engine/`: `countRows` (~120 lines), `sorting.apply` (~50 lines of retry/wait orchestration) and `findRowByIndex` (~65 lines, with its own pagination loop). `smartRow.ts` at 1,039 lines is the largest file: `_navigateToCell` (~330 lines), plus a `toJSON` that contains its own atomic snapshot, materialization and re-pin machinery.
+- **Decision-checklist failures:** None among recent features. #457 (function selectors) warns and degrades in the strategy instead of branching in the core; #461 was a regression, not a design choice. The one soft failure is **Removability** (checklist item 7): recycling-virtualizer correctness (re-pin, atomic `toJSON`, overscan deferral, final scan) is spread through `smartRow` and `tableIteration`, not isolated behind a hook.
+- **Score: 8/10 alignment** (up from 7). The hard violations are gone; what's left is core weight.
 
 ---
 
 ## THE GOOD ✅
 
-- **Describe / strategy / preset layering is real** — not aspirational docs. Official packs are `Partial<TableConfig>`, not forked engines (`src/presets/mui.ts`, `rdg.ts`, `glide/`).
-- **`TableStrategies` is a genuine plug surface** — pagination, sorting, viewport, loading, headers, fill, dedupe, filter, `resolveRowIndex`, `contentReady`, `beforeCellRead`, navigation primitives.
-- **Playwright-native SmartRow** — Locator intersection types, sentinel rows for negative asserts, `get*` vs `find*` mental model, optional `@playwright/test` peer (6.20.1).
-- **`resolveRowIndex` + self-healing `{ index, selector }`** — correct abstraction for virtual identity; `findRowByIndex` refuses to guess without it.
-- **`mergeTableConfig`** — correct composition primitive for presets + user overrides.
-- **Fail-helpful paths** — column typo suggestions, ambiguous `findRow`, missing strategy validation.
-- **Recent changelog motivation matches philosophy** — virtualization correctness, no silent bulk-skipped pages, atomic/`contentReady` for recycling virtualizers.
-- **Test suite is substantial** — ~74 files; unit-heavy on engine internals, E2E-heavy on public API; integration coverage for MUI / RDG / Glide.
+- **Presets are pure configuration.** `mui.ts`, `rdg.ts` and `glide/` are factories returning `Partial<TableConfig>`, and deleting one wouldn't touch the engine. `buttonLabels` localization goes through the factory, not a core flag.
+- **Describe-your-table held under pressure.** Grafana-class tables (`style.top` rows, no `data-rowindex`), async content (`contentReady.textStable` / `mutationSettled`) and recycling DOM were all solved with strategies a user can write. The core only gained generic primitives (`resolveRowIndex`, `contentReady`, overscan-aware `getVisibleRowIndices`).
+- **One scan primitive.** `scanPages` (#427) gives `findRow`/`findRows`/`map`/`forEach`/`filter`/`countRows` the same EOF final scan, loading gate and bounded page budget. The async iterator is a thin adapter over `runMap`.
+- **Playwright-native surface.** `SmartRow` is still a Locator with extras. Sentinel rows keep `expect(row).not.toBeVisible()` working, and `get*` (sync, local) versus `find*` (async, searching) is consistent. `TableSelector` (#457) unifies string and `(root) => Locator` selectors.
+- **Fail-helpful.** Column typo suggestions, strict-mode `getRow`, strategy validators, `maxPages: 1` plus pagination warning, `currentPageIndex` write warning, and one-time warnings when string-only features get a function selector.
+- **Release safety net is real now.** Compiled `dist/` is scanned for runtime Playwright requires (6.23.1). `scripts/test-packaging.sh` runs on every PR: it loads the package without `@playwright/test` and type-checks the published `.d.ts` on TS latest, 5 and 6 (#462). `noUnusedLocals`/`noUnusedParameters` are on (#463). API docs signatures are generated from `src/types.ts` and CI fails on drift (#441).
+- **Deep test suite.** 85 files and about 830 tests, covering both engine internals (Vitest) and public behavior (Playwright), plus integration runs against MUI DataGrid, RDG and RDG2D.
 
 ---
 
 ## THE BAD ⚠️
 
-1. **Deprecated `Plugins` still exported** (`src/index.ts` → `src/plugins/`). Preset JSDoc still teaches `Plugins.*`. Removal promised for v7.
-   - *Fix:* Stop documenting Plugins now; keep shim until v7. Clarify `Plugins.MUI` = DataGrid only (not `muiTable`).
+1. **`useTable.ts` inlines three engines.** `countRows`, `sorting.apply` and `findRowByIndex` together are about 235 of its 889 lines. `findRowByIndex` also keeps its own `_advancePage` loop, the last one outside `scanPages`.
+   - *Fix:* Move them to `src/engine/` (`countRows.ts`, `sorting.ts`, `rowByIndex.ts`) and have `findRowByIndex`'s fallback use `scanPages` with a stop predicate. This is refactoring only, with no behavior change.
 
-2. **`getColumnValues` is undead** — ROADMAP/CHANGELOG say removed in v6.7.0; still on `TableResult` with no `@deprecated`; still documented.
-   - *Fix:* Mark `@deprecated` → `map` / `mapColumn`, or correct ROADMAP.
+2. **Dead module and dead public type.** `src/strategies/resolution.ts` exports `ResolutionStrategies`, which nothing imports; it has 7 unit tests (`tests/unit/resolution.test.ts`). `ColumnResolutionStrategy` is exported from `types.ts` and `strategies/index.ts` but nothing consumes it. Deprecated `CellNavigationStrategy` is still exported.
+   - *Fix:* Delete the factory and its tests now. Keep the two types until v7 (removing a public type is breaking) and add them to ROADMAP "Deferred to v7".
 
-3. **Inconsistent public type exports** — `index.ts` exports some strategy types but not `TableStrategies` / `LoadingStrategy` / `ViewportStrategy` / etc.; `./types` dumps everything including `FinalTableConfig`.
-   - *Fix:* Export strategy contracts from main entry; mark internals `@internal`.
+3. **The README snippet pipeline is vestigial.** `README.md` is now a 63-line landing page with **no** embed markers. `generate-docs` still extracts 15 `#region`s from `readme_verification.spec.ts` on every build and updates nothing. Docs examples, including the new examples page (#402), are hand-copied from tests and can drift. `.cursorrules` / `CLAUDE.md` still say README snippets are auto-generated. There's also an orphan `// #endregion advanced-column-scan` with no opening `#region`.
+   - *Fix:* Either point the generator at `docs/**/*.md` (embed tested snippets into the guide and examples pages), or delete it and update the agent rules. The first option matches the "every snippet is tested" promise on the examples page.
 
-4. **Dead / test-only strategy surface** — unused `Strategies.Resolution` (+ leftover import in `useTable`); no-op `Strategies.CellNavigation`; public `Strategies.Filter.spy`.
-   - *Fix:* Delete or unexport; fix `scrollToColumn` JSDoc that still mentions CellNavigationStrategy.
+4. **`CONTRIBUTING.md` still teaches npm.** `npm install`, `npm test`, `npm run build`, `npm run docs:dev`, plus the PR checklist line. This was flagged in August and still isn't fixed.
+   - *Fix:* Switch to pnpm (`pnpm install --frozen-lockfile`, `pnpm run test:unit`, `npx playwright test`).
 
-5. **`FilterEngine` ignores `getCellLocator`** — uses `cellSelector` + `.nth(colIndex)`. Column-virtualized presets (aria-colindex) can filter the wrong cell on `getRow` / DOM half of find.
-   - *Fix:* Resolve cells through `strategies.getCellLocator` (shared helper).
+5. **`smartRow.ts` is the new center of gravity (1,039 lines).** `toJSON` alone owns atomic snapshots, materialization, re-pin/recovery and per-cell loading timeouts. None of it is framework-specific, but it isn't removable either.
+   - *Fix:* Extract `_navigateToCell` to `src/engine/cellNavigation.ts` (August's option B, never completed) and the atomic/re-pin logic to `src/engine/rowSnapshot.ts`. Freeze growth in `smartRow.ts`.
 
-6. **`getRow` vs `findRow` filter semantics diverge** — overrides post-evaluated in `RowFinder.splitFilters` but not in sync `getRow`.
-   - *Fix:* Reject override filters in `getRow` (like synthetics) or share split logic + document.
+6. **Soft-drift defaults remain.** `maxPages: 1` (it warns now, but still surprises people), `autoScroll: true`, and `pagination: {}` as an empty default object. None are wrong, but each needs a doc callout.
+   - *Fix:* Leave as-is for v6 and revisit with the v7 preset API ([#327](https://github.com/rickcedwhat/playwright-smart-table/issues/327)).
 
-7. **`getValue` does not navigate** — `toJSON` / `getCell().bringIntoView()` do. Silent stale/empty reads on virtualized columns.
-   - *Fix:* Same nav pipeline as `toJSON`, or throw when viewport/nav is configured and cell is unmounted.
-
-8. **`table.scrollToColumn` / `bringIntoView` bypass viewport strategy** — fall through to `scrollIntoViewIfNeeded()` (Y-scroll footgun docs already warn about).
-   - *Fix:* Delegate to `viewport.scrollToColumn` / `scrollToRow` when present.
-
-9. **Soft-drift config / defaults** — `map` defaults to `concurrency: 'parallel'`; `maxPages: 1` surprises when presets are half-applied; writable `currentPageIndex`; `autoScroll: true` default; empty `pagination: {}` semantics.
-   - *Fix:* Prefer safer defaults or louder docs; make `currentPageIndex` read-only (or warn).
-
-10. **Double sort retry** — core `sorting.apply` retries ×3; MUI `doSort` also loops — up to 9 clicks.
-    - *Fix:* Presets trigger-only; retries stay in core (stated design).
-
-11. **Unbounded `isTableLoading` polls** in `countRows` / `waitForTableReady` (sort wait is bounded).
-    - *Fix:* Shared timeout.
-
-12. **`console.log` / `console.warn` in `generateConfig*`** — violates “use `logDebug`” / PHILOSOPHY logging rule.
-    - *Fix:* Route through debug utils or dedicated channel.
-
-13. **Stale CONTRIBUTING** still says `npm install` / `npm test` while the project is pnpm-first.
+7. **`./types` subpath export maps its runtime entry to `dist/index.js`.** Harmless because it's type-only, but surprising.
+   - *Fix:* Mark it types-only, or map `default` to `dist/types.js`.
 
 ---
 
 ## THE UGLY 🚨
 
-1. **Hard philosophy smell: Glide canvas / `Home` / settle magic in `_navigateToCell`** (`src/smartRow.ts`).
-   - Comment even names Glide (“Midas Touch”). Preset that only works because core special-cases DOM shape — PHILOSOPHY’s last-line test.
-   - *Action:* Move into Glide preset / navigation primitives (e.g. after-vertical-nav hook). Core calls primitives only.
+1. **`infiniteScroll` silently returns incomplete data ([#473](https://github.com/rickcedwhat/playwright-smart-table/issues/473)).** A fixed `scrollAmount` (default 500px) larger than the scroller's rendered window skips rows that never get mounted: 163/300 and 246/300 in the Grafana fixture, with no error. Silent data loss is the worst failure mode for a scraping library, and the default is enough to trigger it in a ~300px scroller. Existing tests hide it: they use 1,000–1,500px steps but only `findRow` the *last* row.
+   - *Action:* Clamp the default to the scroller's `clientHeight` and warn when an explicit value exceeds it. Optionally detect gaps via `resolveRowIndex`. Add a `test.fail()` regression now.
 
-2. **Generic strategies ship framework CSS defaults** — `HeaderStrategies.horizontalScroll` (`.dvn-scroller, .rdg-viewport, …`); `Viewport.dataAttribute` default `div[class*="overflow-auto"]`.
-   - *Action:* Require explicit selectors; put library defaults in presets only.
+2. **Grafana-class tables are unverified ([#417](https://github.com/rickcedwhat/playwright-smart-table/issues/417), reopened).** Five fixes landed in August, but the issue auto-closed on the first merge and nobody checked it against the real table. The 18-row early stop is still unreproduced. Until the faithful fixture (branch `test/417-grafana-fixture`) turns into assertions, the virtualization guide's claims for this class of table rest on a weaker synthetic test.
+   - *Action:* Land #473, convert the fixture into asserting tests, then consider an optional real-Grafana-in-Docker job.
 
-3. **`_navigateToCell` is a fused 2D virtualization engine** (~320 lines) with poor removability — deleting the Glide preset would not delete this code.
-   - *Action:* Extract to `src/engine/cellNavigation.ts`; no framework branches; freeze further growth in `useTable`/`smartRow` unless it is a new strategy hook.
+3. **PR CI depends on live third-party sites, hidden by retries.** CI-A runs `readme_verification` (11 datatables.net tests, mui.com and htmx.org), `debug-mode` (6 datatables.net tests) and `error-handling` (3 datatables.net tests). CI-B runs `mui-table` (mui.com) and `glide` (glideapps storybook). Global `retries: 2`, plus per-file retries, hides both site outages and real flakiness. On top of that, `playground-virtualization`, `dedupe-loading-order` and `performance` silently `test.skip` when `localhost:3000` is down, so coverage can drop without anything failing.
+   - *Action:* Move `debug-mode` and `error-handling` to `setContent` fixtures. Snapshot the datatables page into `tests/test-assets/` for `readme_verification`. Keep live-site checks in the existing non-blocking live config. Make the playground skips fail in CI.
 
-4. **Pagination / scan loop fan-out** — findRow, findRows, runMap, countRows, findRowByIndex, async iterator, bringIntoView path planner. `runMap` got overscan/loading-before-dedupe/final-scan; `Symbol.asyncIterator` did not.
-   - *Action:* One `scanPages` primitive; iterator should reuse `runMap` or be documented as thin/unsafe.
-
-5. **ROADMAP is all `[x]`** — no scheduled work for v7 Plugin removal, cell-nav extraction, or “do not grow core.” Production bugfixes keep winning over Principle 2 (thin core).
-   - *Action:* Add a short “philosophy debt” short-term section so GBU items have a home.
+4. **A regression shipped in three releases (6.21.0–6.23.0, [#461](https://github.com/rickcedwhat/playwright-smart-table/issues/461)).** A value import from `@playwright/test` made the package crash for consumers without it. This is fixed now, and three guards prevent a repeat: the build scan, the PR packaging job and `noUnusedLocals`. It stays in Ugly for this report only, because 11 versions had to be deprecated on npm ([#464](https://github.com/rickcedwhat/playwright-smart-table/issues/464)).
+   - *Action:* None left; closed out by #462 and #463. Drop from the next report.
 
 ---
 
 ## TEST AUDIT
 
-**Balance:** ~35 Vitest unit files vs ~39 Playwright specs. Engine internals are unit-heavy; public API is E2E-heavy. Integration covers MUI DataGrid/Table, RDG, RDG2D, Glide. Live DataGrid canaries exist outside CI A/B.
-
-**Named feature coverage:** `contentReady` / `mutationSettled` covered in Grafana-style E2E (no units). Presets well covered via integration. **`Plugins` deprecation has zero tests.**
+**Inventory:** 85 files, about 830 tests: 34 E2E specs (~296), 8 integration specs (28) and 43 Vitest files (~500, of which 75 are CI-bot tests in `unit/bot/bot-queue.test.ts`, which aren't library code).
 
 ### Redundant Tests
 
-| Test File | Scope | Duplicates | Recommendation |
+| Test File | Test Name | Duplicates | Recommendation |
 |---|---|---|---|
-| `tests/unit/paginationPath.test.ts` | “comprehensive” describe | First describe in same file | **Cut** comprehensive block |
-| `tests/unit/tableMapper.test.ts` | Second processHeaders/getMap block | First TableMapper describe | **Merge** unique remap/clear; drop rest |
-| `tests/unit/filterEngine.function.test.ts` | Function filters | `filterStrategies.more` + `locator-filtering.spec.ts` | **Cut** unit file |
-| `tests/unit/filterStrategy.unit.test.ts` | Default text filter | `filterEngine` / `filterStrategies.more` | **Merge** |
-| `tests/filter-strategy.spec.ts` | Spy invoked by getRow | Unit spy coverage | **Cut** E2E |
-| `tests/revalidate.spec.ts` | New column after DOM change | `edge-cases.spec.ts` | **Cut** standalone |
-| `tests/unit/toArray.test.ts` | Entire file | Reimplements production; never imports `useTable` | **Cut** or rewrite against real API |
-| `tests/strategies.spec.ts` | Live HTMX infinite scroll | playground / grafana / live-t2 | **Cut** from CI A or demote (third-party flake risk) |
-| `tests/performance.spec.ts` | 10k iterate | `playground-virtualization.spec.ts` | **Demote** to slow/optional |
-| `tests/dedupe-strategy.spec.ts` | Static non-colliding Y | Real dedupe covered elsewhere | **Rewrite** with overlap or **cut** |
-| `tests/a2-visible-iteration.spec.ts` | Overscan skip | `viewport-strategy` + `overscan-above` unit | **Keep reduced** one E2E |
-| `tests/debug-mode.spec.ts` | Verbose map log strings | `debugUtils.coverage.test.ts` | **Keep reduced** (delays only) |
-| `tests/unit/bot/bot-queue.test.ts` | GitHub bot queue | Not library | **Move** out of library unit suite or accept as tooling |
+| `edge-cases.spec.ts` | `bringIntoView() throws when row index is unknown` | Nothing: it builds a hand-written mock object and asserts the mock's own `throw`; no library code runs | **Cut**, or rewrite against a real `getRow()` row |
+| `edge-cases.spec.ts` | `table has expected core methods` | TypeScript types plus every other spec | **Cut** |
+| `edge-cases.spec.ts` | `init chaining works` | Every spec that does `await useTable(...).init()` | **Cut** |
+| `edge-cases.spec.ts` | `getRow works when table appears later (lazy load)` | Content is set before `init()`; `init with timeout waits for table to appear` covers the real case | **Cut** |
+| `edge-cases.spec.ts` | `getRow vs findRow: current page only vs cross-page` · `wasFound() returns false for sentinel rows…` | `findRow with maxPages: 1 returns sentinel…` (same fixture and steps) | **Merge** into that test |
+| `edge-cases.spec.ts` | `columnOverrides.read only: toJSON uses custom read for column` | `column-overrides-read-context` `single-argument read(cell) still works…` | **Cut** |
+| `row-finder.spec.ts` | Whole file (4 tests) | `rowindex-resolution.spec.ts`, `unit/rowFinder.unit` `useBulk`, `functional-methods` #349 | **Fold** the one unique test (getRow → undefined `rowIndex`) into `rowindex-resolution`; delete the file |
+| `functional-methods.spec.ts` | `dedupe option > map with dedupe skips duplicate rows` | The fixture has no duplicates, so it asserts nothing | **Cut**, or give the fixture real duplicates |
+| `functional-methods.spec.ts` | `map > concurrency: sequential produces ordered results` · `forEach with useBulkPagination: false uses goNext (default)` | The defaults are already exercised by the base `map`/`forEach` tests | **Cut** |
+| `functional-methods.spec.ts` | `filter > returns a SmartRowArray with toJSON()` | `filter > returns only rows matching predicate across all pages` | **Merge** |
+| `functional-methods.spec.ts` | `map > stop() halts after current page` | Asserts `<= 4`, which also passes with 0 rows | **Keep**, but assert the exact rows |
+| `sorting.spec.ts` | `should apply ascending/descending sort and update aria-sort attribute` | The `…correctly sorted alphabetically/numerically` tests (same apply) | **Merge** (state + attribute + data once each) |
+| `debug-mode.spec.ts` | `Combined debug features` · `No debug mode works normally (performance check)` | Assert only `toBeDefined()` / timing on a live site | **Cut** |
+| `debug-mode.spec.ts` | `Verbose logging emits expected messages during map()` · `Granular delays work` | `unit/debugUtils.coverage` (same messages and delays) | **Cut** / **merge**, and move what's left to `setContent` |
+| `strategies.spec.ts` | `Strategy: Infinite Scroll (HTMX Example)` | `readme_verification` HTMX dedupe test (same site and strategy); already out of CI-A | **Cut** |
+| `header-transformer.spec.ts` | `headerTransformer receives seenHeaders to handle duplicates` | `error-handling` `headerTransformer can fix duplicate errors` | **Merge** into one `headerTransformer` describe |
+| `playground-virtualization.spec.ts` | `should handle random stutter delays` | `toBeTruthy()` also passes for a sentinel row; `duration > 0` means nothing | **Cut**, or assert `wasFound()` + data |
+| `integration/rdg.spec.ts` | `should handle reading specific columns from middle of table` · `should paginate through virtualized rows` | Same file: `…all columns including virtualized ones` / `synchronized map collects 50+ unique rows…` | **Cut** / **merge** |
+| `integration/rdg-2d.spec.ts` | `getCell works for columns at different horizontal positions` | Never calls `getCell`; a subset of `reads all columns for a row…` | **Rewrite** to use `getCell`, or cut |
+| `integration/glide.spec.ts` | `should infinite scroll` | `should infinite scroll with scroll right` (a superset) | **Merge** |
+| `unit/issue104.test.ts` | Whole file | One test asserts an object literal (tsc covers it); the rest duplicate `glide-viewport.test.ts` | **Merge** into `glide-viewport`; delete |
+| `unit/mui.sort.test.ts` | `does not call waitForTimeout with a fixed 500ms value` | `gbu-434` `muiDataGrid.doSort clicks once` (same mock) | **Merge** |
+| `unit/resolution.test.ts` | All 7 tests | Tests the dead `ResolutionStrategies` module (Bad #2) | **Cut** with the module |
+
+Also: rename `gbu-432-coverage`, `gbu-434-safer-defaults`, `gbu-457-selector-types` and `dedupe-loading-order` to feature names, since audit or bug numbers don't say what a file covers. Consider moving `unit/bot/bot-queue.test.ts` next to the bot scripts so library test counts stay honest.
 
 ### Missing Tests
 
 | Feature | Why Important | Suggested Test |
 |---|---|---|
-| `Plugins.*` alias parity | Public until v7; untested | Unit: deep-equal / shape match vs `presets.*` |
-| `useTable().toArray()` | Public scrape API; current unit is tautological | E2E: equals map + reset page index |
-| `Pagination.click` factory edge cases | Used everywhere; no unit for windowed goToPage / disabled next | Unit with mock locators |
-| Stabilization `contentChanged` / `rowCountIncreased` | Defaults for click vs infinite scroll | Unit fingerprint/count change + timeout |
-| `LoadingStrategies.Table.*` / `Row.*` | Built-ins barely covered | Unit per factory + one E2E skeleton skip |
-| `contentReady` / `mutationSettled` units | Easy to regress in smartRow; only Grafana E2E | Unit: invoke with row; quietPeriod / timeout |
-| Function selectors (`rowSelector`/`headerSelector`/`cellSelector`) | Documented; untested | E2E with function forms |
-| `getRow` multi-match strict mode | Core contract | E2E: two matches → throw; findRows → 2 |
-| Locale `buttonLabels` on MUI factories | #327 | Factory with non-English labels |
-| `FillStrategies.default` input matrix | checkbox / contenteditable / click-to-edit | E2E matrix |
+| `infiniteScroll` step larger than the rendered window (#473) | Known silent data loss, and no test catches it | Recycling list with a 200–300px scroller and the default step; `map` must return all N unique rows. `test.fail()` until fixed |
+| `createMuiTable` / `createMuiDataGrid` `buttonLabels` | **Zero coverage** (it was on August's missing list too). Non-English UIs silently stop paginating | Footer with `aria-label="Page suivante"`: the factory with labels clicks it; the default preset returns `false` |
+| `Pagination.click` `detectCurrentPage` | **Zero coverage.** The init path sets `currentPageIndex` and has a fallback for invalid values | Init on page 3 → `currentPageIndex === 2`; `-1` or a throw → 0 without crashing |
+| `Pagination.click` `numberOfPages` → `getTotalPages` | **Zero coverage.** Integer validation plus `goToLast` path planning | `0` / `1.5` / NaN throw; `bringIntoView` near the end uses `goToLast` + `goPrevious` |
+| `pageNumbers` windowing (real DOM) | Only a mock unit test exists; exact-label matching ("1" vs "10") is untested | Sliding 1–5 pager; `bringIntoView` to page 12; pages "1" and "10" present |
+| `LoadingStrategies.Table.hasSpinner`, `Row.hasClass` / `hasText` / `hasEmptyCells` | Exported helpers that are never exercised | Unit per helper (true and false branches) |
+| Custom `strategies.fill` contract | Only the "not a function" validation is tested | Spy fill strategy: called once per column with `{row, columnName, value, fillOptions, config, table}`; the default isn't called |
+| `columnOverrides.write` edge cases | 1 happy-path test | write without `read`; a throwing write names the column; conflict with `syntheticColumns` |
+| Row-loading timeouts, deterministic | `findRows` skip/throw only run against the playground server (and silently skip when it's down); `map` + `'throw'` is untested | `setContent` skeleton rows: `findRows` skip/throw and `map` throw |
+| `sorting.apply` when `isTableLoading` never settles | Only the success path is tested | Always-loading table → `apply` rejects within its budget |
+| `findRowByIndex` via `scrollToRow` / pagination, deterministic | Only tested on the MUI app (CI-B) | `setContent` fixture with `resolveRowIndex` + `viewport.scrollToRow` for an unmounted index |
+| Async `headerTransformer` + `locator` arg | The types allow both; neither is tested | Transformer reading `locator.getAttribute('data-key')` asynchronously |
+
+**Adequately covered:** `getRowByIndex`, `countRows`, `mapColumn`, `getColumnValues`, `scrollToColumn`, `revalidate`, `isEmpty`, `reset`/`onReset`, `for await`, `mergeTableConfig`, dedupe, `contentReady`, Glide factories and `rdg2D` (integration only). The optional-peer guarantee is covered by `scripts/test-packaging.sh` on every PR.
+
+**Flaky-risk hot spots:**
+- **Wall-clock assertions:** `debug-mode`, `error-handling` ("wait for headers", > 1,100ms), `playground-virtualization` ("cache", 1,200–1,500ms) and `performance`.
+- **Fixed `waitForTimeout` sleeps:** most heavily in `viewport-strategy` (~12) and `horizontal-virtualization` (7).
 
 ---
 
 ## SUMMARY
 
-- **Overall health score: 7.5/10** — production-capable, well-tested, architecture still strategy-shaped; core virtualization weight and public-surface debt hold it back from 9+.
-- **Philosophy alignment score: 7/10** — describe/strategy/preset model intact; Glide-in-core + framework CSS defaults + loop fan-out are the drift.
-- **Top 3 priorities** (philosophy-restoring first):
-  1. **[#426](https://github.com/rickcedwhat/playwright-smart-table/issues/426)** — slim `_navigateToCell` (prefer B; consider C after RDG→viewport)
-  2. **[#427](https://github.com/rickcedwhat/playwright-smart-table/issues/427)** — unify page/scan loops
-  3. **[#428](https://github.com/rickcedwhat/playwright-smart-table/issues/428)** — public-surface hygiene
+- **Overall health score: 8/10** (up from 7.5). The architecture debt from August is paid down and the release safety net is much stronger. Two things hold it back: one silent data-loss bug (#473), and a CI suite that leans on live sites and retries.
+- **Philosophy alignment score: 8/10** (up from 7). The hard violations are gone; what's left is core weight in `useTable.ts` and `smartRow.ts`.
+- **Top 3 priorities:**
+  1. **[#473](https://github.com/rickcedwhat/playwright-smart-table/issues/473): fix silent row skipping in `infiniteScroll`**, then land the Grafana fixture assertions for [#417](https://github.com/rickcedwhat/playwright-smart-table/issues/417). Correctness first.
+  2. **Take live sites off the PR critical path.** Use `setContent` or snapshot fixtures for `debug-mode`, `error-handling` and `readme_verification`; make playground skips fail in CI; then reconsider the global `retries: 2`. Cut the redundant and tautological tests listed above in the same pass.
+  3. **Thin the core again.** Move `countRows`, `sorting.apply` and `findRowByIndex` (onto `scanPages`) out of `useTable.ts`, and `_navigateToCell` and the snapshot/re-pin logic out of `smartRow.ts`. Delete the dead `ResolutionStrategies` module. Refactor only: this restores Principle 2 without touching the public API.
+
+**Quick wins** (small PRs that don't need a decision): `CONTRIBUTING.md` → pnpm; delete `resolution.ts` + its tests; fix the orphan `#endregion`; add the `buttonLabels` / `detectCurrentPage` / `numberOfPages` tests.
+
+**Needs your decision:** what to do with the README snippet pipeline. Either retarget it at `docs/**/*.md` so the guide and examples pages embed tested snippets, or delete it and update `.cursorrules` / `CLAUDE.md`.
 
 ### Issue map (GBU → GitHub)
 
 | Topic | Issue |
 |---|---|
-| Slim `_navigateToCell` / viewport-first | [#426](https://github.com/rickcedwhat/playwright-smart-table/issues/426) |
-| Unify scan loops | [#427](https://github.com/rickcedwhat/playwright-smart-table/issues/427) |
-| Plugins / getColumnValues / dead Strategies | [#428](https://github.com/rickcedwhat/playwright-smart-table/issues/428) |
-| FilterEngine + getRow/findRow parity | [#429](https://github.com/rickcedwhat/playwright-smart-table/issues/429) |
-| scroll helpers → viewport; getValue nav | [#430](https://github.com/rickcedwhat/playwright-smart-table/issues/430) |
-| Framework CSS out of generic strategies | [#431](https://github.com/rickcedwhat/playwright-smart-table/issues/431) |
-| Test suite cut/gaps | [#432](https://github.com/rickcedwhat/playwright-smart-table/issues/432) |
-| ROADMAP philosophy-debt section | [#433](https://github.com/rickcedwhat/playwright-smart-table/issues/433) |
-| Safer defaults & footguns | [#434](https://github.com/rickcedwhat/playwright-smart-table/issues/434) |
-
-**Could not update existing issues** with this agent token (create works; comment/edit/close return 403). Please manually: close accidental [#425](https://github.com/rickcedwhat/playwright-smart-table/issues/425); comment on / reopen [#327](https://github.com/rickcedwhat/playwright-smart-table/issues/327) (v7 presets) and link [#386](https://github.com/rickcedwhat/playwright-smart-table/issues/386) as needed.
+| `infiniteScroll` silent row skipping | [#473](https://github.com/rickcedwhat/playwright-smart-table/issues/473) |
+| Grafana-class verification | [#417](https://github.com/rickcedwhat/playwright-smart-table/issues/417) |
+| Live sites off the PR critical path | [#474](https://github.com/rickcedwhat/playwright-smart-table/issues/474) |
+| Cut redundant/tautological tests; rename bug-numbered files | [#475](https://github.com/rickcedwhat/playwright-smart-table/issues/475) |
+| Missing tests for public options | [#476](https://github.com/rickcedwhat/playwright-smart-table/issues/476) |
+| Move engines out of `useTable.ts` | [#477](https://github.com/rickcedwhat/playwright-smart-table/issues/477) |
+| Move cell navigation and snapshot logic out of `smartRow.ts` | [#478](https://github.com/rickcedwhat/playwright-smart-table/issues/478) |
+| Quick wins | [#479](https://github.com/rickcedwhat/playwright-smart-table/issues/479) |
+| README snippet generator decision | [#480](https://github.com/rickcedwhat/playwright-smart-table/issues/480) |
