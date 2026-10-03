@@ -56,7 +56,6 @@ const glideFillSimple: FillStrategy = async ({ value, page }) => {
 
 const glidePaginationStrategy = PaginationStrategies.infiniteScroll({
     scrollTarget: 'xpath=//ancestor::body//div[contains(@class, "dvn-scroller")]',
-    scrollAmount: 500,
     action: 'js-scroll',
     stabilization: StabilizationStrategies.contentChanged({ timeout: 5000 }),
     timeout: 5000

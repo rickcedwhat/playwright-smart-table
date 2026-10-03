@@ -97,7 +97,10 @@ export const PaginationStrategies = {  /**
    * 
    * @param options.action 'scroll' (mouse wheel) or 'js-scroll' (direct scrollTop).
    * @param options.scrollTarget Selector for the scroll container (defaults to table root).
-   * @param options.scrollAmount Amount to scroll in pixels (default 500).
+   * @param options.scrollAmount Amount to scroll in pixels. Defaults to 80% of the scroll target's
+   *        visible height, so a step never jumps past the rendered window of a virtualized list.
+   *        An explicit value larger than the visible height logs a one-time warning, because
+   *        virtualizers never mount the rows that get skipped.
    * @param options.stabilization Strategy to determine if new content loaded.
    *        Defaults to `rowCountIncreased` (simple append).
    *        Use `contentChanged` for virtualization.
@@ -113,7 +116,7 @@ export const PaginationStrategies = {  /**
     // Default stabilization: Wait for row count to increase (Append mode)
     const stabilization = options.stabilization ??
       StabilizationStrategies.rowCountIncreased({ timeout: options.timeout });
-    const amount = options.scrollAmount ?? 500;
+    let warnedOversizedStep = false;
 
     const createScroller = (directionMultiplier: 1 | -1) => {
       return async (context: TableContext) => {
@@ -122,9 +125,29 @@ export const PaginationStrategies = {  /**
           ? resolve(options.scrollTarget, root)
           : root;
 
-        const beforeScrollTop = await scrollTarget.evaluate(
-          (el: HTMLElement) => el.scrollTop
-        );
+        const metrics = await scrollTarget.evaluate((el: HTMLElement) => {
+          const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+          return {
+            scrollTop: el.scrollTop,
+            // A non-scrolling target scrolls the page, so the window bounds what is rendered.
+            visibleHeight: el.clientHeight > 0 ? Math.min(el.clientHeight, viewportHeight) : viewportHeight,
+            isScrollContainer: el.scrollHeight > el.clientHeight + 1,
+          };
+        });
+        const beforeScrollTop = metrics.scrollTop;
+
+        let amount: number;
+        if (options.scrollAmount !== undefined) {
+          amount = options.scrollAmount;
+          if (!warnedOversizedStep && metrics.isScrollContainer && amount > metrics.visibleHeight) {
+            warnedOversizedStep = true;
+            console.warn(
+              `[SmartTable] infiniteScroll scrollAmount (${amount}px) is larger than the scroll target's visible height (${Math.round(metrics.visibleHeight)}px). Virtualized lists only render rows near the viewport, so rows between steps are never mounted and will be silently skipped. Omit scrollAmount to step by the visible height, or pass a smaller value.`
+            );
+          }
+        } else {
+          amount = Math.floor(metrics.visibleHeight * 0.8) || 500;
+        }
 
         const doScroll = async () => {
           const box = await scrollTarget.boundingBox();

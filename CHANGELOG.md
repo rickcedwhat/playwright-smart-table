@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **`infiniteScroll` no longer skips rows on short virtualized lists (#473)** — the default step was a fixed 500px. When that's taller than the scroller plus the virtualizer's overscan, the rows in between are never mounted, so `map` / `findRows` returned an incomplete result with no error (a 300px Grafana-style list lost 33 of 200 rows). With no `scrollAmount`, the step is now 80% of the scroll target's visible height (capped by the window height when the target doesn't scroll itself). An explicit `scrollAmount` larger than a scroll container's visible height logs a one-time `console.warn`. The RDG and Glide presets drop their hard-coded `scrollAmount: 500` and use the adaptive default. A faithful Grafana search-table fixture (`tests/test-assets/grafana-search-table.html`) now covers full collection at several heights, duplicate names, and A–Z / Z–A sort parity.
+  - Smaller containers now take more steps to reach the end. If you tuned `maxPages` to the old 500px step, you may need to raise it.
+
 ### Changed
 
 - **Shared header scroll loop (#439)** — `Strategies.Header.horizontalScroll` and the Glide preset's header discovery now share one scroll-and-collect implementation. Each keeps its own scroller lookup (Glide's `.dvn-scroller` is a sibling of the canvas, so it still searches the document). No behavior change.

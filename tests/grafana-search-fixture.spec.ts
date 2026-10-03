@@ -73,42 +73,52 @@ async function expectedHrefs(page: Page, sort = 'alpha-asc'): Promise<string[]> 
   return page.evaluate((s) => (window as any).__grafanaFixture.allHrefs(s), sort);
 }
 
-test.describe('Grafana search table fixture (#417)', () => {
-  test('explore: sort parity by href', async ({ page }) => {
-    test.setTimeout(300_000);
-    await page.goto(fixtureUrl('delay=800&jitter=600'));
-    await expect(page.locator('[role="rowgroup"] [role="row"] a').first()).toBeVisible();
-    const config = grafanaConfig({ loadingAware: true, scrollAmount: 200 });
+async function openFixture(page: Page, query: string) {
+  await page.goto(fixtureUrl(query));
+  await expect(page.locator('[role="rowgroup"] [role="row"] a').first()).toBeVisible();
+}
+
+test.describe('Grafana search table fixture (#417, #473)', () => {
+  test.describe.configure({ timeout: 120_000 });
+
+  for (const height of [300, 450, 800]) {
+    test(`default scroll step collects every row in a ${height}px list`, async ({ page }) => {
+      await openFixture(page, `rows=200&height=${height}`);
+      const expected = await expectedHrefs(page);
+
+      const rows = await scrape(page, grafanaConfig({ loadingAware: true }));
+
+      expect(rows.map(r => r.href)).toEqual(expected);
+      const names = rows.map(r => r.name);
+      expect(new Set(names).size).toBeLessThan(names.length);
+    });
+  }
+
+  test('warns once when scrollAmount is taller than the scroller', async ({ page }) => {
+    await openFixture(page, 'rows=200&height=400');
+    const warnings: string[] = [];
+    const original = console.warn;
+    console.warn = (...args: unknown[]) => { warnings.push(args.map(String).join(' ')); };
+    try {
+      await scrape(page, grafanaConfig({ loadingAware: true, scrollAmount: 1000 }));
+    } finally {
+      console.warn = original;
+    }
+    const stepWarnings = warnings.filter(w => w.includes('infiniteScroll scrollAmount (1000px)'));
+    expect(stepWarnings).toHaveLength(1);
+    expect(stepWarnings[0]).toContain('visible height (400px)');
+  });
+
+  test('sort parity: A–Z and Z–A collect the same hrefs in the expected order', async ({ page }) => {
+    await openFixture(page, 'rows=200&delay=400&jitter=300');
+    const config = grafanaConfig({ loadingAware: true });
+
     const asc = await scrape(page, config);
     await page.getByLabel('Sort').selectOption('alpha-desc');
     await expect(page.getByTestId('status')).toHaveText('');
     const desc = await scrape(page, config);
-    const a = new Set(asc.map(r => r.href)); const d = new Set(desc.map(r => r.href));
-    const onlyAsc = [...a].filter(h => !d.has(h)).length; const onlyDesc = [...d].filter(h => !a.has(h)).length;
-    const expDesc = await expectedHrefs(page, 'alpha-desc');
-    const orderOk = desc.map(r => r.href).join() === expDesc.join();
-    console.log(`[sort] asc=${asc.length} desc=${desc.length} onlyAsc=${onlyAsc} onlyDesc=${onlyDesc} descOrderMatches=${orderOk}`);
-  });
 
-  const scenarios = [
-    { query: 'height=300', scrollAmount: 0 },
-    { query: 'height=450', scrollAmount: 0 },
-    { query: 'height=520', scrollAmount: 0 },
-    { query: 'height=800', scrollAmount: 0 },
-  ];
-  for (const sc of scenarios) for (const loadingAware of [false]) test(`explore ${sc.query} scroll=${sc.scrollAmount} ${loadingAware ? 'aware' : 'naive'}`, async ({ page }) => {
-    test.setTimeout(300_000);
-    {
-      await page.goto(fixtureUrl(sc.query));
-      await expect(page.locator('[role="rowgroup"] [role="row"] a').first()).toBeVisible();
-      const expected = await expectedHrefs(page);
-      const t0 = Date.now();
-      const rows = await scrape(page, grafanaConfig({ loadingAware, scrollAmount: sc.scrollAmount }));
-      const hrefs = rows.map(r => r.href).filter(Boolean) as string[];
-      const blanks = rows.filter(r => !r.href).length;
-      const unique = new Set(hrefs);
-      const missing = expected.filter(h => !unique.has(h)).length;
-      console.log(`[${sc.query} scroll=${sc.scrollAmount} ${loadingAware ? 'loading-aware' : 'naive'}] ${((Date.now() - t0) / 1000).toFixed(0)}s rows=${rows.length} blanks=${blanks} unique=${unique.size}/${expected.length} missing=${missing} dupHrefs=${hrefs.length - unique.size}`);
-    }
+    expect(asc.map(r => r.href)).toEqual(await expectedHrefs(page, 'alpha-asc'));
+    expect(desc.map(r => r.href)).toEqual(await expectedHrefs(page, 'alpha-desc'));
   });
 });
