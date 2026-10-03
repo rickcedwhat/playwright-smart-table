@@ -100,10 +100,12 @@ console.log([...rows].map(r => r.getAttribute('data-index')));
 
 ## Scroll amount
 
-Keep `scrollAmount` below the scroll container's `clientHeight`. Jumping past the container height in a single step can skip rows that are never materialized by the virtualizer. A value of 200–300px is safe for most table viewports.
+Keep `scrollAmount` below the scroll container's `clientHeight`. Jumping past the container height in a single step can skip rows that are never materialized by the virtualizer, and nothing errors when it happens (#473).
+
+The easiest fix is to leave `scrollAmount` out. `infiniteScroll` then steps by 80% of the scroll target's visible height, which adapts to whatever size the list renders at. If you do pass one that's larger than the container, the library logs a one-time `console.warn`.
 
 ```ts
-scrollAmount: 250, // not 600
+scrollAmount: 250, // not 600, or omit it entirely
 ```
 
 ---

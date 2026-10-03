@@ -69,7 +69,6 @@ const rdgGetCellLocator = ({ row, columnIndex }: { row: Locator; columnIndex: nu
 
 const rdgPaginationStrategy = PaginationStrategies.infiniteScroll({
     action: 'js-scroll',
-    scrollAmount: 500,
     stabilization: StabilizationStrategies.contentChanged({ timeout: 5000 })
 });
 

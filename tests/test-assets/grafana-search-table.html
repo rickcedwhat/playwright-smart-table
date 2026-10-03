@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<!--
+  Faithful stand-in for Grafana's dashboard search "list view" (#417).
+  Modeled on grafana/grafana:
+    public/app/features/search/page/components/SearchResultsTable.tsx
+    public/app/features/search/service/unified.ts
+
+  Behaviors reproduced:
+  - react-window FixedSizeList: rows absolutely positioned via style.top, keyed by index,
+    only the visible range + overscan mounted. No data-rowindex / aria-rowindex.
+  - react-window-infinite-loader: itemCount is the server's totalRows up front, but row data
+    arrives in pages (pageSize 50) after a network delay. Unloaded rows are still rendered —
+    with EMPTY cells and no data-testid — until their page lands.
+  - React reconciliation: a row element keyed by index is reused and its content filled in /
+    replaced in place (on page arrival and after a sort), not recreated.
+  - Changing the sort runs a new query: once the first page arrives the loader cache resets
+    and the list scrolls back to 0.
+  - Duplicate names with distinct hrefs (identity must be the href, not the name).
+  - Header row is role="row" too (react-table header group), body is role="rowgroup".
+
+  Query params: rows (300), pageSize (50), delay (250), jitter (150), overscan (2),
+  rowHeight (36), height (400), dupEvery (10), seed (417).
+-->
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Grafana search table fixture</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: sans-serif; margin: 16px; }
+    .toolbar { margin-bottom: 8px; }
+    [role="table"] { width: 900px; border: 1px solid #ddd; }
+    .header-row { display: flex; background: #f4f4f4; font-weight: bold; }
+    [role="columnheader"], [role="cell"] {
+      flex: 1; padding: 8px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+    }
+    [role="columnheader"]:first-child, [role="cell"]:first-child { flex: 2; }
+    .body-row { display: flex; border-bottom: 1px solid #eee; }
+    .no-data { padding: 16px; }
+  </style>
+</head>
+<body>
+  <div class="toolbar">
+    <label>Sort
+      <select id="sort" aria-label="Sort">
+        <option value="alpha-asc">Alphabetically (A–Z)</option>
+        <option value="alpha-desc">Alphabetically (Z–A)</option>
+      </select>
+    </label>
+    <span id="status" data-testid="status"></span>
+  </div>
+
+  <div role="table" aria-label="Search results table" id="search-table">
+    <div role="row" class="header-row">
+      <div role="columnheader">Name</div>
+      <div role="columnheader">Type</div>
+      <div role="columnheader">Location</div>
+      <div role="columnheader">Tags</div>
+    </div>
+    <div role="rowgroup" id="table-body"></div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(location.search);
+    const num = (k, d) => (params.has(k) ? Number(params.get(k)) : d);
+    const TOTAL = num('rows', 300);
+    const PAGE_SIZE = num('pageSize', 50);
+    const DELAY = num('delay', 250);
+    const JITTER = num('jitter', 150);
+    const OVERSCAN = num('overscan', 2);
+    const ROW_HEIGHT = num('rowHeight', 36);
+    const HEIGHT = num('height', 400);
+    const DUP_EVERY = num('dupEvery', 10);
+    const THRESHOLD = 15; // react-window-infinite-loader default
+
+    // ---- deterministic "server" dataset -------------------------------------------------
+    let seed = num('seed', 417);
+    const rand = () => ((seed = (seed * 1103515245 + 12345) % 2147483648) / 2147483648);
+    const words = ['Alerting', 'Billing', 'Checkout', 'Editor', 'Folders', 'Kubernetes', 'Latency',
+      'Logs', 'Payments', 'RBAC', 'Search', 'Storage', 'Traffic', 'Uptime', 'Writer'];
+    const pick = (arr) => arr[Math.floor(rand() * arr.length)];
+
+    const folders = [];
+    const items = [];
+    for (let i = 0; i < TOTAL; i++) {
+      const uid = 'u' + i.toString(36).padStart(4, '0') + Math.floor(rand() * 1e6).toString(36);
+      const isFolder = i % 5 === 0;
+      let name;
+      if (DUP_EVERY > 0 && i > 0 && i % DUP_EVERY === 0) {
+        name = items[Math.floor(rand() * i)].name; // duplicate name, different uid/href
+      } else {
+        name = `${pick(words)} ${pick(words)} ${String(i).padStart(3, '0')}`;
+      }
+      const location = isFolder || folders.length === 0 ? 'Dashboards' : pick(folders).name;
+      const item = {
+        uid,
+        name,
+        kind: isFolder ? 'Folder' : 'Dashboard',
+        url: isFolder ? `/dashboards/f/${uid}/` : `/d/${uid}/${name.toLowerCase().replace(/\W+/g, '-')}`,
+        location,
+        tags: isFolder ? '' : [pick(words), pick(words)].map((w) => w.toLowerCase()).join(', '),
+      };
+      items.push(item);
+      if (isFolder) folders.push(item);
+    }
+
+    const sorted = (sort) => {
+      const dir = sort === 'alpha-desc' ? -1 : 1;
+      return items.slice().sort((a, b) =>
+        dir * (a.name.localeCompare(b.name) || a.uid.localeCompare(b.uid)));
+    };
+
+    let fetchCount = 0;
+    const fetchPage = (sort, offset) => new Promise((resolve) => {
+      fetchCount++;
+      const wait = DELAY + Math.floor(rand() * JITTER);
+      setTimeout(() => resolve({ view: sorted(sort).slice(offset, offset + PAGE_SIZE), totalRows: TOTAL }), wait);
+    });
+
+    // ---- search response state (unified.ts) ---------------------------------------------
+    const state = { sort: 'alpha-asc', generation: 0, loaded: [], totalRows: 0, fetching: false };
+
+    const isItemLoaded = (i) => i < state.loaded.length;
+
+    async function loadMore(stopIndex) {
+      if (state.fetching) return;
+      const offset = state.loaded.length;
+      if (offset >= state.totalRows || offset > stopIndex) return;
+      state.fetching = true;
+      const gen = state.generation;
+      const resp = await fetchPage(state.sort, offset);
+      if (gen !== state.generation) return; // stale response from a previous query
+      state.fetching = false;
+      state.loaded.push(...resp.view);
+      scheduleRender();
+    }
+
+    async function runQuery(sort) {
+      const gen = ++state.generation;
+      state.sort = sort;
+      state.fetching = false;
+      setStatus('loading');
+      const resp = await fetchPage(sort, 0);
+      if (gen !== state.generation) return;
+      state.loaded = resp.view.slice();
+      state.totalRows = resp.totalRows;
+      inner.style.height = state.totalRows * ROW_HEIGHT + 'px';
+      scroller.scrollTop = 0; // listEl.scrollTo(0) + resetloadMoreItemsCache()
+      setStatus('');
+      render();
+    }
+
+    // ---- FixedSizeList ------------------------------------------------------------------
+    const body = document.getElementById('table-body');
+    const scroller = document.createElement('div');
+    Object.assign(scroller.style, {
+      position: 'relative', height: HEIGHT + 'px', width: '100%',
+      overflow: 'hidden auto', willChange: 'transform', direction: 'ltr',
+    });
+    const inner = document.createElement('div');
+    Object.assign(inner.style, { width: '100%', position: 'relative', height: '0px' });
+    scroller.appendChild(inner);
+    body.appendChild(scroller);
+
+    const mounted = new Map(); // index -> row element (React key = row index)
+
+    function fillRow(row, index) {
+      const item = isItemLoaded(index) ? state.loaded[index] : null;
+      const signature = item ? `${state.generation}:${item.uid}` : `${state.generation}:empty`;
+      if (row.dataset.sig === signature) return;
+      row.dataset.sig = signature;
+      if (item) row.setAttribute('data-testid', `data-testid search item ${item.name}`);
+      else row.removeAttribute('data-testid');
+      const cells = row.children;
+      if (item) {
+        cells[0].innerHTML = '';
+        const a = document.createElement('a');
+        a.href = item.url;
+        a.textContent = item.name;
+        cells[0].appendChild(a);
+        cells[1].textContent = item.kind;
+        cells[2].textContent = item.location;
+        cells[3].textContent = item.tags;
+      } else {
+        for (const c of cells) c.textContent = '';
+      }
+    }
+
+    function render() {
+      const count = state.totalRows;
+      if (!count) {
+        body.querySelector('.no-data') || body.insertAdjacentHTML('afterbegin', '<div class="no-data">No values</div>');
+        return;
+      }
+      body.querySelector('.no-data')?.remove();
+      const first = Math.floor(scroller.scrollTop / ROW_HEIGHT);
+      const last = Math.min(count - 1, Math.ceil((scroller.scrollTop + HEIGHT) / ROW_HEIGHT) - 1);
+      const start = Math.max(0, first - OVERSCAN);
+      const stop = Math.min(count - 1, last + OVERSCAN);
+
+      for (const [i, el] of mounted) {
+        if (i < start || i > stop) { el.remove(); mounted.delete(i); }
+      }
+      for (let i = start; i <= stop; i++) {
+        let row = mounted.get(i);
+        if (!row) {
+          row = document.createElement('div');
+          row.setAttribute('role', 'row');
+          row.className = 'body-row';
+          Object.assign(row.style, {
+            position: 'absolute', left: '0px', top: i * ROW_HEIGHT + 'px',
+            height: ROW_HEIGHT + 'px', width: '100%',
+          });
+          for (let c = 0; c < 4; c++) {
+            const cell = document.createElement('div');
+            cell.setAttribute('role', 'cell');
+            row.appendChild(cell);
+          }
+          inner.appendChild(row);
+          mounted.set(i, row);
+        }
+        fillRow(row, i);
+      }
+
+      // InfiniteLoader.onItemsRendered: request the next page when an unloaded row is within
+      // THRESHOLD of the rendered range.
+      if (!isItemLoaded(Math.min(count - 1, stop + THRESHOLD))) loadMore(stop + THRESHOLD);
+    }
+
+    let pending = null;
+    function scheduleRender() {
+      if (pending) cancelAnimationFrame(pending);
+      pending = requestAnimationFrame(() => { pending = null; render(); });
+    }
+    scroller.addEventListener('scroll', scheduleRender);
+
+    const statusEl = document.getElementById('status');
+    function setStatus(s) { statusEl.textContent = s; }
+
+    document.getElementById('sort').addEventListener('change', (e) => runQuery(e.target.value));
+
+    window.__grafanaFixture = {
+      get totalRows() { return state.totalRows; },
+      get loadedCount() { return state.loaded.length; },
+      get fetchCount() { return fetchCount; },
+      allHrefs: (sort = 'alpha-asc') => sorted(sort).map((i) => i.url),
+    };
+
+    runQuery('alpha-asc');
+  </script>
+</body>
+</html>
