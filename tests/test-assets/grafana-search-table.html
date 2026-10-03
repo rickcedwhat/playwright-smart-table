@@ -129,8 +129,8 @@
       state.fetching = true;
       const gen = state.generation;
       const resp = await fetchPage(state.sort, offset);
-      state.fetching = false;
       if (gen !== state.generation) return; // stale response from a previous query
+      state.fetching = false;
       state.loaded.push(...resp.view);
       scheduleRender();
     }
