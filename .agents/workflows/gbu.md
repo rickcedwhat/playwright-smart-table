@@ -83,7 +83,16 @@ Then evaluate:
 - Why it's important to test
 - Recommendation: what the test should verify
 
-### Step 4: Produce the GBU Report
+### Step 4: Check upstream Playwright changelogs
+
+Review recent official Playwright release notes and changelogs (`https://github.com/microsoft/playwright/releases` or `https://playwright.dev/docs/release-notes`) covering the past 6–12 months or since the last audit:
+- **Locator & Assertion enhancements**: Look for new locator methods, options, or matchers (e.g., `locator.describe()`, `locator.waitForFunction()`, `expect.toContainClass()`, `ariaSnapshot`) that could improve table interaction ergonomics, diagnostic error reporting, or assertions.
+- **Action & scrolling primitives**: Check for action options (e.g., `scroll: 'none'`, mouse movement `steps`) that could prevent unwanted layout shifts or snaps in virtualized/sticky tables during clicks or cell interactions.
+- **Engine & lifecycle primitives**: Identify new wait/stabilization hooks, `AbortSignal` support, or storage APIs that could simplify internal polling, cancellation of long page scans, or table state resets.
+- **Deprecations & breaking changes**: Watch for retired selector engines, changed default behaviors, or deprecated APIs that might affect our presets, selectors, or test fixtures.
+- **Peer dependency compatibility**: When proposing features based on newer Playwright APIs, ensure compatibility with the library's minimum peer dependency (currently `@playwright/test: ^1.40.0`) via optional feature detection (e.g., `typeof locator.describe === 'function'`) or graceful fallbacks.
+
+### Step 5: Produce the GBU Report
 
 Write a structured markdown report with these sections:
 
@@ -108,6 +117,12 @@ Generated: {date}
 ## THE UGLY 🚨
 [List of serious problems with recommended actions — include hard philosophy violations]
 
+## UPSTREAM PLAYWRIGHT OPPORTUNITIES 🚀
+- Relevant releases reviewed: [e.g. v1.50.0 – v1.62.1]
+- API opportunities: [ergonomics, locator descriptions, assertion improvements, cancellation signals]
+- Under-the-hood opportunities: [internal optimizations, action flags, waiting primitives, retired workarounds]
+- Compatibility & fallbacks: [feature-detection strategy for minimum peerDependency ^1.40.0]
+
 ## TEST AUDIT
 
 ### Redundant Tests
@@ -124,11 +139,12 @@ Generated: {date}
 
 Output this report to the user as a file that the user can review and add comments to.
 
-### Step 5: Offer actions
+### Step 6: Offer actions
 
 After presenting the report, ask the user:
 1. Which "bad" or "ugly" items they want to address first
 2. For redundant tests: confirm which to cut (then remove them)
 3. For missing tests: confirm which to add (then implement them)
+4. Which upstream Playwright opportunities to pursue or prototype
 
 Wait for user response before making any code changes.

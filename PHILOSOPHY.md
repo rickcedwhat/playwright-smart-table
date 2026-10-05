@@ -134,7 +134,7 @@ If you answer “encode / core branch / custom wrapper / out of scope / speculat
 | Cadence | How |
 |---|---|
 | **PR review** | Run the decision checklist on non-trivial changes |
-| **GBU reports** (`/gbu`) | Score the library against this philosophy; call out drift as Bad/Ugly |
+| **GBU reports** (`/gbu`) | Score the library against this philosophy; audit upstream Playwright changelogs for API/engine opportunities; call out drift as Bad/Ugly |
 | **Roadmap** | Prefer items that deepen strategy/preset power over core complexity |
 | **Agent work** | Agents treat this file as constraints, same as `AGENTS.md` |
 

@@ -109,7 +109,7 @@ Types: `feat` `fix` `docs` `test` `refactor` `perf` `chore`
 - Use `logDebug()` instead of `console.log()`
 - All public types exported from `src/types.ts`
 
-**Guiding light:** [`PHILOSOPHY.md`](PHILOSOPHY.md) — describe-your-table via pluggable strategies; keep the core thin. Use it on PRs and during `/gbu` audits. Practical contributor rules live in `CONTRIBUTING.md`.
+**Guiding light:** [`PHILOSOPHY.md`](PHILOSOPHY.md) — describe-your-table via pluggable strategies; keep the core thin. Use it on PRs and during `/gbu` audits (which also review upstream Playwright changelogs for API/engine opportunities). Practical contributor rules live in `CONTRIBUTING.md`.
 
 ---
 
