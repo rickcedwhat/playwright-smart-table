@@ -105,6 +105,18 @@ Related closed work to reopen/extend: [#327](https://github.com/rickcedwhat/play
     - **Targets**: Material UI Table, MUI DataGrid, React Data Grid (RDG), Glide Data Grid.
     - **Vision**: Enable community contributions for specific library support, removing the burden of manual configuration for popular libraries.
 
+### 🚀 Upstream Playwright Integration Opportunities
+Tracked from the 2026-10 GBU audit of Playwright changelogs (v1.50 – v1.62):
+- [ ] **Annotate SmartRow, SmartCell, and Sentinel locators with `locator.describe()`** ([#485](https://github.com/rickcedwhat/playwright-smart-table/issues/485)):
+    - Gives clear names in Playwright trace viewer, HTML reports, and strict-mode timeout errors.
+    - Includes one-time upgrade reminder on older peer versions (<1.53).
+- [ ] **Support `scroll: 'none'` action option in cell navigation & virtualized presets** ([#486](https://github.com/rickcedwhat/playwright-smart-table/issues/486)):
+    - Prevents Playwright's native auto-scroll from disrupting virtualized sticky columns/headers during cell clicks.
+- [ ] **Add in-browser stabilization strategy via `locator.waitForFunction()`** ([#487](https://github.com/rickcedwhat/playwright-smart-table/issues/487)):
+    - Eliminates Node-to-browser IPC round trips in row content stabilization loops.
+- [ ] **Support `AbortSignal` cancellation in `scanPages`, `findRows`, and `map`** ([#488](https://github.com/rickcedwhat/playwright-smart-table/issues/488)):
+    - Allows clean early cancellation of long table traversals.
+
 ## Non-Goals
 
 To maintain focus, the following are **explicitly out of scope**:
