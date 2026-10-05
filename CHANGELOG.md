@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **`./types` subpath export (#479)** — `@rickcedwhat/playwright-smart-table/types` resolved its JavaScript to `dist/index.js` (the whole library) instead of `dist/types.js`. It now maps to `dist/types.js`, matching its `.d.ts`. Type imports are unaffected. A runtime `require` of `/types` no longer returns the main module's exports; import values from the package root instead. The packaging smoke test now loads `/types` and `/presets` and type-checks an `/types` import.
+
+### Removed
+
+- **Dead `ResolutionStrategies` factory (#479)** — nothing used it and it wasn't exported from the package. The `ColumnResolutionStrategy` type is still exported, now marked `@deprecated`, and will be removed in v7.
+
 ## [6.24.0] - 2026-10-05
 
 ### Fixed

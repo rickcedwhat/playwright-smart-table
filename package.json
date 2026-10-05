@@ -53,9 +53,7 @@
     },
     "./types": {
       "types": "./dist/types.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.js",
-      "default": "./dist/index.js"
+      "default": "./dist/types.js"
     },
     "./presets": {
       "types": "./dist/presets/index.d.ts",

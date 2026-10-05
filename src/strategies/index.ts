@@ -14,7 +14,7 @@ export * from './sorting';
 export * from './columns';
 export * from './headers';
 export * from './fill';
-// ColumnResolutionStrategy type only — ResolutionStrategies factory is unused in core (#428)
+// ColumnResolutionStrategy type only (unused; removed in v7, #479)
 export type { ColumnResolutionStrategy } from './resolution';
 export * from './dedupe';
 export * from './loading';

@@ -15,7 +15,7 @@ cd playwright-smart-table
 ### 2. Install Dependencies
 
 ```bash
-npm install
+pnpm install
 ```
 
 ### 3. Create a Branch
@@ -34,16 +34,16 @@ Follow our [Development Guidelines](#development-guidelines) below.
 
 ```bash
 # Run all tests
-npm test
+pnpm test
 
 # Run specific test
 npx playwright test tests/your-test.spec.ts
 
 # Build the project
-npm run build
+pnpm run build
 
 # Test docs locally
-npm run docs:dev
+pnpm run docs:dev
 ```
 
 ### 6. Commit Your Changes
@@ -353,7 +353,7 @@ test('your feature works correctly', async ({ page }) => {
 ```
 
 **Test checklist:**
-- [ ] Tests pass locally (`npm test`)
+- [ ] Tests pass locally (`pnpm test`)
 - [ ] New features have test coverage
 - [ ] Bug fixes include regression tests
 - [ ] Tests are clear and well-documented
@@ -466,8 +466,8 @@ findRows(
 
 **Checklist:**
 - [ ] Code follows TypeScript best practices
-- [ ] All tests pass (`npm test`)
-- [ ] Build succeeds (`npm run build`)
+- [ ] All tests pass (`pnpm test`)
+- [ ] Build succeeds (`pnpm run build`)
 - [ ] Documentation is updated
 - [ ] Commit messages follow conventional commits
 - [ ] No `console.log()` - use `logDebug()` instead
@@ -527,7 +527,7 @@ playwright-smart-table/
 │   │   ├── fill.ts        # Cell filling strategies
 │   │   ├── headers.ts     # Header detection strategies
 │   │   ├── columns.ts     # Cell navigation strategies
-│   │   ├── resolution.ts  # Column resolution strategies
+│   │   ├── resolution.ts  # ColumnResolutionStrategy type (unused; removed in v7)
 │   │   └── validation.ts  # Strategy validation
 │   └── utils/             # Utility functions
 │       ├── debugUtils.ts  # logDebug, debugDelay, etc.
