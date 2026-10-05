@@ -42,7 +42,6 @@ export interface NavigationPrimitives {
  * the public `Strategies` namespace in #428; this type remains for transitional typings.
  * Defines the contract for a cell navigation strategy.
  */
-// fallow-ignore-next-line unused-type
 export type CellNavigationStrategy = (context: StrategyContext & {
     column: string;
     index: number;

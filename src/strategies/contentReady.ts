@@ -1,8 +1,6 @@
 import type { Locator, Page } from '@playwright/test';
 import type { ContentReadyStrategy } from '../types';
 
-export type { ContentReadyStrategy };
-
 export const ContentReadyStrategies = {
     /**
      * Polls the row's text content until two consecutive reads match.

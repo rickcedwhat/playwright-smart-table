@@ -8,5 +8,8 @@
     "examples/**",
     "docs/**",
     "tests/apps/**"
+  ],
+  "ignoreDependencies": [
+    "vitepress-plugin-tabs"
   ]
 }

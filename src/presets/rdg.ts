@@ -117,7 +117,6 @@ const RDGDefaultStrategies = {
 };
 
 /** Full strategies for React Data Grid. Use when you want to supply your own selectors: `strategies: presets.rdg.Strategies` */
-// fallow-ignore-next-line unused-export
 export const RDGStrategies = RDGDefaultStrategies;
 
 /**
@@ -208,7 +207,6 @@ const RDG2DDefaultStrategies = {
     viewport: rdg2DViewportStrategy,
 };
 
-// fallow-ignore-next-line unused-export
 export const RDG2DStrategies = RDG2DDefaultStrategies;
 
 /**
