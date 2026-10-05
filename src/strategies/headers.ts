@@ -1,4 +1,3 @@
-// fallow-ignore-file circular-dependency
 import type { StrategyContext } from '../types';
 import { logDebug } from '../utils/debugUtils';
 import { readVisibleHeaders, scrollAndCollectHeaders } from '../utils/headerScroll';

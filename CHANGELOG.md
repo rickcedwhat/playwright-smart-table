@@ -6,8 +6,13 @@
 
 - **`./types` subpath export (#479)** — `@rickcedwhat/playwright-smart-table/types` resolved its JavaScript to `dist/index.js` (the whole library) instead of `dist/types.js`. It now maps to `dist/types.js`, matching its `.d.ts`. Type imports are unaffected. A runtime `require` of `/types` no longer returns the main module's exports; import values from the package root instead. The packaging smoke test now loads `/types` and `/presets` and type-checks an `/types` import.
 
+### Changed
+
+- **fallow dead-code check in CI** — `fallow` is now a pinned dev dependency (`pnpm run fallow`). The lint job fails on unused files, exports, types, class members or dependencies, and posts fallow's duplication and complexity report to the job summary without blocking. The existing Claude Code commit hook now finds the local binary instead of silently skipping.
+
 ### Removed
 
+- **Dead internals found by fallow** — `src/utils.ts` (`waitForCondition`, unused), `src/typeContext.ts` and its `generate-types` build step (`TYPE_CONTEXT` hasn't been imported since #405), `NavigationBarrier.isParallel`, duplicate internal re-exports of `ContentReadyStrategy` / `ColumnResolutionStrategy`, and 8 stale `fallow-ignore` comments. None of these were part of the public API.
 - **Dead `ResolutionStrategies` factory (#479)** — nothing used it and it wasn't exported from the package. The `ColumnResolutionStrategy` type is still exported, now marked `@deprecated`, and will be removed in v7.
 
 ## [6.24.0] - 2026-10-05

@@ -100,7 +100,6 @@ Tooling:
 
 scripts/generate-readme.mjs: Syncs tests -> README.
 
-scripts/embed-types.mjs: Syncs types -> src/typeContext.ts.
 
 Output Style
 

@@ -1,8 +1,6 @@
-// fallow-ignore-file circular-dependency
 import { StrategyContext } from '../types';
 
 /** @deprecated Not used by the library. Will be removed in v7. */
-// fallow-ignore-next-line unused-type
 export interface ColumnResolutionStrategy {
     /**
      * Resolves a column name (string or Regex) to a column index.

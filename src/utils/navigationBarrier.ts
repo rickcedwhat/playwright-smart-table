@@ -20,11 +20,6 @@ export class NavigationBarrier {
     this.total = total;
   }
 
-  /** True when more than one row shares this barrier (scrollToRow would evict peers). */
-  isParallel(): boolean {
-    return this.total > 1;
-  }
-
   /**
    * Synchronize all active rows at a specific column index.
    * The last row to arrive (or the last markFinished call) triggers the `moveAction`.
@@ -70,6 +65,7 @@ export class NavigationBarrier {
    * The fn receives a fresh `targetReached` check; if the previous row's scroll
    * already brought this row into view, fn can no-op immediately.
    */
+  // fallow-ignore-next-line unused-class-member
   async runExclusiveRecovery<T>(fn: () => Promise<T>): Promise<T> {
     if (!this.recoveryMutex) this.recoveryMutex = new Mutex();
     return this.recoveryMutex.run(fn);

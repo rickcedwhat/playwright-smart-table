@@ -70,6 +70,17 @@ jobs:
           fi
         continue-on-error: false
 
+      - name: Dead Code (fallow)
+        run: pnpm exec fallow dead-code
+
+      - name: Duplication & Complexity Report (fallow, non-blocking)
+        run: |
+          {
+            pnpm exec fallow dupes --format markdown || true
+            echo
+            pnpm exec fallow health --format markdown || true
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Check Commit Messages (commitlint)
         run: npx commitlint --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }} --verbose
 

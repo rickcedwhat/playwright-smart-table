@@ -64,6 +64,7 @@ npx playwright test --config playwright.config.ci-b.ts   # integration tests onl
 pnpm run docs:dev              # local VitePress docs server
 pnpm run generate-docs         # sync README from test regions
 npx tsc --noEmit               # type check without building
+pnpm run fallow                # dead code: unused files, exports, types, class members, deps
 ```
 
 ---
@@ -85,7 +86,7 @@ This prevents stale-base conflicts and the rebase pain that comes from opening P
 
 | Job | Trigger | What runs |
 |---|---|---|
-| `lint` | every PR | tsc, TODO check, commitlint |
+| `lint` | every PR | tsc, TODO check, fallow dead code (blocking) + duplication/complexity report (job summary), commitlint |
 | `test-a` | PRs touching `src/`, `tests/`, etc. | unit tests + core E2E + build |
 | `test-b` | same | MUI DataGrid integration tests |
 | `CodeQL` | same path filter | security scan |

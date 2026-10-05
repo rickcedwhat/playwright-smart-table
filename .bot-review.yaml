@@ -17,7 +17,7 @@ context_files:
 checklist:
   - No changes to useTable() signature without a types.ts update
   - Pagination loop changes stay consistent between _advancePage and RowFinder
-  - Auto-generated files (typeContext.ts, packageVersion.ts) not edited directly
+  - Auto-generated files (packageVersion.ts, minimalConfigContext.ts) not edited directly
 
 planning:
   enabled: true

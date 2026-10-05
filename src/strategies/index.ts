@@ -14,8 +14,6 @@ export * from './sorting';
 export * from './columns';
 export * from './headers';
 export * from './fill';
-// ColumnResolutionStrategy type only (unused; removed in v7, #479)
-export type { ColumnResolutionStrategy } from './resolution';
 export * from './dedupe';
 export * from './loading';
 export * from './stabilization';

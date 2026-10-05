@@ -518,7 +518,6 @@ playwright-smart-table/
 │   ├── useTable.ts        # Core table logic
 │   ├── types.ts           # TypeScript types & interfaces
 │   ├── smartRow.ts        # SmartRow implementation
-│   ├── typeContext.ts     # Type definitions for AI prompts
 │   ├── filterEngine.ts    # Row filtering logic
 │   ├── strategies/        # Built-in strategies
 │   │   ├── index.ts       # Strategy exports
