@@ -39,6 +39,8 @@ if (m.PLAYWRIGHT_SMART_TABLE_VERSION !== process.env.EXPECTED_VERSION) {
   throw new Error('PLAYWRIGHT_SMART_TABLE_VERSION is ' + m.PLAYWRIGHT_SMART_TABLE_VERSION + ', expected ' + process.env.EXPECTED_VERSION);
 }
 console.log('   loaded ' + m.PLAYWRIGHT_SMART_TABLE_VERSION + ' (useTable, presets: ' + Object.keys(m.presets).length + ')');
+require('@rickcedwhat/playwright-smart-table/types');
+require('@rickcedwhat/playwright-smart-table/presets');
 "
 
 # ── 2. Types with the latest TypeScript ───────────────────────────────────────
@@ -50,9 +52,11 @@ npm install --no-audit --no-fund typescript @types/node @playwright/test "$TARBA
 cat <<'EOF' > smoke-test.ts
 import { useTable, presets, PLAYWRIGHT_SMART_TABLE_VERSION } from '@rickcedwhat/playwright-smart-table';
 import type { TableConfig, TableSelector, SmartRow } from '@rickcedwhat/playwright-smart-table';
+import type { TableResult } from '@rickcedwhat/playwright-smart-table/types';
 import type { Page } from '@playwright/test';
 
 const version: string = PLAYWRIGHT_SMART_TABLE_VERSION;
+export type SmokeTable = TableResult;
 const rowSelector: TableSelector = (root) => root.locator('tbody tr');
 const config: TableConfig = { rowSelector, headerSelector: 'thead th', maxPages: 2 };
 

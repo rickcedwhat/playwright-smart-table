@@ -249,10 +249,9 @@ test.describe('README.md Examples Verification', () => {
 
     // Example from: https://datatables.net/examples/data_sources/dom
     // Quickly grab all text values from the "Office" column
-    const offices = await table.map(({ row }) => row.getCell('Office').innerText());
+    const offices = await table.getColumnValues('Office');
     expect(offices).toContain('Tokyo');
     expect(offices.length).toBeGreaterThan(0);
-    // #endregion advanced-column-scan
   });
 
   test('findRows: Filtering with Exact Match', async ({ page }) => {
