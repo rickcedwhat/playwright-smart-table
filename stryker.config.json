@@ -17,5 +17,6 @@
         "!src/types.ts",
         "!src/minimalConfigContext.ts"
     ],
-    "disableTypeChecks": "src/**/*.ts"
+    "disableTypeChecks": "src/**/*.ts",
+    "tsconfigFile": "tsconfig.stryker-skip.json"
 }
