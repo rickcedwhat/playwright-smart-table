@@ -4,8 +4,8 @@ import { useTable } from '../src';
 /**
  * findRowByIndex (#354) — async accessor for a row's logical/data-model index, as opposed to
  * the sync getRowByIndex (render-window position). These deterministic cases cover the mounted
- * path and the two throw contracts; real-virtualization scroll/pagination is covered against
- * the MUI DataGrid in tests/integration/mui-data-grid.spec.ts.
+ * path, the viewport.scrollToRow jump and the two throw contracts; the MUI DataGrid version is
+ * in tests/integration/mui-data-grid.spec.ts.
  */
 const HTML = `
   <table id="t">
@@ -38,6 +38,53 @@ test.describe('findRowByIndex (#354)', () => {
         const table = await useTable(page.locator('#t')).init();
 
         await expect(table.findRowByIndex(101)).rejects.toThrow(/requires a strategies\.resolveRowIndex/);
+    });
+
+    test('jumps to an unmounted row with viewport.scrollToRow (virtualized list)', async ({ page }) => {
+        await page.setContent(`
+            <div id="grid" style="height: 300px; overflow-y: auto">
+                <table style="border-spacing: 0">
+                    <thead><tr><th>Name</th></tr></thead>
+                    <tbody id="body"></tbody>
+                </table>
+            </div>
+            <script>
+                const ROW_H = 30, TOTAL = 1000, VISIBLE = 10;
+                const grid = document.getElementById('grid');
+                function render() {
+                    const first = Math.min(TOTAL - VISIBLE, Math.floor(grid.scrollTop / ROW_H));
+                    let html = '<tr style="height:' + first * ROW_H + 'px"></tr>';
+                    for (let i = first; i < first + VISIBLE; i++) {
+                        html += '<tr data-ri="' + i + '" style="height:' + ROW_H + 'px"><td>User ' + i + '</td></tr>';
+                    }
+                    html += '<tr style="height:' + (TOTAL - first - VISIBLE) * ROW_H + 'px"></tr>';
+                    document.getElementById('body').innerHTML = html;
+                }
+                grid.addEventListener('scroll', render);
+                render();
+            </script>
+        `);
+        const scrolledTo: number[] = [];
+        const table = await useTable(page.locator('#grid'), {
+            rowSelector: 'tbody tr[data-ri]',
+            strategies: {
+                resolveRowIndex,
+                viewport: {
+                    scrollToRow: async ({ root }, index) => {
+                        scrolledTo.push(index);
+                        await root.evaluate((el, i) => { el.scrollTop = i * 30; }, index);
+                        await root.locator(`tr[data-ri="${index}"]`).waitFor({ state: 'attached' });
+                    },
+                },
+            },
+        }).init();
+        await expect(page.locator('tr[data-ri="500"]')).toHaveCount(0);
+
+        const row = await table.findRowByIndex(500);
+
+        expect(scrolledTo).toEqual([500]);
+        expect(row.rowIndex).toBe(500);
+        await expect(row.getCell('Name')).toHaveText('User 500');
     });
 
     test('throws when the index cannot be reached (no scroll or pagination)', async ({ page }) => {

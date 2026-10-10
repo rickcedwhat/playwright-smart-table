@@ -928,39 +928,48 @@ const createSmartRow = <T = any>(
             });
 
             const columnOverride = config.columnOverrides?.[colName as keyof T];
-            if (columnOverride?.write) {
-                const cellLocator = smart.getCell(colName);
+            try {
+                if (columnOverride?.write) {
+                    const cellLocator = smart.getCell(colName);
 
-                let currentValue;
-                if (columnOverride.read) {
-                    currentValue = await columnOverride.read(cellLocator, {
-                        row: smart, columnName: colName, columnIndex: colIdx,
-                        getCell: (name: string) => smart.getCell(name),
+                    let currentValue;
+                    if (columnOverride.read) {
+                        currentValue = await columnOverride.read(cellLocator, {
+                            row: smart, columnName: colName, columnIndex: colIdx,
+                            getCell: (name: string) => smart.getCell(name),
+                        });
+                    }
+
+                    await columnOverride.write({
+                        cell: cellLocator,
+                        targetValue: value,
+                        currentValue,
+                        row: smart
+                    });
+                } else {
+                    const strategy = config.strategies.fill || FillStrategies.default;
+
+                    logDebug(config, 'verbose', `Filling cell "${colName}" with value`, value);
+
+                    await strategy({
+                        row: smart,
+                        columnName: colName,
+                        value,
+                        index: rowIndex ?? -1,
+                        page: rowLocator.page(),
+                        rootLocator,
+                        config,
+                        table: table as TableResult<T>,
+                        fillOptions
                     });
                 }
-
-                await columnOverride.write({
-                    cell: cellLocator,
-                    targetValue: value,
-                    currentValue,
-                    row: smart
-                });
-            } else {
-                const strategy = config.strategies.fill || FillStrategies.default;
-
-                logDebug(config, 'verbose', `Filling cell "${colName}" with value`, value);
-
-                await strategy({
-                    row: smart,
-                    columnName: colName,
-                    value,
-                    index: rowIndex ?? -1,
-                    page: rowLocator.page(),
-                    rootLocator,
-                    config,
-                    table: table as TableResult<T>,
-                    fillOptions
-                });
+            } catch (err) {
+                const source = columnOverride?.write ? 'columnOverrides.write' : 'fill strategy';
+                const wrapped = new Error(
+                    `[SmartTable] smartFill: ${source} for "${colName}" failed — ${err instanceof Error ? err.message : String(err)}`,
+                );
+                (wrapped as any).cause = err;
+                throw wrapped;
             }
 
             // Delay after filling
