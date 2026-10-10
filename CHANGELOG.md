@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **PR CI no longer depends on third-party sites (#474)** — the README examples and the error-suggestion, MUI Table and Glide specs used to load datatables.net, htmx.org, mui.com and the Glide storybook. They now run against local replicas built from the original sources: static copies of the DataTables and htmx pages with their libraries vendored, a Vite app rendering the mui.com table demos verbatim (`tests/apps/mui-docs`, port 3070), and one rendering Glide's "Add data" story with its own mock-data generator (`tests/apps/glide-grid`, port 3080). `playwright.config.live.ts` runs the same specs against the real sites as a non-blocking drift check. The README spec's extra retries are gone, and the playground specs now fail in CI instead of skipping when `localhost:3000` is down.
+
 ## [6.25.0] - 2026-10-10
 
 ### Added

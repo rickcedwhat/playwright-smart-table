@@ -129,6 +129,10 @@ jobs:
         run: npm ci
         working-directory: playground
 
+      - name: Install MUI Docs Replica App
+        run: npm ci
+        working-directory: tests/apps/mui-docs
+
       - name: Run Unit Tests
         run: pnpm run test:unit
 
@@ -183,6 +187,14 @@ jobs:
       - name: Install RDG Grid App
         run: npm ci
         working-directory: tests/apps/rdg-grid
+
+      - name: Install MUI Docs Replica App
+        run: npm ci
+        working-directory: tests/apps/mui-docs
+
+      - name: Install Glide Grid Replica App
+        run: npm ci
+        working-directory: tests/apps/glide-grid
 
       - name: Run Integration Tests
         run: npx playwright test --config playwright.config.ci-b.ts

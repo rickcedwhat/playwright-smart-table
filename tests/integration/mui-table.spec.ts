@@ -2,13 +2,15 @@ import { test, expect } from '@playwright/test';
 import { Locator } from '@playwright/test';
 import path from 'path';
 import { useTable, presets, TableContext } from '../../src/index';
+import { LIVE_SITES, SITES } from '../support/sites';
 
 test.describe('MUI Table Preset Integration', () => {
 
     test.beforeEach(async ({ page }) => {
-        await page.goto('https://mui.com/material-ui/react-table/');
+        await page.goto(SITES.muiTableDocs);
         // Wait for the docs page to fully load
         await page.waitForSelector('.MuiTableContainer-root', { state: 'attached' });
+        if (!LIVE_SITES) return;
 
         // Dismiss any cookie banner or preferences dialog if it exists
         const cookieSelectors = [

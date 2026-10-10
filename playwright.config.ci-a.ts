@@ -1,12 +1,12 @@
 // CI Group A: unit tests + all core/playground specs
-// Spins up the playground server only (port 3000).
+// Spins up the playground (port 3000) and the mui.com docs replica used by the README examples (port 3070).
 // Group B (playwright.config.ci-b.ts) handles integration tests requiring dedicated app servers.
 import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
   testDir: './tests',
   testMatch: '**/*.spec.ts',
-  // Exclude the specs that belong to Group B (external URLs + MUI DataGrid server)
+  // Exclude the specs that belong to Group B (dedicated app servers)
   testIgnore: [
     '**/integration/mui-data-grid.spec.ts',
     '**/integration/glide.spec.ts',
@@ -32,6 +32,13 @@ export default defineConfig({
       command: 'npm run dev',
       cwd: 'playground',
       port: 3000,
+      reuseExistingServer: false,
+      timeout: 120_000,
+    },
+    {
+      command: 'npm run dev',
+      cwd: 'tests/apps/mui-docs',
+      port: 3070,
       reuseExistingServer: false,
       timeout: 120_000,
     },

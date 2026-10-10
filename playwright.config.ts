@@ -55,5 +55,19 @@ export default defineConfig({
       reuseExistingServer: !isCI,
       timeout: 120 * 1000,
     },
+    {
+      command: 'npm run dev',
+      cwd: 'tests/apps/mui-docs',
+      port: 3070,
+      reuseExistingServer: !isCI,
+      timeout: 120 * 1000,
+    },
+    {
+      command: 'npm run dev',
+      cwd: 'tests/apps/glide-grid',
+      port: 3080,
+      reuseExistingServer: !isCI,
+      timeout: 120 * 1000,
+    },
   ],
 });
