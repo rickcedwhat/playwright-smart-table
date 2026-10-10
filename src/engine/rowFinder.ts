@@ -10,6 +10,7 @@ import { NavigationBarrier } from '../utils/navigationBarrier';
 import { resolveLogicalRowIndex, resolveRowLoading } from './rowResolution';
 import { resolveCellLocator } from '../utils/resolveCellLocator';
 import { scanPages } from './scanPages';
+import { describeLocator, describeRowByFilters, describeRowByIndex, describeSentinelRow } from '../utils/locatorDescription';
 import { waitWhileTableLoading } from '../utils/loadingWait';
 
 export class RowFinder<T = any> {
@@ -137,14 +138,19 @@ export class RowFinder<T = any> {
             await debugDelay(this.config, 'findRow');
             const map = await this.tableMapper.getMap();
             const resolved = await this.resolveRowIndex(rowLocator);
-            return this.makeSmartRow(rowLocator, map, resolved?.index, this.tableState.currentPageIndex, undefined, resolved?.selector);
+            const describedRow = describeLocator(rowLocator, describeRowByFilters(filters), this.config);
+            return this.makeSmartRow(describedRow, map, resolved?.index, this.tableState.currentPageIndex, undefined, resolved?.selector);
         }
 
         logDebug(this.config, 'error', 'Row not found', filters);
         await debugDelay(this.config, 'findRow');
 
-        const sentinel = this.resolve(this.config.rowSelector, this.rootLocator)
-            .filter({ hasText: "___SENTINEL_ROW_NOT_FOUND___" + Date.now() });
+        const sentinel = describeLocator(
+            this.resolve(this.config.rowSelector, this.rootLocator)
+                .filter({ hasText: "___SENTINEL_ROW_NOT_FOUND___" + Date.now() }),
+            describeSentinelRow(filters),
+            this.config
+        );
         const smartRow = this.makeSmartRow(sentinel, await this.tableMapper.getMap(), undefined);
         (smartRow as any)[SENTINEL_ROW] = true;
         return smartRow;
@@ -165,6 +171,12 @@ export class RowFinder<T = any> {
             this.rootLocator.page(),
             'waitForTableReady'
         );
+    }
+
+    /** Unfiltered rows keep the plain `SmartRow #n` name that `_makeSmart` applies. */
+    private nameFilteredRow(row: Locator, resolved: { index: number } | undefined, filters: Record<string, FilterValue>): Locator {
+        if (!resolved || Object.keys(filters).length === 0) return row;
+        return describeLocator(row, describeRowByIndex(resolved.index, filters), this.config);
     }
 
     public async findRows(
@@ -220,7 +232,8 @@ export class RowFinder<T = any> {
                             this.config,
                             () => allRows.length,
                         );
-                        const smartRow = this.makeSmartRow(currentRows[idx], map, resolved?.index, this.tableState.currentPageIndex, barrier, resolved?.selector);
+                        const rowLocator = this.nameFilteredRow(currentRows[idx], resolved, filtersRecord);
+                        const smartRow = this.makeSmartRow(rowLocator, map, resolved?.index, this.tableState.currentPageIndex, barrier, resolved?.selector);
 
                         const loadingOutcome = await resolveRowLoading(
                             smartRow,
