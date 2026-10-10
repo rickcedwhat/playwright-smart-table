@@ -3,6 +3,7 @@ import type { FilterValue, FinalTableConfig } from '../types';
 import { logDebug } from './debugUtils';
 
 const MAX_VALUE_LENGTH = 40;
+const locatorDescriptions = new WeakMap<Locator, string>();
 let loggedUnsupported = false;
 
 const formatFilterValue = (value: FilterValue): string => {
@@ -34,7 +35,11 @@ export const describeSentinelRow = (filters: Record<string, FilterValue>): strin
  * readable name instead of the raw selector chain. Older Playwright versions get the locator back unchanged.
  */
 export const describeLocator = (locator: Locator, description: string, config?: FinalTableConfig): Locator => {
-    if (typeof locator.describe === 'function') return locator.describe(description);
+    if (typeof locator.describe === 'function') {
+        const described = locator.describe(description);
+        locatorDescriptions.set(described, description);
+        return described;
+    }
     if (config?.debug && !loggedUnsupported) {
         loggedUnsupported = true;
         logDebug(config, 'info', 'Upgrade @playwright/test to 1.53+ to see SmartRow / SmartCell names in traces and error messages');
@@ -44,4 +49,4 @@ export const describeLocator = (locator: Locator, description: string, config?: 
 
 /** The description already applied to a locator, or undefined (unsupported or never described). */
 export const getLocatorDescription = (locator: Locator): string | undefined =>
-    typeof locator.description === 'function' ? locator.description() ?? undefined : undefined;
+    typeof locator.description === 'function' ? locator.description() ?? undefined : locatorDescriptions.get(locator);

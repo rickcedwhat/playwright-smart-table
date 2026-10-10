@@ -37,5 +37,27 @@ describe('locatorDescription (#485)', () => {
 
     expect(locator.describe).toHaveBeenCalledWith('SmartRow #1');
     expect(result).toBe(described);
+    expect(getLocatorDescription(result)).toBe('SmartRow #1');
+    expect(getLocatorDescription(locator)).toBeUndefined();
+  });
+
+  it('updates the fallback when describe() returns the same locator', () => {
+    const locator = { describe: vi.fn(() => locator) } as unknown as Locator;
+
+    describeLocator(locator, 'SmartRow #1');
+    expect(getLocatorDescription(locator)).toBe('SmartRow #1');
+
+    describeLocator(locator, 'SmartRow #2');
+    expect(getLocatorDescription(locator)).toBe('SmartRow #2');
+  });
+
+  it.each(['Native description', '', null, undefined])('prefers the native description() result: %s', (description) => {
+    const described = { description: vi.fn(() => description) } as unknown as Locator;
+    const locator = { describe: vi.fn(() => described) } as unknown as Locator;
+
+    describeLocator(locator, 'Stored description');
+
+    expect(getLocatorDescription(described)).toBe(description ?? undefined);
+    expect(described.description).toHaveBeenCalledOnce();
   });
 });
