@@ -1,54 +1,38 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, Page } from '@playwright/test';
 import { useTable } from '../src/index';
+
+// Message content and getDebugDelay resolution are unit-tested in tests/unit/debugUtils.coverage.test.ts;
+// these check that debug.slow actually delays real table calls.
 
 /** Shorter delays in CI so debug.slow tests stay valid but do not dominate runtime. */
 const isCI = !!process.env.CI;
 const slow = {
     uniformMs: isCI ? 80 : 500,
     granularDefaultMs: isCI ? 120 : 800,
-    granularFindRowMs: isCI ? 25 : 100,
-    findRowOnlyMs: isCI ? 100 : 600,
-    combinedUniformMs: isCI ? 40 : 200,
+    granularFindRowMs: isCI ? 100 : 600,
 };
 
 function minElapsedForDelay(ms: number): number {
     return Math.max(15, Math.floor(ms * 0.85));
 }
 
+async function setupTable(page: Page) {
+    await page.setContent(`
+        <table id="t">
+            <thead><tr><th>Name</th><th>Office</th></tr></thead>
+            <tbody>
+                <tr><td>Airi Satou</td><td>Tokyo</td></tr>
+                <tr><td>Bradley Greer</td><td>London</td></tr>
+            </tbody>
+        </table>
+    `);
+    return page.locator('#t');
+}
+
 test.describe('Debug Mode', () => {
-    test('No debug mode works normally (performance check)', async ({ page }) => {
-        await page.goto('https://datatables.net/examples/data_sources/dom');
-        await page.waitForSelector('#example_wrapper');
-
-        const table = useTable(page.locator('#example'), {
-            headerSelector: 'thead th'
-            // No debug config
-        });
-
-        // Should be fast without delays
-        const start = Date.now();
-        await table.init();
-        const elapsed = Date.now() - start;
-
-        // Verify functionality
-        const row = table.getRow({ Name: 'Airi Satou' });
-        expect(row).toBeDefined();
-
-        // Should be much faster than with delays (typically < 100ms locally, but can be ~700ms in CI)
-        expect(elapsed).toBeLessThan(1000);
-    });
-
-    test('Delays work correctly', async ({ page }) => {
-        await page.goto('https://datatables.net/examples/data_sources/dom');
-        await page.waitForSelector('#example_wrapper');
-
-        const table = useTable(page.locator('#example'), {
-            headerSelector: 'thead th',
-            debug: {
-                slow: slow.uniformMs,
-                logLevel: 'info'
-            }
-        });
+    test('a single debug.slow value delays init()', async ({ page }) => {
+        const root = await setupTable(page);
+        const table = useTable(root, { debug: { slow: slow.uniformMs, logLevel: 'info' } });
 
         const start = Date.now();
         await table.init();
@@ -57,99 +41,25 @@ test.describe('Debug Mode', () => {
         expect(elapsed).toBeGreaterThanOrEqual(minElapsedForDelay(slow.uniformMs));
     });
 
-    test('Granular delays work', async ({ page }) => {
-        await page.goto('https://datatables.net/examples/data_sources/dom');
-        await page.waitForSelector('#example_wrapper');
-
-        const table = useTable(page.locator('#example'), {
-            headerSelector: 'thead th',
+    test('per-action debug.slow delays init() by default and findRow() by its own value', async ({ page }) => {
+        const root = await setupTable(page);
+        const table = useTable(root, {
             debug: {
-                slow: {
-                    default: slow.granularDefaultMs,
-                    findRow: slow.granularFindRowMs
-                },
-                logLevel: 'info'
-            }
+                slow: { default: slow.granularDefaultMs, findRow: slow.granularFindRowMs },
+                logLevel: 'info',
+            },
         });
 
-        const start = Date.now();
+        const initStart = Date.now();
         await table.init();
-        const elapsed = Date.now() - start;
+        const initElapsed = Date.now() - initStart;
 
-        expect(elapsed).toBeGreaterThanOrEqual(minElapsedForDelay(slow.granularDefaultMs));
+        const findStart = Date.now();
+        const row = await table.findRow({ Name: 'Airi Satou' });
+        const findElapsed = Date.now() - findStart;
+
+        expect(initElapsed).toBeGreaterThanOrEqual(minElapsedForDelay(slow.granularDefaultMs));
+        expect(findElapsed).toBeGreaterThanOrEqual(minElapsedForDelay(slow.granularFindRowMs));
+        expect(row.wasFound()).toBe(true);
     });
-
-    test('FindRow with delays', async ({ page }) => {
-        await page.goto('https://datatables.net/examples/data_sources/dom');
-        await page.waitForSelector('#example_wrapper');
-
-        const table = useTable(page.locator('#example'), {
-            headerSelector: 'thead th',
-            debug: {
-                slow: {
-                    findRow: slow.findRowOnlyMs
-                },
-                logLevel: 'info'
-            }
-        });
-
-        await table.init();
-
-        const start = Date.now();
-        await table.findRow({ Name: 'Airi Satou' });
-        const elapsed = Date.now() - start;
-
-        expect(elapsed).toBeGreaterThanOrEqual(minElapsedForDelay(slow.findRowOnlyMs));
-    });
-
-    test('Combined debug features', async ({ page }) => {
-        await page.goto('https://datatables.net/examples/data_sources/dom');
-        await page.waitForSelector('#example_wrapper');
-
-        const table = useTable(page.locator('#example'), {
-            headerSelector: 'thead th',
-            debug: {
-                slow: slow.combinedUniformMs,
-                logLevel: 'info'
-            }
-        });
-
-        await table.init();
-        const row = table.getRow({ Name: 'Airi Satou' });
-        expect(row).toBeDefined();
-    });
-
-    test('Verbose logging emits expected messages during map()', async ({ page }) => {
-        await page.goto('https://datatables.net/examples/data_sources/dom');
-        await page.waitForSelector('#example_wrapper');
-
-        // logDebug runs in the Node test process — intercept console.log at the Node level
-        const messages: string[] = [];
-        const originalLog = console.log;
-        console.log = (...args: any[]) => {
-            messages.push(args.join(' '));
-            originalLog(...args);
-        };
-
-        try {
-            const table = useTable(page.locator('#example'), {
-                headerSelector: 'thead th',
-                debug: { logLevel: 'verbose' }
-            });
-
-            await table.init();
-
-            // Run a 1-page map to get iteration log output
-            await table.map(({ row }) => row.getCell('Name').innerText(), { maxPages: 1 });
-        } finally {
-            console.log = originalLog;
-        }
-
-        // Assert key verbose messages were emitted
-        expect(messages.some(m => m.includes('map: starting'))).toBe(true);
-        expect(messages.some(m => m.includes('map: scanning page'))).toBe(true);
-        expect(messages.some(m => m.includes('map: complete'))).toBe(true);
-    });
-
 });
-

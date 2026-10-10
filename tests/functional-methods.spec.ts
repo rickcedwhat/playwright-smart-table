@@ -150,7 +150,7 @@ test.describe('map', () => {
         expect(names).toEqual(['Alice', 'Bob', 'Carol', 'Dave', 'Eve', 'Frank']);
     });
 
-    test('stop() halts after current page', async ({ page }) => {
+    test('stop() keeps the calling row and drops everything after it', async ({ page }) => {
         await page.setContent(TABLE_HTML);
         const table = makeTable(page);
 
@@ -159,8 +159,24 @@ test.describe('map', () => {
             return row.getCell('Name').innerText();
         });
 
-        // stop called after row 2 meaning page 2 doesn't get processed
-        expect(names.length).toBeLessThanOrEqual(4); // at most page 1 + page 2 (stop() mid-page)
+        expect(names).toEqual(['Alice', 'Bob', 'Carol']);
+    });
+
+    test('parallel stop(): the earliest stopping row wins even if it calls stop() last', async ({ page }) => {
+        await page.setContent(TABLE_HTML);
+        const table = makeTable(page);
+        const ran: number[] = [];
+
+        const names = await table.map(async ({ row, rowIndex, stop }) => {
+            // Page 1 is Alice (row 0) and Bob (row 1). Bob calls stop() first, Alice afterwards.
+            await page.waitForTimeout(rowIndex === 1 ? 0 : 150);
+            ran.push(rowIndex);
+            stop();
+            return row.getCell('Name').innerText();
+        }, { concurrency: 'parallel' });
+
+        expect(ran).toEqual([1, 0]);
+        expect(names).toEqual(['Alice']);
     });
 
     test('maxPages: 1 limits to first page', async ({ page }) => {
@@ -172,16 +188,6 @@ test.describe('map', () => {
         expect(names).toEqual(['Alice', 'Bob']);
     });
 
-    test('concurrency: sequential produces ordered results', async ({ page }) => {
-        await page.setContent(TABLE_HTML);
-        const table = makeTable(page);
-
-        const names = await table.map(({ row }) => row.getCell('Name').innerText(), {
-          concurrency: 'sequential',
-        });
-
-        expect(names).toEqual(['Alice', 'Bob', 'Carol', 'Dave', 'Eve', 'Frank']);
-    });
 });
 
 // ─── filter ──────────────────────────────────────────────────────────────────
@@ -196,23 +202,8 @@ test.describe('filter', () => {
 
         // 3 active rows (Alice/Carol/Eve, one per page)
         expect(active.length).toBe(3);
-        // Note: active rows are returned as-is (no bringIntoView).
-        // toJSON() will read the current DOM page (page 3 after full pagination),
-        // so content-based assertions require bringIntoView() first.
-        // We verify the count and that the array is a proper SmartRowArray.
+        // Rows are returned as-is (no bringIntoView), so toJSON() would read page 3; check the SmartRowArray shape only.
         expect(typeof active.toJSON).toBe('function');
-    });
-
-    test('returns a SmartRowArray with toJSON()', async ({ page }) => {
-        await page.setContent(TABLE_HTML);
-        const table = makeTable(page);
-
-        const inactive = await table.filter(async ({ row }) =>
-            await row.getCell('Status').innerText() === 'Inactive'
-        );
-
-        expect(typeof inactive.toJSON).toBe('function');
-        expect(inactive.length).toBe(3);
     });
 
     test('stop() returns partial results collected so far', async ({ page }) => {
@@ -338,20 +329,24 @@ test.describe('async iterator [Symbol.asyncIterator]', () => {
 
 // ─── dedupe option ───────────────────────────────────────────────────────────
 test.describe('dedupe option', () => {
-    test('map with dedupe skips duplicate rows', async ({ page }) => {
-        // Use a page that has duplicate IDs to test dedup
-        await page.setContent(TABLE_HTML);
-        const table = makeTable(page);
+    test('map with a per-call dedupe option skips duplicate rows', async ({ page }) => {
+        await page.setContent(`
+            <table id="tbl">
+                <thead><tr><th>ID</th><th>Name</th></tr></thead>
+                <tbody>
+                    <tr><td>1</td><td>Alice</td></tr>
+                    <tr><td>1</td><td>Alice (again)</td></tr>
+                    <tr><td>2</td><td>Bob</td></tr>
+                </tbody>
+            </table>
+        `);
+        const table = useTable(page.locator('#tbl'));
 
-        // Without dedupe: 6 items. With dedupe by unique ID: same 6 (all unique in fixture)
-        const ids = await table.map(({ row }) => row.getCell('ID').innerText(), {
+        const names = await table.map(({ row }) => row.getCell('Name').innerText(), {
             dedupe: async (row) => row.getCell('ID').innerText(),
         });
 
-        // All unique in this fixture, so dedupe doesn't remove anything
-        expect(ids.length).toBe(6);
-        // Verify no duplicates
-        expect(new Set(ids).size).toBe(6);
+        expect(names).toEqual(['Alice', 'Bob']);
     });
 
     test('filter uses globally configured dedupe strategy sequentially', async ({ page }) => {
@@ -429,17 +424,6 @@ test.describe('useBulkPagination option', () => {
         expect(table.currentPageIndex).toBe(2);
     });
 
-    test('forEach with useBulkPagination: false uses goNext (default)', async ({ page }) => {
-        await page.setContent(TABLE_HTML);
-        const table = makeTable(page);
-        const ids: string[] = [];
-        await table.forEach(
-            async ({ row }) => { ids.push(await row.getCell('ID').innerText()); },
-            { useBulkPagination: false }
-        );
-        expect(ids).toEqual(['1', '2', '3', '4', '5', '6']);
-        expect(table.currentPageIndex).toBe(2);
-    });
 });
 
 // ─── Bug #349: findRow/findRows must default to single-step goNext ──────────────

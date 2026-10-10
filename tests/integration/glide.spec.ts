@@ -53,51 +53,7 @@ test.describe('Live Glide Data Grid', () => {
         console.log("Verified successfully using table helpers!");
     });
 
-    test('should infinite scroll', async ({ page }) => {
-        await page.goto('https://glideapps.github.io/glide-data-grid/iframe.html?viewMode=story&id=glide-data-grid-dataeditor-demos--add-data&globals=');
-        // Stabilize: Wait for grid to be attached
-        const grid = page.locator('table[role="grid"]').first();
-        await expect(grid).toBeAttached({ timeout: 15000 });
-
-        // 3. Configure Table
-        // Root is the CANVAS itself as per user request for this test
-        const table = useTable(page.locator('canvas').first(), {
-            ...glideConfig, debug: {
-                logLevel: 'verbose'
-            }
-        });
-        await table.init();
-
-        // Collect data using map
-        const flattenedData = await table.map(
-            ({ row }) => row.toJSON({ columns: ['First name', 'Last name', 'Title', 'Email'] }),
-            { maxPages: 3 }
-        );
-
-        console.log(`Collected ${flattenedData.length} total rows after scroll`);
-        expect(flattenedData.length).toBeGreaterThan(12);
-
-        // Verify we got new data
-        const uniqueNames = new Set(flattenedData.map((r: any) => r["First name"]));
-        console.log(`Unique Names: ${uniqueNames.size}`);
-
-
-        console.log("--- Verification Data ---");
-        const indicesToLog = [0, 10, 20, 30];
-        indicesToLog.forEach(idx => {
-            if (flattenedData[idx]) {
-                console.log(`Row ${idx + 1}:`, flattenedData[idx]);
-            } else {
-                console.log(`Row ${idx + 1}: [NOT FOUND - Total rows: ${flattenedData.length}]`);
-            }
-        });
-        console.log("-------------------------");
-
-        // If we scrolled successfully, we should have more unique names than the page size (12)
-        expect(uniqueNames.size).toBeGreaterThan(12);
-    });
-
-    test('should infinite scroll with scroll right', async ({ page }) => {
+    test('infinite scroll collects rows past the first page and reads a far-right column', async ({ page }) => {
         await page.goto('https://glideapps.github.io/glide-data-grid/iframe.html?viewMode=story&id=glide-data-grid-dataeditor-demos--add-data&globals=');
         const grid = page.locator('table[role="grid"]').first();
         await expect(grid).toBeAttached({ timeout: 15000 });

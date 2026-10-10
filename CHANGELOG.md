@@ -9,10 +9,13 @@
 ### Fixed
 
 - **`./types` subpath export (#479)** — `@rickcedwhat/playwright-smart-table/types` resolved its JavaScript to `dist/index.js` (the whole library) instead of `dist/types.js`. It now maps to `dist/types.js`, matching its `.d.ts`. Type imports are unaffected. A runtime `require` of `/types` no longer returns the main module's exports; import values from the package root instead. The packaging smoke test now loads `/types` and `/presets` and type-checks an `/types` import.
+- **`stop()` in parallel iteration (#475)** — when several rows called `stop()` out of order, the first call won even if it came from a later row, so `map` / `filter` could return rows past an earlier stopping row. The earliest stopping row now wins.
+- **`stop()` docs (#475)** — said iteration halts "after the current page finishes", which was wrong for the default sequential mode (it ends right after the stopping row). The docs now describe each mode: sequential runs nothing after the stopping row; parallel and synchronized may still run the rest of the current page, but drop those results.
 
 ### Changed
 
 - **fallow dead-code check in CI** — `fallow` is now a pinned dev dependency (`pnpm run fallow`). The lint job fails on unused files, exports, types, class members or dependencies, and posts fallow's duplication and complexity report to the job summary without blocking. The existing Claude Code commit hook now finds the local binary instead of silently skipping.
+- **Test suite cleanup (#475)** — removed tests that couldn't fail or repeated another test, merged near-duplicates, and renamed bug-numbered files to what they cover. `debug-mode` now runs against a local table instead of datatables.net, and the live HTMX spec is gone. Assertions that were only `toBeTruthy()` / `toBeDefined()` now check real values (`rowIndex` for first/middle/last rows, `dedupe` output, `stop()` boundaries, far-right `getCell` in RDG 2D).
 
 ### Removed
 

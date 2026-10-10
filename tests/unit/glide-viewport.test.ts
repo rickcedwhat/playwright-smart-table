@@ -370,4 +370,11 @@ describe('Glide preset — viewport replaces navigation', () => {
         const b = createGlide({ attachTimeout: 5000 });
         expect(a.strategies?.viewport).not.toBe(b.strategies?.viewport);
     });
+
+    it('createGlide() includes the grid selectors and sequential concurrency', () => {
+        const preset = createGlide();
+        expect(preset.headerSelector).toBe('table[role="grid"] thead tr th');
+        expect(preset.rowSelector).toBe('table[role="grid"] tbody tr');
+        expect(preset.concurrency).toBe('sequential');
+    });
 });

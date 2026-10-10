@@ -74,8 +74,9 @@ export async function runMap<T, R>(
     let stopped = false;
     let stoppedIndex = Infinity;
 
+    // In parallel/synchronized mode rows can call stop() out of order; the earliest row wins.
     const stop = (idx: number) => {
-      if (!stopped) {
+      if (idx < stoppedIndex) {
         log(env.config, `${label}: stop() called at row ${idx} — halting`);
         stopped = true;
         stoppedIndex = idx;

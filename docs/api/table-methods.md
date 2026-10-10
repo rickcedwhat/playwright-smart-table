@@ -328,7 +328,7 @@ forEach(
 
 <!-- /api-signature: forEach -->
 
-Iterates every row across all pages. Runs sequentially by default. Call `stop()` in the callback to halt early (stops after the current page finishes).
+Iterates every row across all pages. Runs sequentially by default. Call `stop()` in the callback to halt early. In sequential mode no rows after the one that called it are visited; in parallel mode the rest of the current page may still run.
 
 ```typescript
 await table.forEach(async ({ row, stop }) => {
