@@ -817,6 +817,14 @@ export type RowIterationContext<T = any> = {
   index: number;
   /** 0-based page index — which page this row was collected from. */
   pageIndex: number;
+  /**
+   * Ends the iteration. No further pages are loaded, and the result of `map` / `filter`
+   * includes this row and nothing after it. If several rows call `stop()`, the earliest one wins.
+   *
+   * In `'sequential'` mode (the default) no callback after this row runs. In `'parallel'` and
+   * `'synchronized'` mode the rest of the current page is already in flight, so later rows'
+   * callbacks may still run (and their side effects happen) even though their results are dropped.
+   */
   stop: () => void;
 };
 
@@ -1005,7 +1013,8 @@ export interface TableResult<T = any> extends AsyncIterable<{ row: SmartRow<T>; 
   /**
    * Iterates every row across all pages, calling the callback for side effects.
    * Execution is sequential by default (safe for interactions like clicking/filling).
-   * Call `stop()` in the callback to end iteration early.
+   * Call `stop()` in the callback to end iteration early. In sequential mode no later row runs;
+   * in parallel mode the rest of the current page may still run (see `RowIterationContext.stop`).
    *
    * @param callback - Function receiving { row, rowIndex, stop }
    * @param options - maxPages, concurrency, dedupe, useBulkPagination
@@ -1026,7 +1035,8 @@ export interface TableResult<T = any> extends AsyncIterable<{ row: SmartRow<T>; 
    * Defaults to `concurrency: 'sequential'` (safe for clicks/fills). Pass
    * `concurrency: 'parallel'` for read-only extraction, or `'synchronized'` when
    * navigation must stay lock-step on virtualized grids.
-   * Call `stop()` to end early: the result includes the row that called it and nothing after it.
+   * Call `stop()` to end early: the result includes the row that called it and nothing after it
+   * (in parallel mode, later rows on the same page may still run; see `RowIterationContext.stop`).
    *
    * @param callback - Function receiving { row, rowIndex, stop }
    * @param options - maxPages, concurrency, dedupe, useBulkPagination

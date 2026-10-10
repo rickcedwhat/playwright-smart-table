@@ -9,7 +9,8 @@
 ### Fixed
 
 - **`./types` subpath export (#479)** — `@rickcedwhat/playwright-smart-table/types` resolved its JavaScript to `dist/index.js` (the whole library) instead of `dist/types.js`. It now maps to `dist/types.js`, matching its `.d.ts`. Type imports are unaffected. A runtime `require` of `/types` no longer returns the main module's exports; import values from the package root instead. The packaging smoke test now loads `/types` and `/presets` and type-checks an `/types` import.
-- **`stop()` docs for `map` / `forEach` (#475)** — said iteration halts "after the current page finishes". It actually ends right away: the row that called `stop()` is included and nothing after it is visited.
+- **`stop()` in parallel iteration (#475)** — when several rows called `stop()` out of order, the first call won even if it came from a later row, so `map` / `filter` could return rows past an earlier stopping row. The earliest stopping row now wins.
+- **`stop()` docs (#475)** — said iteration halts "after the current page finishes", which was wrong for the default sequential mode (it ends right after the stopping row). The docs now describe each mode: sequential runs nothing after the stopping row; parallel and synchronized may still run the rest of the current page, but drop those results.
 
 ### Changed
 

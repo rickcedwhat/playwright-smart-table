@@ -50,9 +50,14 @@ await table.forEach(async ({ row, stop }) => {
 })
 ```
 
-`stop()` works in `forEach`, `map`, and `filter`. Note that it halts at the page boundary — rows already in-flight on the current page will still complete before iteration stops.
+`stop()` works in `forEach`, `map`, and `filter`. No further pages are loaded, and `map` / `filter` results include the row that called `stop()` and nothing after it. If several rows call it, the earliest one wins.
 
-If you need to stop at the exact row rather than the page boundary, the table is async-iterable and supports `break`:
+What happens to the rest of the current page depends on `concurrency`:
+
+- `'sequential'` (default): rows run one at a time, so no callback after the stopping row runs.
+- `'parallel'` / `'synchronized'`: the whole page is already in flight, so later rows' callbacks may still run and their side effects (clicks, fills) still happen. Their results are dropped.
+
+If you need side effects to stop at an exact row, use the default sequential mode, or iterate with `for await`, which visits one row at a time and supports `break`:
 
 ```typescript
 for await (const { row } of table) {

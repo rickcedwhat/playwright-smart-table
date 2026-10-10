@@ -162,6 +162,23 @@ test.describe('map', () => {
         expect(names).toEqual(['Alice', 'Bob', 'Carol']);
     });
 
+    test('parallel stop(): the earliest stopping row wins even if it calls stop() last', async ({ page }) => {
+        await page.setContent(TABLE_HTML);
+        const table = makeTable(page);
+        const ran: number[] = [];
+
+        const names = await table.map(async ({ row, rowIndex, stop }) => {
+            // Page 1 is Alice (row 0) and Bob (row 1). Bob calls stop() first, Alice afterwards.
+            await page.waitForTimeout(rowIndex === 1 ? 0 : 150);
+            ran.push(rowIndex);
+            stop();
+            return row.getCell('Name').innerText();
+        }, { concurrency: 'parallel' });
+
+        expect(ran).toEqual([1, 0]);
+        expect(names).toEqual(['Alice']);
+    });
+
     test('maxPages: 1 limits to first page', async ({ page }) => {
         await page.setContent(TABLE_HTML);
         const table = makeTable(page);
