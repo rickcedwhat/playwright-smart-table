@@ -10,6 +10,7 @@ import { NavigationBarrier } from '../utils/navigationBarrier';
 import { resolveLogicalRowIndex, resolveRowLoading } from './rowResolution';
 import { resolveCellLocator } from '../utils/resolveCellLocator';
 import { scanPages } from './scanPages';
+import { describeLocator, describeRowByFilters, describeSentinelRow } from '../utils/locatorDescription';
 import { waitWhileTableLoading } from '../utils/loadingWait';
 
 export class RowFinder<T = any> {
@@ -137,14 +138,19 @@ export class RowFinder<T = any> {
             await debugDelay(this.config, 'findRow');
             const map = await this.tableMapper.getMap();
             const resolved = await this.resolveRowIndex(rowLocator);
-            return this.makeSmartRow(rowLocator, map, resolved?.index, this.tableState.currentPageIndex, undefined, resolved?.selector);
+            const describedRow = describeLocator(rowLocator, describeRowByFilters(filters), this.config);
+            return this.makeSmartRow(describedRow, map, resolved?.index, this.tableState.currentPageIndex, undefined, resolved?.selector);
         }
 
         logDebug(this.config, 'error', 'Row not found', filters);
         await debugDelay(this.config, 'findRow');
 
-        const sentinel = this.resolve(this.config.rowSelector, this.rootLocator)
-            .filter({ hasText: "___SENTINEL_ROW_NOT_FOUND___" + Date.now() });
+        const sentinel = describeLocator(
+            this.resolve(this.config.rowSelector, this.rootLocator)
+                .filter({ hasText: "___SENTINEL_ROW_NOT_FOUND___" + Date.now() }),
+            describeSentinelRow(filters),
+            this.config
+        );
         const smartRow = this.makeSmartRow(sentinel, await this.tableMapper.getMap(), undefined);
         (smartRow as any)[SENTINEL_ROW] = true;
         return smartRow;

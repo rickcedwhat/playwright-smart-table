@@ -21,6 +21,7 @@ import { NavigationBarrier } from './utils/navigationBarrier';
 import { waitWhileTableLoading } from './utils/loadingWait';
 import { SET_CURRENT_PAGE_INDEX } from './utils/pageIndex';
 import { internals } from './utils/smartRowInternals';
+import { describeLocator, describeRowByFilters, describeRowByIndex, getLocatorDescription } from './utils/locatorDescription';
 
 // Helper to safely serialize objects containing functions for logging
 const safeStringify = (obj: any) => {
@@ -168,7 +169,13 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     const effectiveLocator = healSelector
       ? rootLocator.locator(healSelector)
       : rowLocator;
-    const sr = createSmartRow<T>(effectiveLocator, map, rowIndex, config, rootLocator, resolve, finalTable, tablePageIndex, barrier, renderWindowPosition);
+    // Keep a caller-supplied description (e.g. the filters) across self-healing; otherwise name the row by index.
+    const existingDescription = getLocatorDescription(rowLocator);
+    const description = existingDescription ?? (rowIndex !== undefined ? describeRowByIndex(rowIndex) : undefined);
+    const describedLocator = description !== undefined && (healSelector !== undefined || existingDescription === undefined)
+      ? describeLocator(effectiveLocator, description, config)
+      : effectiveLocator;
+    const sr = createSmartRow<T>(describedLocator, map, rowIndex, config, rootLocator, resolve, finalTable, tablePageIndex, barrier, renderWindowPosition);
     if (healSelector) internals(sr)._selfHealing = true;
     return sr;
   };
@@ -548,7 +555,8 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
         rootLocator.page(),
         rootLocator
       );
-      return _makeSmart(matchedRows, map, undefined); // sync path cannot compute real index
+      const describedRows = describeLocator(matchedRows, describeRowByFilters(filters as Record<string, FilterValue>), config);
+      return _makeSmart(describedRows, map, undefined); // sync path cannot compute real index
     },
 
     getRowByIndex: (index: number): SmartRowType<T> => {

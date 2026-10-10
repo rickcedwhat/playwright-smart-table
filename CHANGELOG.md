@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Readable row and cell names in traces and errors (#485)** — rows and cells are now named with Playwright's `locator.describe()`, so the trace viewer, HTML report and failed assertions show `SmartRow where Name="Bob" › "Age" cell` instead of the raw selector chain. `getRow` / `findRow` rows are named by their filters, index-based rows (`getRowByIndex`, `findRowByIndex`, `map` / `forEach` / `findRows`) by index (`SmartRow #2`), and `findRow` misses by what was searched (`SmartRow not found: Name="Zed"`). The name survives `resolveRowIndex` self-healing. It needs `@playwright/test` 1.53+; older versions get the locator unchanged, plus a one-time note when `debug` logging is on.
+
 ### Fixed
 
 - **`./types` subpath export (#479)** — `@rickcedwhat/playwright-smart-table/types` resolved its JavaScript to `dist/index.js` (the whole library) instead of `dist/types.js`. It now maps to `dist/types.js`, matching its `.d.ts`. Type imports are unaffected. A runtime `require` of `/types` no longer returns the main module's exports; import values from the package root instead. The packaging smoke test now loads `/types` and `/presets` and type-checks an `/types` import.

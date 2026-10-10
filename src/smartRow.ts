@@ -9,6 +9,7 @@ import { SENTINEL_ROW } from './utils/sentinel';
 import { NavigationBarrier } from './utils/navigationBarrier';
 import { setCurrentPageIndex } from './utils/pageIndex';
 import type { SmartRowInternals } from './utils/smartRowInternals';
+import { describeLocator, getLocatorDescription } from './utils/locatorDescription';
 
 type StrategyContext = {
     config: FinalTableConfig<any>;
@@ -402,7 +403,8 @@ const createSmartRow = <T = any>(
             baseLocator = resolve(config.cellSelector, rowLocator).nth(idx);
         }
 
-        const smartCell = baseLocator as SmartCell;
+        const cellDescription = `${getLocatorDescription(rowLocator) ?? 'SmartRow'} › "${colName}" cell`;
+        const smartCell = describeLocator(baseLocator, cellDescription, config) as SmartCell;
         smartCell.bringIntoView = async () => {
             const page = rootLocator.page();
             const navigatedCell = await _navigateToCell({
