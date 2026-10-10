@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { useTable } from '../src/index';
+import { SITES } from './support/sites';
 
 test.describe('Error Handling and Validation', () => {
 
@@ -72,7 +73,7 @@ test.describe('Error Handling and Validation', () => {
 
     test.describe('Smart Error Suggestions', () => {
         test('shows helpful suggestions for misspelled column names', async ({ page }) => {
-            await page.goto('https://datatables.net/examples/data_sources/dom');
+            await page.goto(SITES.datatablesDom);
 
             const table = await useTable(page.locator('#example')).init();
             const row = table.getRow({ Name: 'Airi Satou' });
@@ -93,7 +94,7 @@ test.describe('Error Handling and Validation', () => {
         });
 
         test('shows suggestions for case mismatch', async ({ page }) => {
-            await page.goto('https://datatables.net/examples/data_sources/dom');
+            await page.goto(SITES.datatablesDom);
 
             const table = await useTable(page.locator('#example')).init();
             const row = table.getRow({ Name: 'Airi Satou' });
@@ -109,7 +110,7 @@ test.describe('Error Handling and Validation', () => {
         });
 
         test('shows helpful suggestions for invalid filter columns in findRow', async ({ page }) => {
-            await page.goto('https://datatables.net/examples/data_sources/dom');
+            await page.goto(SITES.datatablesDom);
 
             const table = await useTable(page.locator('#example')).init();
 
