@@ -14,6 +14,8 @@
 
 ### Changed
 
+- **`smartFill` errors name the column (#476)** — when a `columnOverrides.write` or `strategies.fill` call throws, `smartFill` now rethrows `[SmartTable] smartFill: <columnOverrides.write | fill strategy> for "<column>" failed — <original message>`, with the original error as `cause`. Previously the raw error surfaced with no hint of which column failed. Matchers on the original message text still match.
+- **Tests for previously untested options (#476)** — MUI `buttonLabels` (Table and DataGrid), `Pagination.click` `detectCurrentPage` / `numberOfPages` / `pageNumbers` windowing / `goToLast` planning, the `LoadingStrategies` row and table helpers, the custom `strategies.fill` contract, `columnOverrides.write` without `read`, row-loading timeouts on a local table, `sorting.apply` when loading never settles, `findRowByIndex` via `viewport.scrollToRow`, and an async `headerTransformer` that reads its locator.
 - **fallow dead-code check in CI** — `fallow` is now a pinned dev dependency (`pnpm run fallow`). The lint job fails on unused files, exports, types, class members or dependencies, and posts fallow's duplication and complexity report to the job summary without blocking. The existing Claude Code commit hook now finds the local binary instead of silently skipping.
 - **Test suite cleanup (#475)** — removed tests that couldn't fail or repeated another test, merged near-duplicates, and renamed bug-numbered files to what they cover. `debug-mode` now runs against a local table instead of datatables.net, and the live HTMX spec is gone. Assertions that were only `toBeTruthy()` / `toBeDefined()` now check real values (`rowIndex` for first/middle/last rows, `dedupe` output, `stop()` boundaries, far-right `getCell` in RDG 2D).
 

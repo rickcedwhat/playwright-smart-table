@@ -116,4 +116,38 @@ test.describe('sorting.apply() — loading stabilization', () => {
     expect(doSortCallCount).toBe(1);
     expect(isLoadingCallCount).toBeGreaterThanOrEqual(3);
   });
+
+  for (const [label, isTableLoading] of [
+    ['stays true', async () => true],
+    ['never resolves', () => new Promise<boolean>(() => {})],
+  ] as const) {
+    test(`rejects within the sortStabilizationTimeout budget when isTableLoading ${label}`, async ({ page }) => {
+      await page.setContent(`
+        <table id="t">
+          <thead><tr><th>Name</th></tr></thead>
+          <tbody><tr><td>Alice</td></tr></tbody>
+        </table>
+      `);
+
+      let doSortCallCount = 0;
+      const table = await useTable(page.locator('#t'), {
+        strategies: {
+          sorting: {
+            doSort: async () => { doSortCallCount++; },
+            getSortState: async () => 'none',
+          },
+          loading: { isTableLoading, sortStabilizationTimeout: 200 },
+        },
+      }).init();
+
+      const start = Date.now();
+      await expect(table.sorting.apply('Name', 'asc')).rejects.toThrow(/after 3 attempts/);
+      const elapsed = Date.now() - start;
+
+      expect(doSortCallCount).toBe(3);
+      // 3 attempts × 200ms budget, plus slack for the getSortState reads.
+      expect(elapsed).toBeGreaterThanOrEqual(3 * 200 * 0.85);
+      expect(elapsed).toBeLessThan(3000);
+    });
+  }
 });

@@ -68,4 +68,53 @@ test.describe('columnOverrides > write', () => {
         const tagsVal = await page.locator('.tags-container').getAttribute('data-tags');
         expect(tagsVal).toBe('dev,lead');
     });
+
+    const SIMPLE = `
+        <table id="t">
+            <thead><tr><th>Name</th><th>Status</th></tr></thead>
+            <tbody><tr><td>Alice</td><td><span class="status">Active</span></td></tr></tbody>
+        </table>
+    `;
+
+    test('write without read receives currentValue undefined and the target cell', async ({ page }) => {
+        await page.setContent(SIMPLE);
+        const calls: { currentValue: unknown; targetValue: unknown; cellText: string }[] = [];
+
+        const table = useTable(page.locator('#t'), {
+            columnOverrides: {
+                Status: {
+                    write: async ({ cell, targetValue, currentValue }) => {
+                        calls.push({ currentValue, targetValue, cellText: await cell.innerText() });
+                        await cell.locator('.status').evaluate((el, v) => { el.textContent = v; }, String(targetValue));
+                    },
+                },
+            },
+        });
+
+        const row = await table.findRow({ Name: 'Alice' });
+        await row.smartFill({ Status: 'Inactive' });
+
+        expect(calls).toEqual([{ currentValue: undefined, targetValue: 'Inactive', cellText: 'Active' }]);
+        await expect(row.getCell('Status')).toHaveText('Inactive');
+    });
+
+    test('a throwing write is rethrown with the column name and the original error as cause', async ({ page }) => {
+        await page.setContent(SIMPLE);
+        const original = new Error('dropdown never opened');
+
+        const table = useTable(page.locator('#t'), {
+            columnOverrides: {
+                Status: { write: async () => { throw original; } },
+            },
+        });
+
+        const row = await table.findRow({ Name: 'Alice' });
+        const error = await row.smartFill({ Status: 'Inactive' }).catch((e: Error) => e);
+
+        expect(error).toBeInstanceOf(Error);
+        expect((error as Error).message).toBe(
+            '[SmartTable] smartFill: columnOverrides.write for "Status" failed — dropdown never opened',
+        );
+        expect((error as Error & { cause?: unknown }).cause).toBe(original);
+    });
 });
