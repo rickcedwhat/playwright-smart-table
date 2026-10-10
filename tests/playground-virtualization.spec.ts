@@ -31,6 +31,7 @@ test.describe('Playground: Virtualized Table', () => {
             const response = await page.request.get('http://localhost:3000/virtualized');
             if (!response.ok()) throw new Error('Local server not running');
         } catch (e) {
+            if (process.env.CI) throw e;
             test.skip(true, 'Skipping: Local playground server not running at localhost:3000');
         }
 
@@ -237,6 +238,7 @@ test.describe('Loading Strategy: row and cell timeout', () => {
             const response = await page.request.get('http://localhost:3000/virtualized');
             if (!response.ok()) throw new Error('Local server not running');
         } catch (e) {
+            if (process.env.CI) throw e;
             test.skip(true, 'Skipping: Local playground server not running at localhost:3000');
         }
 

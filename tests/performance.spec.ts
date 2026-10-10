@@ -25,6 +25,7 @@ test.describe('Performance Benchmark', () => {
             const response = await page.request.get('http://localhost:3000/virtualized');
             if (!response.ok()) throw new Error('Local server not running');
         } catch (e) {
+            if (process.env.CI) throw e;
             test.skip(true, 'Skipping: Local playground server not running at localhost:3000');
         }
 
