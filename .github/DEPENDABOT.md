@@ -15,6 +15,10 @@ Use a **branch ruleset** on `main` (or the default branch):
 
 **Note:** On **classic branch protection**, “allow specified actors to bypass required pull requests” exists only for repositories **owned by an organization** ([docs](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-protected-branches/managing-a-branch-protection-rule)). Personal repos should use **rulesets** with Dependabot bypass as above.
 
+## Release age (cooldown)
+
+`dependabot.yml` sets `cooldown.default-days: 7`, so Dependabot only proposes versions that have been published for at least 7 days. `dependabot-age-check.yml` still enforces the same rule as a required check and stays as a backstop; with cooldown in place it should pass on open.
+
 ## Labels
 
 `dependabot.yml` adds `auto-approve` for visibility only; merging depends on your ruleset + this workflow.
