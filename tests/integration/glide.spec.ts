@@ -1,8 +1,9 @@
 import { test, expect, Locator, Page } from '@playwright/test';
 import { useTable, presets } from '../../src/index';
 import type { TableConfig, TableContext } from '../../src/types';
+import { SITES } from '../support/sites';
 
-test.describe('Live Glide Data Grid', () => {
+test.describe('Glide Data Grid (Add data story)', () => {
     test.setTimeout(60000); // Increase timeout for CI
 
     // Shared Strategies & Configuration
@@ -13,7 +14,7 @@ test.describe('Live Glide Data Grid', () => {
 
     test('should scan headers and write to multiple columns', async ({ page }) => {
         // 1. Setup
-        await page.goto('https://glideapps.github.io/glide-data-grid/iframe.html?viewMode=story&id=glide-data-grid-dataeditor-demos--add-data&globals=');
+        await page.goto(SITES.glideAddData);
         // Stabilize: Wait for grid to be attached
         const grid = page.locator('table[role="grid"]').first();
         await expect(grid).toBeAttached({ timeout: 15000 });
@@ -54,7 +55,7 @@ test.describe('Live Glide Data Grid', () => {
     });
 
     test('infinite scroll collects rows past the first page and reads a far-right column', async ({ page }) => {
-        await page.goto('https://glideapps.github.io/glide-data-grid/iframe.html?viewMode=story&id=glide-data-grid-dataeditor-demos--add-data&globals=');
+        await page.goto(SITES.glideAddData);
         const grid = page.locator('table[role="grid"]').first();
         await expect(grid).toBeAttached({ timeout: 15000 });
 
