@@ -87,7 +87,7 @@ const baseTableConfig = {
     cellSelector: '[role="cell"]',
 };
 
-test.describe('Bug #355 — row loading wait must run before dedupe (deterministic)', () => {
+test.describe('row loading wait runs before dedupe (deterministic)', () => {
     test('Bug #355 — dedupe key is computed after load, so a re-scanned row is deduped', async ({ page }) => {
         // Rows are skeletons at first scan, load 400ms later. A one-shot goNext forces a
         // re-scan of the same (now text-changed) elements.
@@ -151,7 +151,7 @@ test.describe('Bug #355 — row loading wait must run before dedupe (determinist
     });
 });
 
-test.describe('Bug #355 — map() loading semantics on the virtualized playground', () => {
+test.describe('map() loading semantics on the virtualized playground', () => {
     test.beforeEach(async ({ page }) => {
         try {
             const response = await page.request.get('http://localhost:3000/virtualized');

@@ -24,7 +24,7 @@ test.describe('AriaSort Strategy', () => {
     await expect(table.sorting.getState('Age')).resolves.toBe('none');
   });
 
-  test('should apply ascending sort and update aria-sort attribute', async ({ page }) => {
+  test('apply asc sets the state, aria-sort and row order (alphabetical)', async ({ page }) => {
     const table = useTable(page.locator('#sortable-table'), {
       strategies: {
         sorting: Strategies.Sorting.AriaSort(),
@@ -36,40 +36,11 @@ test.describe('AriaSort Strategy', () => {
 
     await expect(table.sorting.getState('Name')).resolves.toBe('asc');
     await expect(page.locator('#name-header')).toHaveAttribute('aria-sort', 'ascending');
-  });
-
-  test('should apply descending sort and update aria-sort attribute', async ({ page }) => {
-    const table = useTable(page.locator('#sortable-table'), {
-      strategies: {
-        sorting: Strategies.Sorting.AriaSort(),
-      },
-    });
-    await table.init();
-
-    // It takes two clicks to get to descending for this implementation
-    await table.sorting.apply('Age', 'asc');
-    await table.sorting.apply('Age', 'desc');
-
-    await expect(table.sorting.getState('Age')).resolves.toBe('desc');
-    await expect(page.locator('#age-header')).toHaveAttribute('aria-sort', 'descending');
-  });
-
-  test('should verify row data is correctly sorted alphabetically', async ({ page }) => {
-    const table = useTable(page.locator('#sortable-table'), {
-      strategies: {
-        sorting: Strategies.Sorting.AriaSort(),
-      },
-    });
-    await table.init();
-
-    await table.sorting.apply('Name', 'asc');
-
-    // After sorting by name asc, the order should be Alice, Bob, Charlie
     const names = await table.map(({ row }) => row.getCell('Name').innerText());
     expect(names).toEqual(['Alice', 'Bob', 'Charlie']);
   });
 
-  test('should verify row data is correctly sorted numerically', async ({ page }) => {
+  test('apply desc sets the state, aria-sort and row order (numeric)', async ({ page }) => {
     const table = useTable(page.locator('#sortable-table'), {
       strategies: {
         sorting: Strategies.Sorting.AriaSort(),
@@ -79,7 +50,8 @@ test.describe('AriaSort Strategy', () => {
 
     await table.sorting.apply('Age', 'desc');
 
-    // After sorting by age desc, the order should be 35, 30, 25
+    await expect(table.sorting.getState('Age')).resolves.toBe('desc');
+    await expect(page.locator('#age-header')).toHaveAttribute('aria-sort', 'descending');
     const ages = await table.map(({ row }) => row.getCell('Age').innerText());
     expect(ages).toEqual(['35', '30', '25']);
   });

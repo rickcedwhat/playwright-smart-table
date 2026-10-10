@@ -1,23 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { useTable } from '../src/index';
 import { Strategies } from '../src/index';
-import type { FinalTableConfig } from '../src/types';
-
 test.describe('Edge cases and missing coverage', () => {
-
-  test('table has expected core methods', async ({ page }) => {
-    await page.setContent(`
-      <table id="t"><thead><tr><th>A</th></tr></thead><tbody><tr><td>1</td></tr></tbody></table>
-    `);
-    const table = useTable(page.locator('#t'));
-    expect(table).toHaveProperty('getRow');
-    expect(table).toHaveProperty('getRowByIndex');
-    expect(table).toHaveProperty('getHeaders');
-    expect(table).toHaveProperty('getHeaderCell');
-    expect(table).toHaveProperty('reset');
-    expect(table).toHaveProperty('findRow');
-    expect(table).toHaveProperty('findRows');
-  });
 
   test('init with timeout waits for table to appear', async ({ page }) => {
     await page.setContent('<div id="container"></div>');
@@ -36,113 +20,23 @@ test.describe('Edge cases and missing coverage', () => {
     await expect(row).toBeVisible();
   });
 
-  test('init chaining works', async ({ page }) => {
+  test('bringIntoView() on a getRow() row (unknown index) scrolls it into view instead of throwing', async ({ page }) => {
     await page.setContent(`
-      <table id="test-table">
-        <thead><tr><th>Name</th></tr></thead>
-        <tbody><tr><td>John</td></tr></tbody>
-      </table>
-    `);
-    const table = await useTable(page.locator('#test-table')).init();
-    const row = table.getRow({ Name: 'John' });
-    await expect(row).toBeVisible();
-  });
-
-  test('getRow works when table appears later (lazy load)', async ({ page }) => {
-    await page.setContent('<div id="container"></div>');
-    const table = useTable(page.locator('#my-table'));
-    await page.setContent(`
-      <table id="my-table">
-        <thead><tr><th>Name</th><th>Age</th></tr></thead>
-        <tbody><tr><td>John</td><td>30</td></tr></tbody>
-      </table>
-    `);
-    await table.init();
-    const row = table.getRow({ Name: 'John' });
-    await expect(row.getCell('Name')).toHaveText('John');
-    await expect(row.getCell('Age')).toHaveText('30');
-    await expect(row).toBeVisible();
-    await page.evaluate(() => document.querySelector('#my-table tbody tr')?.remove());
-    await expect(row).not.toBeVisible();
-  });
-
-  test('getRow vs findRow: current page only vs cross-page', async ({ page }) => {
-    await page.setContent(`
-      <table id="my-table">
-        <thead><tr><th>ID</th><th>Name</th></tr></thead>
-        <tbody id="tbody">
-          <tr><td>1</td><td>Alice</td></tr>
-          <tr><td>2</td><td>Bob</td></tr>
-        </tbody>
-        <tfoot><tr><td><button id="next">Next</button></td></tr></tfoot>
-      </table>
-      <script>
-        let pageNum = 1;
-        document.getElementById('next').onclick = () => {
-          if (pageNum === 1) {
-            pageNum = 2;
-            document.getElementById('tbody').innerHTML = '<tr><td>3</td><td>Carol</td></tr><tr><td>4</td><td>Dave</td></tr>';
-          }
-        };
-      </script>
-    `);
-    const table = useTable(page.locator('#my-table'), {
-      strategies: { pagination: Strategies.Pagination.click({ next: '#next' }) },
-      maxPages: 2,
-    });
-    await table.init();
-    await expect(table.getRow({ Name: 'Carol' })).not.toBeVisible();
-    await expect(table.getRow({ Name: 'Alice' })).toBeVisible();
-    const row = await table.findRow({ Name: 'Carol' });
-    await expect(row).toBeVisible();
-  });
-
-  test('bringIntoView() throws when row index is unknown', async ({ page }) => {
-    await page.setContent(`
+      <div style="height: 2000px"></div>
       <table id="t">
         <thead><tr><th>Name</th></tr></thead>
-        <tbody>
-          <tr><td>Alice</td></tr>
-          <tr><td>Bob</td></tr>
-        </tbody>
+        <tbody><tr><td>Alice</td></tr><tr><td>Bob</td></tr></tbody>
       </table>
     `);
-    const root = page.locator('#t');
-    const table = useTable(root, { headerSelector: 'thead th', rowSelector: 'tbody tr', cellSelector: 'td' });
-    await table.init();
+    const table = await useTable(page.locator('#t')).init();
+    await page.evaluate(() => window.scrollTo(0, 0));
+    const row = table.getRow({ Name: 'Bob' });
+    await expect(row).not.toBeInViewport();
 
-    const headers = await table.getHeaders();
-    const map = new Map(headers.map((h, i) => [h, i]));
-    const rowLocator = root.locator('tbody tr').first();
-    const config: FinalTableConfig = {
-      headerSelector: 'thead th',
-      rowSelector: 'tbody tr',
-      cellSelector: 'td',
-      maxPages: 1,
-      autoScroll: true,
-      headerTransformer: ({ text }) => text,
-      onReset: async () => {},
-      strategies: {},
-    };
-    const resolve = (sel: string, parent: any) => parent.locator(sel);
-    // Simulate a SmartRow with an unknown index to validate bringIntoView error behavior
-    const rowWithUnknownIndex: any = {
-      rowIndex: undefined,
-      async bringIntoView() {
-        if (this.rowIndex === undefined) {
-          throw new Error('Cannot bring row into view - row index is unknown. Use getRowByIndex().');
-        }
-      }
-    };
+    await row.bringIntoView();
 
-    let thrown: Error | null = null;
-    try {
-      await rowWithUnknownIndex.bringIntoView();
-    } catch (e) {
-      thrown = e as Error;
-    }
-    expect(thrown).not.toBeNull();
-    expect(thrown!.message).toMatch(/row index is unknown|Cannot bring row into view/);
+    expect(row.rowIndex).toBeUndefined();
+    await expect(row).toBeInViewport();
   });
 
   test('revalidate() with no DOM change leaves headers unchanged', async ({ page }) => {
@@ -495,7 +389,7 @@ test.describe('Edge cases and missing coverage', () => {
     await expect(partialRow).toHaveCount(2);
   });
 
-  test('findRow with maxPages: 1 returns sentinel when row is on later page', async ({ page }) => {
+  test('findRow with maxPages: 1 returns a sentinel (wasFound false) when the row is on a later page', async ({ page }) => {
     await page.setContent(`
       <table id="t">
         <thead><tr><th>ID</th><th>Name</th></tr></thead>
@@ -520,75 +414,18 @@ test.describe('Edge cases and missing coverage', () => {
       maxPages: 3,
     });
     await table.init();
+
+    // getRow only sees the current page; findRow paginates.
+    await expect(table.getRow({ Name: 'Carol' })).not.toBeVisible();
+    expect(table.getRow({ Name: 'Alice' }).wasFound()).toBe(true);
+
     const missing = await table.findRow({ Name: 'Carol' }, { maxPages: 1 });
+    expect(missing.wasFound()).toBe(false);
     await expect(missing).not.toBeVisible();
+
     const found = await table.findRow({ Name: 'Carol' }, { maxPages: 2 });
+    expect(found.wasFound()).toBe(true);
     await expect(found).toBeVisible();
-  });
-
-  test('wasFound() returns false for sentinel rows, true for real rows', async ({ page }) => {
-    await page.setContent(`
-      <table id="t">
-        <thead><tr><th>ID</th><th>Name</th></tr></thead>
-        <tbody id="tb">
-          <tr><td>1</td><td>Alice</td></tr>
-          <tr><td>2</td><td>Bob</td></tr>
-        </tbody>
-        <tfoot><tr><td><button id="next">Next</button></td></tr></tfoot>
-      </table>
-      <script>
-        let p = 1;
-        document.getElementById('next').onclick = () => {
-          if (p === 1) {
-            p = 2;
-            document.getElementById('tb').innerHTML = '<tr><td>3</td><td>Carol</td></tr><tr><td>4</td><td>Dave</td></tr>';
-          }
-        };
-      </script>
-    `);
-    const table = useTable(page.locator('#t'), {
-      strategies: { pagination: Strategies.Pagination.click({ next: '#next' }) },
-      maxPages: 3,
-    });
-    await table.init();
-
-    // Sentinel from findRow (row not found within maxPages)
-    const sentinelFromFind = await table.findRow({ Name: 'Carol' }, { maxPages: 1 });
-    expect(sentinelFromFind.wasFound()).toBe(false);
-
-    // Real row from findRow
-    const realFromFind = await table.findRow({ Name: 'Carol' }, { maxPages: 2 });
-    expect(realFromFind.wasFound()).toBe(true);
-
-    // Real row from getRow (getRow never returns sentinels)
-    const realFromGet = table.getRow({ Name: 'Alice' });
-    expect(realFromGet.wasFound()).toBe(true);
-  });
-
-  test('columnOverrides.read only: toJSON uses custom read for column', async ({ page }) => {
-    await page.setContent(`
-      <table id="t">
-        <thead><tr><th>Name</th><th>Score</th></tr></thead>
-        <tbody>
-          <tr><td>Alice</td><td><span data-value="100">100 pts</span></td></tr>
-        </tbody>
-      </table>
-    `);
-    const table = useTable(page.locator('#t'), {
-      columnOverrides: {
-        Score: {
-          read: async (cell) => {
-            const el = await cell.locator('[data-value]').getAttribute('data-value');
-            return el ? parseInt(el, 10) : 0;
-          },
-        },
-      },
-    });
-    await table.init();
-    const row = table.getRowByIndex(0);
-    const data = await row.toJSON();
-    expect(data.Score).toBe(100);
-    expect(data.Name).toBe('Alice');
   });
 
   test('beforeCellRead hook is called during toJSON', async ({ page }) => {

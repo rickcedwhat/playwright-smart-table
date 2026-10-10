@@ -43,37 +43,30 @@ test.describe('Error Handling and Validation', () => {
             await expect(table.init()).rejects.toThrow(/Initialization Error: Duplicate column names found: "Name"/);
         });
 
-        test('headerTransformer can fix duplicate errors', async ({ page }) => {
+        test('headerTransformer can fix duplicate errors using seenHeaders', async ({ page }) => {
             await page.setContent(`
                 <table id="fix-dup-table">
                     <thead>
-                        <tr>
-                            <th>Name</th>
-                            <th>Email</th>
-                            <th>Name</th> <!-- Duplicate -->
-                        </tr>
+                        <tr><th>Name</th><th>Email</th><th>Name</th><th>Role</th><th>Name</th></tr>
                     </thead>
-                    <tbody></tbody>
+                    <tbody>
+                        <tr><td>John</td><td>john@example.com</td><td>Duplicate1</td><td>Admin</td><td>Duplicate2</td></tr>
+                    </tbody>
                 </table>
             `);
 
             const table = useTable(page.locator('#fix-dup-table'), {
-                headerSelector: 'thead th',
-                // Use transformer to rename the second "Name"
-                headerTransformer: ({ text, index }) => {
-                    if (text === 'Name' && index === 2) {
-                        return 'Name (Secondary)';
-                    }
-                    return text;
+                headerTransformer: ({ text, seenHeaders }) => {
+                    if (!seenHeaders.has(text)) return text;
+                    let suffix = 1;
+                    while (seenHeaders.has(`${text} (${suffix})`)) suffix++;
+                    return `${text} (${suffix})`;
                 }
             });
+            await table.init();
 
-            // Should NOT throw because we fixed the duplicate
-            await expect(table.init()).resolves.not.toThrow();
-
-            const headers = await table.getHeaders();
-            expect(headers).toContain('Name');
-            expect(headers).toContain('Name (Secondary)');
+            expect(await table.getHeaders()).toEqual(['Name', 'Email', 'Name (1)', 'Role', 'Name (2)']);
+            await expect(table.getRow({ Name: 'John' }).getCell('Name (2)')).toHaveText('Duplicate2');
         });
     });
 

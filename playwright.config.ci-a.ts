@@ -15,7 +15,6 @@ export default defineConfig({
     '**/integration/mui-table.spec.ts',
     '**/integration/mui-datagrid-live*.spec.ts',
     // #432 — demote flake-prone / optional slow suites from CI A
-    '**/strategies.spec.ts', // live third-party HTMX
     '**/performance.spec.ts', // optional 10k iterate
   ],
   fullyParallel: true,

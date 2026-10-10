@@ -73,7 +73,7 @@ test.describe('React Data Grid 2D (rdg2D preset)', () => {
         expect(uniqueIds.size).toBe(dataRows.length);
     });
 
-    test('getCell works for columns at different horizontal positions', async ({ page }) => {
+    test('getCell resolves a column beyond the initial viewport to the right cell', async ({ page }) => {
         await page.goto(RDG_URL, { waitUntil: 'domcontentloaded' });
 
         const grid = page.locator('[role="grid"]').first();
@@ -82,12 +82,13 @@ test.describe('React Data Grid 2D (rdg2D preset)', () => {
         const table = useTable(grid, { ...presets.rdg2D });
         await table.init();
 
-        const rows = await table.findRows({}, { maxPages: 1 });
-        expect(rows.length).toBeGreaterThan(0);
+        const [row] = await table.findRows({}, { maxPages: 1 });
+        const expected = await row.toJSON({ columns: ['Department'] });
 
-        const data = await rows[0].toJSON({ columns: ['ID', 'Task', 'Completion'] });
-        expect(data).toHaveProperty('ID');
-        expect(data).toHaveProperty('Task');
-        expect(data).toHaveProperty('Completion');
+        const cell = row.getCell('Department');
+        await cell.bringIntoView();
+
+        await expect(cell).toHaveAttribute('aria-colindex', '16');
+        await expect(cell).toHaveText(expected.Department);
     });
 });

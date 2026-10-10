@@ -30,11 +30,18 @@ test.describe('rowIndex resolution — characterization (#362)', () => {
         expect(carol.rowIndex).toBe(102); // strategy value, not DOM position (2)
     });
 
-    test('findRow falls back to DOM position without a strategy', async ({ page }) => {
+    test('findRow falls back to DOM position without a strategy (first, middle, last)', async ({ page }) => {
         await page.setContent(HTML);
         const table = await useTable(page.locator('#t')).init();
-        const carol = await table.findRow({ Name: 'Carol' });
-        expect(carol.rowIndex).toBe(2);
+        expect((await table.findRow({ Name: 'Alice' })).rowIndex).toBe(0);
+        expect((await table.findRow({ Name: 'Bob' })).rowIndex).toBe(1);
+        expect((await table.findRow({ Name: 'Carol' })).rowIndex).toBe(2);
+    });
+
+    test('getRow leaves rowIndex undefined (the sync path cannot compute it)', async ({ page }) => {
+        await page.setContent(HTML);
+        const table = await useTable(page.locator('#t'), { strategies: { resolveRowIndex } }).init();
+        expect(table.getRow({ Name: 'Carol' }).rowIndex).toBeUndefined();
     });
 
     test('findRows uses the resolveRowIndex strategy per row', async ({ page }) => {

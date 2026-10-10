@@ -16,7 +16,7 @@ function makeMockContext(overrides: Partial<TableContext> = {}): TableContext {
   };
 }
 
-describe('StabilizationStrategies.contentChanged (#432)', () => {
+describe('StabilizationStrategies.contentChanged', () => {
   it('returns true when row text changes after action', async () => {
     const firstRow = {
       innerText: vi.fn()
@@ -56,7 +56,7 @@ describe('StabilizationStrategies.contentChanged (#432)', () => {
   });
 });
 
-describe('StabilizationStrategies.rowCountIncreased (#432)', () => {
+describe('StabilizationStrategies.rowCountIncreased', () => {
   it('returns true when count rises', async () => {
     const rows = {
       count: vi.fn().mockResolvedValueOnce(2).mockResolvedValueOnce(5),
@@ -83,7 +83,7 @@ describe('StabilizationStrategies.rowCountIncreased (#432)', () => {
   });
 });
 
-describe('ContentReadyStrategies (#432)', () => {
+describe('ContentReadyStrategies', () => {
   it('textStable resolves when consecutive reads match', async () => {
     const row = {
       innerText: vi.fn()
@@ -106,7 +106,7 @@ describe('ContentReadyStrategies (#432)', () => {
   });
 });
 
-describe('PaginationStrategies.click edge cases (#432)', () => {
+describe('PaginationStrategies.click edge cases', () => {
   it('goNext returns false when next button is disabled', async () => {
     const btn = {
       first: vi.fn().mockReturnThis(),

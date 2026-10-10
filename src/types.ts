@@ -1026,7 +1026,7 @@ export interface TableResult<T = any> extends AsyncIterable<{ row: SmartRow<T>; 
    * Defaults to `concurrency: 'sequential'` (safe for clicks/fills). Pass
    * `concurrency: 'parallel'` for read-only extraction, or `'synchronized'` when
    * navigation must stay lock-step on virtualized grids.
-   * Call `stop()` to halt after the current page finishes.
+   * Call `stop()` to end early: the result includes the row that called it and nothing after it.
    *
    * @param callback - Function receiving { row, rowIndex, stop }
    * @param options - maxPages, concurrency, dedupe, useBulkPagination

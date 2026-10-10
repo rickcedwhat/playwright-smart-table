@@ -29,7 +29,7 @@ vi.mock('../../src/utils/elementTracker', () => {
 
 import { runMap } from '../../src/engine/tableIteration';
 
-describe('gbu #434 safer defaults', () => {
+describe('safer defaults', () => {
   describe('waitWhileTableLoading', () => {
     beforeEach(() => vi.useFakeTimers());
     afterEach(() => {
@@ -211,8 +211,9 @@ describe('gbu #434 safer defaults', () => {
       expect(getSortState).not.toHaveBeenCalled();
     });
 
-    it('muiDataGrid.doSort clicks once', async () => {
+    it('muiDataGrid.doSort clicks once with no fixed 500ms wait', async () => {
       const click = vi.fn().mockImplementation(async () => {});
+      const waitForTimeout = vi.fn().mockResolvedValue(undefined);
       const clickTarget = {
         isVisible: vi.fn().mockResolvedValue(true),
         click,
@@ -229,7 +230,7 @@ describe('gbu #434 safer defaults', () => {
         first: vi.fn().mockReturnThis(),
       };
       const context = {
-        page: { waitForTimeout: vi.fn().mockResolvedValue(undefined) },
+        page: { waitForTimeout },
         root: { locator: vi.fn().mockReturnValue(stubLocator) },
         getHeaderCell: vi.fn().mockResolvedValue(header),
         config: { strategies: { sorting: { getSortState: vi.fn() }, loading: {} } },
@@ -239,6 +240,7 @@ describe('gbu #434 safer defaults', () => {
       await doSort({ columnName: 'Desk', direction: 'desc', context });
 
       expect(click).toHaveBeenCalledTimes(1);
+      expect(waitForTimeout.mock.calls.filter(([ms]) => ms === 500)).toHaveLength(0);
     });
   });
 });

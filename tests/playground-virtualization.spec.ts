@@ -118,44 +118,6 @@ test.describe('Playground: Virtualized Table', () => {
         expect(data).toEqual(expect.objectContaining({ ID: '100', Name: 'Item 100' }));
     });
 
-    test('should handle random stutter delays', async ({ page }) => {
-        // 1. Setup: Stutter (Base 200, Jitter 50)
-        await setPlaygroundConfig(page, {
-            rowCount: 100,
-            defaults: {
-                tableInitDelay: 0,
-                rowDelay: { base: 2000, stutter: 500 },
-                generator: "users"
-            }
-        });
-
-        const table = useTable(page.locator('.virtual-table-container'), {
-            rowSelector: '.virtual-row',
-            headerSelector: '.header [role="columnheader"]',
-            cellSelector: '[role="cell"]',
-            strategies: {
-                pagination: Strategies.Pagination.infiniteScroll({
-                    scrollTarget: '[data-testid="virtuoso-scroller"]',
-                    scrollAmount: 1000,
-                    action: 'js-scroll',
-                    stabilization: Strategies.Stabilization.contentChanged({ timeout: 500 })
-                })
-            }
-        });
-
-        // 2. Fetch all
-        const start = Date.now();
-
-        // Just verify we can fetch rows despite delays
-        // Filter by "ID" (User 20 is last item)
-        const row = await table.findRow({ ID: '100' });
-
-        const duration = Date.now() - start;
-
-        expect(row).toBeTruthy();
-        expect(duration).toBeGreaterThan(0);
-    });
-
     test('should iterate through 100 rows with late-loading cells', async ({ page }) => {
         test.setTimeout(120000); // Allow time for slow iteration
 

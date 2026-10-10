@@ -5,7 +5,7 @@ import { muiDataGrid } from '../../src/presets/mui';
 
 const fnSelector = (root: any) => root.locator('.row');
 
-describe('gbu #457 selector types', () => {
+describe('selector types', () => {
   let warn: ReturnType<typeof vi.spyOn>;
   beforeEach(() => {
     warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
