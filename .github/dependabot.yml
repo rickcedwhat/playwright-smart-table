@@ -7,6 +7,10 @@ updates:
       interval: "weekly"
       day: "monday"
       time: "08:00"
+    # Only propose versions published ≥ 7 days ago. Without this, every rebase of the
+    # grouped PR picked up a fresh release and restarted the age-check soak (#490 → #495 → #501).
+    cooldown:
+      default-days: 7
     # Room for the minor/patch group plus individual major-bump PRs.
     open-pull-requests-limit: 5
     labels:
@@ -40,6 +44,8 @@ updates:
       interval: "weekly"
       day: "thursday"
       time: "08:00"
+    cooldown:
+      default-days: 7
     open-pull-requests-limit: 5
     labels:
       - "dependencies"
