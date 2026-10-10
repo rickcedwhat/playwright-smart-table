@@ -23,7 +23,11 @@ export const describeRowByFilters = (filters: Record<string, FilterValue>): stri
     return formatted ? `SmartRow where ${formatted}` : 'SmartRow';
 };
 
-export const describeRowByIndex = (rowIndex: number): string => `SmartRow #${rowIndex}`;
+/** `SmartRow #3`, or `SmartRow #3 where Dept="Eng"` when the row came from a filtered search. */
+export const describeRowByIndex = (rowIndex: number, filters: Record<string, FilterValue> = {}): string => {
+    const formatted = formatFilters(filters);
+    return formatted ? `SmartRow #${rowIndex} where ${formatted}` : `SmartRow #${rowIndex}`;
+};
 
 export const describeSentinelRow = (filters: Record<string, FilterValue>): string => {
     const formatted = formatFilters(filters);

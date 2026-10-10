@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import type { Locator } from '@playwright/test';
-import { describeLocator, describeRowByFilters, describeSentinelRow, formatFilters, getLocatorDescription } from '../../src/utils/locatorDescription';
+import { describeLocator, describeRowByFilters, describeRowByIndex, describeSentinelRow, formatFilters, getLocatorDescription } from '../../src/utils/locatorDescription';
 
 describe('locatorDescription (#485)', () => {
   it('formats strings, numbers, regexes and locator filters readably', () => {
@@ -18,6 +18,11 @@ describe('locatorDescription (#485)', () => {
   it('names rows with no filters plainly', () => {
     expect(describeRowByFilters({})).toBe('SmartRow');
     expect(describeSentinelRow({})).toBe('SmartRow not found');
+    expect(describeRowByIndex(3)).toBe('SmartRow #3');
+  });
+
+  it('combines index and filters for rows from a filtered search', () => {
+    expect(describeRowByIndex(3, { Dept: 'Eng', Level: /senior/i })).toBe('SmartRow #3 where Dept="Eng", Level=/senior/i');
   });
 
   it('returns the same locator when describe() is unavailable (Playwright < 1.53)', () => {

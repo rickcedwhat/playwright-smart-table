@@ -4,7 +4,7 @@
 
 ### Added
 
-- **Readable row and cell names in traces and errors (#485)** — rows and cells are now named with Playwright's `locator.describe()`, so the trace viewer, HTML report and failed assertions show `SmartRow where Name="Bob" › "Age" cell` instead of the raw selector chain. `getRow` / `findRow` rows are named by their filters, index-based rows (`getRowByIndex`, `findRowByIndex`, `map` / `forEach` / `findRows`) by index (`SmartRow #2`), and `findRow` misses by what was searched (`SmartRow not found: Name="Zed"`). The name survives `resolveRowIndex` self-healing. It needs `@playwright/test` 1.53+; older versions get the locator unchanged, plus a one-time note when `debug` logging is on.
+- **Readable row and cell names in traces and errors (#485)** — rows and cells are now named with Playwright's `locator.describe()`, so the trace viewer, HTML report and failed assertions show `SmartRow where Name="Bob" › "Age" cell` instead of the raw selector chain. `getRow` / `findRow` rows are named by their filters, index-based rows (`getRowByIndex`, `findRowByIndex`, `map` / `forEach`) by index (`SmartRow #2`), `findRows` rows by both (`SmartRow #2 where Status="Active"`), and `findRow` misses by what was searched (`SmartRow not found: Name="Zed"`). The name survives `resolveRowIndex` self-healing. It needs `@playwright/test` 1.53+; older versions get the locator unchanged, plus a one-time note when `debug` logging is on.
 
 ### Fixed
 

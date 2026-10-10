@@ -10,7 +10,7 @@ import { NavigationBarrier } from '../utils/navigationBarrier';
 import { resolveLogicalRowIndex, resolveRowLoading } from './rowResolution';
 import { resolveCellLocator } from '../utils/resolveCellLocator';
 import { scanPages } from './scanPages';
-import { describeLocator, describeRowByFilters, describeSentinelRow } from '../utils/locatorDescription';
+import { describeLocator, describeRowByFilters, describeRowByIndex, describeSentinelRow } from '../utils/locatorDescription';
 import { waitWhileTableLoading } from '../utils/loadingWait';
 
 export class RowFinder<T = any> {
@@ -173,6 +173,12 @@ export class RowFinder<T = any> {
         );
     }
 
+    /** Unfiltered rows keep the plain `SmartRow #n` name that `_makeSmart` applies. */
+    private nameFilteredRow(row: Locator, resolved: { index: number } | undefined, filters: Record<string, FilterValue>): Locator {
+        if (!resolved || Object.keys(filters).length === 0) return row;
+        return describeLocator(row, describeRowByIndex(resolved.index, filters), this.config);
+    }
+
     public async findRows(
         filters: Record<string, FilterValue> = {},
         options?: { exact?: boolean, maxPages?: number, useBulkPagination?: boolean }
@@ -226,7 +232,8 @@ export class RowFinder<T = any> {
                             this.config,
                             () => allRows.length,
                         );
-                        const smartRow = this.makeSmartRow(currentRows[idx], map, resolved?.index, this.tableState.currentPageIndex, barrier, resolved?.selector);
+                        const rowLocator = this.nameFilteredRow(currentRows[idx], resolved, filtersRecord);
+                        const smartRow = this.makeSmartRow(rowLocator, map, resolved?.index, this.tableState.currentPageIndex, barrier, resolved?.selector);
 
                         const loadingOutcome = await resolveRowLoading(
                             smartRow,

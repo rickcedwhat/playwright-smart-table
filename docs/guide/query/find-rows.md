@@ -44,7 +44,7 @@ Needs a [`resolveRowIndex`](/guide/describe/virtualization#which-row-is-which) s
 
 ## Readable names in traces and errors
 
-Rows and cells come back with a name, so the trace viewer, HTML report and failed assertions show `SmartRow where Name="Bob" › "Age" cell` instead of a long selector chain. Rows found by position show up as `SmartRow #2`, and a `findRow` that comes up empty shows `SmartRow not found: Name="Zed"`.
+Rows and cells come back with a name, so the trace viewer, HTML report and failed assertions show `SmartRow where Name="Bob" › "Age" cell` instead of a long selector chain. Rows found by position show up as `SmartRow #2`, `findRows` results include their filters too (`SmartRow #2 where Status="Active"`), and a `findRow` that comes up empty shows `SmartRow not found: Name="Zed"`.
 
 You don't need to do anything to get this. It uses Playwright's `locator.describe()`, so it needs `@playwright/test` 1.53 or newer. On older versions everything still works; you just see the raw selectors.
 

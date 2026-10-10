@@ -50,6 +50,21 @@ test.describe('locator descriptions (#485)', () => {
     expect(mapped).toEqual(['SmartRow #0', 'SmartRow #1', 'SmartRow #2']);
   });
 
+  test('findRows rows are named by index and filters', async ({ page }) => {
+    const table = await setupTable(page);
+
+    const active = await table.findRows({ Status: 'Active' }, { exact: true });
+    const all = await table.findRows();
+
+    expect(active.map(r => r.description())).toEqual([
+      'SmartRow #0 where Status="Active"',
+      'SmartRow #1 where Status="Active"',
+    ]);
+    expect(active[1].getCell('Name').description()).toBe('SmartRow #1 where Status="Active" › "Name" cell');
+    await expect(active[1].getCell('Name')).toHaveText('Carol');
+    expect(all.map(r => r.description())).toEqual(['SmartRow #0', 'SmartRow #1', 'SmartRow #2']);
+  });
+
   test('assertion failures show the description instead of the selector chain', async ({ page }) => {
     const table = await setupTable(page);
     const cell = table.getRow({ Name: 'Alice' }).getCell('Age');
