@@ -975,6 +975,8 @@ export interface TableResult<T = any> extends AsyncIterable<{ row: SmartRow<T>; 
   /**
    * ASYNC: Searches for all matching rows across pages using pagination.
    * Auto-initializes the table if not already initialized.
+   * Returned rows can be read independently, including with `concurrency: 'synchronized'`.
+   * Use synchronized `map()` for coordinated column scrolling across virtualized rows.
    * @param filters - The filter criteria to match (omit or pass {} for all rows)
    * @param options - Search options (exact, maxPages). `useBulkPagination` defaults to `false`: pages advance one at a time via `goNext` so no intermediate page is skipped. Set it to `true` to opt into `goNextBulk` (faster, but skips the rows on jumped-over pages). `signal` cancels the page scan; the call rejects with `signal.reason`.
    */
