@@ -1,5 +1,5 @@
 import type { Locator, Page } from '@playwright/test';
-import { TableConfig, TableContext, Selector, TableResult, SmartRow as SmartRowType, FinalTableConfig, StrategyContext, TableStrategies as ITableStrategies, FilterValue } from './types';
+import { TableConfig, TableContext, Selector, TableResult, SmartRow as SmartRowType, FinalTableConfig, TableStrategies as ITableStrategies, FilterValue } from './types';
 import { MINIMAL_CONFIG_CONTEXT } from './minimalConfigContext';
 import { validatePaginationResult, validateSortingStrategy, validateFillStrategy } from './strategies/validation';
 
@@ -12,30 +12,16 @@ import { FilterEngine } from './filterEngine';
 import { TableMapper } from './engine/tableMapper';
 import { RowFinder } from './engine/rowFinder';
 import { runForEach, runMap, runFilter } from './engine/tableIteration';
-import { normalizeRowIndexResult } from './engine/rowResolution';
-import { scanPages } from './engine/scanPages';
+import { countRows } from './engine/countRows';
+import { applySort, getSortState, SortingEnv } from './engine/sorting';
+import { findRowByIndex } from './engine/rowByIndex';
+import { safeStringify } from './utils/safeStringify';
 import { debugDelay, logDebug, warnIfDebugInCI } from './utils/debugUtils';
 import { createSmartRowArray, SmartRowArray } from './utils/smartRowArray';
-import { ElementTracker } from './utils/elementTracker';
 import { NavigationBarrier } from './utils/navigationBarrier';
-import { waitWhileTableLoading } from './utils/loadingWait';
 import { SET_CURRENT_PAGE_INDEX } from './utils/pageIndex';
 import { internals } from './utils/smartRowInternals';
 import { describeLocator, describeRowByFilters, describeRowByIndex, getLocatorDescription } from './utils/locatorDescription';
-
-// Helper to safely serialize objects containing functions for logging
-const safeStringify = (obj: any) => {
-  try {
-    return JSON.stringify(obj, (_key: string, value: any) => {
-      if (typeof value === 'function') {
-        return '[Function]';
-      }
-      return value;
-    });
-  } catch (e) {
-    return '[unserializable]';
-  }
-};
 
 /**
  * Main hook to interact with a table.
@@ -255,6 +241,12 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     return didAdvance;
   };
 
+  const sortingEnv = (): SortingEnv<T> => ({
+    config,
+    getPage: () => rootLocator.page(),
+    getContext: () => ({ ...createStrategyContext(), getHeaderCell: result.getHeaderCell }),
+  });
+
   const result: TableResult<T> = {
     get currentPageIndex() { return tableState.currentPageIndex; },
     set currentPageIndex(v: number) {
@@ -352,120 +344,22 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     countRows: async (filters?: Record<string, FilterValue>, options?: { exact?: boolean; maxPages?: number }): Promise<number> => {
       if (tableState.empty) return 0;
       await _autoInit();
-      const filtersRecord = (filters ?? {}) as Record<string, FilterValue>;
-      const hasFilters = Object.keys(filtersRecord).length > 0;
-      const effectiveMaxPages = options?.maxPages ?? config.maxPages;
-      const pag = config.strategies.pagination;
-      const hasPagination = effectiveMaxPages > 1 && !!(pag?.goNext || pag?.goNextBulk);
-
-      const domFilters: Record<string, FilterValue> = {};
-      const overrideFilters: Record<string, FilterValue> = {};
-      const syntheticFilters: Record<string, FilterValue> = {};
-      if (hasFilters) {
-        for (const [key, value] of Object.entries(filtersRecord)) {
-          if (config.syntheticColumns?.[key]) {
-            syntheticFilters[key] = value;
-          } else if (config.columnOverrides?.[key as keyof T]?.read) {
-            overrideFilters[key] = value;
-          } else {
-            domFilters[key] = value;
-          }
-        }
-      }
-      const hasPostFilters = Object.keys(overrideFilters).length > 0 || Object.keys(syntheticFilters).length > 0;
-
-      const resolveRows = () => {
-        let rows = resolve(config.rowSelector, rootLocator);
-        if (Object.keys(domFilters).length > 0) {
-          const map = tableMapper.getMapSync();
-          if (!map) throw new Error('Initialization Error: Table map not available. Call "await table.init()" first.');
-          rows = filterEngine.applyFilters(rows, domFilters, map, options?.exact ?? false, rootLocator.page(), rootLocator);
-        }
-        return rows;
-      };
-
-      const countPostFilterMatches = async (candidates: import('@playwright/test').Locator[], indices: number[]): Promise<number> => {
-        if (!hasPostFilters) return indices.length;
-        const map = tableMapper.getMapSync();
-        if (!map) throw new Error('Initialization Error: Table map not available. Call "await table.init()" first.');
-        const exact = options?.exact ?? false;
-        const hasOverrides = Object.keys(overrideFilters).length > 0;
-        const hasSynthetics = Object.keys(syntheticFilters).length > 0;
-        let count = 0;
-        for (const idx of indices) {
-          const row = candidates[idx];
-          if (hasOverrides && !await rowFinder.matchesOverrideFilters(row, overrideFilters, map, exact)) continue;
-          if (hasSynthetics && !await rowFinder.matchesSyntheticFilters(row, syntheticFilters, map, exact)) continue;
-          count++;
-        }
-        return count;
-      };
-
-      // Wait for table to finish loading before counting
-      const isTableLoading = config.strategies.loading?.isTableLoading;
-      if (isTableLoading) {
-        const ctx = createStrategyContext();
-        await waitWhileTableLoading(config, ctx, rootLocator.page(), 'countRows');
-      }
-
-      if (!hasPagination) {
-        log(`countRows: counting rows in current viewport (no pagination)${hasFilters ? ` filters=${safeStringify(filtersRecord)}` : ''}`);
-        if (!hasPostFilters) return resolveRows().count();
-        const all = await resolveRows().all();
-        return countPostFilterMatches(all, all.map((_, i) => i));
-      }
-
-      log(`countRows: paginating up to ${effectiveMaxPages} page(s)${hasFilters ? ` filters=${safeStringify(filtersRecord)}` : ''}`);
-      const tracker = new ElementTracker('countRows');
-      let total = 0;
-      let pagesScanned = 1;
-      let paginationError: unknown;
-      try {
-        const scanned = await scanPages(
-          {
-            advancePage: _advancePage,
-            getCurrentPageIndex: () => tableState.currentPageIndex,
-            config,
-            waitForReady: async () => {
-              if (!isTableLoading) return;
-              const ctx = createStrategyContext();
-              await waitWhileTableLoading(config, ctx, rootLocator.page(), 'countRows');
-            },
-          },
-          async ({ pagesScanned: pageNum }) => {
-            const rowLocators = resolveRows();
-            const newIndices = await tracker.getUnseenIndices(rowLocators);
-            const candidates = await rowLocators.all();
-            const matched = await countPostFilterMatches(candidates, newIndices);
-            total += matched;
-            log(`countRows: page ${pageNum} — ${matched} row(s) (running total: ${total})`);
-            return 'continue';
-          },
-          {
-            maxPages: effectiveMaxPages,
-            useBulk: false,
-            label: 'countRows',
-            finalScanOnEof: true,
-          }
-        );
-        pagesScanned = scanned.pagesScanned;
-      } catch (e) {
-        paginationError = e;
-        throw e;
-      } finally {
-        await tracker.cleanup(rootLocator.page());
-        // Always restore page 1, even if pagination threw mid-count (#348), so the table
-        // stays usable for callers that catch the error. If reset() itself fails, only let
-        // it surface when pagination succeeded — otherwise preserve the original error.
-        log(`countRows: ${total} total row(s) across ${pagesScanned} page(s) — resetting`);
-        try {
-          await result.reset();
-        } catch (resetError) {
-          if (paginationError === undefined) throw resetError;
-          logDebug(config, 'error', 'countRows: reset() failed after pagination error', resetError);
-        }
-      }
-      return total;
+      return countRows(
+        {
+          config,
+          rootLocator,
+          getRowLocators: () => resolve(config.rowSelector, rootLocator),
+          tableMapper,
+          filterEngine,
+          rowFinder,
+          advancePage: _advancePage,
+          getCurrentPageIndex: () => tableState.currentPageIndex,
+          getContext: () => createStrategyContext(),
+          reset: () => result.reset(),
+        },
+        filters,
+        options
+      );
     },
 
     mapColumn: async <R = string>(columnName: string, options: import('./types').RowIterationOptions = {}): Promise<R[]> => {
@@ -569,69 +463,20 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     },
 
     findRowByIndex: async (index: number, options?: { maxPages?: number }): Promise<SmartRowType<T>> => {
-      log(`findRowByIndex: index=${index} options=${safeStringify(options)}`);
       await _autoInit();
-      const map = tableMapper.getMapSync()!;
-      const resolveRI = config.strategies.resolveRowIndex;
-      const viewport = config.strategies.viewport;
-
-      // Identifying a row by its logical index requires a resolveRowIndex strategy. Without one
-      // the library can only offer render-window-relative getRowByIndex, or filter-based findRow.
-      if (!resolveRI) {
-        throw new Error(
-          `findRowByIndex(${index}) requires a strategies.resolveRowIndex to identify rows by their logical index. ` +
-          `Configure one (e.g. read the grid's row-index attribute), or use getRowByIndex() (current render window) / findRow(filters).`
-        );
-      }
-
-      let foundSelector: string | undefined;
-
-      // The currently-mounted row whose logical index === index, if any.
-      const findMounted = async (): Promise<Locator | null> => {
-        const rows = await resolve(config.rowSelector, rootLocator).all();
-        for (const r of rows) {
-          const result = await resolveRI(r);
-          if (result === undefined) continue;
-          const normalized = normalizeRowIndexResult(result);
-          if (normalized.index === index) {
-            foundSelector = normalized.selector;
-            return r;
-          }
-        }
-        return null;
-      };
-
-      // 1. Already mounted (no navigation needed)?
-      let loc = await findMounted();
-
-      // 2. Fast path: jump straight to it via the viewport's random-access scroll.
-      if (!loc && viewport?.scrollToRow) {
-        log(`findRowByIndex: scrolling to row ${index}`);
-        await viewport.scrollToRow(createStrategyContext(), index);
-        loc = await findMounted();
-      }
-
-      // 3. Fallback: advance pages (on infinite-scroll tables, a "page" is a scroll step) until
-      //    the row is reached. Bounded by maxPages so an unreachable index can't loop forever.
-      if (!loc && config.strategies.pagination) {
-        const effectiveMaxPages = options?.maxPages ?? config.maxPages;
-        let pagesScanned = 1;
-        while (!loc && pagesScanned < effectiveMaxPages) {
-          if (!await _advancePage(false)) break;
-          pagesScanned++;
-          loc = await findMounted();
-        }
-      }
-
-      if (!loc) {
-        throw new Error(
-          `findRowByIndex(${index}): could not reach row ${index}. ` +
-          `Ensure a viewport.scrollToRow or pagination can bring it into view (searched up to maxPages=${options?.maxPages ?? config.maxPages}).`
-        );
-      }
-
-      await debugDelay(config, 'findRow');
-      return _makeSmart(loc, map, index, tableState.currentPageIndex, undefined, foundSelector);
+      return findRowByIndex(
+        {
+          config,
+          getRowLocators: () => resolve(config.rowSelector, rootLocator),
+          getMap: () => tableMapper.getMapSync()!,
+          advancePage: _advancePage,
+          getCurrentPageIndex: () => tableState.currentPageIndex,
+          getContext: () => createStrategyContext(),
+          makeSmartRow: (loc, map, idx, pageIdx, sel) => _makeSmart(loc, map, idx, pageIdx, undefined, sel),
+        },
+        index,
+        options
+      );
     },
 
     findRow: async (filters: Record<string, FilterValue>, options?: { exact?: boolean, maxPages?: number }): Promise<SmartRowType<T>> => {
@@ -659,49 +504,12 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     sorting: {
       apply: async (columnName: string, direction: 'asc' | 'desc'): Promise<void> => {
         await _autoInit();
-        if (!config.strategies.sorting) throw new Error('No sorting strategy has been configured.');
-        log(`Applying sort for column "${columnName}" (${direction})`);
-        const context: StrategyContext = { ...createStrategyContext(), getHeaderCell: result.getHeaderCell };
-
-        const maxRetries = 3;
-        for (let i = 0; i < maxRetries; i++) {
-          const currentState = await config.strategies.sorting.getSortState({ columnName, context });
-          if (currentState === direction) {
-            log(`Sort for "${columnName}" is already "${direction}".`);
-            return;
-          }
-          await config.strategies.sorting.doSort({ columnName, direction, context });
-
-          if (config.strategies.loading?.isTableLoading) {
-            const timeout =
-              config.strategies.loading.sortStabilizationTimeout ??
-              config.strategies.loading.loadingTimeout ??
-              10_000;
-            const poll = config.strategies.loading.sortStabilizationPollInterval ?? 100;
-            await waitWhileTableLoading(config, context, rootLocator.page(), 'sorting.apply', {
-              timeout,
-              pollInterval: poll,
-            });
-          } else {
-            const fallback = config.strategies.loading?.sortStabilizationFallbackDelay ?? 200;
-            await rootLocator.page().waitForTimeout(fallback);
-          }
-          await debugDelay(config, 'default');
-
-          const newState = await config.strategies.sorting.getSortState({ columnName, context });
-          if (newState === direction) {
-            log(`Successfully sorted "${columnName}" to "${direction}".`);
-            return;
-          }
-        }
-        throw new Error(`Failed to sort column "${columnName}" to "${direction}" after ${maxRetries} attempts.`);
+        return applySort(sortingEnv(), columnName, direction);
       },
       getState: async (columnName: string): Promise<'asc' | 'desc' | 'none'> => {
         log(`sorting.getState: column="${columnName}"`);
         await _autoInit();
-        if (!config.strategies.sorting) throw new Error('No sorting strategy has been configured.');
-        const context: StrategyContext = { ...createStrategyContext(), getHeaderCell: result.getHeaderCell };
-        return config.strategies.sorting.getSortState({ columnName, context });
+        return getSortState(sortingEnv(), columnName);
       }
     },
 
