@@ -8,9 +8,35 @@ function isTimeout(error: unknown): boolean {
 /** Playwright < 1.62 has no `locator.waitForFunction`: poll with one `evaluate` per check. */
 async function pollPredicate(row: Locator, page: Page, predicate: RowReadyPredicate<unknown>, arg: unknown, timeout: number, interval: number): Promise<void> {
     const deadline = Date.now() + timeout;
-    while (Date.now() < deadline) {
-        if (await row.evaluate(predicate, arg, { timeout: Math.max(1, deadline - Date.now()) })) return;
-        await page.waitForTimeout(Math.min(interval, Math.max(0, deadline - Date.now())));
+    let source = predicate.toString();
+    // Build a serializable callback; the user predicate executes only inside the browser.
+    const wrap = (expression: string) => new Function(`return async (row, arg) => Boolean(await (${expression})(row, arg))`)() as RowReadyPredicate<unknown>;
+    let evaluateBoolean: RowReadyPredicate<unknown>;
+    try {
+        evaluateBoolean = wrap(source);
+    } catch {
+        // Like Playwright's serializer, normalize method shorthand into a function expression.
+        source = source.startsWith('async ') ? source.replace(/^async\s+/, 'async function ') : `function ${source}`;
+        evaluateBoolean = wrap(source);
+    }
+    let expired = false;
+    let deadlineTimer: ReturnType<typeof setTimeout> | undefined;
+    const timeoutReached = new Promise<void>(resolve => {
+        deadlineTimer = setTimeout(() => { expired = true; resolve(); }, timeout);
+    });
+    const poll = async () => {
+        while (!expired && Date.now() < deadline) {
+            // Convert truthiness before serialization, including async DOM-element results.
+            if (await row.evaluate(evaluateBoolean, arg, { timeout: Math.max(1, deadline - Date.now()) })) return;
+            if (expired || Date.now() >= deadline) return;
+            await page.waitForTimeout(Math.min(interval, Math.max(0, deadline - Date.now())));
+        }
+    };
+    try {
+        // evaluate's timeout only bounds locator resolution, not an async predicate's promise.
+        await Promise.race([poll(), timeoutReached]);
+    } finally {
+        clearTimeout(deadlineTimer);
     }
 }
 

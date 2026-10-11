@@ -635,6 +635,54 @@ test.describe('contentReady strategy (#417 content staleness)', () => {
 });
 
 test.describe('contentReady.until (#487)', () => {
+  test('fallback treats a DOM element returned by an async predicate as truthy', async ({ page }) => {
+    await page.setContent('<div id="ready-row"><span class="ready">ready</span></div>');
+    const row = page.locator('#ready-row');
+    let evaluations = 0;
+    const results: unknown[] = [];
+    const target = {
+      evaluate: async (...args: Parameters<Locator['evaluate']>) => {
+        evaluations++;
+        const result = await row.evaluate(...args);
+        results.push(result);
+        return result;
+      },
+    } as Locator;
+    await Strategies.ContentReady.until(async (el, selector) => el.querySelector(selector), {
+      arg: '.ready', timeout: 100, interval: 10,
+    })(target, page);
+    expect(evaluations).toBe(1);
+    expect(results).toEqual([true]);
+  });
+
+  test('fallback resolves at its deadline when an async predicate never settles', async ({ page }) => {
+    await page.setContent('<div id="ready-row">loading</div>');
+    const row = page.locator('#ready-row');
+    const target = { evaluate: row.evaluate.bind(row) } as Locator;
+    await Strategies.ContentReady.until(() => new Promise(() => {}), { timeout: 50 })(target, page);
+  });
+
+  test('fallback preserves function truthiness and method-shorthand predicates', async ({ page }) => {
+    await page.setContent('<div id="ready-row">ready</div>');
+    const row = page.locator('#ready-row');
+    const results: unknown[] = [];
+    const target = {
+      evaluate: async (...args: Parameters<Locator['evaluate']>) => {
+        const result = await row.evaluate(...args);
+        results.push(result);
+        return result;
+      },
+    } as Locator;
+    const predicates = {
+      ready(el: HTMLElement | SVGElement) { return el.textContent === 'ready' ? () => true : null; },
+      async asyncReady(el: HTMLElement | SVGElement) { return el.querySelector('span') ?? (() => true); },
+    };
+    for (const predicate of [predicates.ready, predicates.asyncReady]) {
+      await Strategies.ContentReady.until(predicate, { timeout: 100 })(target, page);
+    }
+    expect(results).toEqual([true, true]);
+  });
+
   for (const fallback of [false, true]) {
     const mode = fallback ? 'evaluate fallback' : 'native waitForFunction';
 

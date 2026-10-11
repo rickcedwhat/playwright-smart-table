@@ -138,6 +138,36 @@ describe('ContentReadyStrategies', () => {
       await expect(ContentReadyStrategies.until(predicate, { timeout: 50 })(row as any, {} as any)).resolves.toBeUndefined();
     });
 
+    it('bounds a pending fallback evaluation and leaves no deadline timer after completion', async () => {
+      vi.useFakeTimers();
+      try {
+        const row = { evaluate: vi.fn().mockReturnValue(new Promise(() => {})) };
+        const strategy = ContentReadyStrategies.until(() => true, { timeout: 50 });
+        const assertion = expect(strategy(row as any, {} as any)).resolves.toBeUndefined();
+        await vi.advanceTimersByTimeAsync(50);
+        await assertion;
+        expect(row.evaluate).toHaveBeenCalledOnce();
+        expect(vi.getTimerCount()).toBe(0);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('clears the fallback deadline timer when the predicate succeeds or throws', async () => {
+      vi.useFakeTimers();
+      try {
+        const page = { waitForTimeout: vi.fn() };
+        const success = { evaluate: vi.fn().mockResolvedValue(true) };
+        await ContentReadyStrategies.until(predicate)(success as any, page as any);
+        expect(vi.getTimerCount()).toBe(0);
+        const failure = { evaluate: vi.fn().mockRejectedValue(new TypeError('predicate failed')) };
+        await expect(ContentReadyStrategies.until(predicate)(failure as any, page as any)).rejects.toThrow('predicate failed');
+        expect(vi.getTimerCount()).toBe(0);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it('rethrows errors thrown by the predicate', async () => {
       const row = { waitForFunction: vi.fn().mockRejectedValue(new TypeError('row.children[1] is undefined')) };
       await expect(ContentReadyStrategies.until(predicate)(row as any, {} as any)).rejects.toThrow(TypeError);
