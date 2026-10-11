@@ -22,6 +22,8 @@ export const ContentReadyStrategies = {
      *
      * Uses `locator.waitForFunction` (Playwright 1.62+), which re-resolves the row on each retry
      * and polls without a round-trip per check. Older versions poll via `locator.evaluate`.
+     * `timeout` and `interval` must be positive finite milliseconds. `interval` only controls
+     * the older-version fallback; native polling is controlled by Playwright.
      *
      * @example
      * contentReady: Strategies.ContentReady.until(row => !row.querySelector('.skeleton'))
@@ -32,6 +34,12 @@ export const ContentReadyStrategies = {
     ): ContentReadyStrategy => {
         const timeout = options.timeout ?? 500;
         const interval = options.interval ?? 50;
+        if (!Number.isFinite(timeout) || timeout <= 0) {
+            throw new Error('ContentReady.until: timeout must be a positive finite number');
+        }
+        if (!Number.isFinite(interval) || interval <= 0) {
+            throw new Error('ContentReady.until: interval must be a positive finite number');
+        }
         const fn = predicate as RowReadyPredicate<unknown>;
         const arg: unknown = options.arg;
         return async (row: Locator, page: Page) => {

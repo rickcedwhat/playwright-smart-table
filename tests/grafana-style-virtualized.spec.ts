@@ -635,6 +635,36 @@ test.describe('contentReady strategy (#417 content staleness)', () => {
 });
 
 test.describe('contentReady.until (#487)', () => {
+  for (const fallback of [false, true]) {
+    const mode = fallback ? 'evaluate fallback' : 'native waitForFunction';
+
+    test(`${mode} waits for replacement row content and forwards arg`, async ({ page }) => {
+      await page.setContent('<div id="ready-row">loading</div>');
+      const row = page.locator('#ready-row');
+      const target = fallback ? { evaluate: row.evaluate.bind(row) } as Locator : row;
+      await page.evaluate(() => {
+        setTimeout(() => {
+          const replacement = document.createElement('div');
+          replacement.id = 'ready-row';
+          replacement.textContent = 'ready';
+          document.querySelector('#ready-row')!.replaceWith(replacement);
+        }, 100);
+      });
+
+      await Strategies.ContentReady.until((el, expected) => el.textContent === expected, {
+        arg: 'ready', timeout: 1000, interval: 10,
+      })(target, page);
+      expect(await row.textContent()).toBe('ready');
+    });
+
+    test(`${mode} resolves when an absent row exceeds the readiness budget`, async ({ page }) => {
+      await page.setContent('<div>No rows</div>');
+      const row = page.locator('#missing-row');
+      const target = fallback ? { evaluate: row.evaluate.bind(row) } as Locator : row;
+      await Strategies.ContentReady.until(() => true, { timeout: 50 })(target, page);
+    });
+  }
+
   test('waits in the browser until the recycled row shows its own content', { timeout: 60000 }, async ({ page }) => {
     // Same setup as mutationSettled: content lands 100ms after the row moves,
     // and stabilization only waits for the position change.

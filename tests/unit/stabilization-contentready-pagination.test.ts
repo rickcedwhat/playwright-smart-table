@@ -109,6 +109,14 @@ describe('ContentReadyStrategies', () => {
     const predicate = (el: HTMLElement | SVGElement, cls: string) => !el.querySelector(cls);
     const timeoutError = () => Object.assign(new Error('Timeout 50ms exceeded'), { name: 'TimeoutError' });
 
+    it.each([0, -1, NaN, Infinity])('rejects timeout %s instead of allowing an unbounded native wait', (timeout) => {
+      expect(() => ContentReadyStrategies.until(predicate, { timeout })).toThrow('timeout must be a positive finite number');
+    });
+
+    it.each([0, -1, NaN, Infinity])('rejects invalid polling interval %s', (interval) => {
+      expect(() => ContentReadyStrategies.until(predicate, { interval })).toThrow('interval must be a positive finite number');
+    });
+
     it('waits via locator.waitForFunction with the arg and timeout', async () => {
       const row = { waitForFunction: vi.fn().mockResolvedValue(undefined), evaluate: vi.fn() };
       await ContentReadyStrategies.until(predicate, { arg: '.skeleton', timeout: 300 })(row as any, {} as any);
