@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { ControlPanel, type PlaygroundConfig } from '../components/ControlPanel';
 import { VirtualizedTable } from '../components/VirtualizedTable';
 
@@ -17,6 +17,8 @@ export const VirtualizedPage = () => {
     const [isTableLoading, setIsTableLoading] = useState(false);
     const [tableKey, setTableKey] = useState(0); // Used to force re-render
     const [hasLoadedTable, setHasLoadedTable] = useState(false);
+    // Only the latest reload may finish; a stale timer would remount the table again later.
+    const reloadTimer = useRef<ReturnType<typeof setTimeout>>();
 
     const handleReload = () => {
         setIsTableLoading(true);
@@ -33,7 +35,8 @@ export const VirtualizedPage = () => {
             delay = delayConfig.base; // Use base for simple table init
         }
 
-        setTimeout(() => {
+        clearTimeout(reloadTimer.current);
+        reloadTimer.current = setTimeout(() => {
             setIsTableLoading(false);
             setHasLoadedTable(true);
             setTableKey(prev => prev + 1); // Force new table instance if needed
@@ -43,6 +46,7 @@ export const VirtualizedPage = () => {
     // Initial load
     useEffect(() => {
         handleReload();
+        return () => clearTimeout(reloadTimer.current);
     }, []);
 
     return (
@@ -60,7 +64,13 @@ export const VirtualizedPage = () => {
                 onReload={handleReload}
             />
 
-            <div className="card" style={{ padding: 0, overflow: 'hidden', minHeight: '500px', position: 'relative' }}>
+            <div
+                className="card"
+                style={{ padding: 0, overflow: 'hidden', minHeight: '500px', position: 'relative' }}
+                data-testid="table-card"
+                data-table-key={tableKey}
+                data-table-loading={isTableLoading}
+            >
                 {isTableLoading && (
                     <div style={{
                         position: 'absolute', inset: 0, backgroundColor: 'rgba(255,255,255,0.8)',
