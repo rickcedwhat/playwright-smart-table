@@ -58,6 +58,17 @@ export interface ScanPagesOptions {
      * Matches runMap / findRows EOF behavior. @default true
      */
     finalScanOnEof?: boolean;
+    /**
+     * Checked before each page and before each advance. When aborted, the scan throws
+     * `signal.reason` instead of returning partial results (#488).
+     */
+    signal?: AbortSignal;
+}
+
+function throwIfAborted(env: ScanPagesEnv, label: string, signal: AbortSignal | undefined): void {
+    if (!signal?.aborted) return;
+    logDebug(env.config, 'info', `${label}: aborted via AbortSignal at page ${env.getCurrentPageIndex()}`);
+    throw signal.reason;
 }
 
 export async function scanPages(
@@ -76,8 +87,10 @@ export async function scanPages(
     logDebug(env.config, 'verbose', `${label}: starting (maxPages=${maxPages}, useBulk=${useBulk}, finalScanOnEof=${finalScanOnEof})`);
 
     while (true) {
+        throwIfAborted(env, label, options.signal);
         if (env.waitForReady) {
             await env.waitForReady();
+            throwIfAborted(env, label, options.signal);
         }
 
         const decision = await onPage({
@@ -86,6 +99,7 @@ export async function scanPages(
             isFinalScan: reachedEnd,
         });
 
+        throwIfAborted(env, label, options.signal);
         if (decision === 'stop') {
             logDebug(env.config, 'verbose', `${label}: onPage returned stop at page ${env.getCurrentPageIndex()}`);
             break;
@@ -95,8 +109,10 @@ export async function scanPages(
             break;
         }
 
+        throwIfAborted(env, label, options.signal);
         const prevPage = env.getCurrentPageIndex();
         const didAdvance = await env.advancePage(useBulk);
+        throwIfAborted(env, label, options.signal);
         if (!didAdvance) {
             if (finalScanOnEof) {
                 logDebug(env.config, 'verbose', `${label}: pagination returned false — final scan`);

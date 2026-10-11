@@ -341,7 +341,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       return resolve(config.headerSelector, rootLocator).nth(idx);
     },
 
-    countRows: async (filters?: Record<string, FilterValue>, options?: { exact?: boolean; maxPages?: number }): Promise<number> => {
+    countRows: async (filters?: Record<string, FilterValue>, options?: { exact?: boolean; maxPages?: number; signal?: AbortSignal }): Promise<number> => {
       if (tableState.empty) return 0;
       await _autoInit();
       return countRows(
@@ -462,7 +462,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       return _makeSmart(rowLocator, map, index, undefined, undefined, undefined, true);
     },
 
-    findRowByIndex: async (index: number, options?: { maxPages?: number }): Promise<SmartRowType<T>> => {
+    findRowByIndex: async (index: number, options?: { maxPages?: number, signal?: AbortSignal }): Promise<SmartRowType<T>> => {
       await _autoInit();
       return findRowByIndex(
         {
@@ -479,14 +479,14 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       );
     },
 
-    findRow: async (filters: Record<string, FilterValue>, options?: { exact?: boolean, maxPages?: number }): Promise<SmartRowType<T>> => {
+    findRow: async (filters: Record<string, FilterValue>, options?: { exact?: boolean, maxPages?: number, signal?: AbortSignal }): Promise<SmartRowType<T>> => {
       log(`findRow: filters=${safeStringify(filters)} options=${safeStringify(options)}`);
       return rowFinder.findRow(filters, options);
     },
 
 
 
-    findRows: async (filters?: Record<string, FilterValue>, options?: { exact?: boolean, maxPages?: number, useBulkPagination?: boolean }): Promise<SmartRowArray<T>> => {
+    findRows: async (filters?: Record<string, FilterValue>, options?: { exact?: boolean, maxPages?: number, useBulkPagination?: boolean, signal?: AbortSignal }): Promise<SmartRowArray<T>> => {
       log(`findRows: filters=${safeStringify(filters ?? {})} options=${safeStringify(options)}`);
       return rowFinder.findRows(filters ?? {}, options);
     },

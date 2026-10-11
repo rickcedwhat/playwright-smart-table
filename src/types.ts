@@ -853,6 +853,11 @@ export type RowIterationOptions = {
    * @default false — uses goNext for one-page-at-a-time advancement
    */
   useBulkPagination?: boolean;
+  /**
+   * Cancels the iteration between pages. When aborted, the call rejects with
+   * `signal.reason` (rows already processed are not returned).
+   */
+  signal?: AbortSignal;
 };
 
 /**
@@ -939,33 +944,34 @@ export interface TableResult<T = any> extends AsyncIterable<{ row: SmartRow<T>; 
    * is not configured. Also throws if the row cannot be reached (no silent wrong-row fallback).
    *
    * @param index 0-based logical/data-model row index
-   * @param options - `maxPages` bounds how far to scroll/paginate (defaults to config.maxPages)
+   * @param options - `maxPages` bounds how far to scroll/paginate (defaults to config.maxPages).
+   * `signal` cancels the page scan; the call rejects with `signal.reason`.
    */
   findRowByIndex: (
     index: number,
-    options?: { maxPages?: number }
+    options?: { maxPages?: number, signal?: AbortSignal }
   ) => Promise<SmartRow<T>>;
 
   /**
    * ASYNC: Searches for a single row across pages using pagination.
    * Auto-initializes the table if not already initialized.
    * @param filters - The filter criteria to match
-   * @param options - Search options including exact match and max pages
+   * @param options - Search options including exact match and max pages. `signal` cancels the page scan; the call rejects with `signal.reason`.
    */
   findRow: (
     filters: Record<string, FilterValue>,
-    options?: { exact?: boolean, maxPages?: number }
+    options?: { exact?: boolean, maxPages?: number, signal?: AbortSignal }
   ) => Promise<SmartRow<T>>;
 
   /**
    * ASYNC: Searches for all matching rows across pages using pagination.
    * Auto-initializes the table if not already initialized.
    * @param filters - The filter criteria to match (omit or pass {} for all rows)
-   * @param options - Search options (exact, maxPages). `useBulkPagination` defaults to `false`: pages advance one at a time via `goNext` so no intermediate page is skipped. Set it to `true` to opt into `goNextBulk` (faster, but skips the rows on jumped-over pages).
+   * @param options - Search options (exact, maxPages). `useBulkPagination` defaults to `false`: pages advance one at a time via `goNext` so no intermediate page is skipped. Set it to `true` to opt into `goNextBulk` (faster, but skips the rows on jumped-over pages). `signal` cancels the page scan; the call rejects with `signal.reason`.
    */
   findRows: (
     filters?: Record<string, FilterValue>,
-    options?: { exact?: boolean, maxPages?: number, useBulkPagination?: boolean }
+    options?: { exact?: boolean, maxPages?: number, useBulkPagination?: boolean, signal?: AbortSignal }
   ) => Promise<SmartRowArray<T>>;
 
   /**
@@ -978,9 +984,10 @@ export interface TableResult<T = any> extends AsyncIterable<{ row: SmartRow<T>; 
   /**
    * Counts the number of rows, optionally filtered.
    * Without arguments, counts all rows. With filters, counts only matching rows.
-   * Paginates when pagination is configured.
+   * Paginates when pagination is configured. `signal` cancels the page scan; the call
+   * rejects with `signal.reason` (the table is still reset to page 1).
    */
-  countRows: (filters?: Record<string, FilterValue>, options?: { exact?: boolean; maxPages?: number }) => Promise<number>;
+  countRows: (filters?: Record<string, FilterValue>, options?: { exact?: boolean; maxPages?: number; signal?: AbortSignal }) => Promise<number>;
 
   /**
    * Iterates over rows and extracts the value of a single column.

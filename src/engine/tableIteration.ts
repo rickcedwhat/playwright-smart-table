@@ -245,6 +245,7 @@ export async function runMap<T, R>(
         useBulk,
         label,
         finalScanOnEof: true,
+        signal: options.signal,
       }
     );
 

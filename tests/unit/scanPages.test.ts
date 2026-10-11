@@ -142,4 +142,129 @@ describe('scanPages (#427)', () => {
         // page1, page2, final scan = 3
         expect(waitForReady).toHaveBeenCalledTimes(3);
     });
+
+    describe('AbortSignal (#488)', () => {
+        it('rejects with signal.reason before visiting any page when already aborted', async () => {
+            const controller = new AbortController();
+            const reason = new Error('cancelled');
+            controller.abort(reason);
+            const onPage = vi.fn().mockResolvedValue('continue');
+            const waitForReady = vi.fn().mockResolvedValue(undefined);
+
+            await expect(scanPages(
+                { advancePage: vi.fn(), getCurrentPageIndex: () => 0, config, waitForReady },
+                onPage,
+                { maxPages: 5, signal: controller.signal }
+            )).rejects.toBe(reason);
+
+            expect(waitForReady).not.toHaveBeenCalled();
+            expect(onPage).not.toHaveBeenCalled();
+        });
+
+        it('preserves null as the abort reason', async () => {
+            const controller = new AbortController();
+            controller.abort(null);
+            await expect(scanPages(
+                { advancePage: vi.fn(), getCurrentPageIndex: () => 0, config },
+                vi.fn(),
+                { maxPages: 1, signal: controller.signal }
+            )).rejects.toBe(null);
+        });
+
+        it('does not visit a page when aborted during readiness', async () => {
+            const controller = new AbortController();
+            const reason = new Error('cancelled while loading');
+            const onPage = vi.fn();
+            const advancePage = vi.fn();
+            await expect(scanPages(
+                {
+                    advancePage, getCurrentPageIndex: () => 0, config,
+                    waitForReady: async () => { controller.abort(reason); },
+                },
+                onPage,
+                { maxPages: 5, signal: controller.signal }
+            )).rejects.toBe(reason);
+            expect(onPage).not.toHaveBeenCalled();
+            expect(advancePage).not.toHaveBeenCalled();
+        });
+
+        it.each([
+            { decision: 'stop' as const, maxPages: 5, finalScan: false },
+            { decision: 'continue' as const, maxPages: 1, finalScan: false },
+            { decision: 'continue' as const, maxPages: 5, finalScan: true },
+        ])('rejects when onPage aborts on a terminal path: %j', async ({ decision, maxPages, finalScan }) => {
+            const controller = new AbortController();
+            const reason = new Error('cancelled in callback');
+            const advancePage = vi.fn().mockResolvedValue(false);
+            const onPage = vi.fn(async ({ isFinalScan }) => {
+                if (!finalScan || isFinalScan) controller.abort(reason);
+                return decision;
+            });
+            await expect(scanPages(
+                { advancePage, getCurrentPageIndex: () => 0, config },
+                onPage,
+                { maxPages, signal: controller.signal }
+            )).rejects.toBe(reason);
+            expect(advancePage).toHaveBeenCalledTimes(finalScan ? 1 : 0);
+            expect(onPage).toHaveBeenCalledTimes(finalScan ? 2 : 1);
+        });
+
+        it.each([true, false])('rejects after an aborted false advance (finalScanOnEof=%s)', async (finalScanOnEof) => {
+            const controller = new AbortController();
+            const reason = new Error('cancelled while advancing');
+            const onPage = vi.fn().mockResolvedValue('continue');
+            const waitForReady = vi.fn().mockResolvedValue(undefined);
+            await expect(scanPages(
+                {
+                    advancePage: async () => { controller.abort(reason); return false; },
+                    getCurrentPageIndex: () => 0, config, waitForReady,
+                },
+                onPage,
+                { maxPages: 5, finalScanOnEof, signal: controller.signal }
+            )).rejects.toBe(reason);
+            expect(onPage).toHaveBeenCalledTimes(1);
+            expect(waitForReady).toHaveBeenCalledTimes(1);
+        });
+
+        it('does not advance after onPage aborts mid-scan', async () => {
+            const controller = new AbortController();
+            const advancePage = vi.fn().mockResolvedValue(true);
+            const onPage = vi.fn(async ({ pagesScanned }) => {
+                if (pagesScanned === 1) controller.abort();
+                return 'continue' as const;
+            });
+
+            const err = await scanPages(
+                { advancePage, getCurrentPageIndex: () => 0, config },
+                onPage,
+                { maxPages: 5, signal: controller.signal }
+            ).catch(e => e);
+
+            expect(err.name).toBe('AbortError');
+            expect(onPage).toHaveBeenCalledTimes(1);
+            expect(advancePage).not.toHaveBeenCalled();
+        });
+
+        it('stops before the next page when aborted during advancePage', async () => {
+            const controller = new AbortController();
+            let pageIndex = 0;
+            const onPage = vi.fn().mockResolvedValue('continue');
+
+            await expect(scanPages(
+                {
+                    advancePage: async () => {
+                        pageIndex++;
+                        controller.abort();
+                        return true;
+                    },
+                    getCurrentPageIndex: () => pageIndex,
+                    config,
+                },
+                onPage,
+                { maxPages: 5, signal: controller.signal }
+            )).rejects.toThrow();
+
+            expect(onPage).toHaveBeenCalledTimes(1);
+        });
+    });
 });

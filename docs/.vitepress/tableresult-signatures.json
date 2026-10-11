@@ -41,18 +41,18 @@
   },
   {
     "name": "findRowByIndex",
-    "signature": "findRowByIndex(\n  index: number,\n  options?: { maxPages?: number }\n  ): Promise<SmartRow<T>>",
-    "comment": "/**\n* ASYNC: Returns the row with a specific logical/data-model index, scrolling/paginating to\n* reach it. Unlike the sync `getRowByIndex` (render-window position), this resolves the true\n* data-model row `index` on virtualized tables.\n*\n* Reaches the row via, in order: a currently-mounted match, the viewport's random-access\n* `scrollToRow` fast path, then advancing pages (on infinite-scroll tables a \"page\" is a\n* scroll step) up to `maxPages`.\n*\n* Requires a `strategies.resolveRowIndex` to identify rows by logical index — throws if one\n* is not configured. Also throws if the row cannot be reached (no silent wrong-row fallback).\n*\n* @param index 0-based logical/data-model row index\n* @param options - `maxPages` bounds how far to scroll/paginate (defaults to config.maxPages)\n*/"
+    "signature": "findRowByIndex(\n  index: number,\n  options?: { maxPages?: number, signal?: AbortSignal }\n  ): Promise<SmartRow<T>>",
+    "comment": "/**\n* ASYNC: Returns the row with a specific logical/data-model index, scrolling/paginating to\n* reach it. Unlike the sync `getRowByIndex` (render-window position), this resolves the true\n* data-model row `index` on virtualized tables.\n*\n* Reaches the row via, in order: a currently-mounted match, the viewport's random-access\n* `scrollToRow` fast path, then advancing pages (on infinite-scroll tables a \"page\" is a\n* scroll step) up to `maxPages`.\n*\n* Requires a `strategies.resolveRowIndex` to identify rows by logical index — throws if one\n* is not configured. Also throws if the row cannot be reached (no silent wrong-row fallback).\n*\n* @param index 0-based logical/data-model row index\n* @param options - `maxPages` bounds how far to scroll/paginate (defaults to config.maxPages).\n* `signal` cancels the page scan; the call rejects with `signal.reason`.\n*/"
   },
   {
     "name": "findRow",
-    "signature": "findRow(\n  filters: Record<string, FilterValue>,\n  options?: { exact?: boolean, maxPages?: number }\n  ): Promise<SmartRow<T>>",
-    "comment": "/**\n* ASYNC: Searches for a single row across pages using pagination.\n* Auto-initializes the table if not already initialized.\n* @param filters - The filter criteria to match\n* @param options - Search options including exact match and max pages\n*/"
+    "signature": "findRow(\n  filters: Record<string, FilterValue>,\n  options?: { exact?: boolean, maxPages?: number, signal?: AbortSignal }\n  ): Promise<SmartRow<T>>",
+    "comment": "/**\n* ASYNC: Searches for a single row across pages using pagination.\n* Auto-initializes the table if not already initialized.\n* @param filters - The filter criteria to match\n* @param options - Search options including exact match and max pages. `signal` cancels the page scan; the call rejects with `signal.reason`.\n*/"
   },
   {
     "name": "findRows",
-    "signature": "findRows(\n  filters?: Record<string, FilterValue>,\n  options?: { exact?: boolean, maxPages?: number, useBulkPagination?: boolean }\n  ): Promise<SmartRowArray<T>>",
-    "comment": "/**\n* ASYNC: Searches for all matching rows across pages using pagination.\n* Auto-initializes the table if not already initialized.\n* @param filters - The filter criteria to match (omit or pass {} for all rows)\n* @param options - Search options (exact, maxPages). `useBulkPagination` defaults to `false`: pages advance one at a time via `goNext` so no intermediate page is skipped. Set it to `true` to opt into `goNextBulk` (faster, but skips the rows on jumped-over pages).\n*/"
+    "signature": "findRows(\n  filters?: Record<string, FilterValue>,\n  options?: { exact?: boolean, maxPages?: number, useBulkPagination?: boolean, signal?: AbortSignal }\n  ): Promise<SmartRowArray<T>>",
+    "comment": "/**\n* ASYNC: Searches for all matching rows across pages using pagination.\n* Auto-initializes the table if not already initialized.\n* @param filters - The filter criteria to match (omit or pass {} for all rows)\n* @param options - Search options (exact, maxPages). `useBulkPagination` defaults to `false`: pages advance one at a time via `goNext` so no intermediate page is skipped. Set it to `true` to opt into `goNextBulk` (faster, but skips the rows on jumped-over pages). `signal` cancels the page scan; the call rejects with `signal.reason`.\n*/"
   },
   {
     "name": "scrollToColumn",
@@ -61,8 +61,8 @@
   },
   {
     "name": "countRows",
-    "signature": "countRows(filters?: Record<string, FilterValue>, options?: { exact?: boolean; maxPages?: number }): Promise<number>",
-    "comment": "/**\n* Counts the number of rows, optionally filtered.\n* Without arguments, counts all rows. With filters, counts only matching rows.\n* Paginates when pagination is configured.\n*/"
+    "signature": "countRows(filters?: Record<string, FilterValue>, options?: { exact?: boolean; maxPages?: number; signal?: AbortSignal }): Promise<number>",
+    "comment": "/**\n* Counts the number of rows, optionally filtered.\n* Without arguments, counts all rows. With filters, counts only matching rows.\n* Paginates when pagination is configured. `signal` cancels the page scan; the call\n* rejects with `signal.reason` (the table is still reset to page 1).\n*/"
   },
   {
     "name": "mapColumn",
