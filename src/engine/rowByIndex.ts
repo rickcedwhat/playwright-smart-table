@@ -23,7 +23,7 @@ export interface RowByIndexEnv<T = any> {
 export async function findRowByIndex<T>(
   env: RowByIndexEnv<T>,
   index: number,
-  options?: { maxPages?: number }
+  options?: { maxPages?: number, signal?: AbortSignal }
 ): Promise<SmartRow<T>> {
   const { config } = env;
   logDebug(config, 'verbose', `findRowByIndex: index=${index} options=${safeStringify(options)}`);
@@ -77,7 +77,7 @@ export async function findRowByIndex<T>(
         if (pagesScanned > 1) hit = await findMounted();
         return hit ? 'stop' : 'continue';
       },
-      { maxPages, useBulk: false, label: 'findRowByIndex', finalScanOnEof: false }
+      { maxPages, useBulk: false, label: 'findRowByIndex', finalScanOnEof: false, signal: options?.signal }
     );
     return hit;
   };

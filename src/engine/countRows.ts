@@ -58,7 +58,7 @@ function requireMap(tableMapper: TableMapper): Map<string, number> {
 export async function countRows<T>(
   env: CountRowsEnv<T>,
   filters?: Record<string, FilterValue>,
-  options?: { exact?: boolean; maxPages?: number }
+  options?: { exact?: boolean; maxPages?: number; signal?: AbortSignal }
 ): Promise<number> {
   const { config, rootLocator, tableMapper, rowFinder } = env;
   const filtersRecord = filters ?? {};
@@ -135,6 +135,7 @@ export async function countRows<T>(
         useBulk: false,
         label: 'countRows',
         finalScanOnEof: true,
+        signal: options?.signal,
       }
     );
     pagesScanned = scanned.pagesScanned;

@@ -125,7 +125,7 @@ export class RowFinder<T = any> {
 
     public async findRow(
         filters: Record<string, FilterValue>,
-        options: { exact?: boolean, maxPages?: number } = {}
+        options: { exact?: boolean, maxPages?: number, signal?: AbortSignal } = {}
     ): Promise<SmartRow<T>> {
         logDebug(this.config, 'info', 'Searching for row', filters);
 
@@ -181,7 +181,7 @@ export class RowFinder<T = any> {
 
     public async findRows(
         filters: Record<string, FilterValue> = {},
-        options?: { exact?: boolean, maxPages?: number, useBulkPagination?: boolean }
+        options?: { exact?: boolean, maxPages?: number, useBulkPagination?: boolean, signal?: AbortSignal }
     ): Promise<SmartRowArray<T>> {
         const filtersRecord = filters;
         const map = await this.tableMapper.getMap();
@@ -270,6 +270,7 @@ export class RowFinder<T = any> {
                     useBulk,
                     label: 'findRows',
                     finalScanOnEof: hasPagination,
+                    signal: options?.signal,
                 }
             );
 
@@ -283,7 +284,7 @@ export class RowFinder<T = any> {
 
     private async findRowLocator(
         filters: Record<string, FilterValue>,
-        options: { exact?: boolean, maxPages?: number, useBulkPagination?: boolean } = {}
+        options: { exact?: boolean, maxPages?: number, useBulkPagination?: boolean, signal?: AbortSignal } = {}
     ): Promise<Locator | null> {
         const map = await this.tableMapper.getMap();
         const effectiveMaxPages = options.maxPages ?? this.config.maxPages;
@@ -350,6 +351,7 @@ export class RowFinder<T = any> {
                 useBulk,
                 label: 'findRow',
                 finalScanOnEof: true,
+                signal: options.signal,
             }
         );
 

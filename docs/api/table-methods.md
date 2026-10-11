@@ -216,14 +216,14 @@ const firstRow = table.getRowByIndex(0);
 ```typescript
 findRowByIndex(
   index: number,
-  options?: { maxPages?: number }
+  options?: { maxPages?: number, signal?: AbortSignal }
 ): Promise<SmartRow<T>>
 ```
 
 ### Parameters
 
 - `index` - 0-based logical/data-model row index
-- `options` - `maxPages` bounds how far to scroll/paginate (defaults to config.maxPages)
+- `options` - `maxPages` bounds how far to scroll/paginate (defaults to config.maxPages).
 
 <!-- /api-signature: findRowByIndex -->
 
@@ -253,14 +253,14 @@ await expect(row.getCell('ID')).toHaveText('250');
 ```typescript
 findRow(
   filters: Record<string, FilterValue>,
-  options?: { exact?: boolean, maxPages?: number }
+  options?: { exact?: boolean, maxPages?: number, signal?: AbortSignal }
 ): Promise<SmartRow<T>>
 ```
 
 ### Parameters
 
 - `filters` - The filter criteria to match
-- `options` - Search options including exact match and max pages
+- `options` - Search options including exact match and max pages. `signal` cancels the
 
 <!-- /api-signature: findRow -->
 
@@ -284,14 +284,14 @@ const row = await table.findRow({ Status: 'Active' }, { maxPages: 10 });
 ```typescript
 findRows(
   filters?: Record<string, FilterValue>,
-  options?: { exact?: boolean, maxPages?: number, useBulkPagination?: boolean }
+  options?: { exact?: boolean, maxPages?: number, useBulkPagination?: boolean, signal?: AbortSignal }
 ): Promise<SmartRowArray<T>>
 ```
 
 ### Parameters
 
 - `filters` - The filter criteria to match (omit or pass {} for all rows)
-- `options` - Search options (exact, maxPages). `useBulkPagination` defaults to `false`: pages advance one at a time via `goNext` so no intermediate page is skipped. Set it to `true` to opt into `goNextBulk` (faster, but skips the rows on jumped-over pages).
+- `options` - Search options (exact, maxPages). `useBulkPagination` defaults to `false`: pages advance one at a time via `goNext` so no intermediate page is skipped. Set it to `true` to opt into `goNextBulk` (faster, but skips the rows on jumped-over pages). `signal` cancels the page scan; the call rejects with `signal.reason`.
 
 <!-- /api-signature: findRows -->
 
@@ -534,7 +534,7 @@ await table.scrollToColumn('Notes');
 ### Signature
 
 ```typescript
-countRows(filters?: Record<string, FilterValue>, options?: { exact?: boolean; maxPages?: number }): Promise<number>
+countRows(filters?: Record<string, FilterValue>, options?: { exact?: boolean; maxPages?: number; signal?: AbortSignal }): Promise<number>
 ```
 
 <!-- /api-signature: countRows -->

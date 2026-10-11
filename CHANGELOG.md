@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **`AbortSignal` cancellation for table scans (#488)** — `findRow`, `findRows`, `findRowByIndex`, `countRows`, `map`, `forEach`, `filter`, `toArray` and `mapColumn` accept a `signal` option. The signal is checked before each page and before each page advance; once it is aborted the call rejects with `signal.reason` (an `AbortError` by default) instead of returning partial results, and `findRow` rejects instead of returning a not-found row. `countRows` still resets to page 1. A page advance or row callback already in progress finishes first; to cancel those too, pass the same signal to the Playwright actions in your own strategies or callbacks.
+
 ### Changed
 
 - **Playground spec flakes fixed** — the virtualized playground never cancelled a pending table reload, so the page-load reload (scheduled twice under React StrictMode) could fire after a test applied its config and remount the table mid-test, and the specs' config helper could return before the new table had rendered. A newer reload now cancels the pending one, the page exposes `data-table-key` / `data-table-loading`, and a shared `tests/support/playground.ts` helper waits for that exact reload. Under 8-worker stress the playground specs went from 1 failure in 84 runs to 0 in 204.

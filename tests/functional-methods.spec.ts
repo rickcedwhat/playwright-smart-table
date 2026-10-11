@@ -708,3 +708,58 @@ test.describe('new API additions', () => {
         expect(err.message).toMatch(/Column is out of view and no navigation fallback is configured/);
     });
 });
+
+// ─── AbortSignal (#488) ──────────────────────────────────────────────────────
+test.describe('AbortSignal cancellation', () => {
+    test('map rejects with signal.reason and stops paginating', async ({ page }) => {
+        await page.setContent(TABLE_HTML);
+        const table = makeTable(page);
+        const controller = new AbortController();
+        const reason = new Error('user cancelled');
+        const visited: string[] = [];
+
+        const err = await table.map(async ({ row }) => {
+            visited.push(await row.getCell('ID').innerText());
+            controller.abort(reason);
+        }, { signal: controller.signal }).catch(e => e);
+
+        expect(err).toBe(reason);
+        expect(visited).toEqual(['1', '2']);
+        await expect(page.locator('#current-page')).toHaveText('1');
+    });
+
+    test('findRow with an already-aborted signal rejects instead of returning a sentinel', async ({ page }) => {
+        await page.setContent(TABLE_HTML);
+        const table = makeTable(page);
+
+        const err = await table.findRow({ Name: 'Frank' }, { signal: AbortSignal.abort() }).catch(e => e);
+
+        expect(err.name).toBe('AbortError');
+    });
+
+    test('countRows still resets to page 1 when aborted mid-scan', async ({ page }) => {
+        await page.setContent(TABLE_HTML);
+        const controller = new AbortController();
+        const table = useTable(page.locator('#tbl'), {
+            maxPages: 3,
+            strategies: {
+                pagination: {
+                    goNext: async ({ root }) => {
+                        await root.page().locator('#next').click();
+                        controller.abort();
+                        return true;
+                    },
+                    goToFirst: async ({ root }) => {
+                        await root.page().locator('#first').click();
+                        return true;
+                    },
+                },
+            },
+        });
+
+        const err = await table.countRows({}, { signal: controller.signal }).catch(e => e);
+
+        expect(err.name).toBe('AbortError');
+        await expect(page.locator('#current-page')).toHaveText('1');
+    });
+});
