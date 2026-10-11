@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Snapshot row identity (#511, #513)** — live and atomic `toJSON()` reads on `getRowByIndex()` capture the selected mounted row's logical identity before readiness or navigation, so a window starting at row 100 no longer attempts to recover logical row 0. Atomic reads now recover or reject when `contentReady` recycles the target away, rather than cloning a replacement row. Batch recovery remains rescan-only to avoid scrolling sibling rows out of view.
+
 ### Added
 
 - **`AbortSignal` cancellation for table scans (#488)** — `findRow`, `findRows`, `findRowByIndex`, `countRows`, `map`, `forEach`, `filter`, `toArray` and `mapColumn` accept a `signal` option. The signal is checked before each page and before each page advance; once it is aborted the call rejects with `signal.reason` (an `AbortError` by default) instead of returning partial results, and `findRow` rejects instead of returning a not-found row. `countRows` still resets to page 1. A page advance or row callback already in progress finishes first; to cancel those too, pass the same signal to the Playwright actions in your own strategies or callbacks.
@@ -974,4 +978,3 @@ const table = await useTable(page.locator('#example')).init();
 ## [2.3.1] - Previous Version
 
 See git history for previous changelog entries.
-

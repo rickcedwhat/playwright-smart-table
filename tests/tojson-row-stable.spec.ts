@@ -29,6 +29,122 @@ const resolveRowIndex = async (row: import('@playwright/test').Locator) => {
     return v != null ? Number(v) : undefined;
 };
 
+test.describe('snapshot identity in a scrolled render window', () => {
+    for (const atomic of [false, true]) {
+        for (const selectorBacked of [false, true]) {
+            test(`${atomic ? 'atomic' : 'live'} read resolves mounted position with a ${selectorBacked ? 'selector-backed' : 'numeric'} identity`, async ({ page }) => {
+                await page.setContent(HTML);
+                await page.locator('tbody tr').evaluateAll(rows => rows.forEach((row, i) => {
+                    row.setAttribute('data-ri', String(100 + i));
+                }));
+                const cellRowIndices: Array<number | undefined> = [];
+                const table = await useTable(page.locator('#t'), {
+                    strategies: {
+                        resolveRowIndex: async row => {
+                            const index = await resolveRowIndex(row);
+                            return index === undefined || !selectorBacked
+                                ? index
+                                : { index, selector: `[data-ri="${index}"]` };
+                        },
+                        getCellLocator: ({ row, rowIndex, columnIndex }) => {
+                            cellRowIndices.push(rowIndex);
+                            return row.locator('td').nth(columnIndex);
+                        },
+                    },
+                }).init();
+
+                const row = table.getRowByIndex(1);
+                expect(await row.toJSON({ atomic })).toEqual({ Name: 'Bob', Type: 'Type-Bob', Extra: 'Extra-Bob' });
+                expect(row.rowIndex).toBe(1); // Public index remains the mounted position.
+                if (!atomic) {
+                    expect(cellRowIndices.length).toBeGreaterThan(0);
+                    expect(new Set(cellRowIndices)).toEqual(new Set([101]));
+                }
+            });
+        }
+    }
+
+    for (const atomic of [false, true]) {
+        test(`${atomic ? 'atomic' : 'live'} read recovers the captured logical identity after recycling`, async ({ page }) => {
+            await page.setContent(HTML);
+            await page.locator('tbody tr').evaluateAll(rows => rows.forEach((row, i) => {
+                row.setAttribute('data-ri', String(100 + i));
+            }));
+            const recycle = async () => {
+                await page.evaluate(() => {
+                    const rows = document.querySelectorAll('#t tbody tr');
+                    rows[1].setAttribute('data-ri', '999');
+                    rows[1].innerHTML = '<td>Ghost</td><td>Type-Ghost</td><td>Extra-Ghost</td>';
+                    rows[2].setAttribute('data-ri', '101');
+                    rows[2].innerHTML = '<td>Bob</td><td>Type-Bob</td><td>Extra-Bob</td>';
+                });
+            };
+            const table = await useTable(page.locator('#t'), {
+                strategies: {
+                    resolveRowIndex,
+                    ...(atomic ? { contentReady: recycle } : {}),
+                },
+                columnOverrides: atomic ? undefined : {
+                    Name: { read: async cell => {
+                        const name = await cell.innerText();
+                        await recycle();
+                        return name;
+                    } },
+                },
+            }).init();
+
+            expect(await table.getRowByIndex(1).toJSON({ atomic })).toEqual({
+                Name: 'Bob', Type: 'Type-Bob', Extra: 'Extra-Bob',
+            });
+        });
+    }
+});
+
+test.describe('atomic identity after content readiness', () => {
+    for (const recovery of ['rescan', 'scroll', 'missing', 'batch'] as const) {
+        test(`${recovery}: never clones a replacement row`, async ({ page }) => {
+            await page.setContent(HTML);
+            const scrollIndices: number[] = [];
+            const table = await useTable(page.locator('#t'), {
+                strategies: {
+                    resolveRowIndex,
+                    contentReady: async row => {
+                        await row.evaluate(el => {
+                            el.setAttribute('data-ri', '99');
+                            el.innerHTML = '<td>Ghost</td><td>Type-Ghost</td><td>Extra-Ghost</td>';
+                        });
+                        if (recovery === 'rescan') {
+                            await page.locator('tbody tr').last().evaluate(el => {
+                                el.setAttribute('data-ri', '0');
+                                el.innerHTML = '<td>Alice</td><td>Type-Alice</td><td>Extra-Alice</td>';
+                            });
+                        }
+                    },
+                    viewport: { scrollToRow: async (_context, index) => {
+                        scrollIndices.push(index);
+                        if (recovery === 'scroll') {
+                            await page.locator('tbody').evaluate(el => {
+                                el.insertAdjacentHTML('beforeend', '<tr data-ri="0"><td>Alice</td><td>Type-Alice</td><td>Extra-Alice</td></tr>');
+                            });
+                        }
+                    } },
+                },
+            }).init();
+
+            const reading = recovery === 'batch'
+                ? table.map(({ row }) => row.toJSON({ atomic: true }))
+                : (await table.findRowByIndex(0)).toJSON({ atomic: true });
+            if (recovery === 'missing' || recovery === 'batch') {
+                await expect(reading).rejects.toThrow(recovery === 'batch' ? /map\/forEach batch/ : /row 0 recycled out of the DOM/);
+            } else {
+                expect(await reading).toEqual({ Name: 'Alice', Type: 'Type-Alice', Extra: 'Extra-Alice' });
+            }
+            expect(scrollIndices).toEqual(recovery === 'scroll' || recovery === 'missing' ? [0] : []);
+            await expect(page.locator('[id^="__st_snap_"]')).toHaveCount(0);
+        });
+    }
+});
+
 test.describe('toJSON row stability (#366)', () => {
     test('re-pins to the correct logical row when the node recycles mid-read', async ({ page }) => {
         await page.setContent(HTML);
