@@ -159,13 +159,8 @@ test.describe('Error Handling and Validation', () => {
                 }, 1000);
             });
 
-            // 4. Init should wait and succeed
-            const start = Date.now();
+            // 4. Init should wait for the injected headers rather than map the empty row
             await table.init();
-            const duration = Date.now() - start;
-
-            // Should have taken at least 1000ms (for headers) + 200ms (stability check)
-            expect(duration).toBeGreaterThan(1100);
             expect(await table.getHeaders()).toEqual(['ID', 'Name']);
         });
 

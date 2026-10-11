@@ -19,7 +19,7 @@ export default defineConfig({
   ],
   fullyParallel: true,
   forbidOnly: true,
-  retries: 2,
+  retries: 1,
   workers: 2,
   reporter: 'html',
   use: {
