@@ -386,7 +386,7 @@ function makeAsyncContentTableHtml(opts?: { contentDelay?: number }) {
 }
 
 function asyncContentConfig(opts?: {
-  contentReady?: boolean | 'mutationSettled';
+  contentReady?: boolean | 'mutationSettled' | 'until';
   positionOnlyStabilization?: boolean;
 }): TableConfig {
   const isMutation = opts?.contentReady === 'mutationSettled';
@@ -449,6 +449,11 @@ function asyncContentConfig(opts?: {
       },
       ...(isMutation ? {
         contentReady: Strategies.ContentReady.mutationSettled({ timeout: 500, quietPeriod: 50 }),
+      } : opts?.contentReady === 'until' ? {
+        contentReady: Strategies.ContentReady.until(
+          (row) => row.children[1]?.textContent === (row as HTMLElement).dataset.logicalIndex,
+          { timeout: 1000 },
+        ),
       } : opts?.contentReady ? {
         contentReady: Strategies.ContentReady.textStable({ timeout: 500, interval: 30 }),
       } : {}),
@@ -626,5 +631,106 @@ test.describe('contentReady strategy (#417 content staleness)', () => {
 
     expect(names).toContain('Row-000');
     expect(names).toContain('Row-099');
+  });
+});
+
+test.describe('contentReady.until (#487)', () => {
+  test('fallback treats a DOM element returned by an async predicate as truthy', async ({ page }) => {
+    await page.setContent('<div id="ready-row"><span class="ready">ready</span></div>');
+    const row = page.locator('#ready-row');
+    let evaluations = 0;
+    const results: unknown[] = [];
+    const target = {
+      evaluate: async (...args: Parameters<Locator['evaluate']>) => {
+        evaluations++;
+        const result = await row.evaluate(...args);
+        results.push(result);
+        return result;
+      },
+    } as Locator;
+    await Strategies.ContentReady.until(async (el, selector) => el.querySelector(selector), {
+      arg: '.ready', timeout: 100, interval: 10,
+    })(target, page);
+    expect(evaluations).toBe(1);
+    expect(results).toEqual([true]);
+  });
+
+  test('fallback resolves at its deadline when an async predicate never settles', async ({ page }) => {
+    await page.setContent('<div id="ready-row">loading</div>');
+    const row = page.locator('#ready-row');
+    const target = { evaluate: row.evaluate.bind(row) } as Locator;
+    await Strategies.ContentReady.until(() => new Promise(() => {}), { timeout: 50 })(target, page);
+  });
+
+  test('fallback preserves function truthiness and method-shorthand predicates', async ({ page }) => {
+    await page.setContent('<div id="ready-row">ready</div>');
+    const row = page.locator('#ready-row');
+    const results: unknown[] = [];
+    const target = {
+      evaluate: async (...args: Parameters<Locator['evaluate']>) => {
+        const result = await row.evaluate(...args);
+        results.push(result);
+        return result;
+      },
+    } as Locator;
+    const predicates = {
+      ready(el: HTMLElement | SVGElement) { return el.textContent === 'ready' ? () => true : null; },
+      async asyncReady(el: HTMLElement | SVGElement) { return el.querySelector('span') ?? (() => true); },
+    };
+    for (const predicate of [predicates.ready, predicates.asyncReady]) {
+      await Strategies.ContentReady.until(predicate, { timeout: 100 })(target, page);
+    }
+    expect(results).toEqual([true, true]);
+  });
+
+  for (const fallback of [false, true]) {
+    const mode = fallback ? 'evaluate fallback' : 'native waitForFunction';
+
+    test(`${mode} waits for replacement row content and forwards arg`, async ({ page }) => {
+      await page.setContent('<div id="ready-row">loading</div>');
+      const row = page.locator('#ready-row');
+      const target = fallback ? { evaluate: row.evaluate.bind(row) } as Locator : row;
+      await page.evaluate(() => {
+        setTimeout(() => {
+          const replacement = document.createElement('div');
+          replacement.id = 'ready-row';
+          replacement.textContent = 'ready';
+          document.querySelector('#ready-row')!.replaceWith(replacement);
+        }, 100);
+      });
+
+      await Strategies.ContentReady.until((el, expected) => el.textContent === expected, {
+        arg: 'ready', timeout: 1000, interval: 10,
+      })(target, page);
+      expect(await row.textContent()).toBe('ready');
+    });
+
+    test(`${mode} resolves when an absent row exceeds the readiness budget`, async ({ page }) => {
+      await page.setContent('<div>No rows</div>');
+      const row = page.locator('#missing-row');
+      const target = fallback ? { evaluate: row.evaluate.bind(row) } as Locator : row;
+      await Strategies.ContentReady.until(() => true, { timeout: 50 })(target, page);
+    });
+  }
+
+  test('waits in the browser until the recycled row shows its own content', { timeout: 60000 }, async ({ page }) => {
+    // Same setup as mutationSettled: content lands 100ms after the row moves,
+    // and stabilization only waits for the position change.
+    await page.setContent(makeAsyncContentTableHtml({ contentDelay: 100 }));
+    await page.waitForSelector('[role="row"]');
+    const table = useTable(page.locator('#the-table'), asyncContentConfig({
+      contentReady: 'until',
+      positionOnlyStabilization: true,
+    }));
+    await table.init();
+
+    const rows = await table.map(async ({ row }) => {
+      return await row.toJSON({ atomic: true });
+    }, { concurrency: 'sequential' });
+
+    expect(rows.length).toBe(TOTAL_ROWS);
+    for (const [i, r] of (rows as Record<string, string>[]).entries()) {
+      expect(r).toEqual({ Name: `Row-${String(i).padStart(3, '0')}`, Value: String(i) });
+    }
   });
 });

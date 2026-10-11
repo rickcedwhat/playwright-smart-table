@@ -31,6 +31,7 @@ export type {
     NavigationPrimitives,
     DedupeStrategy,
     ContentReadyStrategy,
+    RowReadyPredicate,
     FillStrategy,
     PaginationStrategy,
     HeaderStrategy,

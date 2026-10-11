@@ -5,6 +5,7 @@
 ### Added
 
 - **`AbortSignal` cancellation for table scans (#488)** — `findRow`, `findRows`, `findRowByIndex`, `countRows`, `map`, `forEach`, `filter`, `toArray` and `mapColumn` accept a `signal` option. The signal is checked before each page and before each page advance; once it is aborted the call rejects with `signal.reason` (an `AbortError` by default) instead of returning partial results, and `findRow` rejects instead of returning a not-found row. `countRows` still resets to page 1. A page advance or row callback already in progress finishes first; to cancel those too, pass the same signal to the Playwright actions in your own strategies or callbacks.
+- **`Strategies.ContentReady.until(predicate)` (#487)** — a content-ready strategy that waits until a condition holds on the row element in the browser, e.g. `until(row => !row.querySelector('.skeleton'))`, or until a recycled row's cells match the slot it was moved to. Pass `{ arg }` to send a value to the predicate (it runs in the browser, so it can't use test-side variables). On Playwright 1.62+ it uses `locator.waitForFunction`, which re-resolves the row on each retry and checks without a round-trip per poll; older versions poll with `locator.evaluate`. Like `textStable` and `mutationSettled`, it resolves when `timeout` (default 500ms) runs out rather than failing; errors thrown by the predicate still surface. Timeout and interval values must be positive finite milliseconds; zero is rejected so native polling cannot become unbounded.
 
 ### Changed
 
