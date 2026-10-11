@@ -4,7 +4,7 @@ import { StrategyContext } from '../types';
 
 /**
  * Primitive navigation functions that define HOW to move within a table.
- * The orchestration logic (WHEN to move) lives in _navigateToCell.
+ * The orchestration logic (WHEN to move) lives in navigateToCell (src/engine/cellNavigation.ts).
  */
 export interface NavigationPrimitives {
     goUp?: (context: StrategyContext) => Promise<void>;

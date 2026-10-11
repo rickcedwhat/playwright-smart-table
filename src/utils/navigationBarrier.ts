@@ -65,7 +65,6 @@ export class NavigationBarrier {
    * The fn receives a fresh `targetReached` check; if the previous row's scroll
    * already brought this row into view, fn can no-op immediately.
    */
-  // fallow-ignore-next-line unused-class-member
   async runExclusiveRecovery<T>(fn: () => Promise<T>): Promise<T> {
     if (!this.recoveryMutex) this.recoveryMutex = new Mutex();
     return this.recoveryMutex.run(fn);
