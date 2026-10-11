@@ -2,7 +2,6 @@ import { test, expect } from '@playwright/test';
 import { useTable, presets } from '../../src/index';
 
 test.describe('MUI DataGrid Recon', () => {
-    test.describe.configure({ retries: 2 });
     test.beforeEach(async ({ page }) => {
         await page.goto('http://localhost:3050');
         await expect(page.locator('[role="grid"]')).toBeVisible();

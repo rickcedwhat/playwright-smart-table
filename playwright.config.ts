@@ -15,7 +15,7 @@ export default defineConfig({
   forbidOnly: isCI,
 
   // Retry on CI only.
-  retries: isCI ? 2 : 0,
+  retries: isCI ? 1 : 0,
 
   // CI: use 2 workers on typical 2-vCPU GHA runners (was 1, which serialized everything).
   workers: isCI ? 2 : undefined,

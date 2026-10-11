@@ -207,28 +207,45 @@ test.describe('Playground: Virtualized Table', () => {
             maxPages: 20
         });
 
-        // 2. Find row 20 (First time: should be slow due to delay)
-        // Note: Row 20 might be around 1000px down.
-        const start1 = Date.now();
-        await table.findRow({ ID: '20' });
-        const duration1 = Date.now() - start1;
+        // Record which virtuoso item indexes ever render a loading skeleton.
+        await page.evaluate(() => {
+            const w = window as unknown as { __skeletonIndexes: Set<string> };
+            w.__skeletonIndexes = new Set();
+            const record = (el: Element) => {
+                const index = el.closest('[data-index]')?.getAttribute('data-index');
+                if (index != null) w.__skeletonIndexes.add(index);
+            };
+            document.querySelectorAll('.skeleton-row').forEach(record);
+            new MutationObserver(mutations => {
+                for (const m of mutations) {
+                    m.addedNodes.forEach(node => {
+                        if (!(node instanceof Element)) return;
+                        if (node.matches('.skeleton-row')) record(node);
+                        node.querySelectorAll('.skeleton-row').forEach(record);
+                    });
+                }
+            }).observe(document.body, { childList: true, subtree: true });
+        });
+        const skeletonIndexes = () => page.evaluate(() =>
+            [...(window as unknown as { __skeletonIndexes: Set<string> }).__skeletonIndexes]);
+        const clearSkeletonIndexes = () => page.evaluate(() =>
+            (window as unknown as { __skeletonIndexes: Set<string> }).__skeletonIndexes.clear());
 
-        expect(duration1).toBeGreaterThan(1200); // At least delay time (minus some jitter/overhead margin) // At least delay time (minus some jitter/overhead margin)
+        // 2. Find row 20 the first time: it has to go through the 2s loading delay.
+        const first = await table.findRow({ ID: '20' });
+        const row20Index = await first.evaluate(el => el.closest('[data-index]')?.getAttribute('data-index'));
+        expect(row20Index).toBeTruthy();
+        expect(await skeletonIndexes()).toContain(row20Index);
 
-        // 3. Reset scroll to top (destroying row 20)
+        // 3. Reset scroll to top (unmounting row 20)
         await page.locator('[data-testid="virtuoso-scroller"]').evaluate(el => el.scrollTop = 0);
-        await page.waitForTimeout(500); // Wait for unmount/render
+        await expect(page.locator(`[data-index="${row20Index}"]`)).toHaveCount(0);
+        await clearSkeletonIndexes();
 
-        // 4. Find row 20 again (Second time: should be fast)
-        const start2 = Date.now();
-        await table.findRow({ ID: '20' });
-        const duration2 = Date.now() - start2;
-
-        console.log(`First load: ${duration1}ms, Second load: ${duration2}ms`);
-        // Should be much faster. Allow some buffer for scrolling/rendering (e.g. 1000ms), but definitely less than 2000ms delay + scroll
-        // Actually, without delay, it should be instant (< 1000ms depending on scroll speed).
-        expect(duration2).toBeLessThan(duration1);
-        expect(duration2).toBeLessThan(1500);
+        // 4. Find row 20 again: it is cached, so it remounts loaded without a skeleton.
+        const second = await table.findRow({ ID: '20' });
+        await expect(second.getCell('ID')).toHaveText('20');
+        expect(await skeletonIndexes()).not.toContain(row20Index);
     });
 });
 
