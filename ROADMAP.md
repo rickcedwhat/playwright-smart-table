@@ -24,16 +24,32 @@ Guiding light: [`PHILOSOPHY.md`](PHILOSOPHY.md) is the scoring rubric for every 
 - [x] **Unify `headerSelector` / `rowSelector` / `cellSelector` types; warn when string-only features get a function** — [#457](https://github.com/rickcedwhat/playwright-smart-table/issues/457)
 - [x] **Dependabot weekly npm group blocked by bundled major bumps** — [#442](https://github.com/rickcedwhat/playwright-smart-table/issues/442)
 
-### Batch 2 — GBU 2026-09-30 ([`GBU-REPORT.md`](GBU-REPORT.md))
+### Batch 2 — GBU 2026-09-30 ([report at the pre-audit commit](https://github.com/rickcedwhat/playwright-smart-table/blob/0d74239c7a4e42c1f5ba708fc6f5422a59f07984/GBU-REPORT.md))
 
-- [ ] **`infiniteScroll` silently skips rows when the step exceeds the rendered window** — [#473](https://github.com/rickcedwhat/playwright-smart-table/issues/473) (then verify Grafana-class tables, [#417](https://github.com/rickcedwhat/playwright-smart-table/issues/417))
-- [ ] **Take live third-party sites off the PR critical path** — [#474](https://github.com/rickcedwhat/playwright-smart-table/issues/474)
-- [ ] **Cut redundant/tautological tests; rename bug-numbered test files** — [#475](https://github.com/rickcedwhat/playwright-smart-table/issues/475)
-- [ ] **Cover untested public options (MUI `buttonLabels`, `detectCurrentPage`, `numberOfPages`, …)** — [#476](https://github.com/rickcedwhat/playwright-smart-table/issues/476)
-- [ ] **Move `countRows` / `sorting.apply` / `findRowByIndex` out of `useTable.ts`** — [#477](https://github.com/rickcedwhat/playwright-smart-table/issues/477)
-- [ ] **Move cell navigation and `toJSON` snapshot/re-pin logic out of `smartRow.ts`** — [#478](https://github.com/rickcedwhat/playwright-smart-table/issues/478)
-- [ ] **Quick wins (CONTRIBUTING pnpm, dead `ResolutionStrategies`, orphan `#endregion`, `./types` export)** — [#479](https://github.com/rickcedwhat/playwright-smart-table/issues/479)
+- [x] **`infiniteScroll` silently skips rows when the step exceeds the rendered window** — [#473](https://github.com/rickcedwhat/playwright-smart-table/issues/473) (then verify Grafana-class tables, [#417](https://github.com/rickcedwhat/playwright-smart-table/issues/417))
+- [x] **Take live third-party sites off the PR critical path** — [#474](https://github.com/rickcedwhat/playwright-smart-table/issues/474)
+- [x] **Cut redundant/tautological tests; rename bug-numbered test files** — [#475](https://github.com/rickcedwhat/playwright-smart-table/issues/475)
+- [x] **Cover untested public options (MUI `buttonLabels`, `detectCurrentPage`, `numberOfPages`, …)** — [#476](https://github.com/rickcedwhat/playwright-smart-table/issues/476)
+- [x] **Move `countRows` / `sorting.apply` / `findRowByIndex` out of `useTable.ts`** — [#477](https://github.com/rickcedwhat/playwright-smart-table/issues/477)
+- [x] **Move cell navigation and `toJSON` snapshot/re-pin logic out of `smartRow.ts`** — [#478](https://github.com/rickcedwhat/playwright-smart-table/issues/478)
+- [x] **Quick wins (CONTRIBUTING pnpm, dead `ResolutionStrategies`, orphan `#endregion`, `./types` export)** — [#479](https://github.com/rickcedwhat/playwright-smart-table/issues/479)
 - [ ] **Decide the fate of the README snippet generator** — [#480](https://github.com/rickcedwhat/playwright-smart-table/issues/480)
+
+### Batch 3 — GBU 2026-10-11 ([`GBU-REPORT.md`](GBU-REPORT.md))
+
+Reproduced after #508 merged. Prioritize row identity, detached synchronized reads, and bounded readiness/lifecycle handling. The report also proposes test rewrites and agent-documentation cleanup; select those before implementation.
+
+- [ ] **Atomic snapshot can silently read a replacement row (P1)** — [#511](https://github.com/rickcedwhat/playwright-smart-table/issues/511) (U1)
+- [ ] **Returned synchronized `findRows()` rows can deadlock when read separately (P1)** — [#512](https://github.com/rickcedwhat/playwright-smart-table/issues/512) (U2)
+- [ ] **Render-window index is mistaken for logical row identity during snapshots (P1)** — [#513](https://github.com/rickcedwhat/playwright-smart-table/issues/513) (U3)
+- [ ] **Row, cell, and header loading waits are not bounded when predicates stay pending (P1)** — [#514](https://github.com/rickcedwhat/playwright-smart-table/issues/514) (U4)
+- [ ] **Viewport cache survives DOM changes, reset, and revalidation (P1)** — [#515](https://github.com/rickcedwhat/playwright-smart-table/issues/515) (U5)
+- [ ] **`byTopPosition` drops different records that reuse one viewport slot (P1)** — [#516](https://github.com/rickcedwhat/playwright-smart-table/issues/516) (U6)
+- [ ] **Horizontal header discovery loses order and early columns when starting scrolled (P1)** — [#517](https://github.com/rickcedwhat/playwright-smart-table/issues/517) (U7)
+- [ ] **Lazy initialization skips starting-page detection permanently (P1)** — [#518](https://github.com/rickcedwhat/playwright-smart-table/issues/518) (U8)
+- [ ] **Missing index attributes are parsed as valid zeroes (P2)** — [#519](https://github.com/rickcedwhat/playwright-smart-table/issues/519) (U9)
+
+Follow-up API inconsistencies and test/agent-documentation cleanup remain described in the report (B1–B5). Existing upstream follow-ups: [#486](https://github.com/rickcedwhat/playwright-smart-table/issues/486) and [#509](https://github.com/rickcedwhat/playwright-smart-table/issues/509).
 
 ### Deferred to v7
 
@@ -60,7 +76,7 @@ Related closed work to reopen/extend: [#327](https://github.com/rickcedwhat/play
     - **Callback**: `{ row, rowIndex, stop }` — call `stop()` to end iteration early.
     - **Options**: `{ concurrency?: 'parallel' | 'sequential' | 'synchronized', maxPages?: number, dedupe?: DedupeStrategy }`.
       - `forEach`, `filter`, and `map`: default `concurrency: 'sequential'` (safer for UI interactions; pass `parallel` for read-only maps).
-      - `synchronized`: lock-step navigation with serialized callbacks (virtualized grids).
+      - `synchronized`: lock-step navigation with concurrent callbacks (virtualized grids); use sequential mode for independent UI mutations.
     - **Also adds**: Public `[Symbol.asyncIterator]` on `TableResult` — enables `for await (const { row } of table)`.
     - **Deprecates**:
       - `iterateThroughTable` (use `forEach`/`map`/`filter` instead).
@@ -106,15 +122,15 @@ Related closed work to reopen/extend: [#327](https://github.com/rickcedwhat/play
     - **Vision**: Enable community contributions for specific library support, removing the burden of manual configuration for popular libraries.
 
 ### 🚀 Upstream Playwright Integration Opportunities
-Tracked from the 2026-10 GBU audit of Playwright changelogs (v1.50 – v1.62):
-- [ ] **Annotate SmartRow, SmartCell, and Sentinel locators with `locator.describe()`** ([#485](https://github.com/rickcedwhat/playwright-smart-table/issues/485)):
+Tracked from the previous audit; refreshed by the 2026-10-11 review of Playwright v1.56.1–v1.64.0:
+- [x] **Annotate SmartRow, SmartCell, and Sentinel locators with `locator.describe()`** ([#485](https://github.com/rickcedwhat/playwright-smart-table/issues/485)):
     - Gives clear names in Playwright trace viewer, HTML reports, and strict-mode timeout errors.
     - Includes one-time upgrade reminder on older peer versions (<1.53).
 - [ ] **Support `scroll: 'none'` action option in cell navigation & virtualized presets** ([#486](https://github.com/rickcedwhat/playwright-smart-table/issues/486)):
     - Prevents Playwright's native auto-scroll from disrupting virtualized sticky columns/headers during cell clicks.
-- [ ] **Add in-browser stabilization strategy via `locator.waitForFunction()`** ([#487](https://github.com/rickcedwhat/playwright-smart-table/issues/487)):
+- [x] **Add in-browser stabilization strategy via `locator.waitForFunction()`** ([#487](https://github.com/rickcedwhat/playwright-smart-table/issues/487)):
     - Eliminates Node-to-browser IPC round trips in row content stabilization loops.
-- [ ] **Support `AbortSignal` cancellation in `scanPages`, `findRows`, and `map`** ([#488](https://github.com/rickcedwhat/playwright-smart-table/issues/488)):
+- [x] **Support `AbortSignal` cancellation in `scanPages`, `findRows`, and `map`** ([#488](https://github.com/rickcedwhat/playwright-smart-table/issues/488)):
     - Allows clean early cancellation of long table traversals.
 
 ## Non-Goals
