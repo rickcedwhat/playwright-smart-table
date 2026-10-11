@@ -13,6 +13,7 @@
  */
 import { test, expect, Page } from '@playwright/test';
 import { useTable, Strategies } from '../src/index';
+import { openVirtualizedPlayground, setPlaygroundConfig } from './support/playground';
 
 /**
  * Deterministic repro of the #355 core mechanism, with no virtualization/timing races.
@@ -65,20 +66,6 @@ const skeletonAwareDedupe = async (row: any) =>
         return 'id:' + (idCell?.textContent ?? '').trim();
     });
 
-async function setPlaygroundConfig(page: Page, config: any) {
-    const json = JSON.stringify(config, null, 2);
-    await page.locator('textarea').click();
-    await page.keyboard.press('ControlOrMeta+a');
-    await page.keyboard.press('Backspace');
-    await page.locator('textarea').fill(json);
-    await page.getByRole('button', { name: 'Apply & Reload Table' }).click();
-    try {
-        await page.locator('.spinner').waitFor({ state: 'visible', timeout: 2000 });
-    } catch (e) {
-        // Reload may be too fast to catch the spinner
-    }
-    await expect(page.locator('.spinner')).not.toBeVisible();
-}
 
 /** Selectors for the virtualized playground table. */
 const baseTableConfig = {
@@ -161,8 +148,7 @@ test.describe('map() loading semantics on the virtualized playground', () => {
             test.skip(true, 'Skipping: Local playground server not running at localhost:3000');
         }
 
-        await page.goto('http://localhost:3000/virtualized');
-        await expect(page.getByRole('heading', { name: 'Virtualized Table Scenario' })).toBeVisible();
+        await openVirtualizedPlayground(page);
     });
 
     test('Bug #355 — onRowLoadingTimeout: "skip" drops never-loading rows from map()', async ({ page }) => {

@@ -1,27 +1,7 @@
-import { test, expect, Page } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 import { useTable, Strategies } from '../src/index';
+import { openVirtualizedPlayground, setPlaygroundConfig } from './support/playground';
 
-// Helper to set config
-async function setPlaygroundConfig(page: Page, config: any) {
-    const json = JSON.stringify(config, null, 2);
-    // Clear and type
-    await page.locator('textarea').click();
-    await page.keyboard.press('ControlOrMeta+a');
-    await page.keyboard.press('Backspace');
-    await page.locator('textarea').fill(json);
-    // Ensure React onChange flushed before reload (CI race with controlled textarea).
-    await expect(page.locator('textarea')).toHaveValue(json);
-    // Apply
-    await page.getByRole('button', { name: 'Apply & Reload Table' }).click();
-    // Wait for reload (spinner)
-    // Wait for reload (spinner) - use loose check as it might be too fast
-    try {
-        await page.locator('.spinner').waitFor({ state: 'visible', timeout: 2000 });
-    } catch (e) {
-        // Ignored - might have missed it
-    }
-    await expect(page.locator('.spinner')).not.toBeVisible();
-}
 
 
 
@@ -35,9 +15,45 @@ test.describe('Playground: Virtualized Table', () => {
             test.skip(true, 'Skipping: Local playground server not running at localhost:3000');
         }
 
-        await page.goto('http://localhost:3000/virtualized');
-        // Ensure ready
-        await expect(page.getByRole('heading', { name: 'Virtualized Table Scenario' })).toBeVisible();
+        await openVirtualizedPlayground(page);
+    });
+
+    test('a newer reload cancels the pending reload without remounting again', async ({ page }) => {
+        await page.clock.install({ time: new Date('2026-01-01T00:00:00Z') });
+        await page.clock.pauseAt(new Date('2026-01-01T00:00:01Z'));
+
+        const card = page.getByTestId('table-card');
+        const textarea = page.locator('textarea');
+        const reload = page.getByRole('button', { name: 'Apply & Reload Table' });
+        const config = {
+            rowCount: 10,
+            defaults: {
+                tableInitDelay: 1000,
+                rowDelay: 0,
+                cellDelay: 0,
+                generator: 'simple'
+            }
+        };
+
+        // Leave the first reload pending; the shared config helper waits for completion.
+        await textarea.fill(JSON.stringify(config));
+        await reload.click();
+        await expect(card).toHaveAttribute('data-table-key', '1');
+        await expect(card).toHaveAttribute('data-table-loading', 'true');
+
+        await textarea.fill(JSON.stringify({
+            ...config,
+            defaults: { ...config.defaults, tableInitDelay: 0 }
+        }));
+        await reload.click();
+        await page.clock.runFor(10);
+        await expect(card).toHaveAttribute('data-table-key', '2');
+        await expect(card).toHaveAttribute('data-table-loading', 'false');
+
+        // Cross the superseded timer's deadline: it must not remount the table a second time.
+        await page.clock.runFor(2000);
+        await expect(card).toHaveAttribute('data-table-key', '2');
+        await expect(card).toHaveAttribute('data-table-loading', 'false');
     });
 
     test('should fetch rows with infinite scroll', async ({ page }) => {
@@ -66,7 +82,8 @@ test.describe('Playground: Virtualized Table', () => {
             }
         });
 
-        // 3. Get Rows (First batch)
+        // 3. Get Rows (First batch), once Virtuoso has mounted the first rows
+        await expect(page.locator('.virtual-table-container .virtual-row').first()).toBeVisible();
         const rows = await table.findRows({}, { maxPages: 1 });
 
         expect(rows.length).toBeGreaterThan(0);
@@ -259,8 +276,7 @@ test.describe('Loading Strategy: row and cell timeout', () => {
             test.skip(true, 'Skipping: Local playground server not running at localhost:3000');
         }
 
-        await page.goto('http://localhost:3000/virtualized');
-        await expect(page.getByRole('heading', { name: 'Virtualized Table Scenario' })).toBeVisible();
+        await openVirtualizedPlayground(page);
     });
 
     test('rowLoadingTimeout — rows load within timeout → all collected', async ({ page }) => {
@@ -411,6 +427,8 @@ test.describe('Loading Strategy: row and cell timeout', () => {
         });
 
         await table.init();
+        // Virtuoso mounts rows after its first measurement pass; searching before then sees none.
+        await expect(page.locator('.virtual-table-container .virtual-row')).toHaveCount(10);
         const rows = await table.findRows({}, { maxPages: 1 });
 
         expect(rows.length).toBe(10);

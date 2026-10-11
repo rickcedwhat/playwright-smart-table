@@ -1,23 +1,7 @@
-import { test, expect, Page } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 import { useTable, Strategies } from '../src/index';
+import { openVirtualizedPlayground, setPlaygroundConfig } from './support/playground';
 
-// Helper to set config
-async function setPlaygroundConfig(page: Page, config: any) {
-    const json = JSON.stringify(config, null, 2);
-    // Clear and type
-    await page.locator('textarea').click();
-    await page.keyboard.press('ControlOrMeta+a');
-    await page.keyboard.press('Backspace');
-    await page.locator('textarea').fill(json);
-    // Apply
-    await page.getByRole('button', { name: 'Apply & Reload Table' }).click();
-    try {
-        await page.locator('.spinner').waitFor({ state: 'visible', timeout: 2000 });
-    } catch (e) {
-        // Ignored - might have missed it
-    }
-    await expect(page.locator('.spinner')).not.toBeVisible();
-}
 
 test.describe('Performance Benchmark', () => {
     test.beforeEach(async ({ page }) => {
@@ -29,8 +13,7 @@ test.describe('Performance Benchmark', () => {
             test.skip(true, 'Skipping: Local playground server not running at localhost:3000');
         }
 
-        await page.goto('http://localhost:3000/virtualized');
-        await expect(page.getByRole('heading', { name: 'Virtualized Table Scenario' })).toBeVisible();
+        await openVirtualizedPlayground(page);
     });
 
     test('should iterate 10,000 virtualized rows in a performant manner', async ({ page }) => {
