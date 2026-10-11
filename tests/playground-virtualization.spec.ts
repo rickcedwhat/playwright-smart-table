@@ -18,6 +18,44 @@ test.describe('Playground: Virtualized Table', () => {
         await openVirtualizedPlayground(page);
     });
 
+    test('a newer reload cancels the pending reload without remounting again', async ({ page }) => {
+        await page.clock.install({ time: new Date('2026-01-01T00:00:00Z') });
+        await page.clock.pauseAt(new Date('2026-01-01T00:00:01Z'));
+
+        const card = page.getByTestId('table-card');
+        const textarea = page.locator('textarea');
+        const reload = page.getByRole('button', { name: 'Apply & Reload Table' });
+        const config = {
+            rowCount: 10,
+            defaults: {
+                tableInitDelay: 1000,
+                rowDelay: 0,
+                cellDelay: 0,
+                generator: 'simple'
+            }
+        };
+
+        // Leave the first reload pending; the shared config helper waits for completion.
+        await textarea.fill(JSON.stringify(config));
+        await reload.click();
+        await expect(card).toHaveAttribute('data-table-key', '1');
+        await expect(card).toHaveAttribute('data-table-loading', 'true');
+
+        await textarea.fill(JSON.stringify({
+            ...config,
+            defaults: { ...config.defaults, tableInitDelay: 0 }
+        }));
+        await reload.click();
+        await page.clock.runFor(10);
+        await expect(card).toHaveAttribute('data-table-key', '2');
+        await expect(card).toHaveAttribute('data-table-loading', 'false');
+
+        // Cross the superseded timer's deadline: it must not remount the table a second time.
+        await page.clock.runFor(2000);
+        await expect(card).toHaveAttribute('data-table-key', '2');
+        await expect(card).toHaveAttribute('data-table-loading', 'false');
+    });
+
     test('should fetch rows with infinite scroll', async ({ page }) => {
         // 1. Setup: 100 rows, simple data
         await setPlaygroundConfig(page, {
