@@ -260,7 +260,7 @@ findRow(
 ### Parameters
 
 - `filters` - The filter criteria to match
-- `options` - Search options including exact match and max pages. `signal` cancels the
+- `options` - Search options including exact match and max pages. `signal` cancels the page scan; the call rejects with `signal.reason`.
 
 <!-- /api-signature: findRow -->
 

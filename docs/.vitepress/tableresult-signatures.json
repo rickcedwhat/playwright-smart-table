@@ -47,7 +47,7 @@
   {
     "name": "findRow",
     "signature": "findRow(\n  filters: Record<string, FilterValue>,\n  options?: { exact?: boolean, maxPages?: number, signal?: AbortSignal }\n  ): Promise<SmartRow<T>>",
-    "comment": "/**\n* ASYNC: Searches for a single row across pages using pagination.\n* Auto-initializes the table if not already initialized.\n* @param filters - The filter criteria to match\n* @param options - Search options including exact match and max pages. `signal` cancels the\n* page scan; the call rejects with `signal.reason`.\n*/"
+    "comment": "/**\n* ASYNC: Searches for a single row across pages using pagination.\n* Auto-initializes the table if not already initialized.\n* @param filters - The filter criteria to match\n* @param options - Search options including exact match and max pages. `signal` cancels the page scan; the call rejects with `signal.reason`.\n*/"
   },
   {
     "name": "findRows",

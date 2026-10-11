@@ -98,14 +98,23 @@ export async function countRows<T>(
     await waitWhileTableLoading(config, env.getContext(), rootLocator.page(), 'countRows');
   };
 
+  options?.signal?.throwIfAborted();
   await waitForReady();
+  options?.signal?.throwIfAborted();
 
   const filterSuffix = hasFilters ? ` filters=${safeStringify(filtersRecord)}` : '';
   if (!hasPagination) {
     log(config, `countRows: counting rows in current viewport (no pagination)${filterSuffix}`);
-    if (!hasPostFilters) return resolveRows().count();
-    const all = await resolveRows().all();
-    return countPostFilterMatches(all, all.map((_, i) => i));
+    let count: number;
+    if (!hasPostFilters) {
+      count = await resolveRows().count();
+    } else {
+      const all = await resolveRows().all();
+      options?.signal?.throwIfAborted();
+      count = await countPostFilterMatches(all, all.map((_, i) => i));
+    }
+    options?.signal?.throwIfAborted();
+    return count;
   }
 
   log(config, `countRows: paginating up to ${effectiveMaxPages} page(s)${filterSuffix}`);

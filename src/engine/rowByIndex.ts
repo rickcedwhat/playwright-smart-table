@@ -25,6 +25,7 @@ export async function findRowByIndex<T>(
   index: number,
   options?: { maxPages?: number, signal?: AbortSignal }
 ): Promise<SmartRow<T>> {
+  options?.signal?.throwIfAborted();
   const { config } = env;
   logDebug(config, 'verbose', `findRowByIndex: index=${index} options=${safeStringify(options)}`);
   const resolveRI = config.strategies.resolveRowIndex;
@@ -44,8 +45,10 @@ export async function findRowByIndex<T>(
   // The currently-mounted row whose logical index === index, if any.
   const findMounted = async (): Promise<Locator | null> => {
     const rows = await env.getRowLocators().all();
+    options?.signal?.throwIfAborted();
     for (const r of rows) {
       const result = await resolveRI(r);
+      options?.signal?.throwIfAborted();
       if (result === undefined) continue;
       const normalized = normalizeRowIndexResult(result);
       if (normalized.index === index) {
@@ -58,12 +61,15 @@ export async function findRowByIndex<T>(
 
   // 1. Already mounted (no navigation needed)?
   let loc = await findMounted();
+  options?.signal?.throwIfAborted();
 
   // 2. Fast path: jump straight to it via the viewport's random-access scroll.
   if (!loc && viewport?.scrollToRow) {
     logDebug(config, 'verbose', `findRowByIndex: scrolling to row ${index}`);
     await viewport.scrollToRow(env.getContext(), index);
+    options?.signal?.throwIfAborted();
     loc = await findMounted();
+    options?.signal?.throwIfAborted();
   }
 
   // 3. Fallback: advance pages (on infinite-scroll tables, a "page" is a scroll step) until
@@ -93,5 +99,6 @@ export async function findRowByIndex<T>(
   }
 
   await debugDelay(config, 'findRow');
+  options?.signal?.throwIfAborted();
   return env.makeSmartRow(loc, env.getMap(), index, env.getCurrentPageIndex(), foundSelector);
 }

@@ -956,8 +956,7 @@ export interface TableResult<T = any> extends AsyncIterable<{ row: SmartRow<T>; 
    * ASYNC: Searches for a single row across pages using pagination.
    * Auto-initializes the table if not already initialized.
    * @param filters - The filter criteria to match
-   * @param options - Search options including exact match and max pages. `signal` cancels the
-   * page scan; the call rejects with `signal.reason`.
+   * @param options - Search options including exact match and max pages. `signal` cancels the page scan; the call rejects with `signal.reason`.
    */
   findRow: (
     filters: Record<string, FilterValue>,
