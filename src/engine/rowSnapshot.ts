@@ -1,6 +1,6 @@
 import type { Locator, Page } from '@playwright/test';
 import type { FinalTableConfig, SmartRow, TableResult } from '../types';
-import { normalizeRowIndexResult } from './rowResolution';
+import { normalizeRowIndexResult, resolveLogicalRowIndex } from './rowResolution';
 import { navigateToCell } from './cellNavigation';
 import { logDebug } from '../utils/debugUtils';
 import type { SmartRowInternals } from '../utils/smartRowInternals';
@@ -45,6 +45,15 @@ async function computeSyntheticColumns<T>(env: RowSnapshotEnv<T>, result: Record
 }
 
 const isBatchRow = (row: SmartRowInternals) => row._inBatch === true || !!row._barrier;
+
+/** Capture a mounted position's identity once, before readiness or navigation can recycle it. */
+async function resolveSnapshotIdentity<T>(env: RowSnapshotEnv<T>): Promise<RowSnapshotEnv<T>> {
+    if (!env.renderWindowPosition || !env.config.strategies.resolveRowIndex) return env;
+    const identity = await resolveLogicalRowIndex(env.rowLocator, env.config, () => undefined);
+    // Keep the public SmartRow's mounted position unchanged; all snapshot recovery and
+    // navigation use this read's logical identity. An unknown identity is not position 0.
+    return { ...env, rowIndex: identity?.index, renderWindowPosition: false };
+}
 
 // ─── Atomic snapshot ─────────────────────────────────────────────────────────
 
@@ -122,8 +131,7 @@ async function resolveCloneTarget<T>(env: RowSnapshotEnv<T>): Promise<Locator> {
         await config.strategies.contentReady(cloneTarget, env.rootLocator.page());
         // Revalidate: the element may have recycled during the await.
         if (canRepin && await logicalIndexOf(env, cloneTarget) !== rowIndex) {
-            const reFound = await rescanForRow(env, rowIndex);
-            if (reFound) cloneTarget = reFound;
+            cloneTarget = await recoverDriftedRow(env, rowIndex);
         }
     }
     return cloneTarget;
@@ -163,6 +171,7 @@ export async function readRowAtomic<T>(env: RowSnapshotEnv<T>, columns?: string[
     if (typeof cellSel !== 'string') {
         throw new Error('[SmartTable] toJSON({ atomic: true }) requires cellSelector to be a CSS string, not a function.');
     }
+    env = await resolveSnapshotIdentity(env);
     const page = rootLocator.page();
     const snapshot = await cloneRow(await resolveCloneTarget(env), cellSel);
 
@@ -365,6 +374,7 @@ async function waitForCellLoaded<T>(env: RowSnapshotEnv<T>, targetCell: Locator,
  * (keeps synchronized batches in lock-step) and re-pinning the row before each read.
  */
 export async function readRowLive<T>(env: RowSnapshotEnv<T>, columns?: string[]): Promise<T> {
+    env = await resolveSnapshotIdentity(env);
     const { config, map, rootLocator, rowIndex } = env;
     const result: Record<string, any> = {};
     const page = rootLocator.page();
