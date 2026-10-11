@@ -1,7 +1,53 @@
 import type { Locator, Page } from '@playwright/test';
-import type { ContentReadyStrategy } from '../types';
+import type { ContentReadyStrategy, RowReadyPredicate } from '../types';
+
+function isTimeout(error: unknown): boolean {
+    return (error as Error | undefined)?.name === 'TimeoutError';
+}
+
+/** Playwright < 1.62 has no `locator.waitForFunction`: poll with one `evaluate` per check. */
+async function pollPredicate(row: Locator, page: Page, predicate: RowReadyPredicate<unknown>, arg: unknown, timeout: number, interval: number): Promise<void> {
+    const deadline = Date.now() + timeout;
+    while (Date.now() < deadline) {
+        if (await row.evaluate(predicate, arg, { timeout: Math.max(1, deadline - Date.now()) })) return;
+        await page.waitForTimeout(Math.min(interval, Math.max(0, deadline - Date.now())));
+    }
+}
 
 export const ContentReadyStrategies = {
+    /**
+     * Waits in the browser until `predicate(rowElement, arg)` returns a truthy value, e.g. until
+     * a skeleton placeholder is gone or every cell has rendered. Resolves when `timeout` expires
+     * even if the predicate never passed, like the other content-ready strategies.
+     *
+     * Uses `locator.waitForFunction` (Playwright 1.62+), which re-resolves the row on each retry
+     * and polls without a round-trip per check. Older versions poll via `locator.evaluate`.
+     *
+     * @example
+     * contentReady: Strategies.ContentReady.until(row => !row.querySelector('.skeleton'))
+     */
+    until: <Arg = undefined>(
+        predicate: RowReadyPredicate<Arg>,
+        options: { arg?: Arg; timeout?: number; interval?: number } = {}
+    ): ContentReadyStrategy => {
+        const timeout = options.timeout ?? 500;
+        const interval = options.interval ?? 50;
+        const fn = predicate as RowReadyPredicate<unknown>;
+        const arg: unknown = options.arg;
+        return async (row: Locator, page: Page) => {
+            try {
+                if (typeof row.waitForFunction === 'function') {
+                    await row.waitForFunction(fn, arg, { timeout });
+                } else {
+                    await pollPredicate(row, page, fn, arg, timeout, interval);
+                }
+            } catch (error) {
+                if (!isTimeout(error)) throw error;
+            }
+        };
+    },
+
+
     /**
      * Polls the row's text content until two consecutive reads match.
      */

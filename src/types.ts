@@ -461,6 +461,9 @@ export type DedupeStrategy = (row: SmartRow) => string | number | Promise<string
 
 export type ContentReadyStrategy = (row: Locator, page: Page) => Promise<void>;
 
+/** Predicate for `Strategies.ContentReady.until`. Runs in the browser with the row element, so it must not close over test-side variables; pass values via `arg`. */
+export type RowReadyPredicate<Arg = undefined> = (row: HTMLElement | SVGElement, arg: Arg) => unknown;
+
 
 
 export type FillStrategy = (options: {
@@ -693,11 +696,17 @@ export interface TableStrategies {
    * Without this, the clone captures stale content from the previous occupant of the
    * DOM slot — the element is at the correct position but React hasn't re-rendered yet.
    *
-   * Use `Strategies.ContentReady.textStable()` for the built-in text-polling strategy.
+   * Built-ins: `Strategies.ContentReady.textStable()` (text stops changing),
+   * `mutationSettled()` (no DOM mutations for a quiet period), and `until(predicate)`
+   * (an in-browser condition holds, e.g. no skeleton placeholder).
    *
    * @example
    * strategies: {
    *   contentReady: Strategies.ContentReady.textStable({ timeout: 500 }),
+   * }
+   * @example
+   * strategies: {
+   *   contentReady: Strategies.ContentReady.until(row => !row.querySelector('.skeleton')),
    * }
    */
   contentReady?: ContentReadyStrategy;

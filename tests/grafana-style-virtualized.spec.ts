@@ -386,7 +386,7 @@ function makeAsyncContentTableHtml(opts?: { contentDelay?: number }) {
 }
 
 function asyncContentConfig(opts?: {
-  contentReady?: boolean | 'mutationSettled';
+  contentReady?: boolean | 'mutationSettled' | 'until';
   positionOnlyStabilization?: boolean;
 }): TableConfig {
   const isMutation = opts?.contentReady === 'mutationSettled';
@@ -449,6 +449,11 @@ function asyncContentConfig(opts?: {
       },
       ...(isMutation ? {
         contentReady: Strategies.ContentReady.mutationSettled({ timeout: 500, quietPeriod: 50 }),
+      } : opts?.contentReady === 'until' ? {
+        contentReady: Strategies.ContentReady.until(
+          (row) => row.children[1]?.textContent === (row as HTMLElement).dataset.logicalIndex,
+          { timeout: 1000 },
+        ),
       } : opts?.contentReady ? {
         contentReady: Strategies.ContentReady.textStable({ timeout: 500, interval: 30 }),
       } : {}),
@@ -626,5 +631,28 @@ test.describe('contentReady strategy (#417 content staleness)', () => {
 
     expect(names).toContain('Row-000');
     expect(names).toContain('Row-099');
+  });
+});
+
+test.describe('contentReady.until (#487)', () => {
+  test('waits in the browser until the recycled row shows its own content', { timeout: 60000 }, async ({ page }) => {
+    // Same setup as mutationSettled: content lands 100ms after the row moves,
+    // and stabilization only waits for the position change.
+    await page.setContent(makeAsyncContentTableHtml({ contentDelay: 100 }));
+    await page.waitForSelector('[role="row"]');
+    const table = useTable(page.locator('#the-table'), asyncContentConfig({
+      contentReady: 'until',
+      positionOnlyStabilization: true,
+    }));
+    await table.init();
+
+    const rows = await table.map(async ({ row }) => {
+      return await row.toJSON({ atomic: true });
+    }, { concurrency: 'sequential' });
+
+    expect(rows.length).toBe(TOTAL_ROWS);
+    for (const [i, r] of (rows as Record<string, string>[]).entries()) {
+      expect(r).toEqual({ Name: `Row-${String(i).padStart(3, '0')}`, Value: String(i) });
+    }
   });
 });
