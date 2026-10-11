@@ -23,10 +23,10 @@ import { logDebug } from '../utils/debugUtils';
  * | findRow | yes | options.useBulkPagination | yes | DOM/post filters only |
  * | countRows | yes | no (single-step) | yes | count-only / post filters |
  * | async iterator | yes | no | via runMap path | same as map |
- * | findRowByIndex | no* | no | n/a | scroll/search, not a full scan |
+ * | findRowByIndex | no | no | no | stops once the target index is mounted* |
  * | bringIntoView | n/a | path planner | n/a | not a page scan |
  *
- * \* findRowByIndex stops when the target index is mounted; it does not collect rows.
+ * \* findRowByIndex only falls back to scanPages after the mounted / viewport.scrollToRow paths miss.
  */
 
 export type ScanDecision = 'continue' | 'stop';
