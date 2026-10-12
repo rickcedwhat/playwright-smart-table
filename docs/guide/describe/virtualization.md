@@ -76,6 +76,14 @@ _Config: `strategies.viewport`_
 
 ---
 
+## Viewport freshness and caching
+
+Viewport geometry is queried again for each cell navigation, and visible row membership is queried again for each scan. External scrolling, sorting, reset, and revalidation therefore cannot reuse geometry or membership from an earlier operation.
+
+Within one navigation, the library memoizes repeated range queries to reduce DOM round-trips. Both ranges are cleared before and after scrolling either axis, including a failed scroll. Set `strategies.viewport.disableCache: true` to bypass this in-navigation memoization.
+
+---
+
 ## Which row is which?
 
 In a virtualized table, the 3rd `<tr>` in the DOM isn't row 3 — it's whatever happens to be rendered in that slot right now. Scroll a little and the same element can be holding a completely different row.

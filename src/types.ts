@@ -214,9 +214,9 @@ export interface ViewportStrategy {
 
   /**
    * When true, disables the automatic memoization of getVisibleColumnRange and
-   * getVisibleRowRange results. By default the library caches each range value and
-   * invalidates it after the corresponding scroll call, eliminating redundant DOM
-   * evaluate() round-trips between scrolls.
+   * getVisibleRowRange results within a single cell-navigation operation. Geometry
+   * is refreshed for each new read and around scroll calls. Row membership is not
+   * memoized by the library. Caches never persist across scans, resets, or revalidation.
    */
   disableCache?: boolean;
 }
