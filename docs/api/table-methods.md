@@ -297,6 +297,8 @@ findRows(
 
 Searches for **all** matching rows across pages. Pass empty filters `{}` or omit to collect every row.
 
+Returned rows can be read individually, sequentially, or with different column selections, even when the table's `concurrency` is `'synchronized'`. The array's `toJSON()` helper reads rows sequentially to avoid competing viewport moves. For coordinated column scrolling across virtualized rows, use `map(({ row }) => row.toJSON(), { concurrency: 'synchronized' })`.
+
 ```typescript
 const activeRows = await table.findRows({ Status: 'Active' });
 const allRows = await table.findRows();

@@ -4,6 +4,7 @@
 
 ### Fixed
 
+- **Independent `findRows()` reads (#512)** — returned rows no longer carry a shared navigation barrier that could wait forever when only one result was read, results were read sequentially, or readers selected different columns. The array's `toJSON()` helper reads rows sequentially to avoid competing viewport moves. Synchronized iteration methods still coordinate navigation within their owned callback batches.
 - **Snapshot row identity (#511, #513)** — live and atomic `toJSON()` reads on `getRowByIndex()` capture the selected mounted row's logical identity before readiness or navigation, so a window starting at row 100 no longer attempts to recover logical row 0. Atomic reads now recover or reject when `contentReady` recycles the target away, rather than cloning a replacement row. Batch recovery remains rescan-only to avoid scrolling sibling rows out of view.
 
 ### Added

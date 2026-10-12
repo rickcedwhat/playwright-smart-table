@@ -6,7 +6,7 @@ import { logDebug, debugDelay } from '../utils/debugUtils';
 import { createSmartRowArray, SmartRowArray } from '../utils/smartRowArray';
 import { ElementTracker } from '../utils/elementTracker';
 import { SENTINEL_ROW } from '../utils/sentinel';
-import { NavigationBarrier } from '../utils/navigationBarrier';
+import type { NavigationBarrier } from '../utils/navigationBarrier';
 import { resolveLogicalRowIndex, resolveRowLoading } from './rowResolution';
 import { resolveCellLocator } from '../utils/resolveCellLocator';
 import { scanPages } from './scanPages';
@@ -223,9 +223,6 @@ export class RowFinder<T = any> {
                     const currentRows = await rowLocators.all();
                     let added = 0;
 
-                    const useBarrier = this.config.concurrency === 'synchronized' && newIndices.length > 1;
-                    const barrier = useBarrier ? new NavigationBarrier(newIndices.length) : undefined;
-
                     for (const idx of newIndices) {
                         const resolved = await resolveLogicalRowIndex(
                             currentRows[idx],
@@ -233,7 +230,9 @@ export class RowFinder<T = any> {
                             () => allRows.length,
                         );
                         const rowLocator = this.nameFilteredRow(currentRows[idx], resolved, filtersRecord);
-                        const smartRow = this.makeSmartRow(rowLocator, map, resolved?.index, this.tableState.currentPageIndex, barrier, resolved?.selector);
+                        // These rows outlive the scan and may be consumed individually. Only
+                        // iteration engines that own every callback can attach a batch barrier.
+                        const smartRow = this.makeSmartRow(rowLocator, map, resolved?.index, this.tableState.currentPageIndex, undefined, resolved?.selector);
 
                         const loadingOutcome = await resolveRowLoading(
                             smartRow,
@@ -242,7 +241,6 @@ export class RowFinder<T = any> {
                             (msg) => logDebug(this.config, 'verbose', `findRows: ${msg}`),
                         );
                         if (loadingOutcome !== 'process') {
-                            barrier?.markFinished();
                             if (loadingOutcome === 'throw') {
                                 throw new Error(`[SmartTable] Row ${allRows.length} did not finish loading within ${this.config.strategies.loading?.rowLoadingTimeout}ms`);
                             }
@@ -250,12 +248,10 @@ export class RowFinder<T = any> {
                         }
 
                         if (hasOverrideFilters && !await this.matchesOverrideFilters(currentRows[idx], overrideFilters, map, options?.exact ?? false)) {
-                            barrier?.markFinished();
                             continue;
                         }
 
                         if (hasSyntheticFilters && !await this.matchesSyntheticFilters(currentRows[idx], syntheticFilters, map, options?.exact ?? false)) {
-                            barrier?.markFinished();
                             continue;
                         }
 
