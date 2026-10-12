@@ -4,6 +4,7 @@ import { normalizeRowIndexResult, resolveLogicalRowIndex } from './rowResolution
 import { navigateToCell } from './cellNavigation';
 import { logDebug } from '../utils/debugUtils';
 import type { SmartRowInternals } from '../utils/smartRowInternals';
+import { withinDeadline } from '../utils/deadline';
 
 /** Everything `toJSON` needs from the SmartRow being read. */
 export interface RowSnapshotEnv<T = any> {
@@ -311,7 +312,8 @@ function cellLoadingTimeoutOf(config: FinalTableConfig): number | undefined {
 async function pollUntil(page: Page, deadline: number, intervalMs: number, check: () => Promise<boolean>, initial: boolean): Promise<boolean> {
     let done = initial;
     while (!done && Date.now() < deadline) {
-        await page.waitForTimeout(intervalMs);
+        await page.waitForTimeout(Math.min(intervalMs, deadline - Date.now()));
+        if (Date.now() >= deadline) break;
         done = await check();
     }
     return done;
@@ -322,10 +324,10 @@ async function pollUntil(page: Page, deadline: number, intervalMs: number, check
  * indicator mounts. A single false-negative then reads "" and skips
  * onCellLoadingTimeout. Only grace when the cell still looks empty.
  */
-async function graceForLoadingIndicator(page: Page, targetCell: Locator, isLoading: () => Promise<boolean>, timeout: number): Promise<boolean> {
-    const peek = await targetCell.evaluate((el) => (el.textContent || '').trim()).catch(() => '');
+async function graceForLoadingIndicator(page: Page, targetCell: Locator, isLoading: () => Promise<boolean>, deadline: number): Promise<boolean> {
+    const peek = await withinDeadline(() => targetCell.evaluate((el) => (el.textContent || '').trim()).catch(() => ''), deadline, '');
     if (peek !== '') return false;
-    return pollUntil(page, Date.now() + Math.min(250, timeout), 25, isLoading, false);
+    return pollUntil(page, Math.min(Date.now() + 250, deadline), 25, isLoading, false);
 }
 
 /** What to do when a cell is still loading after `cellLoadingTimeout`. */
@@ -353,19 +355,20 @@ async function waitForCellLoaded<T>(env: RowSnapshotEnv<T>, targetCell: Locator,
     const isCellLoading: IsCellLoading | undefined = config.strategies.loading?.isCellLoading;
     if (!isCellLoading) return { read: true };
     const page = env.rootLocator.page();
-    const isLoading = () => isCellLoading(targetCell, col, smart);
     const timeout = cellLoadingTimeoutOf(config);
+    const deadline = Date.now() + (timeout ?? Infinity);
+    const isLoading = () => withinDeadline(() => isCellLoading(targetCell, col, smart), deadline, true);
 
     let loading = await isLoading();
     if (!loading && timeout !== undefined && timeout > 0) {
-        loading = await graceForLoadingIndicator(page, targetCell, isLoading, timeout);
+        loading = await graceForLoadingIndicator(page, targetCell, isLoading, deadline);
     }
     if (!loading || timeout === undefined) return { read: true };
 
     logDebug(config, 'verbose', `toJSON: cell "${col}" — waiting up to ${timeout}ms`);
-    const deadline = Date.now() + timeout;
     const isLoaded = async () => !(await isLoading());
-    const cellResolved = await pollUntil(page, deadline, 100, isLoaded, await isLoaded()); // immediate check (handles timeout=0)
+    const initial = (timeout === 0 || Date.now() < deadline) && await isLoaded();
+    const cellResolved = await pollUntil(page, deadline, 100, isLoaded, initial);
     return cellResolved ? { read: true } : onStillLoading(env, targetCell, col, timeout);
 }
 

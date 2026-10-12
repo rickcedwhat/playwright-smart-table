@@ -568,6 +568,7 @@ export interface LoadingStrategy {
    * How long (ms) to wait for a loading row to resolve before applying onRowLoadingTimeout.
    * Honored by findRows AND by map/forEach/filter, where the wait runs before the dedupe
    * strategy so content-based dedupe keys see the row's final loaded state.
+   * Includes time spent awaiting the loading predicate, even if it never settles.
    * When not set (backward-compatible behavior): findRows skips loading rows immediately;
    * map/forEach/filter process them as-is.
    */
@@ -591,6 +592,7 @@ export interface LoadingStrategy {
 
   /**
    * How long (ms) to wait for a loading cell to resolve before applying onCellLoadingTimeout.
+   * Includes predicate evaluation and any initial rendering grace period.
    * When not set and isCellLoading returns true, the cell is read as-is immediately.
    */
   cellLoadingTimeout?: number;
