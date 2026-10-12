@@ -457,6 +457,11 @@ export interface PaginationPrimitives {
 
 export type PaginationStrategy = PaginationPrimitives;
 
+/**
+ * Returns a stable record key across the entire scan, including page advances.
+ * Different records must have different keys; viewport coordinates and mounted DOM indices
+ * are not stable identities in recycled or paginated tables.
+ */
 export type DedupeStrategy = (row: SmartRow) => string | number | Promise<string | number>;
 
 export type ContentReadyStrategy = (row: Locator, page: Page) => Promise<void>;

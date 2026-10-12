@@ -155,9 +155,25 @@ const table = useTable(tableContainer, {
       isTableLoading: Strategies.Loading.Table.never,
     },
 
-    dedupe: async (row) =>
-      (await row.getAttribute("data-index").catch(() => null)) ??
-      Math.random().toString(),
+    // Add dedupe only if your table exposes a stable record ID.
+    // Do not use screen position, a mounted-slot index, or a random fallback.
   },
 });
 ```
+
+
+## Deduplication requires record identity
+
+`Strategies.Dedupe.byTopPosition()` is deprecated and unsuitable for recycling
+virtualizers. If Alice is replaced by Bob at the same screen Y coordinate, both
+receive the same key and Bob is silently discarded. Use a unique record ID:
+
+```ts
+dedupe: async (row) => row.getCell('ID').innerText(),
+```
+
+A row attribute can also work if it identifies the same record across scrolling
+and pagination. Verify that it is present and unique; a mounted-slot or page-local
+index is insufficient. Without such an ID, omit the custom strategy and rely on
+DOM tracking, which cannot guarantee record-level uniqueness when nodes are
+replaced. Random fallback keys conceal missing identity and do not deduplicate.

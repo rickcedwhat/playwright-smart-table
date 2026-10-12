@@ -301,16 +301,26 @@ dedupe?: DedupeStrategy
 
 <!-- /api-signature: dedupe -->
 
-Prevents the same row from being yielded twice during pagination. Useful when rows overlap between scroll positions.
+Prevents a record from being yielded twice during a scan. Keys must identify the
+record across scrolling and pagination, rather than its mounted slot or page-local index.
 
 ```typescript
-// Dedupe by a stable row attribute
-dedupe: async (row) => row.getAttribute('aria-rowindex')
-
-// Dedupe by cell text
-dedupe: async (row) =>
-  row.locator('td').first().innerText().catch(() => null)
+// Dedupe by a unique, stable record ID
+dedupe: async (row) => row.getCell('ID').innerText()
 ```
+
+### Avoid viewport-position keys
+
+`Strategies.Dedupe.byTopPosition()` is deprecated. It groups rows by their rounded
+screen Y coordinate, not by record identity. It only works when each position
+represents the same record throughout a scan. Scrolling and pagination invalidate
+that assumption: Alice and Bob can occupy the same slot, causing Bob to be dropped.
+The helper retains its existing behavior for compatibility.
+
+An index attribute is suitable only if it identifies the record across the whole
+scan. If no stable key exists, omit `dedupe` and rely on built-in DOM tracking;
+this cannot guarantee record-level uniqueness across replacement nodes. Do not
+substitute random keys or screen coordinates.
 
 ---
 
