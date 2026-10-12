@@ -3,8 +3,11 @@ import { DedupeStrategy } from '../types';
 
 export const DedupeStrategies = {
     /**
-     * Deduplicates rows based on their vertical position (Y coordinate).
-     * Useful for virtualized tables where row DOM elements are reused but content changes.
+     * Groups rows by their viewport Y coordinate, rounded to a pixel bucket.
+     * Only applicable when each screen position represents the same record for the entire scan.
+     * Scrolling or pagination can place different records at the same position and silently drop them.
+     * @deprecated Prefer a stable record key, e.g. `async row => row.getCell('ID').innerText()`.
+     * Do not use for recycled virtualized rows or paginated tables.
      * @param tolerance Pixel tolerance for position comparison (default: 2)
      */
     byTopPosition: (tolerance = 2): DedupeStrategy => async (row) => {
