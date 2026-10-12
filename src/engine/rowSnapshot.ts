@@ -325,7 +325,8 @@ async function pollUntil(page: Page, deadline: number, intervalMs: number, check
  * onCellLoadingTimeout. Only grace when the cell still looks empty.
  */
 async function graceForLoadingIndicator(page: Page, targetCell: Locator, isLoading: () => Promise<boolean>, deadline: number): Promise<boolean> {
-    const peek = await withinDeadline(() => targetCell.evaluate((el) => (el.textContent || '').trim()).catch(() => ''), deadline, '');
+    const peek = await withinDeadline<string | null>(() => targetCell.evaluate((el) => (el.textContent || '').trim()).catch(() => ''), deadline, null);
+    if (peek === null) return true; // Deadline expired: apply the cell loading timeout policy.
     if (peek !== '') return false;
     return pollUntil(page, Math.min(Date.now() + 250, deadline), 25, isLoading, false);
 }

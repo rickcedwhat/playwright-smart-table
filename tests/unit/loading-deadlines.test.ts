@@ -92,6 +92,42 @@ describe('loading deadlines include pending checks', () => {
         expect(vi.getTimerCount()).toBe(0);
     });
 
+    for (const policy of ['skip', 'throw', 'read-as-is', 'callback'] as const) {
+        it(`cell ${policy}: a pending grace text peek applies the timeout policy`, async () => {
+            const check = vi.fn().mockResolvedValue(false);
+            const callback = vi.fn().mockResolvedValue('fallback');
+            const row = makeRow({ isCellLoading: check, cellLoadingTimeout: 50,
+                onCellLoadingTimeout: policy === 'callback' ? callback : policy });
+            const peek = vi.spyOn(row, 'evaluate').mockImplementation(() => new Promise(() => {}));
+            const read = vi.spyOn(row, 'innerText');
+            const settled = observe(row.toJSON());
+            await vi.advanceTimersByTimeAsync(49);
+            expect(settled).not.toHaveBeenCalled();
+            await vi.advanceTimersByTimeAsync(1);
+            if (policy === 'throw') {
+                expect(settled).toHaveBeenCalledExactlyOnceWith({ error: expect.objectContaining({ message: expect.stringContaining('within 50ms') }) });
+            } else {
+                expect(settled).toHaveBeenCalledExactlyOnceWith({ value: { Name: policy === 'callback' ? 'fallback' : policy === 'skip' ? '' : 'Alice' } });
+            }
+            expect(peek).toHaveBeenCalledOnce();
+            expect(check).toHaveBeenCalledOnce();
+            expect(read).toHaveBeenCalledTimes(policy === 'read-as-is' ? 1 : 0);
+            expect(callback).toHaveBeenCalledTimes(policy === 'callback' ? 1 : 0);
+            expect(vi.getTimerCount()).toBe(0);
+        });
+    }
+
+    it('continues grace polling for actual empty text without applying the timeout policy', async () => {
+        const check = vi.fn().mockResolvedValue(false);
+        const settled = observe(makeRow({ isCellLoading: check, cellLoadingTimeout: 50, onCellLoadingTimeout: 'throw' }, '').toJSON());
+        await vi.advanceTimersByTimeAsync(49);
+        expect(settled).not.toHaveBeenCalled();
+        expect(check).toHaveBeenCalledTimes(2);
+        await vi.advanceTimersByTimeAsync(1);
+        expect(settled).toHaveBeenCalledExactlyOnceWith({ value: { Name: '' } });
+        expect(vi.getTimerCount()).toBe(0);
+    });
+
     it('a late header-loading result cannot resume initialization or poison a retry', async () => {
         let release!: (value: boolean) => void;
         const delayed = new Promise<boolean>(resolve => { release = resolve; });
