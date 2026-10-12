@@ -3,6 +3,7 @@ import type { FinalTableConfig, GetActiveCellFn, NavigationPrimitives, ViewportS
 import { resolveLogicalRowIndex } from './rowResolution';
 import { logDebug } from '../utils/debugUtils';
 import type { NavigationBarrier } from '../utils/navigationBarrier';
+import { memoizeViewport } from '../utils/memoizeViewport';
 
 type StrategyContext = {
     config: FinalTableConfig<any>;
@@ -100,9 +101,9 @@ export const navigateToCell = async (params: NavigateToCellParams): Promise<Loca
 
     // Viewport-oracle phase: direct positioning for 2D virtualized tables.
     // Runs before navigation primitives; falls through to them if cell still not accessible.
-    const viewport = config.strategies.viewport;
-    if (viewport && typeof rowIndex === 'number') {
-        const viaViewport = await navigateViaViewport(nav, viewport, rowIndex);
+    const cache = config.strategies.viewport && memoizeViewport(config.strategies.viewport);
+    if (cache && typeof rowIndex === 'number') {
+        const viaViewport = await navigateViaViewport(nav, cache.viewport, rowIndex, cache.clear);
         if (viaViewport) return viaViewport;
     }
 
@@ -168,7 +169,7 @@ async function readIfInView(nav: CellNav, viewport: ViewportStrategy, rowIndex: 
  * Viewport phase. Returns the cell locator, or null to fall through to navigation primitives
  * (only when `strategies.navigation` is configured; otherwise throws on a miss).
  */
-async function navigateViaViewport(nav: CellNav, viewport: ViewportStrategy, rowIndex: number): Promise<Locator | null> {
+async function navigateViaViewport(nav: CellNav, viewport: ViewportStrategy, rowIndex: number, clearCache: () => void): Promise<Locator | null> {
     const { config, context, index } = nav;
 
     const inView = await readIfInView(nav, viewport, rowIndex);
@@ -185,6 +186,9 @@ async function navigateViaViewport(nav: CellNav, viewport: ViewportStrategy, row
             await viewport.scrollToColumn(context, index);
         }
     });
+
+    // A peer may have performed the coordinated scroll. Drop this row's pre-scroll geometry too.
+    clearCache();
 
     await recoverEvictedRow(nav, viewport, rowIndex);
 
