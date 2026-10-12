@@ -2,6 +2,7 @@ import type { Locator, Page } from '@playwright/test';
 import { FinalTableConfig, TableContext, Selector } from '../types';
 import { HeaderStrategies } from '../strategies/headers';
 import { logDebug } from '../utils/debugUtils';
+import { withinDeadline } from '../utils/deadline';
 
 export class TableMapper {
     private _headerMap: Map<string, number> | null = null;
@@ -29,9 +30,13 @@ export class TableMapper {
         this.log('Mapping headers...');
         const headerTimeout = timeout ?? 3000;
         const startTime = Date.now();
+        const deadline = startTime + headerTimeout;
+        const remaining = () => Math.max(0, deadline - Date.now());
 
         if (this.config.autoScroll) {
-            try { await this.rootLocator.scrollIntoViewIfNeeded({ timeout: 1000 }); } catch (e) { }
+            try {
+                await withinDeadline(() => this.rootLocator.scrollIntoViewIfNeeded({ timeout: Math.max(1, Math.min(1000, remaining())) }), deadline, undefined);
+            } catch (e) { }
         }
 
         const headerLoc = this.resolve(this.config.headerSelector, this.rootLocator);
@@ -48,23 +53,27 @@ export class TableMapper {
         while (Date.now() - startTime < headerTimeout) {
             // 1. Wait for visibility
             try {
-                await headerLoc.first().waitFor({ state: 'visible', timeout: 200 });
+                await withinDeadline(() => headerLoc.first().waitFor({ state: 'visible', timeout: Math.max(1, Math.min(200, remaining())) }), deadline, undefined);
             } catch (e) {
                 // Continue to check existing/loading state even if not strictly "visible" yet
             }
+            if (remaining() <= 0) break;
 
             // 2. Check Smart Loading State
             if (this.config.strategies.loading?.isHeaderLoading) {
-                const isStable = !(await this.config.strategies.loading.isHeaderLoading(context));
+                const isStable = !(await withinDeadline(() => this.config.strategies.loading!.isHeaderLoading!(context), deadline, true));
                 if (!isStable) {
                     this.log('Headers are loading/unstable... waiting');
-                    await new Promise(r => setTimeout(r, 100));
+                    if (remaining() > 0) await new Promise(r => setTimeout(r, Math.min(100, remaining())));
                     continue;
                 }
             }
 
             // 3. Attempt Scan
+            if (remaining() <= 0) break;
             try {
+                // Preserve long-running discovery strategies (e.g. horizontal header scans).
+                // The deadline bounds readiness and retries, not a strategy's own operation.
                 const rawHeaders = await strategy(context);
                 const entries = await this.processHeaders(rawHeaders);
 
@@ -87,7 +96,7 @@ export class TableMapper {
             } catch (e) {
                 lastError = e as Error;
                 this.log(`Header mapping failed. Attempt ${Math.floor((Date.now() - startTime) / 100)}: ${(e as Error).message}`);
-                await new Promise(r => setTimeout(r, 100));
+                if (remaining() > 0) await new Promise(r => setTimeout(r, Math.min(100, remaining())));
             }
         }
 

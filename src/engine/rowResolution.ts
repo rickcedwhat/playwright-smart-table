@@ -1,5 +1,6 @@
 import type { Locator } from '@playwright/test';
 import type { FinalTableConfig, LoadingStrategy, RowIndexResult, SmartRow } from '../types';
+import { withinDeadline } from '../utils/deadline';
 
 /** Normalized result from resolveRowIndex — always has `.index`, optionally `.selector`. */
 export interface ResolvedRowIndex {
@@ -48,8 +49,8 @@ export type RowLoadingOutcome = 'process' | 'skip' | 'throw';
  * 'skip'`), while `map`/`forEach`/`filter` process it as-is (`'process'`) — and map, in that
  * case, never even probes `isRowLoading`. Both are preserved exactly.
  *
- * The helper never throws and never touches the navigation barrier; it returns a decision so
- * each caller keeps its own barrier bookkeeping and error message.
+ * Timeout returns a decision so each caller keeps its own barrier bookkeeping and error
+ * message. Predicate errors propagate unchanged.
  */
 export async function resolveRowLoading(
   row: SmartRow,
@@ -70,18 +71,20 @@ export async function resolveRowLoading(
   // map's fast path: with no timeout and a process-default, it never probes isRowLoading.
   if (timeout === undefined && noTimeoutAction === 'process') return 'process';
 
-  if (!(await isRowLoading(row))) return 'process';
+  const deadline = Date.now() + (timeout ?? Infinity);
+  const check = () => withinDeadline(() => isRowLoading(row), deadline, true);
+  if (!(await check())) return 'process';
 
   // Row is loading with no timeout configured → legacy skip (findRows).
   if (timeout === undefined) return 'skip';
 
   log?.(`row ${row.rowIndex} — waiting up to ${timeout}ms for row to load`);
-  const deadline = Date.now() + timeout;
-  let resolved = !(await isRowLoading(row)); // immediate check (handles timeout=0)
+  let resolved = (timeout === 0 || Date.now() < deadline) && !(await check());
   while (!resolved && Date.now() < deadline) {
     // Page accessed lazily (only while actually polling), matching the pre-refactor code.
-    await row.page().waitForTimeout(100);
-    resolved = !(await isRowLoading(row));
+    await row.page().waitForTimeout(Math.min(100, deadline - Date.now()));
+    if (Date.now() >= deadline) break;
+    resolved = !(await check());
   }
   if (resolved) return 'process';
 

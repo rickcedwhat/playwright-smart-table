@@ -41,6 +41,12 @@ strategies: {
 
 _Config: `strategies.loading.loadingTimeout`_
 
+Configured `rowLoadingTimeout` and `cellLoadingTimeout` budgets include the loading check itself, even if it returns a promise that never finishes. Polling pauses and the cell's initial rendering grace period use the same budget. On expiry, the library follows your configured skip, read-as-is, throw, or cell callback policy.
+
+Header loading and visibility checks use the initialization budget (`table.init({ timeout: 5000 })`, default 3000 ms). Custom header discovery and header transformers retain control of their own operations, which may take longer. A timed-out loading check cannot resume initialization later.
+
+These deadlines stop waiting for loading checks; they do not cancel the checks' underlying work. Reading the value or running a timeout callback happens afterward and may take additional time. Without a configured row/cell timeout, the existing behavior is unchanged.
+
 ---
 
 ## Cell loading timeout
@@ -52,7 +58,7 @@ const table = useTable(locator, {
   strategies: {
     loading: {
       cellLoadingTimeout: 5000,
-      onCellLoadingTimeout: 'skip', // omit from toJSON() | 'read-as-is' | 'throw'
+      onCellLoadingTimeout: 'skip', // use an empty string | 'read-as-is' | 'throw'
     }
   }
 })
