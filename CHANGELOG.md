@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- **Automatic initialization (#518)** — explicit `init()` and async table operations now share strategy validation, header mapping, empty-state handling and starting-page detection. Concurrent callers wait for the same setup operation; mapped headers alone no longer mark initialization complete. Failed setup can be retried, reset/revalidation rebuild the lifecycle, and automatic `countRows()` returns zero for a recognized empty state. Synchronous row access still requires completed initialization.
+
 - **Horizontal header discovery (#517)** — generic, Glide and RDG discovery reset left and collect the first window before advancing, so initializing or remapping a table that starts horizontally scrolled preserves complete column order. Discovery tracks column positions rather than unique labels, allowing duplicate names to reach mapper validation or `headerTransformer`. Mixed indexed/unindexed headers use one coordinate system for ordering. RDG derives enough steps to cover its scroll range. Scroll steps are capped to the viewport width, and scroller handles are disposed after restoring the leftmost position, including on errors.
 
 - **Viewport cache lifecycle (#515)** — viewport geometry is memoized only within one cell-navigation operation, rather than for the lifetime of a table. New scans and reads observe external UI updates, reset/revalidation, and sorting; row membership is no longer memoized. Both geometry ranges are cleared before and after either scrolling axis, including failed scrolls, and pending queries cannot repopulate invalidated cache entries. `disableCache` still bypasses memoization.

@@ -443,7 +443,7 @@ export interface PaginationPrimitives {
   previousBulkPages?: number;
 
   /**
-   * Called once during init() to sync the library's page counter with the actual DOM state.
+   * Called during explicit or automatic initialization to sync the library's page counter with the actual DOM state.
    * Use when a table may open on a page other than the first (e.g. a deep-linked URL that
    * lands on page 5). Returns a 0-indexed page number.
    * @example
@@ -891,14 +891,14 @@ export interface TableResult<T = any> extends AsyncIterable<{ row: SmartRow<T>; 
   currentPageIndex: number;
 
   /**
-   * Initializes the table by resolving headers. Must be called before using sync methods.
+   * Initializes headers, strategy validation and starting-page detection. Async operations initialize automatically; sync row methods require completed initialization.
    * @param options Optional timeout for header resolution (default: 3000ms)
    */
   init(options?: { timeout?: number }): Promise<TableResult<T>>;
 
   /**
    * SYNC: Checks if the table has been initialized.
-   * @returns true if init() has been called and completed, false otherwise
+   * @returns true if explicit or automatic initialization has completed, false otherwise
    */
   isInitialized(): boolean;
 
