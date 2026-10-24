@@ -4,7 +4,7 @@ import { readVisibleHeaders, scrollAndCollectHeaders } from '../utils/headerScro
 
 /**
  * Defines the contract for a header retrieval strategy.
- * Returns a list of unique header names found in the table.
+ * Returns header labels in column order, preserving duplicates for mapper validation.
  */
 export type HeaderStrategy = (context: StrategyContext) => Promise<string[]>;
 
