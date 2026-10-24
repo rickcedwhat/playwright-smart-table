@@ -103,11 +103,6 @@ export class TableMapper {
         throw lastError || new Error(`Timed out waiting for headers after ${headerTimeout}ms`);
     }
 
-    public async remapHeaders(): Promise<void> {
-        this._headerMap = null;
-        await this.getMap();
-    }
-
     public getMapSync(): Map<string, number> | null {
         return this._headerMap;
     }
