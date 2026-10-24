@@ -28,7 +28,7 @@ init(options?: { timeout?: number }): Promise<TableResult<T>>
 
 <!-- /api-signature: init -->
 
-Resolves column headers and prepares the table for use. Must be called before any sync methods (`getRow`, `getRowByIndex`). Async methods auto-initialize if needed.
+Validates strategies, resolves column headers, handles configured empty states, and detects the starting page. Must complete before sync row methods (`getRow`, `getRowByIndex`). Async table operations run the same initialization automatically. Concurrent callers share setup; a later `init()` reuses completed setup, and failed setup can be retried.
 
 ```typescript
 const table = await useTable(locator, config).init();
@@ -49,7 +49,7 @@ isInitialized(): boolean
 
 <!-- /api-signature: isInitialized -->
 
-Returns `true` if `init()` has completed successfully.
+Returns `true` if explicit or automatic initialization has completed successfully, including starting-page detection. It remains `false` while setup is pending.
 
 ```typescript
 if (!table.isInitialized()) await table.init();
@@ -136,7 +136,7 @@ revalidate(): Promise<void>
 
 <!-- /api-signature: revalidate -->
 
-Re-scans headers and rebuilds the column map without resetting pagination state. Use when columns change visibility or order dynamically (e.g., after toggling column visibility).
+Re-scans headers and reruns initialization checks, including starting-page detection, without navigating to the first page. Use when columns change visibility or order dynamically (e.g., after toggling column visibility).
 
 ```typescript
 await table.revalidate();
