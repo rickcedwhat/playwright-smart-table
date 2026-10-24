@@ -61,6 +61,7 @@ describe('HeaderStrategies.horizontalScroll', () => {
       allInnerTexts: vi.fn().mockResolvedValue(['Visible']),
     };
     const scrollerHandle = {
+      dispose: vi.fn(),
       evaluate: vi.fn()
         .mockResolvedValueOnce(false), // isScrollerFound
     };
@@ -76,13 +77,14 @@ describe('HeaderStrategies.horizontalScroll', () => {
 
     const res = await HeaderStrategies.horizontalScroll({ selector: '.dvn-scroller' })(ctx as any);
     expect(res).toEqual(['Visible']);
+    expect(scrollerHandle.dispose).toHaveBeenCalledOnce();
     expect(evaluateHandle).toHaveBeenCalledWith(expect.any(Function), '.dvn-scroller');
   });
 });
 
 // A fake scroller whose visible headers depend on scrollLeft (3 columns per 300px window).
 const makeScrollingContext = (columnCount: number) => {
-  const el = { scrollLeft: 0 };
+  const el = { scrollLeft: 400, clientWidth: 300 };
   const visible = () => {
     const first = Math.floor(el.scrollLeft / 100);
     return Array.from({ length: 3 }, (_, i) => first + i)
@@ -90,16 +92,24 @@ const makeScrollingContext = (columnCount: number) => {
       .map(i => `Col${i}`);
   };
   const scrollerHandle = {
+      dispose: vi.fn(),
     evaluate: vi.fn(async (fn: any, arg?: any) => fn(el, arg)),
   };
   const evaluateHandle = vi.fn().mockResolvedValue(scrollerHandle);
   const ctx: StrategyContext = {
     config: { headerSelector: 'th', debug: { logLevel: 'none' } } as any,
-    resolve: vi.fn().mockReturnValue({ allInnerTexts: vi.fn(async () => visible()) }),
+    resolve: vi.fn().mockReturnValue({
+      allInnerTexts: vi.fn(async () => visible()),
+      evaluateAll: vi.fn(async (fn, offset) => fn(visible().map(name => ({
+        innerText: name,
+        getAttribute: () => String(Number(name.slice(3)) + 1),
+        getBoundingClientRect: () => ({ left: Number(name.slice(3)) * 100 - el.scrollLeft }),
+      })), offset)),
+    }),
     root: { evaluateHandle } as any,
     page: { waitForTimeout: vi.fn() } as any,
   };
-  return { ctx, el, evaluateHandle };
+  return { ctx, el, evaluateHandle, scrollerHandle };
 };
 
 describe('shared horizontal header scroll (#439)', () => {
@@ -129,5 +139,16 @@ describe('shared horizontal header scroll (#439)', () => {
     expect(lookup(canvas, undefined)).toBe(sibling);
     expect(querySelector).toHaveBeenCalledWith('.dvn-scroller');
     vi.unstubAllGlobals();
+  });
+});
+
+
+describe('header scan cleanup', () => {
+  it('restores scroll position and disposes the handle when header reading fails', async () => {
+    const { ctx, el, scrollerHandle } = makeScrollingContext(8);
+    ctx.resolve = vi.fn().mockReturnValue({ evaluateAll: vi.fn().mockRejectedValue(new Error('read failed')) });
+    await expect(HeaderStrategies.horizontalScroll({ selector: '.scroller' })(ctx)).rejects.toThrow('read failed');
+    expect(el.scrollLeft).toBe(0);
+    expect(scrollerHandle.dispose).toHaveBeenCalledOnce();
   });
 });

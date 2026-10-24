@@ -2,65 +2,22 @@ import type { Locator } from '@playwright/test';
 import { TableContext, TableConfig, ViewportStrategy, StrategyContext } from '../types';
 import { PaginationStrategies } from '../strategies/pagination';
 import { StabilizationStrategies } from '../strategies/stabilization';
+import { scrollAndCollectHeaders } from '../utils/headerScroll';
 
 /**
  * Scrolls the grid horizontally to collect all column headers.
  * Handles empty headers by labeling them (e.g. "Checkbox").
  */
-const scrollRightHeaderRDG = async (context: TableContext) => {
-    const { resolve, config, root, page } = context;
-    const collectedHeaders = new Set<string>();
-
-    const gridHandle = await root.evaluateHandle((el) => {
-        return el.querySelector('[role="grid"]') || el.closest('[role="grid"]');
+const scrollRightHeaderRDG = async (context: TableContext) =>
+    scrollAndCollectHeaders(context, () => context.root.evaluateHandle(el =>
+        el.matches('[role="grid"]') ? el : el.querySelector('[role="grid"]') || el.closest('[role="grid"]')
+    ), {
+        limit: 30,
+        coverScrollRange: true,
+        scrollAmount: 500,
+        emptyHeader: 'Checkbox',
+        notFoundMessage: 'RDG: Could not find grid scroller. Returning visible headers.',
     });
-
-    const expectedColumns = await gridHandle.evaluate(el =>
-        el ? parseInt(el.getAttribute('aria-colcount') || '0', 10) : 0
-    );
-
-    const getVisible = async () => {
-        const headerLoc = resolve(config.headerSelector, root);
-        const texts = await headerLoc.allInnerTexts();
-        return texts.map(t => {
-            const trimmed = t.trim();
-            return trimmed.length > 0 ? trimmed : 'Checkbox';
-        });
-    };
-
-    let currentHeaders = await getVisible();
-    currentHeaders.forEach(h => collectedHeaders.add(h));
-
-    const hasScroll = await gridHandle.evaluate(el =>
-        el ? el.scrollWidth > el.clientWidth : false
-    );
-
-    if (hasScroll) {
-        await gridHandle.evaluate(el => el!.scrollLeft = 0);
-        await page.waitForTimeout(200);
-
-        let iteration = 0;
-        while (collectedHeaders.size < expectedColumns && iteration < 30) {
-            await gridHandle.evaluate(el => el!.scrollLeft += 500);
-            await page.waitForTimeout(300);
-
-            const newHeaders = await getVisible();
-            newHeaders.forEach(h => collectedHeaders.add(h));
-
-            const atEnd = await gridHandle.evaluate(el =>
-                el!.scrollLeft >= el!.scrollWidth - el!.clientWidth - 10
-            );
-
-            iteration++;
-            if (atEnd) break;
-        }
-
-        await gridHandle.evaluate(el => el!.scrollLeft = 0);
-        await page.waitForTimeout(200);
-    }
-
-    return Array.from(collectedHeaders);
-};
 
 const rdgGetCellLocator = ({ row, columnIndex }: { row: Locator; columnIndex: number }) => {
     const ariaColIndex = columnIndex + 1;
