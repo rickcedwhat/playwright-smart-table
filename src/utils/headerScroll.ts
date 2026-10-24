@@ -11,10 +11,10 @@ export const readVisibleHeaders = async ({ resolve, config, root }: StrategyCont
 export async function scrollAndCollectHeaders(
     context: StrategyContext,
     findScroller: () => Promise<JSHandle<Element | null>>,
-    options: { limit?: number; scrollAmount?: number; notFoundMessage: string; emptyHeader?: string },
+    options: { limit?: number; scrollAmount?: number; notFoundMessage: string; emptyHeader?: string; coverScrollRange?: boolean },
 ): Promise<string[]> {
     const { config, page, resolve, root } = context;
-    const limit = options.limit ?? 20;
+    let limit = options.limit ?? 20;
     const scrollAmount = options.scrollAmount ?? 300;
     const scrollerHandle = await findScroller();
     let found = false;
@@ -25,9 +25,18 @@ export async function scrollAndCollectHeaders(
             return (await readVisibleHeaders(context)).map(h => h || options.emptyHeader || '');
         }
 
-        // Position identifies a column, whereas its label may legitimately repeat.
-        // Prefer the grid's logical index; otherwise use the header's content-space X.
-        const collected = new Map<string, { name: string; position: number }>();
+        // RDG must retain full coverage when steps are narrowed to fit its viewport.
+        // Derive a finite budget from the current scroll range; other callers keep their limit.
+        if (options.coverScrollRange) {
+            const steps = await scrollerHandle.evaluate((el, amount) => {
+                const step = Math.min(amount, el!.clientWidth);
+                return step > 0 ? Math.ceil((el!.scrollWidth - el!.clientWidth) / step) + 1 : 0;
+            }, scrollAmount);
+            limit = Math.max(limit, steps);
+        }
+
+        // Identity and ordering are separate: an index key is not a pixel coordinate.
+        const collected = new Map<string, { name: string; index?: number; x: number }>();
         const collect = async () => {
             const scrollLeft = await scrollerHandle.evaluate(el => el!.scrollLeft);
             const headers = await resolve(config.headerSelector, root).evaluateAll((elements, offset) =>
@@ -41,7 +50,7 @@ export async function scrollAndCollectHeaders(
                 const indexed = Number.isFinite(index);
                 const position = indexed ? index : Math.round(header.x);
                 const key = `${indexed ? 'index' : 'x'}_${position}`;
-                collected.set(key, { name: header.name || options.emptyHeader || '', position });
+                collected.set(key, { name: header.name || options.emptyHeader || '', index: indexed ? index : undefined, x: header.x });
             }
         };
 
@@ -59,7 +68,10 @@ export async function scrollAndCollectHeaders(
             const after = await scrollerHandle.evaluate(el => el!.scrollLeft);
             if (after === before) break;
         }
-        return [...collected.values()].sort((a, b) => a.position - b.position).map(h => h.name);
+        const headers = [...collected.values()];
+        // Choose one coordinate system for the entire result, never per header.
+        const allIndexed = headers.every(h => h.index !== undefined);
+        return headers.sort((a, b) => allIndexed ? a.index! - b.index! : a.x - b.x).map(h => h.name);
     } finally {
         try {
             if (found) {

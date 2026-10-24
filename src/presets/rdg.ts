@@ -13,6 +13,7 @@ const scrollRightHeaderRDG = async (context: TableContext) =>
         el.matches('[role="grid"]') ? el : el.querySelector('[role="grid"]') || el.closest('[role="grid"]')
     ), {
         limit: 30,
+        coverScrollRange: true,
         scrollAmount: 500,
         emptyHeader: 'Checkbox',
         notFoundMessage: 'RDG: Could not find grid scroller. Returning visible headers.',

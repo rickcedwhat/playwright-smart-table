@@ -141,7 +141,7 @@ src/strategies/headers.ts. generate-all-api-docs.mjs extracts signatures from
 src/types.ts; update-all-api-signatures.mjs only replaces api-signature blocks. -->
 
 - `Strategies.Header.visible` — reads headers currently in the DOM
-- `Strategies.Header.horizontalScroll` — starts at the left edge and scans right to discover virtualized headers in column order, then returns to the left edge (requires `{ selector }` for the scroll container; omitting it returns visible headers only). Uses `aria-colindex` when available, otherwise content-space horizontal positions; custom layouts without stable header positions should supply a custom header strategy. Duplicate labels are preserved for mapper validation or `headerTransformer`.
+- `Strategies.Header.horizontalScroll` — starts at the left edge and scans right to discover virtualized headers in column order, then returns to the left edge (requires `{ selector }` for the scroll container; omitting it returns visible headers only). Uses logical order when all headers have `aria-colindex`, otherwise content-space horizontal positions for the entire result; custom layouts without stable header positions should supply a custom header strategy. Duplicate labels are preserved for mapper validation or `headerTransformer`.
 
 ```typescript
 // Discover virtualized headers by scrolling a known container

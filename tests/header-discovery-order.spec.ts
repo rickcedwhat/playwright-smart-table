@@ -62,3 +62,40 @@ test('geometry fallback and headerTransformer preserve distinct duplicate column
   }).init();
   expect(await table.getHeaders()).toEqual(names.map((name, i) => `${i === 6 ? 'Column 0' : name}_${i}`));
 });
+
+test('partially indexed headers use one ordering coordinate system', async ({ page }) => {
+  await fixture(page);
+  await page.locator('#grid').evaluate(el => {
+    (el as HTMLElement).style.marginLeft = '200px';
+    const removeFirstIndex = () => el.querySelector('[aria-colindex="1"]')?.removeAttribute('aria-colindex');
+    new MutationObserver(removeFirstIndex).observe(el.querySelector('#headers')!, { childList: true });
+    removeFirstIndex();
+  });
+  const table = await useTable(page.locator('#grid'), {
+    headerSelector: '[role="columnheader"]', rowSelector: '[role="row"]', cellSelector: '[role="gridcell"]',
+    autoScroll: false, strategies: { header: strategies.generic },
+  }).init();
+  expect(await table.getHeaders()).toEqual(names);
+  expect(await table.getRowByIndex(0).getCell('Column 0').innerText()).toBe('value 0');
+  expect(await table.getRowByIndex(0).getCell('Column 7').innerText()).toBe('value 7');
+});
+
+test('RDG reaches columns beyond thirty viewport-sized steps', async ({ page }) => {
+  await page.setContent('<div id="grid" role="grid" aria-colcount="130" style="width:400px;overflow:auto;position:relative"><div id="headers" style="width:13000px;height:35px"></div></div>');
+  await page.locator('#grid').evaluate(el => {
+    const render = () => {
+      const start = Math.floor(el.scrollLeft / 100);
+      el.querySelector('#headers')!.innerHTML = Array.from({ length: Math.min(4, 130 - start) }, (_, n) => {
+        const i = start + n;
+        return `<span role="columnheader" aria-colindex="${i + 1}" style="position:absolute;left:${i * 100}px;width:100px">Column ${i}</span>`;
+      }).join('');
+    };
+    el.addEventListener('scroll', render);
+    render();
+  });
+  const table = await useTable(page.locator('#grid'), {
+    headerSelector: '[role="columnheader"]', strategies: { header: strategies.rdg },
+  }).init();
+  expect(await table.getHeaders()).toEqual(Array.from({ length: 130 }, (_, i) => `Column ${i}`));
+  expect(await page.locator('#grid').evaluate(el => el.scrollLeft)).toBe(0);
+});
