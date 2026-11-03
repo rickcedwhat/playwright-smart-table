@@ -129,6 +129,18 @@ test('a header inside a sticky container is discovered once', async ({ page }) =
   expect(await table.getHeaders()).toEqual(stickyLabels({}));
 });
 
+test('a column pinned by a script instead of CSS is discovered once', async ({ page }) => {
+  await stickyFixture(page, {});
+  await page.evaluate(() => {
+    const grid = document.querySelector('#grid')!;
+    const pinned = [...grid.querySelectorAll<HTMLElement>('tr > :first-child')];
+    grid.addEventListener('scroll', () => pinned.forEach(cell => cell.style.transform = `translateX(${grid.scrollLeft}px)`));
+  });
+  const table = await stickyTable(page).init();
+  expect(await table.getHeaders()).toEqual(stickyLabels({}));
+  expect(await table.getRowByIndex(0).getCell('Name').innerText()).toBe('value 0');
+});
+
 test('a vertically sticky header row is not treated as pinned', async ({ page }) => {
   await stickyFixture(page, { top: true, duplicate: true });
   await expect(stickyTable(page).init()).rejects.toThrow('Duplicate column names found: "Col1"');

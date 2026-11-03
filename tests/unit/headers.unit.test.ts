@@ -100,20 +100,11 @@ const makeScrollingContext = (columnCount: number) => {
     config: { headerSelector: 'th', debug: { logLevel: 'none' } } as any,
     resolve: vi.fn().mockReturnValue({
       allInnerTexts: vi.fn(async () => visible()),
-      evaluateAll: vi.fn(async (fn, arg) => {
-        // The fake headers are plain objects: report them as unpinned.
-        vi.stubGlobal('getComputedStyle', () => ({ position: 'static', left: 'auto', right: 'auto' }));
-        try {
-          return fn(visible().map(name => ({
-            innerText: name,
-            parentElement: null,
-            getAttribute: () => String(Number(name.slice(3)) + 1),
-            getBoundingClientRect: () => ({ left: Number(name.slice(3)) * 100 - el.scrollLeft }),
-          })), arg);
-        } finally {
-          vi.unstubAllGlobals();
-        }
-      }),
+      evaluateAll: vi.fn(async (fn, offset) => fn(visible().map(name => ({
+        innerText: name,
+        getAttribute: () => String(Number(name.slice(3)) + 1),
+        getBoundingClientRect: () => ({ left: Number(name.slice(3)) * 100 - el.scrollLeft }),
+      })), offset)),
     }),
     root: { evaluateHandle } as any,
     page: { waitForTimeout: vi.fn() } as any,

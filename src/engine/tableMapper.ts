@@ -156,7 +156,12 @@ export class TableMapper {
 
         if (duplicates.size > 0) {
             const dupList = Array.from(duplicates).map(d => `"${d}"`).join(', ');
-            throw new Error(`Initialization Error: Duplicate column names found: ${dupList}. Use 'headerTransformer' to rename duplicate columns.`);
+            throw new Error(
+                `Initialization Error: Duplicate column names found: ${dupList}. ` +
+                `If the table really has columns with the same label, use 'headerTransformer' to rename them. ` +
+                `If one column was collected more than once (for example a pinned column that horizontal scrolling ` +
+                `could not recognize), provide a custom 'strategies.header' that returns each column once.`
+            );
         }
 
         return entries;
