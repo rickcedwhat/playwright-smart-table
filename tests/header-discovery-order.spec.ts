@@ -80,6 +80,60 @@ test('partially indexed headers use one ordering coordinate system', async ({ pa
   expect(await table.getRowByIndex(0).getCell('Column 7').innerText()).toBe('value 7');
 });
 
+type StickyOptions = { left?: boolean; right?: boolean; top?: boolean; indexed?: boolean; duplicate?: boolean };
+const stickyLabels = ({ right, duplicate }: StickyOptions) =>
+  Array.from({ length: 8 }, (_, i) => i === 0 ? 'Name' : i === 7 && right ? 'Actions' : duplicate && i === 6 ? 'Col1' : `Col${i}`);
+async function stickyFixture(page: Page, options: StickyOptions) {
+  const pin = (i: number) => [
+    options.left && i === 0 ? 'position:sticky;left:0;z-index:2;' : '',
+    options.right && i === 7 ? 'position:sticky;right:0;z-index:2;' : '',
+  ].join('');
+  const ths = stickyLabels(options).map((label, i) => {
+    const top = options.top ? 'position:sticky;top:0;' : '';
+    return `<th${options.indexed ? ` aria-colindex="${i + 1}"` : ''} style="width:150px;background:#fff;${top}${pin(i)}">${label}</th>`;
+  }).join('');
+  const tds = Array.from({ length: 8 }, (_, i) => `<td style="background:#fff;${pin(i)}">value ${i}</td>`).join('');
+  await page.setContent(`<div id="grid" style="width:400px;height:200px;overflow:auto">
+    <table style="table-layout:fixed;width:1200px;border-collapse:collapse"><thead><tr>${ths}</tr></thead><tbody><tr>${tds}</tr></tbody></table></div>`);
+}
+const stickyTable = (page: Page) => useTable(page.locator('#grid table'), {
+  autoScroll: false, strategies: { header: Strategies.Header.horizontalScroll({ selector: '#grid', scrollAmount: 300 }) },
+});
+
+for (const indexed of [false, true]) {
+  test(`a sticky first column is discovered once (indexed=${indexed})`, async ({ page }) => {
+    await stickyFixture(page, { left: true, indexed });
+    const table = await stickyTable(page).init();
+    expect(await table.getHeaders()).toEqual(stickyLabels({}));
+    expect(await table.getRowByIndex(0).getCell('Name').innerText()).toBe('value 0');
+    expect(await table.getRowByIndex(0).getCell('Col7').innerText()).toBe('value 7');
+  });
+}
+
+test('start- and end-pinned columns keep their table positions', async ({ page }) => {
+  await stickyFixture(page, { left: true, right: true });
+  const table = await stickyTable(page).init();
+  expect(await table.getHeaders()).toEqual(stickyLabels({ right: true }));
+  expect(await table.getRowByIndex(0).getCell('Actions').innerText()).toBe('value 7');
+});
+
+test('a header inside a sticky container is discovered once', async ({ page }) => {
+  const header = (label: string) => `<span role="columnheader" style="display:inline-block;width:150px;flex:none">${label}</span>`;
+  await page.setContent(`<div id="grid" style="width:400px;overflow-x:auto"><div style="display:flex;width:1200px">
+    <div style="position:sticky;left:0;z-index:1;background:#fff">${header('Name')}</div>
+    ${Array.from({ length: 7 }, (_, i) => header(`Col${i + 1}`)).join('')}</div></div>`);
+  const table = await useTable(page.locator('#grid'), {
+    headerSelector: '[role="columnheader"]',
+    strategies: { header: Strategies.Header.horizontalScroll({ selector: '#grid', scrollAmount: 300 }) },
+  }).init();
+  expect(await table.getHeaders()).toEqual(stickyLabels({}));
+});
+
+test('a vertically sticky header row is not treated as pinned', async ({ page }) => {
+  await stickyFixture(page, { top: true, duplicate: true });
+  await expect(stickyTable(page).init()).rejects.toThrow('Duplicate column names found: "Col1"');
+});
+
 test('RDG reaches columns beyond thirty viewport-sized steps', async ({ page }) => {
   await page.setContent('<div id="grid" role="grid" aria-colcount="130" style="width:400px;overflow:auto;position:relative"><div id="headers" style="width:13000px;height:35px"></div></div>');
   await page.locator('#grid').evaluate(el => {

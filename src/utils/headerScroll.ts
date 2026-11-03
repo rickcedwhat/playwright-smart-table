@@ -7,6 +7,40 @@ export const readVisibleHeaders = async ({ resolve, config, root }: StrategyCont
     return texts.map(t => t.trim());
 };
 
+type HeaderGeometry = { name: string; index: string | null; x: number; screenX: number; pinned?: 'start' | 'end' };
+
+/** Runs in the browser, so it must not reference anything outside its own body. */
+function readHeaderGeometry(elements: Element[], { offset, scroller }: { offset: number; scroller: Element | null }): HeaderGeometry[] {
+    // Horizontally sticky/fixed headers keep their screen x while the content scrolls.
+    const pinnedSide = (el: Element): HeaderGeometry['pinned'] => {
+        for (let n: Element | null = el; n && n !== scroller; n = n.parentElement) {
+            const style = getComputedStyle(n);
+            if (style.position === 'fixed') return 'start';
+            if (style.position === 'sticky' && style.left !== 'auto') return 'start';
+            if (style.position === 'sticky' && style.right !== 'auto') return 'end';
+        }
+        return undefined;
+    };
+    return elements.map(el => {
+        const left = el.getBoundingClientRect().left;
+        return {
+            name: (el as HTMLElement).innerText.trim(),
+            index: el.getAttribute('aria-colindex'),
+            x: left + offset,
+            screenX: left,
+            pinned: pinnedSide(el),
+        };
+    });
+}
+
+/** Logical index when present; otherwise screen x for pinned headers and content x for the rest. */
+function headerIdentity(header: HeaderGeometry): { key: string; index?: number } {
+    const index = header.index?.trim() ? Number(header.index) : NaN;
+    if (Number.isFinite(index)) return { key: `index_${index}`, index };
+    if (header.pinned) return { key: `pinned_${Math.round(header.screenX)}` };
+    return { key: `x_${Math.round(header.x)}` };
+}
+
 /** Shared horizontal discovery for generic, Glide and RDG strategies. */
 export async function scrollAndCollectHeaders(
     context: StrategyContext,
@@ -39,18 +73,14 @@ export async function scrollAndCollectHeaders(
         const collected = new Map<string, { name: string; index?: number; x: number }>();
         const collect = async () => {
             const scrollLeft = await scrollerHandle.evaluate(el => el!.scrollLeft);
-            const headers = await resolve(config.headerSelector, root).evaluateAll((elements, offset) =>
-                elements.map(el => ({
-                    name: (el as HTMLElement).innerText.trim(),
-                    index: el.getAttribute('aria-colindex'),
-                    x: el.getBoundingClientRect().left + offset,
-                })), scrollLeft);
+            const headers = await resolve(config.headerSelector, root)
+                .evaluateAll(readHeaderGeometry, { offset: scrollLeft, scroller: scrollerHandle });
             for (const header of headers) {
-                const index = header.index?.trim() ? Number(header.index) : NaN;
-                const indexed = Number.isFinite(index);
-                const position = indexed ? index : Math.round(header.x);
-                const key = `${indexed ? 'index' : 'x'}_${position}`;
-                collected.set(key, { name: header.name || options.emptyHeader || '', index: indexed ? index : undefined, x: header.x });
+                const { key, index } = headerIdentity(header);
+                // A pinned header sits at its content position only at one scroll extreme:
+                // start-pinned in the leftmost window, end-pinned in the rightmost.
+                if (index === undefined && header.pinned === 'start' && collected.has(key)) continue;
+                collected.set(key, { name: header.name || options.emptyHeader || '', index, x: header.x });
             }
         };
 
