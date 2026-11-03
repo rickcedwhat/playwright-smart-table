@@ -7,7 +7,7 @@ export const readVisibleHeaders = async ({ resolve, config, root }: StrategyCont
     return texts.map(t => t.trim());
 };
 
-type HeaderGeometry = { name: string; index: string | null; x: number; screenX: number; node: number };
+type HeaderGeometry = { name: string; index: string | null; x: number; screenX: number; width: number; node: number };
 
 /** Runs in the browser, so it must not reference anything outside its own body. */
 function readHeaderGeometry(elements: Element[], offset: number): HeaderGeometry[] {
@@ -20,12 +20,13 @@ function readHeaderGeometry(elements: Element[], offset: number): HeaderGeometry
             w.__smartTableHeaderSeq = (w.__smartTableHeaderSeq || 0) + 1;
             nodes.set(el, w.__smartTableHeaderSeq);
         }
-        const left = el.getBoundingClientRect().left;
+        const { left, width } = el.getBoundingClientRect();
         return {
             name: (el as HTMLElement).innerText.trim(),
             index: el.getAttribute('aria-colindex'),
             x: left + offset,
             screenX: left,
+            width,
             node: nodes.get(el)!,
         };
     });
@@ -35,6 +36,29 @@ const logicalIndex = (header: HeaderGeometry): number | undefined => {
     const index = header.index?.trim() ? Number(header.index) : NaN;
     return Number.isFinite(index) ? index : undefined;
 };
+
+/** `candidates` holds every content x seen for a header that did not move with the content. */
+type CollectedHeader = { name: string; index?: number; x: number; width: number; candidates?: number[] };
+type Sighting = { key: string; screenX: number; scrollLeft: number };
+
+const movedWithContent = (header: HeaderGeometry, scrollLeft: number, last: Sighting) =>
+    Math.abs(header.screenX - (last.screenX - (scrollLeft - last.scrollLeft))) < 1.5;
+
+const overlaps = (x: number, width: number, other: CollectedHeader) =>
+    x < other.x + other.width - 1 && other.x < x + width - 1;
+
+/**
+ * A pinned header sits at its real table position only in some windows (the leftmost for
+ * start-pinned, the rightmost for end-pinned); elsewhere it covers other columns.
+ */
+function placePinnedHeaders(headers: CollectedHeader[]): void {
+    const scrolling = headers.filter(h => !h.candidates);
+    for (const header of headers) {
+        if (!header.candidates) continue;
+        header.x = header.candidates.find(x => !scrolling.some(other => overlaps(x, header.width, other)))
+            ?? header.candidates[0];
+    }
+}
 
 /** Shared horizontal discovery for generic, Glide and RDG strategies. */
 export async function scrollAndCollectHeaders(
@@ -65,26 +89,25 @@ export async function scrollAndCollectHeaders(
         }
 
         // Identity and ordering are separate: an index key is not a pixel coordinate.
-        const collected = new Map<string, { name: string; index?: number; x: number }>();
-        // First sighting of each unindexed header element at a screen position, keyed by node|name|x.
-        const sightings = new Map<string, { key: string; scrollLeft: number }>();
-        let viewportCenter: number | undefined;
-        const recordUnindexed = async (header: HeaderGeometry, name: string, scrollLeft: number) => {
-            const sighting = `${header.node}|${name}|${Math.round(header.screenX)}`;
-            const earlier = sightings.get(sighting);
-            if (!earlier || earlier.scrollLeft === scrollLeft) {
-                const key = `x_${Math.round(header.x)}`;
-                sightings.set(sighting, { key, scrollLeft });
-                collected.set(key, { name, x: header.x });
+        const collected = new Map<string, CollectedHeader>();
+        // Latest sighting of each unindexed header element, keyed by node|name.
+        const sightings = new Map<string, Sighting>();
+        const recordUnindexed = (header: HeaderGeometry, name: string, scrollLeft: number) => {
+            const id = `${header.node}|${name}`;
+            const last = sightings.get(id);
+            const entry = last && collected.get(last.key);
+            if (!last || !entry || (!entry.candidates && movedWithContent(header, scrollLeft, last))) {
+                // The label keeps a pinned header from replacing the column it is drawn over.
+                const key = `x_${Math.round(header.x)}|${name}`;
+                sightings.set(id, { key, screenX: header.screenX, scrollLeft });
+                collected.set(key, { name, x: header.x, width: header.width });
                 return;
             }
-            // Same element and label at the same screen x after the content scrolled: the header is
-            // pinned, however the page pins it. Its content x is only true at one scroll extreme:
-            // the leftmost window for start-pinned headers, the rightmost for end-pinned ones.
-            if (viewportCenter === undefined) {
-                viewportCenter = await scrollerHandle.evaluate(el => el!.getBoundingClientRect().left + el!.clientWidth / 2);
-            }
-            if (header.screenX > viewportCenter) collected.get(earlier.key)!.x = header.x;
+            // Same element and label, but it did not move with the content: the header is pinned
+            // (or shifting into its pinned spot), however the page pins it.
+            sightings.set(id, { key: last.key, screenX: header.screenX, scrollLeft });
+            if (!entry.candidates) entry.candidates = [entry.x];
+            entry.candidates.push(header.x);
         };
         const collect = async () => {
             const scrollLeft = await scrollerHandle.evaluate(el => el!.scrollLeft);
@@ -92,8 +115,8 @@ export async function scrollAndCollectHeaders(
             for (const header of headers) {
                 const name = header.name || options.emptyHeader || '';
                 const index = logicalIndex(header);
-                if (index === undefined) await recordUnindexed(header, name, scrollLeft);
-                else collected.set(`index_${index}`, { name, index, x: header.x });
+                if (index === undefined) recordUnindexed(header, name, scrollLeft);
+                else collected.set(`index_${index}`, { name, index, x: header.x, width: header.width });
             }
         };
 
@@ -112,6 +135,7 @@ export async function scrollAndCollectHeaders(
             if (after === before) break;
         }
         const headers = [...collected.values()];
+        placePinnedHeaders(headers);
         // Choose one coordinate system for the entire result, never per header.
         const allIndexed = headers.every(h => h.index !== undefined);
         return headers.sort((a, b) => allIndexed ? a.index! - b.index! : a.x - b.x).map(h => h.name);
