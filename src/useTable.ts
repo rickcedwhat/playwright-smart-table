@@ -174,11 +174,11 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
         logDebug(config, 'info', `init: detected starting page index ${detected}`);
         return detected;
       }
-      logDebug(config, 'error', `init: detectCurrentPage returned invalid index (${detected}); defaulting to 0`);
+      logDebug(config, 'error', `init: detectCurrentPage returned invalid index (${detected}); keeping known page index ${tableState.currentPageIndex}`);
     } catch (e) {
-      logDebug(config, 'error', `init: detectCurrentPage failed`, e);
+      logDebug(config, 'error', `init: detectCurrentPage failed; keeping known page index ${tableState.currentPageIndex}`, e);
     }
-    return 0;
+    return undefined;
   };
 
   const _validateSetup = () => {
@@ -406,12 +406,14 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       log("Resetting table...");
       if (config.strategies.pagination?.goToFirst) {
         log("Auto-navigating to first page...");
-        await config.strategies.pagination.goToFirst(createStrategyContext());
+        const rewound = await config.strategies.pagination.goToFirst(createStrategyContext());
+        // Keep compatibility with legacy action-only callbacks that return undefined.
+        if (rewound !== false) tableState.currentPageIndex = 0;
+        else logDebug(config, 'error', `reset: goToFirst returned false; keeping known page index ${tableState.currentPageIndex}. Configure detectCurrentPage to verify the DOM position.`);
       } else if (hasPaginationInConfig) {
-        log("No goToFirst strategy configured. Table may not be on page 1.");
+        log(`No goToFirst strategy configured; keeping known page index ${tableState.currentPageIndex}.`);
       }
 
-      tableState.currentPageIndex = 0;
       _startLifecycle();
       log("Table reset complete. Calling autoInit to restore state.");
       await _autoInit();
