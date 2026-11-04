@@ -72,6 +72,15 @@ strategies: {
 }
 ```
 
+Index attributes must be present and nonempty, and normalize to finite,
+nonnegative integer indices after the configured offsets. Zero is valid. If any
+selected visible row or selected cell has missing/invalid metadata, the respective
+range is unknown (`{ first: 0, last: Infinity }`), rather than a partial range or a
+fabricated row/column zero. Enable `debug: { logLevel: 'error' }` for a diagnostic.
+Empty selections also return unknown, without a metadata warning. DOM attachment
+checks and geometry-based row membership still apply; fix missing metadata before
+relying on index-based scrolling.
+
 _Config: `strategies.viewport`_
 
 ---
