@@ -1,4 +1,5 @@
 import type { Locator, Page } from '@playwright/test';
+import { AsyncLocalStorage } from 'async_hooks';
 import { TableConfig, TableContext, Selector, TableResult, SmartRow as SmartRowType, FinalTableConfig, TableStrategies as ITableStrategies, FilterValue } from './types';
 import { MINIMAL_CONFIG_CONTEXT } from './minimalConfigContext';
 import { validatePaginationResult, validateSortingStrategy, validateFillStrategy } from './strategies/validation';
@@ -11,7 +12,7 @@ import createSmartRow from './smartRow';
 import { FilterEngine } from './filterEngine';
 import { TableMapper } from './engine/tableMapper';
 import { RowFinder } from './engine/rowFinder';
-import { runForEach, runMap, runFilter } from './engine/tableIteration';
+import { runForEach, runMap, runFilter, type TableIterationEnv } from './engine/tableIteration';
 import { countRows } from './engine/countRows';
 import { applySort, getSortState, SortingEnv } from './engine/sorting';
 import { findRowByIndex } from './engine/rowByIndex';
@@ -149,8 +150,108 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     throw new Error(finalPrompt);
   };
 
-  const _autoInit = async () => {
-    await tableMapper.getMap();
+  let initialized = false;
+  let initialization: Promise<void> | undefined;
+  // reset() and revalidate() start a new lifecycle; setup begun in an earlier one must not mark the table ready.
+  let lifecycle = 0;
+  // Strategies called during setup (detectCurrentPage) may call table methods, which must not wait on that setup.
+  const setupScope = new AsyncLocalStorage<true>();
+
+  const _startLifecycle = () => {
+    lifecycle++;
+    initialization = undefined;
+    initialized = false;
+    tableState.empty = false;
+    tableMapper.clear();
+  };
+
+  const _detectStartingPage = async (): Promise<number | undefined> => {
+    const detect = config.strategies.pagination?.detectCurrentPage;
+    if (!detect) return undefined;
+    try {
+      const detected = await setupScope.run(true, () => detect(rootLocator));
+      if (Number.isInteger(detected) && detected >= 0) {
+        logDebug(config, 'info', `init: detected starting page index ${detected}`);
+        return detected;
+      }
+      logDebug(config, 'error', `init: detectCurrentPage returned invalid index (${detected}); defaulting to 0`);
+    } catch (e) {
+      logDebug(config, 'error', `init: detectCurrentPage failed`, e);
+    }
+    return 0;
+  };
+
+  const _validateSetup = () => {
+    if (config.strategies.sorting) validateSortingStrategy(config.strategies.sorting);
+    if (config.strategies.fill) validateFillStrategy(config.strategies.fill);
+
+    warnIfDebugInCI(config);
+    logDebug(config, 'info', 'Initializing table');
+
+    if (
+      config.maxPages === 1 &&
+      (config.strategies.pagination?.goNext || config.strategies.pagination?.goNextBulk)
+    ) {
+      console.warn(
+        '[SmartTable] maxPages is 1 but a pagination strategy is configured — iteration/find will never leave page 1. Pass maxPages: N (or Infinity) to scan further pages.'
+      );
+    }
+  };
+
+  const _emptyStateVisible = async () => !!config.emptyState && await config.emptyState.isVisible().catch(() => false);
+
+  /** Resolves true when a newer lifecycle replaced this setup before it finished. */
+  const _runSetup = async (options: { timeout?: number } | undefined, isStale: () => boolean): Promise<boolean> => {
+    _validateSetup();
+    let map: Map<string, number>;
+    try {
+      map = await tableMapper.getMap(options?.timeout);
+    } catch (headerError) {
+      if (!(await _emptyStateVisible())) throw headerError;
+      if (isStale()) return true;
+      tableState.empty = true;
+      logDebug(config, 'info', 'init: header resolution failed but emptyState locator is visible — table is empty');
+      initialized = true;
+      return false;
+    }
+    if (isStale()) return true;
+
+    logDebug(config, 'info', `Table initialized with ${map.size} columns`, Array.from(map.keys()));
+
+    const startingPage = await _detectStartingPage();
+    if (isStale()) return true;
+    if (startingPage !== undefined) tableState.currentPageIndex = startingPage;
+
+    await debugDelay(config, 'default');
+    if (isStale()) return true;
+    initialized = true;
+    return false;
+  };
+
+  const _autoInit = async (options?: { timeout?: number }): Promise<void> => {
+    if (initialization) return setupScope.getStore() ? undefined : initialization;
+    if (initialized) return;
+    const startedIn = lifecycle;
+    const isStale = () => startedIn !== lifecycle;
+    // A replaced setup hands its callers over to the current lifecycle instead of finishing it.
+    const setup: Promise<void> = _runSetup(options, isStale)
+      .then(stale => stale ? _autoInit(options) : undefined, error => isStale() ? _autoInit(options) : Promise.reject(error))
+      .finally(() => { if (initialization === setup) initialization = undefined; });
+    initialization = setup;
+    return setup;
+  };
+
+  // Initialization strategies may inspect headers after mapping has completed.
+  // Reuse that map rather than waiting recursively for their own initialization.
+  const _getHeaderMap = async () => {
+    if (!tableMapper.isInitialized()) await _autoInit();
+    return tableMapper.getMap();
+  };
+
+  const _getRowMap = () => {
+    const map = tableMapper.getMapSync();
+    if (!map) throw new Error('Initialization Error: No column map is available for row operations. Check isEmpty() before reading rows.');
+    return map;
   };
 
   // Default: goNext (one page). Pass useBulk true to prefer goNextBulk. "How far" uses numeric return when strategy provides it.
@@ -184,6 +285,18 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     return didAdvance;
   };
 
+  const _iterationEnv = (): TableIterationEnv<T> => ({
+    getRowLocators: () => resolve(config.rowSelector, rootLocator),
+    getMap: _getRowMap,
+    advancePage: _advancePage,
+    makeSmartRow: (loc, map, idx, pageIdx, barrier, sel) => _makeSmart(loc, map, idx, pageIdx, barrier, sel),
+    createSmartRowArray,
+    config,
+    getPage: () => rootLocator.page(),
+    getCurrentPageIndex: () => tableState.currentPageIndex,
+    getContext: () => createStrategyContext(),
+  });
+
   const sortingEnv = (): SortingEnv<T> => ({
     config,
     getPage: () => rootLocator.page(),
@@ -199,62 +312,13 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       tableState.currentPageIndex = v;
     },
     init: async (options?: { timeout?: number }): Promise<TableResult<T>> => {
-      if (tableMapper.isInitialized() || tableState.empty) return result;
-
-      if (config.strategies.sorting) validateSortingStrategy(config.strategies.sorting);
-      if (config.strategies.fill) validateFillStrategy(config.strategies.fill);
-
-      warnIfDebugInCI(config);
-      logDebug(config, 'info', 'Initializing table');
-
-      if (
-        config.maxPages === 1 &&
-        (config.strategies.pagination?.goNext || config.strategies.pagination?.goNextBulk)
-      ) {
-        console.warn(
-          '[SmartTable] maxPages is 1 but a pagination strategy is configured — iteration/find will never leave page 1. Pass maxPages: N (or Infinity) to scan further pages.'
-        );
-      }
-      let map: Map<string, number>;
-      try {
-        map = await tableMapper.getMap(options?.timeout);
-      } catch (headerError) {
-        if (config.emptyState) {
-          const visible = await config.emptyState.isVisible().catch(() => false);
-          if (visible) {
-            tableState.empty = true;
-            logDebug(config, 'info', 'init: header resolution failed but emptyState locator is visible — table is empty');
-            return result;
-          }
-        }
-        throw headerError;
-      }
-
-      logDebug(config, 'info', `Table initialized with ${map.size} columns`, Array.from(map.keys()));
-
-      if (config.strategies.pagination?.detectCurrentPage) {
-        try {
-          const detected = await config.strategies.pagination.detectCurrentPage(rootLocator);
-          if (Number.isInteger(detected) && detected >= 0) {
-            tableState.currentPageIndex = detected;
-            logDebug(config, 'info', `init: detected starting page index ${detected}`);
-          } else {
-            tableState.currentPageIndex = 0;
-            logDebug(config, 'error', `init: detectCurrentPage returned invalid index (${detected}); defaulting to 0`);
-          }
-        } catch (e) {
-          tableState.currentPageIndex = 0;
-          logDebug(config, 'error', `init: detectCurrentPage failed`, e);
-        }
-      }
-
-      await debugDelay(config, 'default');
+      await _autoInit(options);
       return result;
     },
 
     scrollToColumn: async (columnName: string) => {
       log(`scrollToColumn: column="${columnName}"`);
-      const map = await tableMapper.getMap();
+      const map = await _getHeaderMap();
       const idx = map.get(columnName);
       if (idx === undefined) throw _createColumnError(columnName, map);
 
@@ -272,21 +336,21 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
 
     getHeaders: async () => {
       log("getHeaders: fetching available columns");
-      const map = await tableMapper.getMap();
+      const map = await _getHeaderMap();
       return [...map.keys(), ...Object.keys(config.syntheticColumns ?? {})];
     },
 
     getHeaderCell: async (columnName: string) => {
       log(`getHeaderCell: column="${columnName}"`);
-      const map = await tableMapper.getMap();
+      const map = await _getHeaderMap();
       const idx = map.get(columnName);
       if (idx === undefined) throw _createColumnError(columnName, map, 'header cell');
       return resolve(config.headerSelector, rootLocator).nth(idx);
     },
 
     countRows: async (filters?: Record<string, FilterValue>, options?: { exact?: boolean; maxPages?: number; signal?: AbortSignal }): Promise<number> => {
-      if (tableState.empty) return 0;
       await _autoInit();
+      if (tableState.empty) return 0;
       return countRows(
         {
           config,
@@ -308,7 +372,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     mapColumn: async <R = string>(columnName: string, options: import('./types').RowIterationOptions = {}): Promise<R[]> => {
       log(`mapColumn: column="${columnName}" options=${safeStringify(options)}`);
       await _autoInit();
-      const map = await tableMapper.getMap();
+      const map = await _getHeaderMap();
       if (!map.has(columnName)) throw _createColumnError(columnName, map, 'mapColumn iteration');
 
       return result.map(async ({ row }) => {
@@ -348,8 +412,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       }
 
       tableState.currentPageIndex = 0;
-      tableState.empty = false;
-      tableMapper.clear();
+      _startLifecycle();
       log("Table reset complete. Calling autoInit to restore state.");
       await _autoInit();
       await config.onReset(createStrategyContext());
@@ -357,8 +420,8 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
 
     revalidate: async () => {
       log("Revalidating table structure...");
-      await tableMapper.remapHeaders();
-      tableState.empty = false;
+      _startLifecycle();
+      await _autoInit();
       log("Table revalidated.");
     },
 
@@ -381,7 +444,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
         );
       }
       const map = tableMapper.getMapSync();
-      if (!map) throw new Error('Initialization Error: You attempted to access a row before the table structure was mapped. Please call "await table.init()" once before using synchronous row access.');
+      if (!initialized || !map) throw new Error('Initialization Error: You attempted to access a row before the table structure was mapped. Please call "await table.init()" once before using synchronous row access.');
 
       const allRows = resolve(config.rowSelector, rootLocator);
       const matchedRows = filterEngine.applyFilters(
@@ -399,7 +462,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     getRowByIndex: (index: number): SmartRowType<T> => {
       log(`getRowByIndex: index=${index}`);
       const map = tableMapper.getMapSync();
-      if (!map) throw new Error('Initialization Error: You attempted to access a row before the table structure was mapped. Please call "await table.init()" once before using synchronous row access.');
+      if (!initialized || !map) throw new Error('Initialization Error: You attempted to access a row before the table structure was mapped. Please call "await table.init()" once before using synchronous row access.');
 
       const rowLocator = resolve(config.rowSelector, rootLocator).nth(index);
       return _makeSmart(rowLocator, map, index, undefined, undefined, undefined, true);
@@ -411,7 +474,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
         {
           config,
           getRowLocators: () => resolve(config.rowSelector, rootLocator),
-          getMap: () => tableMapper.getMapSync()!,
+          getMap: _getRowMap,
           advancePage: _advancePage,
           getCurrentPageIndex: () => tableState.currentPageIndex,
           getContext: () => createStrategyContext(),
@@ -424,6 +487,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
 
     findRow: async (filters: Record<string, FilterValue>, options?: { exact?: boolean, maxPages?: number, signal?: AbortSignal }): Promise<SmartRowType<T>> => {
       log(`findRow: filters=${safeStringify(filters)} options=${safeStringify(options)}`);
+      await _autoInit();
       return rowFinder.findRow(filters, options);
     },
 
@@ -431,11 +495,11 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
 
     findRows: async (filters?: Record<string, FilterValue>, options?: { exact?: boolean, maxPages?: number, useBulkPagination?: boolean, signal?: AbortSignal }): Promise<SmartRowArray<T>> => {
       log(`findRows: filters=${safeStringify(filters ?? {})} options=${safeStringify(options)}`);
+      await _autoInit();
       return rowFinder.findRows(filters ?? {}, options);
     },
 
     isInitialized: (): boolean => {
-      const initialized = tableMapper.isInitialized() || tableState.empty;
       log(`isInitialized: ${initialized}`);
       return initialized;
     },
@@ -481,17 +545,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       };
 
       const runPromise = runMap(
-        {
-          getRowLocators: () => resolve(config.rowSelector, rootLocator),
-          getMap: () => tableMapper.getMapSync()!,
-          advancePage: _advancePage,
-          makeSmartRow: (loc, map, idx, pageIdx, barrier, sel) => _makeSmart(loc, map, idx, pageIdx, barrier, sel),
-          createSmartRowArray,
-          config,
-          getPage: () => rootLocator.page(),
-          getCurrentPageIndex: () => tableState.currentPageIndex,
-          getContext: () => createStrategyContext(),
-        },
+        _iterationEnv(),
         async (ctx) => {
           queue.push({
             row: ctx.row,
@@ -535,17 +589,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       log(`forEach: options=${safeStringify(options)}`);
       await _autoInit();
       await runForEach(
-        {
-          getRowLocators: () => resolve(config.rowSelector, rootLocator),
-          getMap: () => tableMapper.getMapSync()!,
-          advancePage: _advancePage,
-          makeSmartRow: (loc, map, idx, pageIdx, barrier, sel) => _makeSmart(loc, map, idx, pageIdx, barrier, sel),
-          createSmartRowArray,
-          config,
-          getPage: () => rootLocator.page(),
-          getCurrentPageIndex: () => tableState.currentPageIndex,
-          getContext: () => createStrategyContext(),
-        },
+        _iterationEnv(),
         callback,
         options
       );
@@ -555,17 +599,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       log(`map: options=${safeStringify(options)}`);
       await _autoInit();
       return runMap(
-        {
-          getRowLocators: () => resolve(config.rowSelector, rootLocator),
-          getMap: () => tableMapper.getMapSync()!,
-          advancePage: _advancePage,
-          makeSmartRow: (loc, map, idx, pageIdx, barrier, sel) => _makeSmart(loc, map, idx, pageIdx, barrier, sel),
-          createSmartRowArray,
-          config,
-          getPage: () => rootLocator.page(),
-          getCurrentPageIndex: () => tableState.currentPageIndex,
-          getContext: () => createStrategyContext(),
-        },
+        _iterationEnv(),
         callback,
         options
       );
@@ -588,17 +622,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       log(`filter: options=${safeStringify(options)}`);
       await _autoInit();
       return runFilter(
-        {
-          getRowLocators: () => resolve(config.rowSelector, rootLocator),
-          getMap: () => tableMapper.getMapSync()!,
-          advancePage: _advancePage,
-          makeSmartRow: (loc, map, idx, pageIdx, barrier, sel) => _makeSmart(loc, map, idx, pageIdx, barrier, sel),
-          createSmartRowArray,
-          config,
-          getPage: () => rootLocator.page(),
-          getCurrentPageIndex: () => tableState.currentPageIndex,
-          getContext: () => createStrategyContext(),
-        },
+        _iterationEnv(),
         predicate,
         options
       );

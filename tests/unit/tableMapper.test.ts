@@ -129,14 +129,14 @@ describe('TableMapper', () => {
         expect(loadingStrategy).toHaveBeenCalledTimes(2);
     });
 
-    it('remapHeaders / clear resets internal map', async () => {
+    it('clear resets internal map', async () => {
         mockConfig.strategies.header = vi.fn().mockResolvedValue(['One']);
         const mapper = createMapper();
         await mapper.getMap();
         expect(mapper.isInitialized()).toBe(true);
         mapper.clear();
         expect(mapper.isInitialized()).toBe(false);
-        await mapper.remapHeaders();
+        await mapper.getMap();
         expect(mapper.isInitialized()).toBe(true);
     });
 });

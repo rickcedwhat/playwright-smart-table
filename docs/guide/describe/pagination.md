@@ -67,7 +67,7 @@ strategies: {
       return text ? parseInt(text) : null
     },
 
-    // Called once at init() — sync the library's page counter if the table
+    // Called during explicit or automatic initialization — sync the library's page counter if the table
     // loads on a page other than the first (e.g. a deep-linked URL on page 5)
     detectCurrentPage: async (root) => {
       const text = await root.locator('[aria-current="page"]').textContent()
