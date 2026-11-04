@@ -61,7 +61,8 @@ export class RowFinder<T = any> {
             return exact ? readValue === target : readValue.includes(target);
         }
         if (filterValue instanceof RegExp) {
-            return filterValue.test(readValue);
+            // A filter is evaluated independently for each row, not as a stateful regex scan.
+            return new RegExp(filterValue.source, filterValue.flags).test(readValue);
         }
         return true;
     }

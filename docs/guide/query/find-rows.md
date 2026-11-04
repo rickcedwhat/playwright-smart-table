@@ -20,6 +20,17 @@ Paginates until it finds exactly one match or hits `maxPages`. If more than one 
 
 ---
 
+## Regular expression filters
+
+Built-in regex filtering evaluates each value independently from the beginning.
+Global (`g`) and sticky (`y`) expressions do not carry match state between rows or
+calls, and the caller's `lastIndex` is ignored and left unchanged. Flags still
+apply: a sticky expression must match at the beginning of the value. This also
+applies to values read by column overrides and synthetic columns. A custom
+`strategies.filter` implementation defines its own matching behavior.
+
+---
+
 ## Collect all matching rows
 
 ```typescript

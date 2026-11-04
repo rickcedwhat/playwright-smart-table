@@ -39,6 +39,8 @@ export type RowIndexResult = number | { index: number; selector: string };
  * Value used to filter rows.
  * - string/number/RegExp: filter by text content of the cell.
  * - function: filter by custom locator logic within the cell.
+ * Built-in RegExp filtering tests each value from the beginning, preserving flags
+ * without reading or mutating the caller's lastIndex (including override/synthetic values).
  * @example
  * // Text filter
  * { Name: 'John' }
