@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- **Stateful regex filters (#534)** — override and synthetic-column filters now evaluate a fresh expression per value, preserving flags while ignoring and leaving the caller's `lastIndex` unchanged. Global/sticky expressions no longer alternate matches across identical rows or repeated find/count calls; duplicate matches correctly trigger `findRow()` ambiguity errors. Sticky anchoring is preserved, and frozen caller expressions are supported.
+
 - **Viewport index attributes (#519)** — `dataAttribute()` no longer converts missing/blank indices to zero or accepts nonfinite, fractional or negative normalized indices. Zero and configured offsets remain valid. Missing/invalid metadata in any selected visible row or selected cell makes that axis's range unknown (`{ first: 0, last: Infinity }`) and emits a diagnostic at the configured error debug level; empty selections return unknown without a metadata warning. Geometry-based row membership is unchanged.
 
 - **Reset page position (#533)** — missing `goToFirst` and explicit `false` results no longer replace the known page with zero. Reset still rebuilds setup and runs `onReset`; valid page detection can correct the position, while invalid/throwing detectors preserve it (fresh tables still start at zero). Successful rewinds and legacy action-only callbacks retain page-zero behavior; thrown rewind errors still propagate. `countRows()`/`toArray()` cleanup follows the same policy rather than claiming an unperformed rewind.
