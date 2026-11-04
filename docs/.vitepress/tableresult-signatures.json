@@ -7,12 +7,12 @@
   {
     "name": "init",
     "signature": "init(options?: { timeout?: number }): Promise<TableResult<T>>",
-    "comment": "/**\n* Initializes the table by resolving headers. Must be called before using sync methods.\n* @param options Optional timeout for header resolution (default: 3000ms)\n*/"
+    "comment": "/**\n* Initializes headers, strategy validation and starting-page detection. Async operations initialize automatically; sync row methods require completed initialization.\n* @param options Optional timeout for header resolution (default: 3000ms)\n*/"
   },
   {
     "name": "isInitialized",
     "signature": "isInitialized(): boolean",
-    "comment": "/**\n* SYNC: Checks if the table has been initialized.\n* @returns true if init() has been called and completed, false otherwise\n*/"
+    "comment": "/**\n* SYNC: Checks if the table has been initialized.\n* @returns true if explicit or automatic initialization has completed, false otherwise\n*/"
   },
   {
     "name": "isEmpty",
