@@ -60,14 +60,18 @@ export type DataAttributeViewportOptions = {
  * equal to their index (e.g. Braintrust logs table, TanStack-style grids).
  *
  * Derives selectors from the table config so no duplication is needed:
- *   - getVisibleColumnRange — reads column attribute from cells in the first visible row
+ *   - getVisibleColumnRange — reads column attribute from cells in the first matched row
  *   - getVisibleRowRange   — reads row attribute from all visible row elements
  *   - scrollToColumn       — aligns header's left edge to container left, waits for cell mount
  *   - scrollToRow          — scrolls row into view, waits for row mount
  *
  * **Important:** `rowAttribute` must be present on the elements matched by `rowSelector`,
- * not on child cells. If row elements lack the attribute, `getVisibleRowRange` returns
- * `{first:0, last:0}` and logs a warning at the `error` log level.
+ * not on child cells. Indices must be nonempty numbers that normalize to finite,
+ * nonnegative integers after the configured offset. If any selected visible row, or
+ * selected cell in the first matched row, has missing/invalid metadata, its range is unknown (`{first:0, last:Infinity}`)
+ * and a diagnostic is logged at the `error` debug level. Empty selections also return
+ * an unknown range, without a metadata diagnostic. DOM attachment/geometry checks
+ * still apply; an unknown range is not proof that an element exists or is visible.
  *
  * @example
  * // TanStack / Braintrust — pass your scroll container explicitly (no Tailwind default)
@@ -107,14 +111,17 @@ const dataAttribute = (options?: DataAttributeViewportOptions): ViewportStrategy
                 if (!firstRow) return { first: 0, last: 0, _cellCount: 0, _validCount: 0 };
                 const cells = Array.from(firstRow.querySelectorAll(cellSel));
                 const indices = cells
-                    .map(c => Number(c.getAttribute(colAttr)) - colOffset)
-                    .filter(n => !isNaN(n));
+                    .map(c => c.getAttribute(colAttr))
+                    .filter((value): value is string => value !== null && value.trim() !== '')
+                    .map(value => Number(value) - colOffset)
+                    .filter(n => Number.isFinite(n) && Number.isInteger(n) && n >= 0);
                 if (!indices.length) return { first: 0, last: 0, _cellCount: cells.length, _validCount: 0 };
                 return { first: Math.min(...indices), last: Math.max(...indices), _cellCount: cells.length, _validCount: indices.length };
             }, { rowSel, cellSel, colAttr, colOffset });
-            if (result._cellCount > 0 && result._validCount === 0) {
-                logDebug(config, 'error', `dataAttribute viewport: ${result._cellCount} cell(s) found but none have attribute "${colAttr}". Check that columnAttribute targets cell elements matched by cellSelector.`);
+            if (result._cellCount > 0 && result._validCount < result._cellCount) {
+                logDebug(config, 'error', `dataAttribute viewport: ${result._cellCount - result._validCount} of ${result._cellCount} cell(s) have missing, empty or invalid "${colAttr}" indices after offset ${colOffset}. Check that columnAttribute targets cell elements matched by cellSelector. Returning unknown range {first:0, last:Infinity}.`);
             }
+            if (result._cellCount === 0 || result._validCount < result._cellCount) return UNKNOWN_RANGE;
             return { first: result.first, last: result.last };
         },
 
@@ -161,14 +168,17 @@ const dataAttribute = (options?: DataAttributeViewportOptions): ViewportStrategy
                         return rect.bottom > containerRect.top && rect.top < containerRect.bottom;
                     });
                 const indices = visibleRows
-                    .map(r => Number(r.getAttribute(rowAttr)) - rowOffset)
-                    .filter(n => !isNaN(n));
+                    .map(r => r.getAttribute(rowAttr))
+                    .filter((value): value is string => value !== null && value.trim() !== '')
+                    .map(value => Number(value) - rowOffset)
+                    .filter(n => Number.isFinite(n) && Number.isInteger(n) && n >= 0);
                 if (!indices.length) return { first: 0, last: 0, _rowCount: visibleRows.length, _validCount: 0 };
                 return { first: Math.min(...indices), last: Math.max(...indices), _rowCount: visibleRows.length, _validCount: indices.length };
             }, { rowSel, rowAttr, rowOffset, containerSel });
-            if (result._rowCount > 0 && result._validCount === 0) {
-                logDebug(config, 'error', `dataAttribute viewport: ${result._rowCount} row(s) found but none have attribute "${rowAttr}". Check that rowAttribute targets row elements matched by rowSelector, not child cells. getVisibleRowRange returning {first:0, last:0}.`);
+            if (result._rowCount > 0 && result._validCount < result._rowCount) {
+                logDebug(config, 'error', `dataAttribute viewport: ${result._rowCount - result._validCount} of ${result._rowCount} row(s) have missing, empty or invalid "${rowAttr}" indices after offset ${rowOffset}. Check that rowAttribute targets row elements matched by rowSelector, not child cells. Returning unknown range {first:0, last:Infinity}.`);
             }
+            if (result._rowCount === 0 || result._validCount < result._rowCount) return UNKNOWN_RANGE;
             return { first: result.first, last: result.last };
         },
 

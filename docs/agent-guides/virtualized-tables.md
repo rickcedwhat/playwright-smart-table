@@ -47,11 +47,24 @@ This terminates naturally: `true` on every scroll that moves, `false` only when 
 
 `Strategies.Viewport.dataAttribute()` reads `data-index` (configurable via `rowAttribute`) from **row elements** to compute `getVisibleRowRange`. It reads `data-index` from **cell elements** to compute `getVisibleColumnRange`. These are two different DOM elements — the strategy assumes the same attribute name appears on both.
 
-When `data-index` exists only on cells (column index) and not on rows, `getVisibleRowRange` gets `NaN` for every row, filters them all out, and returns `{ first: 0, last: 0 }` with no warning.
+When `data-index` exists only on cells (column index) and not on rows, the old parser converted missing row attributes to zero: `Number(null)` and `Number('')` are both `0`, not `NaN`. It could report `{ first: 0, last: 0 }` without detecting the missing metadata.
 
-In 6.20.0+, the final-scan viewport filter uses this range to decide which newly-discovered rows are "in view." A range of `[0, 0]` means every row at DOM position > 0 is excluded. In the Braintrust case, this silently dropped 4 rows that `ElementTracker` had correctly discovered — producing a clean 16-row result with no error thrown.
+In the historical 6.20.0 failure, the final-scan viewport filter used this range to decide which newly-discovered rows are "in view." A range of `[0, 0]` means every row at DOM position > 0 is excluded. In the Braintrust case, this silently dropped 4 rows that `ElementTracker` had correctly discovered — producing a clean 16-row result with no error thrown.
 
-Issue filed: [#410](https://github.com/rickcedwhat/playwright-smart-table/issues/410)
+Issues: [#410](https://github.com/rickcedwhat/playwright-smart-table/issues/410), [#519](https://github.com/rickcedwhat/playwright-smart-table/issues/519).
+
+The parser now requires nonempty numeric attributes that normalize to finite,
+nonnegative integers after the configured offset. Valid zero is preserved. If any
+selected visible row or selected cell has missing/invalid metadata, the respective
+range is unknown (`{ first: 0, last: Infinity }`), including mixed valid/invalid
+selections. A diagnostic names the attribute and invalid count when
+`debug: { logLevel: 'error' }` (or a more verbose level) is enabled. An empty
+selection also returns unknown, without a metadata warning.
+
+Unknown ranges avoid rejecting rows/cells solely on unreliable index metadata;
+they do not prove visibility or attachment. Geometry-based `getVisibleRowIndices`
+is independent and still filters overscan. Fix the attribute configuration when
+index-based navigation is needed; this fallback does not supply missing identities.
 
 ### When `dataAttribute()` is correct
 

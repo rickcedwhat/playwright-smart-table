@@ -17,6 +17,7 @@ const mockConfig = (overrides: any = {}) => ({
     ...overrides,
 });
 
+// Browser parsing is covered by viewport-index-validation.spec.ts; these isolate diagnostics.
 describe('Strategies.Viewport.dataAttribute()', () => {
     describe('getVisibleRowRange', () => {
         it('logs error when rows exist but none have the row attribute', async () => {
@@ -29,9 +30,9 @@ describe('Strategies.Viewport.dataAttribute()', () => {
                 { root, config } as any,
             );
 
-            expect(result).toEqual({ first: 0, last: 0 });
+            expect(result).toEqual({ first: 0, last: Infinity });
             expect(spy).toHaveBeenCalledWith(
-                expect.stringContaining('dataAttribute viewport: 15 row(s) found but none have attribute "data-index"'),
+                expect.stringContaining('dataAttribute viewport: 15 of 15 row(s) have missing, empty or invalid "data-index"'),
                 expect.anything(),
             );
             spy.mockRestore();
@@ -62,7 +63,7 @@ describe('Strategies.Viewport.dataAttribute()', () => {
                 { root, config } as any,
             );
 
-            expect(result).toEqual({ first: 0, last: 0 });
+            expect(result).toEqual({ first: 0, last: Infinity });
             expect(spy).not.toHaveBeenCalled();
             spy.mockRestore();
         });
@@ -76,7 +77,7 @@ describe('Strategies.Viewport.dataAttribute()', () => {
             await strategy.getVisibleRowRange!({ root, config } as any);
 
             expect(spy).toHaveBeenCalledWith(
-                expect.stringContaining('none have attribute "aria-rowindex"'),
+                expect.stringContaining('missing, empty or invalid "aria-rowindex"'),
                 expect.anything(),
             );
             spy.mockRestore();
@@ -94,9 +95,9 @@ describe('Strategies.Viewport.dataAttribute()', () => {
                 { root, config } as any,
             );
 
-            expect(result).toEqual({ first: 0, last: 0 });
+            expect(result).toEqual({ first: 0, last: Infinity });
             expect(spy).toHaveBeenCalledWith(
-                expect.stringContaining('dataAttribute viewport: 8 cell(s) found but none have attribute "data-index"'),
+                expect.stringContaining('dataAttribute viewport: 8 of 8 cell(s) have missing, empty or invalid "data-index"'),
                 expect.anything(),
             );
             spy.mockRestore();
