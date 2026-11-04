@@ -1,8 +1,19 @@
 import { test, expect } from '@playwright/test';
-import { useTable, type TableConfig } from '../src';
+import { useTable, type TableConfig, type TableResult } from '../src';
 
 const html = '<table data-page="2"><thead><tr><th>Name</th></tr></thead><tbody><tr><td>Alice</td></tr></tbody></table>';
-for (const entry of ['findRow', 'findRows', 'map', 'countRows', 'findRowByIndex', 'getHeaders', 'getHeaderCell', 'scrollToColumn', 'iterator'] as const) {
+const entryPoints: Record<string, (table: TableResult) => Promise<void>> = {
+  findRow: async table => expect((await table.findRow({ Name: 'Alice' })).tablePageIndex).toBe(2),
+  findRows: async table => expect((await table.findRows())[0].tablePageIndex).toBe(2),
+  map: async table => expect(await table.map(({ pageIndex }) => pageIndex)).toEqual([2]),
+  countRows: async table => expect(await table.countRows()).toBe(1),
+  findRowByIndex: async table => expect((await table.findRowByIndex(0)).tablePageIndex).toBe(2),
+  getHeaders: async table => expect(await table.getHeaders()).toEqual(['Name']),
+  getHeaderCell: async table => expect(await (await table.getHeaderCell('Name')).innerText()).toBe('Name'),
+  scrollToColumn: async table => table.scrollToColumn('Name'),
+  iterator: async table => { for await (const item of table) expect(item.pageIndex).toBe(2); },
+};
+for (const [entry, run] of Object.entries(entryPoints)) {
   test(`${entry} detects the starting page before later explicit init`, async ({ page }) => {
     await page.setContent(html);
     let detections = 0;
@@ -13,15 +24,7 @@ for (const entry of ['findRow', 'findRows', 'map', 'countRows', 'findRowByIndex'
         pagination: { detectCurrentPage: async root => { detections++; return Number(await root.getAttribute('data-page')); } },
       },
     });
-    if (entry === 'findRow') expect((await table.findRow({ Name: 'Alice' })).tablePageIndex).toBe(2);
-    if (entry === 'findRows') expect((await table.findRows())[0].tablePageIndex).toBe(2);
-    if (entry === 'map') expect(await table.map(({ pageIndex }) => pageIndex)).toEqual([2]);
-    if (entry === 'countRows') expect(await table.countRows()).toBe(1);
-    if (entry === 'findRowByIndex') expect((await table.findRowByIndex(0)).tablePageIndex).toBe(2);
-    if (entry === 'getHeaders') expect(await table.getHeaders()).toEqual(['Name']);
-    if (entry === 'getHeaderCell') expect(await (await table.getHeaderCell('Name')).innerText()).toBe('Name');
-    if (entry === 'scrollToColumn') await table.scrollToColumn('Name');
-    if (entry === 'iterator') { for await (const item of table) expect(item.pageIndex).toBe(2); }
+    await run(table);
     expect(detections).toBe(1);
     await table.init();
     expect(detections).toBe(1);

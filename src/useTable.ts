@@ -12,7 +12,7 @@ import createSmartRow from './smartRow';
 import { FilterEngine } from './filterEngine';
 import { TableMapper } from './engine/tableMapper';
 import { RowFinder } from './engine/rowFinder';
-import { runForEach, runMap, runFilter } from './engine/tableIteration';
+import { runForEach, runMap, runFilter, type TableIterationEnv } from './engine/tableIteration';
 import { countRows } from './engine/countRows';
 import { applySort, getSortState, SortingEnv } from './engine/sorting';
 import { findRowByIndex } from './engine/rowByIndex';
@@ -285,6 +285,18 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
     return didAdvance;
   };
 
+  const _iterationEnv = (): TableIterationEnv<T> => ({
+    getRowLocators: () => resolve(config.rowSelector, rootLocator),
+    getMap: _getRowMap,
+    advancePage: _advancePage,
+    makeSmartRow: (loc, map, idx, pageIdx, barrier, sel) => _makeSmart(loc, map, idx, pageIdx, barrier, sel),
+    createSmartRowArray,
+    config,
+    getPage: () => rootLocator.page(),
+    getCurrentPageIndex: () => tableState.currentPageIndex,
+    getContext: () => createStrategyContext(),
+  });
+
   const sortingEnv = (): SortingEnv<T> => ({
     config,
     getPage: () => rootLocator.page(),
@@ -533,17 +545,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       };
 
       const runPromise = runMap(
-        {
-          getRowLocators: () => resolve(config.rowSelector, rootLocator),
-          getMap: _getRowMap,
-          advancePage: _advancePage,
-          makeSmartRow: (loc, map, idx, pageIdx, barrier, sel) => _makeSmart(loc, map, idx, pageIdx, barrier, sel),
-          createSmartRowArray,
-          config,
-          getPage: () => rootLocator.page(),
-          getCurrentPageIndex: () => tableState.currentPageIndex,
-          getContext: () => createStrategyContext(),
-        },
+        _iterationEnv(),
         async (ctx) => {
           queue.push({
             row: ctx.row,
@@ -587,17 +589,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       log(`forEach: options=${safeStringify(options)}`);
       await _autoInit();
       await runForEach(
-        {
-          getRowLocators: () => resolve(config.rowSelector, rootLocator),
-          getMap: _getRowMap,
-          advancePage: _advancePage,
-          makeSmartRow: (loc, map, idx, pageIdx, barrier, sel) => _makeSmart(loc, map, idx, pageIdx, barrier, sel),
-          createSmartRowArray,
-          config,
-          getPage: () => rootLocator.page(),
-          getCurrentPageIndex: () => tableState.currentPageIndex,
-          getContext: () => createStrategyContext(),
-        },
+        _iterationEnv(),
         callback,
         options
       );
@@ -607,17 +599,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       log(`map: options=${safeStringify(options)}`);
       await _autoInit();
       return runMap(
-        {
-          getRowLocators: () => resolve(config.rowSelector, rootLocator),
-          getMap: _getRowMap,
-          advancePage: _advancePage,
-          makeSmartRow: (loc, map, idx, pageIdx, barrier, sel) => _makeSmart(loc, map, idx, pageIdx, barrier, sel),
-          createSmartRowArray,
-          config,
-          getPage: () => rootLocator.page(),
-          getCurrentPageIndex: () => tableState.currentPageIndex,
-          getContext: () => createStrategyContext(),
-        },
+        _iterationEnv(),
         callback,
         options
       );
@@ -640,17 +622,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       log(`filter: options=${safeStringify(options)}`);
       await _autoInit();
       return runFilter(
-        {
-          getRowLocators: () => resolve(config.rowSelector, rootLocator),
-          getMap: _getRowMap,
-          advancePage: _advancePage,
-          makeSmartRow: (loc, map, idx, pageIdx, barrier, sel) => _makeSmart(loc, map, idx, pageIdx, barrier, sel),
-          createSmartRowArray,
-          config,
-          getPage: () => rootLocator.page(),
-          getCurrentPageIndex: () => tableState.currentPageIndex,
-          getContext: () => createStrategyContext(),
-        },
+        _iterationEnv(),
         predicate,
         options
       );
