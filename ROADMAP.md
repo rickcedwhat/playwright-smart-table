@@ -35,21 +35,38 @@ Guiding light: [`PHILOSOPHY.md`](PHILOSOPHY.md) is the scoring rubric for every 
 - [x] **Quick wins (CONTRIBUTING pnpm, dead `ResolutionStrategies`, orphan `#endregion`, `./types` export)** — [#479](https://github.com/rickcedwhat/playwright-smart-table/issues/479)
 - [ ] **Decide the fate of the README snippet generator** — [#480](https://github.com/rickcedwhat/playwright-smart-table/issues/480)
 
-### Batch 3 — GBU 2026-10-11 ([`GBU-REPORT.md`](GBU-REPORT.md))
+### Batch 3 — GBU 2026-10-11 ([report at the audit commit](https://github.com/rickcedwhat/playwright-smart-table/blob/4d4c252c9c256a7b58cd69799dc86e4d328b7de1/GBU-REPORT.md))
 
-Reproduced after #508 merged. Prioritize row identity, detached synchronized reads, and bounded readiness/lifecycle handling. The report also proposes test rewrites and agent-documentation cleanup; select those before implementation.
+Reproduced after #508 merged. Prioritize row identity, detached synchronized reads, and bounded readiness/lifecycle handling. The report also proposes test rewrites and agent-documentation cleanup; select those before implementation. Fixes for #511–#517 are merged but unreleased as of 2026-11-01.
 
-- [ ] **Atomic snapshot can silently read a replacement row (P1)** — [#511](https://github.com/rickcedwhat/playwright-smart-table/issues/511) (U1)
-- [ ] **Returned synchronized `findRows()` rows can deadlock when read separately (P1)** — [#512](https://github.com/rickcedwhat/playwright-smart-table/issues/512) (U2)
-- [ ] **Render-window index is mistaken for logical row identity during snapshots (P1)** — [#513](https://github.com/rickcedwhat/playwright-smart-table/issues/513) (U3)
-- [ ] **Row, cell, and header loading waits are not bounded when predicates stay pending (P1)** — [#514](https://github.com/rickcedwhat/playwright-smart-table/issues/514) (U4)
-- [ ] **Viewport cache survives DOM changes, reset, and revalidation (P1)** — [#515](https://github.com/rickcedwhat/playwright-smart-table/issues/515) (U5)
-- [ ] **`byTopPosition` drops different records that reuse one viewport slot (P1)** — [#516](https://github.com/rickcedwhat/playwright-smart-table/issues/516) (U6)
-- [ ] **Horizontal header discovery loses order and early columns when starting scrolled (P1)** — [#517](https://github.com/rickcedwhat/playwright-smart-table/issues/517) (U7)
+- [x] **Atomic snapshot can silently read a replacement row (P1)** — [#511](https://github.com/rickcedwhat/playwright-smart-table/issues/511) (U1)
+- [x] **Returned synchronized `findRows()` rows can deadlock when read separately (P1)** — [#512](https://github.com/rickcedwhat/playwright-smart-table/issues/512) (U2)
+- [x] **Render-window index is mistaken for logical row identity during snapshots (P1)** — [#513](https://github.com/rickcedwhat/playwright-smart-table/issues/513) (U3)
+- [x] **Row, cell, and header loading waits are not bounded when predicates stay pending (P1)** — [#514](https://github.com/rickcedwhat/playwright-smart-table/issues/514) (U4)
+- [x] **Viewport cache survives DOM changes, reset, and revalidation (P1)** — [#515](https://github.com/rickcedwhat/playwright-smart-table/issues/515) (U5)
+- [x] **`byTopPosition` drops different records that reuse one viewport slot (P1)** — [#516](https://github.com/rickcedwhat/playwright-smart-table/issues/516) (U6; deprecated with behavior retained, follow-up [#526](https://github.com/rickcedwhat/playwright-smart-table/issues/526))
+- [x] **Horizontal header discovery loses order and early columns when starting scrolled (P1)** — [#517](https://github.com/rickcedwhat/playwright-smart-table/issues/517) (U7; sticky-header regression tracked in Batch 4)
 - [ ] **Lazy initialization skips starting-page detection permanently (P1)** — [#518](https://github.com/rickcedwhat/playwright-smart-table/issues/518) (U8)
 - [ ] **Missing index attributes are parsed as valid zeroes (P2)** — [#519](https://github.com/rickcedwhat/playwright-smart-table/issues/519) (U9)
 
 Follow-up API inconsistencies and test/agent-documentation cleanup remain described in the report (B1–B5). Existing upstream follow-ups: [#486](https://github.com/rickcedwhat/playwright-smart-table/issues/486) and [#509](https://github.com/rickcedwhat/playwright-smart-table/issues/509).
+
+### Batch 4 — GBU 2026-11-01 ([`GBU-REPORT.md`](GBU-REPORT.md))
+
+Audited `da9fcc26`. Ship the unreleased Batch 3 fixes first (merge #530, release 6.26.0), then remove the new P1s. Evidence: [2026-11-01 reproductions](docs/audits/2026-11-01-reproductions.md).
+
+- [ ] **Release the merged Batch 3 fixes** — merge [#530](https://github.com/rickcedwhat/playwright-smart-table/pull/530) (#518), then `pnpm version minor` (B1)
+- [ ] **Atomic `toJSON` mislabels columns when `getCellLocator` is configured (P1)** — issue to file (U1)
+- [ ] **Sticky/pinned header without `aria-colindex` breaks `init()` after #529 (P1, regression)** — issue to file (U2)
+- [ ] **`reset()` / `countRows()` / `toArray()` record page 0 without rewinding (P1)** — [#533](https://github.com/rickcedwhat/playwright-smart-table/issues/533) (U3; after #530)
+- [ ] **Global/sticky RegExp filters drop rows on override/synthetic columns (P2)** — [#534](https://github.com/rickcedwhat/playwright-smart-table/issues/534) (U4)
+- [ ] **Ambiguous-row errors sample non-matching rows (P2)** — issue to file (B2)
+- [ ] **Dedupe semantics for co-occurring equal keys differ by concurrency mode** — fold into [#526](https://github.com/rickcedwhat/playwright-smart-table/issues/526) with [#535](https://github.com/rickcedwhat/playwright-smart-table/issues/535) (B3)
+- [ ] **`mapColumn<R>` promises unconverted values (P2)** — [#536](https://github.com/rickcedwhat/playwright-smart-table/issues/536) (B4)
+- [ ] **Consolidate cell resolution on `resolveCellLocator`** — issue to file (B5)
+- [ ] **Missing index attributes are parsed as valid zeroes (P2)** — [#519](https://github.com/rickcedwhat/playwright-smart-table/issues/519) (carried)
+
+Deferred until the P1s ship: packaged consumer agent skills ([#532](https://github.com/rickcedwhat/playwright-smart-table/issues/532)).
 
 ### Deferred to v7
 
