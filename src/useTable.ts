@@ -1,4 +1,5 @@
 import type { Locator, Page } from '@playwright/test';
+import { AsyncLocalStorage } from 'async_hooks';
 import { TableConfig, TableContext, Selector, TableResult, SmartRow as SmartRowType, FinalTableConfig, TableStrategies as ITableStrategies, FilterValue } from './types';
 import { MINIMAL_CONFIG_CONTEXT } from './minimalConfigContext';
 import { validatePaginationResult, validateSortingStrategy, validateFillStrategy } from './strategies/validation';
@@ -151,62 +152,93 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
 
   let initialized = false;
   let initialization: Promise<void> | undefined;
-  const _autoInit = async (options?: { timeout?: number }): Promise<void> => {
-    if (initialization) return initialization;
-    if (initialized) return;
-    initialization = (async () => {
-      if (config.strategies.sorting) validateSortingStrategy(config.strategies.sorting);
-      if (config.strategies.fill) validateFillStrategy(config.strategies.fill);
+  // reset() and revalidate() start a new lifecycle; setup begun in an earlier one must not mark the table ready.
+  let lifecycle = 0;
+  // Strategies called during setup (detectCurrentPage) may call table methods, which must not wait on that setup.
+  const setupScope = new AsyncLocalStorage<true>();
 
-      warnIfDebugInCI(config);
-      logDebug(config, 'info', 'Initializing table');
+  const _startLifecycle = () => {
+    lifecycle++;
+    initialization = undefined;
+    initialized = false;
+    tableState.empty = false;
+    tableMapper.clear();
+  };
 
-      if (
-        config.maxPages === 1 &&
-        (config.strategies.pagination?.goNext || config.strategies.pagination?.goNextBulk)
-      ) {
-        console.warn(
-          '[SmartTable] maxPages is 1 but a pagination strategy is configured — iteration/find will never leave page 1. Pass maxPages: N (or Infinity) to scan further pages.'
-        );
+  const _detectStartingPage = async (): Promise<number | undefined> => {
+    const detect = config.strategies.pagination?.detectCurrentPage;
+    if (!detect) return undefined;
+    try {
+      const detected = await setupScope.run(true, () => detect(rootLocator));
+      if (Number.isInteger(detected) && detected >= 0) {
+        logDebug(config, 'info', `init: detected starting page index ${detected}`);
+        return detected;
       }
-      let map: Map<string, number>;
-      try {
-        map = await tableMapper.getMap(options?.timeout);
-      } catch (headerError) {
-        if (config.emptyState) {
-          const visible = await config.emptyState.isVisible().catch(() => false);
-          if (visible) {
-            tableState.empty = true;
-            logDebug(config, 'info', 'init: header resolution failed but emptyState locator is visible — table is empty');
-            initialized = true;
-            return;
-          }
-        }
-        throw headerError;
-      }
+      logDebug(config, 'error', `init: detectCurrentPage returned invalid index (${detected}); defaulting to 0`);
+    } catch (e) {
+      logDebug(config, 'error', `init: detectCurrentPage failed`, e);
+    }
+    return 0;
+  };
 
-      logDebug(config, 'info', `Table initialized with ${map.size} columns`, Array.from(map.keys()));
+  const _validateSetup = () => {
+    if (config.strategies.sorting) validateSortingStrategy(config.strategies.sorting);
+    if (config.strategies.fill) validateFillStrategy(config.strategies.fill);
 
-      if (config.strategies.pagination?.detectCurrentPage) {
-        try {
-          const detected = await config.strategies.pagination.detectCurrentPage(rootLocator);
-          if (Number.isInteger(detected) && detected >= 0) {
-            tableState.currentPageIndex = detected;
-            logDebug(config, 'info', `init: detected starting page index ${detected}`);
-          } else {
-            tableState.currentPageIndex = 0;
-            logDebug(config, 'error', `init: detectCurrentPage returned invalid index (${detected}); defaulting to 0`);
-          }
-        } catch (e) {
-          tableState.currentPageIndex = 0;
-          logDebug(config, 'error', `init: detectCurrentPage failed`, e);
-        }
-      }
+    warnIfDebugInCI(config);
+    logDebug(config, 'info', 'Initializing table');
 
-      await debugDelay(config, 'default');
+    if (
+      config.maxPages === 1 &&
+      (config.strategies.pagination?.goNext || config.strategies.pagination?.goNextBulk)
+    ) {
+      console.warn(
+        '[SmartTable] maxPages is 1 but a pagination strategy is configured — iteration/find will never leave page 1. Pass maxPages: N (or Infinity) to scan further pages.'
+      );
+    }
+  };
+
+  const _emptyStateVisible = async () => !!config.emptyState && await config.emptyState.isVisible().catch(() => false);
+
+  /** Resolves true when a newer lifecycle replaced this setup before it finished. */
+  const _runSetup = async (options: { timeout?: number } | undefined, isStale: () => boolean): Promise<boolean> => {
+    _validateSetup();
+    let map: Map<string, number>;
+    try {
+      map = await tableMapper.getMap(options?.timeout);
+    } catch (headerError) {
+      if (!(await _emptyStateVisible())) throw headerError;
+      if (isStale()) return true;
+      tableState.empty = true;
+      logDebug(config, 'info', 'init: header resolution failed but emptyState locator is visible — table is empty');
       initialized = true;
-    })().finally(() => { initialization = undefined; });
-    return initialization;
+      return false;
+    }
+    if (isStale()) return true;
+
+    logDebug(config, 'info', `Table initialized with ${map.size} columns`, Array.from(map.keys()));
+
+    const startingPage = await _detectStartingPage();
+    if (isStale()) return true;
+    if (startingPage !== undefined) tableState.currentPageIndex = startingPage;
+
+    await debugDelay(config, 'default');
+    if (isStale()) return true;
+    initialized = true;
+    return false;
+  };
+
+  const _autoInit = async (options?: { timeout?: number }): Promise<void> => {
+    if (initialization) return setupScope.getStore() ? undefined : initialization;
+    if (initialized) return;
+    const startedIn = lifecycle;
+    const isStale = () => startedIn !== lifecycle;
+    // A replaced setup hands its callers over to the current lifecycle instead of finishing it.
+    const setup: Promise<void> = _runSetup(options, isStale)
+      .then(stale => stale ? _autoInit(options) : undefined, error => isStale() ? _autoInit(options) : Promise.reject(error))
+      .finally(() => { if (initialization === setup) initialization = undefined; });
+    initialization = setup;
+    return setup;
   };
 
   // Initialization strategies may inspect headers after mapping has completed.
@@ -368,9 +400,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
       }
 
       tableState.currentPageIndex = 0;
-      tableState.empty = false;
-      tableMapper.clear();
-      initialized = false;
+      _startLifecycle();
       log("Table reset complete. Calling autoInit to restore state.");
       await _autoInit();
       await config.onReset(createStrategyContext());
@@ -378,9 +408,7 @@ export const useTable = <T = any>(rootLocator: Locator, configOptions: TableConf
 
     revalidate: async () => {
       log("Revalidating table structure...");
-      tableMapper.clear();
-      tableState.empty = false;
-      initialized = false;
+      _startLifecycle();
       await _autoInit();
       log("Table revalidated.");
     },

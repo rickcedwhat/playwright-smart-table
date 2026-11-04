@@ -22,6 +22,7 @@ for (const entry of ['findRow', 'findRows', 'map', 'countRows', 'findRowByIndex'
     if (entry === 'getHeaderCell') expect(await (await table.getHeaderCell('Name')).innerText()).toBe('Name');
     if (entry === 'scrollToColumn') await table.scrollToColumn('Name');
     if (entry === 'iterator') { for await (const item of table) expect(item.pageIndex).toBe(2); }
+    expect(detections).toBe(1);
     await table.init();
     expect(detections).toBe(1);
     expect(table.currentPageIndex).toBe(2);
@@ -92,6 +93,43 @@ test('detector can read mapped headers without recursive initialization', async 
   await table.init();
   expect(table.currentPageIndex).toBe(2);
 });
+
+for (const entry of ['findRow', 'findRows'] as const) {
+  test(`detector can call ${entry} without waiting on its own initialization`, async ({ page }) => {
+    test.setTimeout(10_000);
+    await page.setContent(html);
+    const table = useTable(page.locator('table'), { autoScroll: false, strategies: {
+      loading: {}, resolveRowIndex: async () => 0, pagination: { detectCurrentPage: async () => {
+        const found = entry === 'findRow' ? [await table.findRow({ Name: 'Alice' })] : await table.findRows({ Name: 'Alice' });
+        return found.length === 1 ? 2 : 0;
+      } },
+    } });
+    await table.init();
+    expect(table.currentPageIndex).toBe(2);
+  });
+}
+
+for (const entry of ['reset', 'revalidate'] as const) {
+  test(`${entry} during setup replaces the in-flight initialization`, async ({ page }) => {
+    test.setTimeout(10_000);
+    await page.setContent(html);
+    let release!: () => void;
+    const gate = new Promise<void>(r => { release = r; });
+    let detections = 0;
+    const table = useTable(page.locator('table'), { autoScroll: false, strategies: {
+      loading: {}, pagination: { detectCurrentPage: async () => { const call = ++detections; if (call === 1) await gate; return call; } },
+    } });
+    const initializing = table.init();
+    await expect.poll(() => detections).toBe(1);
+    const restarting = table[entry]();
+    release();
+    await Promise.all([initializing, restarting]);
+    expect(detections).toBe(2);
+    expect(table.currentPageIndex).toBe(2);
+    expect(table.isInitialized()).toBe(true);
+    expect(await table.getRowByIndex(0).getCell('Name').innerText()).toBe('Alice');
+  });
+}
 
 for (const entry of ['findRow', 'findRows', 'map', 'countRows'] as const) {
   test(`${entry} advances relative to detected page and count restores page zero`, async ({ page }) => {
