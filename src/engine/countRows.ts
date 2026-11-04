@@ -19,7 +19,7 @@ export interface CountRowsEnv<T = any> {
   advancePage: (useBulk: boolean) => Promise<boolean>;
   getCurrentPageIndex: () => number;
   getContext: () => TableContext;
-  /** Restores page 1 after a paginated count. */
+  /** Rebuilds setup after a paginated count and rewinds when goToFirst succeeds. */
   reset: () => Promise<void>;
 }
 
@@ -52,7 +52,7 @@ function requireMap(tableMapper: TableMapper): Map<string, number> {
 
 /**
  * Counts matching rows on the current page, or across pages when pagination and
- * `maxPages > 1` allow it. A paginated count always resets to page 1 afterwards (#348).
+ * `maxPages > 1` allow it. A paginated count always calls reset afterwards (#348); rewind requires goToFirst.
  * Callers must have initialized the table.
  */
 export async function countRows<T>(
@@ -153,9 +153,10 @@ export async function countRows<T>(
     throw e;
   } finally {
     await tracker.cleanup(rootLocator.page());
-    // Always restore page 1, even if pagination threw mid-count (#348), so the table
-    // stays usable for callers that catch the error. If reset() itself fails, only let
-    // it surface when pagination succeeded — otherwise preserve the original error.
+    // Always attempt reset, even if pagination threw mid-count (#348). Rewind depends
+    // on goToFirst; an unavailable/failed rewind preserves the last known position.
+    // If reset() itself fails, only surface it when pagination succeeded; otherwise
+    // preserve the original error.
     log(config, `countRows: ${total} total row(s) across ${pagesScanned} page(s) — resetting`);
     try {
       await env.reset();

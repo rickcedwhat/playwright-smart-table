@@ -116,7 +116,18 @@ reset(): Promise<void>
 
 <!-- /api-signature: reset -->
 
-Resets table state (clears cached page position) and calls the `onReset` strategy if configured. Use after iteration to restore the table to its first page.
+Attempts `goToFirst` if configured, rebuilds table setup, then calls `onReset`.
+A successful rewind sets the page index to zero. If the strategy is absent or
+returns `false`, reset retains the last known page index; a valid
+`detectCurrentPage` result can then update it. Invalid or throwing detectors keep
+the known position (zero on a fresh table), rather than inventing a first page.
+An explicit `false` is logged when error debug logging is enabled. Reset still
+rebuilds headers and runs the hook when rewind is unavailable; a thrown rewind
+error propagates before those steps. Legacy action-only callbacks returning
+`undefined` keep the existing assumption that they succeeded.
+
+Provide a working `goToFirst` strategy when you require actual navigation to the
+first page. `detectCurrentPage` can verify position but does not navigate.
 
 ```typescript
 await table.reset();
@@ -404,7 +415,7 @@ toArray<R = Record<string, unknown>>(
 
 <!-- /api-signature: toArray -->
 
-Shorthand for `map()` followed by `reset()`. Iterates every row across all pages, applies the callback (defaults to `row.toJSON()`), then resets the table to page 1 — even if the callback throws. Accepts the same options as `map`.
+Shorthand for `map()` followed by `reset()`. Iterates every row across all pages, applies the callback (defaults to `row.toJSON()`), then calls `reset()` — even if the callback throws. Actual rewind requires a working `goToFirst` strategy. Accepts the same options as `map`.
 
 ```typescript
 // Every row as JSON
@@ -541,7 +552,10 @@ countRows(filters?: Record<string, FilterValue>, options?: { exact?: boolean; ma
 
 <!-- /api-signature: countRows -->
 
-Returns the number of rows currently visible on the page. Does not paginate.
+Paginated counts always call `reset()` afterward. Rewind depends on the configured
+`goToFirst`; an unavailable or failed rewind retains the known page position.
+
+Counts matching rows in the current view, or across pages when pagination and `maxPages > 1` are configured.
 
 ```typescript
 const count = await table.countRows();

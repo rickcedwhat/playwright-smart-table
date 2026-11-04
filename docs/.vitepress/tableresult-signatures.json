@@ -62,7 +62,7 @@
   {
     "name": "countRows",
     "signature": "countRows(filters?: Record<string, FilterValue>, options?: { exact?: boolean; maxPages?: number; signal?: AbortSignal }): Promise<number>",
-    "comment": "/**\n* Counts the number of rows, optionally filtered.\n* Without arguments, counts all rows. With filters, counts only matching rows.\n* Paginates when pagination is configured. `signal` cancels the page scan; the call\n* rejects with `signal.reason` (the table is still reset to page 1).\n*/"
+    "comment": "/**\n* Counts the number of rows, optionally filtered.\n* Without arguments, counts all rows. With filters, counts only matching rows.\n* Paginates when pagination is configured. `signal` cancels the page scan; the call\n* rejects with `signal.reason` (reset is still attempted; rewind requires a working goToFirst).\n*/"
   },
   {
     "name": "mapColumn",
@@ -77,7 +77,7 @@
   {
     "name": "reset",
     "signature": "reset(): Promise<void>",
-    "comment": "/**\n* Resets the table: calls goToFirst (if configured), clears cache, re-inits headers, then calls onReset.\n*/"
+    "comment": "/**\n* Rebuilds setup and calls onReset after attempting goToFirst. Without a rewind,\n* preserves the known page; a valid detectCurrentPage result can update it.\n*/"
   },
   {
     "name": "revalidate",
@@ -97,7 +97,7 @@
   {
     "name": "toArray",
     "signature": "toArray<R = Record<string, unknown>>(\n  callback?: (ctx: RowIterationContext<T>) => R | Promise<R>,\n  options?: RowIterationOptions\n  ): Promise<R[]>",
-    "comment": "/**\n* Shorthand for `map()` + `reset()`. Iterates every row across all pages, applies the\n* callback (defaults to `row.toJSON()`), then resets the table back to page 1 — even if\n* the callback throws.\n*\n* @param callback - Optional map function. Defaults to `({ row }) => row.toJSON()`.\n* @param options - Same options as `map()`.\n*\n* @example\n* // Zero-arg: returns toJSON() for every row\n* const rows = await table.toArray();\n*\n* @example\n* // Custom callback\n* const names = await table.toArray(({ row }) => row.getCell('Name').innerText());\n*\n* @example\n* // With options\n* const rows = await table.toArray(({ row }) => row.toJSON(), { concurrency: 'parallel' });\n*/"
+    "comment": "/**\n* Shorthand for `map()` + `reset()`. Iterates every row across all pages, applies the\n* callback (defaults to `row.toJSON()`), then calls reset() — even if the callback\n* throws. Returning to page 1 requires a working goToFirst strategy.\n*\n* @param callback - Optional map function. Defaults to `({ row }) => row.toJSON()`.\n* @param options - Same options as `map()`.\n*\n* @example\n* // Zero-arg: returns toJSON() for every row\n* const rows = await table.toArray();\n*\n* @example\n* // Custom callback\n* const names = await table.toArray(({ row }) => row.getCell('Name').innerText());\n*\n* @example\n* // With options\n* const rows = await table.toArray(({ row }) => row.toJSON(), { concurrency: 'parallel' });\n*/"
   },
   {
     "name": "filter",

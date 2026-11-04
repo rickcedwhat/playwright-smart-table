@@ -100,7 +100,7 @@ test.describe('Edge cases and missing coverage', () => {
     expect(await table.getHeaders()).toEqual(['A']);
   });
 
-  test('toArray() scrapes rows then resets page index (#432)', async ({ page }) => {
+  test('toArray() scrapes rows then runs the reset hook (#432)', async ({ page }) => {
     await page.setContent(`
       <table id="t">
         <thead><tr><th>Name</th></tr></thead>
@@ -110,12 +110,13 @@ test.describe('Edge cases and missing coverage', () => {
         </tbody>
       </table>
     `);
-    const table = useTable(page.locator('#t'));
+    let resets = 0;
+    const table = useTable(page.locator('#t'), { onReset: async () => { resets++; } });
     await table.init();
-    table.currentPageIndex = 2;
 
     const rows = await table.toArray();
     expect(rows).toEqual([{ Name: 'Alice' }, { Name: 'Bob' }]);
+    expect(resets).toBe(1);
     expect(table.currentPageIndex).toBe(0);
   });
 

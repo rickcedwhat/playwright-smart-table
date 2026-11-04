@@ -417,7 +417,7 @@ export interface PaginationPrimitives {
   /** Bulk skip backward multiple pages at once. Returns number of pages skipped. */
   goPreviousBulk?: (context: TableContext) => Promise<boolean | number>;
 
-  /** Jump to first page / scroll to top */
+  /** Jump to first page / scroll to top. Return false if rewind could not be established; reset then preserves the known page until detection updates it. */
   goToFirst?: (context: TableContext) => Promise<boolean>;
 
   /** Jump to last page / scroll to bottom */
@@ -445,7 +445,8 @@ export interface PaginationPrimitives {
   /**
    * Called during explicit or automatic initialization to sync the library's page counter with the actual DOM state.
    * Use when a table may open on a page other than the first (e.g. a deep-linked URL that
-   * lands on page 5). Returns a 0-indexed page number.
+   * lands on page 5). Returns a 0-indexed page number. Invalid/throwing detectors
+   * preserve the last known page (zero before the first detection).
    * @example
    * detectCurrentPage: async (root) => {
    *   const text = await root.locator('[aria-current="page"]').textContent();
@@ -1003,7 +1004,7 @@ export interface TableResult<T = any> extends AsyncIterable<{ row: SmartRow<T>; 
    * Counts the number of rows, optionally filtered.
    * Without arguments, counts all rows. With filters, counts only matching rows.
    * Paginates when pagination is configured. `signal` cancels the page scan; the call
-   * rejects with `signal.reason` (the table is still reset to page 1).
+   * rejects with `signal.reason` (reset is still attempted; rewind requires a working goToFirst).
    */
   countRows: (filters?: Record<string, FilterValue>, options?: { exact?: boolean; maxPages?: number; signal?: AbortSignal }) => Promise<number>;
 
@@ -1025,7 +1026,8 @@ export interface TableResult<T = any> extends AsyncIterable<{ row: SmartRow<T>; 
 
 
   /**
-   * Resets the table: calls goToFirst (if configured), clears cache, re-inits headers, then calls onReset.
+   * Rebuilds setup and calls onReset after attempting goToFirst. Without a rewind,
+   * preserves the known page; a valid detectCurrentPage result can update it.
    */
   reset: () => Promise<void>;
 
@@ -1089,8 +1091,8 @@ export interface TableResult<T = any> extends AsyncIterable<{ row: SmartRow<T>; 
 
   /**
    * Shorthand for `map()` + `reset()`. Iterates every row across all pages, applies the
-   * callback (defaults to `row.toJSON()`), then resets the table back to page 1 — even if
-   * the callback throws.
+   * callback (defaults to `row.toJSON()`), then calls reset() — even if the callback
+   * throws. Returning to page 1 requires a working goToFirst strategy.
    *
    * @param callback - Optional map function. Defaults to `({ row }) => row.toJSON()`.
    * @param options - Same options as `map()`.
