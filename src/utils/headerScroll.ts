@@ -7,6 +7,59 @@ export const readVisibleHeaders = async ({ resolve, config, root }: StrategyCont
     return texts.map(t => t.trim());
 };
 
+type HeaderGeometry = { name: string; index: string | null; x: number; screenX: number; width: number; node: number };
+
+/** Runs in the browser, so it must not reference anything outside its own body. */
+function readHeaderGeometry(elements: Element[], offset: number): HeaderGeometry[] {
+    // Stable per-element ids let discovery tell a header that stayed put from a recycled node.
+    const w = window as unknown as { __smartTableHeaderNodes?: WeakMap<Element, number>; __smartTableHeaderSeq?: number };
+    if (!w.__smartTableHeaderNodes) w.__smartTableHeaderNodes = new WeakMap();
+    const nodes = w.__smartTableHeaderNodes;
+    return elements.map(el => {
+        if (!nodes.has(el)) {
+            w.__smartTableHeaderSeq = (w.__smartTableHeaderSeq || 0) + 1;
+            nodes.set(el, w.__smartTableHeaderSeq);
+        }
+        const { left, width } = el.getBoundingClientRect();
+        return {
+            name: (el as HTMLElement).innerText.trim(),
+            index: el.getAttribute('aria-colindex'),
+            x: left + offset,
+            screenX: left,
+            width,
+            node: nodes.get(el)!,
+        };
+    });
+}
+
+const logicalIndex = (header: HeaderGeometry): number | undefined => {
+    const index = header.index?.trim() ? Number(header.index) : NaN;
+    return Number.isFinite(index) ? index : undefined;
+};
+
+/** `candidates` holds every content x seen for a header that did not move with the content. */
+type CollectedHeader = { name: string; index?: number; x: number; width: number; candidates?: number[] };
+type Sighting = { key: string; screenX: number; scrollLeft: number };
+
+const movedWithContent = (header: HeaderGeometry, scrollLeft: number, last: Sighting) =>
+    Math.abs(header.screenX - (last.screenX - (scrollLeft - last.scrollLeft))) < 1.5;
+
+const overlaps = (x: number, width: number, other: CollectedHeader) =>
+    x < other.x + other.width - 1 && other.x < x + width - 1;
+
+/**
+ * A pinned header sits at its real table position only in some windows (the leftmost for
+ * start-pinned, the rightmost for end-pinned); elsewhere it covers other columns.
+ */
+function placePinnedHeaders(headers: CollectedHeader[]): void {
+    const scrolling = headers.filter(h => !h.candidates);
+    for (const header of headers) {
+        if (!header.candidates) continue;
+        header.x = header.candidates.find(x => !scrolling.some(other => overlaps(x, header.width, other)))
+            ?? header.candidates[0];
+    }
+}
+
 /** Shared horizontal discovery for generic, Glide and RDG strategies. */
 export async function scrollAndCollectHeaders(
     context: StrategyContext,
@@ -36,21 +89,34 @@ export async function scrollAndCollectHeaders(
         }
 
         // Identity and ordering are separate: an index key is not a pixel coordinate.
-        const collected = new Map<string, { name: string; index?: number; x: number }>();
+        const collected = new Map<string, CollectedHeader>();
+        // Latest sighting of each unindexed header element, keyed by node|name.
+        const sightings = new Map<string, Sighting>();
+        const recordUnindexed = (header: HeaderGeometry, name: string, scrollLeft: number) => {
+            const id = `${header.node}|${name}`;
+            const last = sightings.get(id);
+            const entry = last && collected.get(last.key);
+            if (!last || !entry || (!entry.candidates && movedWithContent(header, scrollLeft, last))) {
+                // The label keeps a pinned header from replacing the column it is drawn over.
+                const key = `x_${Math.round(header.x)}|${name}`;
+                sightings.set(id, { key, screenX: header.screenX, scrollLeft });
+                collected.set(key, { name, x: header.x, width: header.width });
+                return;
+            }
+            // Same element and label, but it did not move with the content: the header is pinned
+            // (or shifting into its pinned spot), however the page pins it.
+            sightings.set(id, { key: last.key, screenX: header.screenX, scrollLeft });
+            if (!entry.candidates) entry.candidates = [entry.x];
+            entry.candidates.push(header.x);
+        };
         const collect = async () => {
             const scrollLeft = await scrollerHandle.evaluate(el => el!.scrollLeft);
-            const headers = await resolve(config.headerSelector, root).evaluateAll((elements, offset) =>
-                elements.map(el => ({
-                    name: (el as HTMLElement).innerText.trim(),
-                    index: el.getAttribute('aria-colindex'),
-                    x: el.getBoundingClientRect().left + offset,
-                })), scrollLeft);
+            const headers = await resolve(config.headerSelector, root).evaluateAll(readHeaderGeometry, scrollLeft);
             for (const header of headers) {
-                const index = header.index?.trim() ? Number(header.index) : NaN;
-                const indexed = Number.isFinite(index);
-                const position = indexed ? index : Math.round(header.x);
-                const key = `${indexed ? 'index' : 'x'}_${position}`;
-                collected.set(key, { name: header.name || options.emptyHeader || '', index: indexed ? index : undefined, x: header.x });
+                const name = header.name || options.emptyHeader || '';
+                const index = logicalIndex(header);
+                if (index === undefined) recordUnindexed(header, name, scrollLeft);
+                else collected.set(`index_${index}`, { name, index, x: header.x, width: header.width });
             }
         };
 
@@ -69,6 +135,7 @@ export async function scrollAndCollectHeaders(
             if (after === before) break;
         }
         const headers = [...collected.values()];
+        placePinnedHeaders(headers);
         // Choose one coordinate system for the entire result, never per header.
         const allIndexed = headers.every(h => h.index !== undefined);
         return headers.sort((a, b) => allIndexed ? a.index! - b.index! : a.x - b.x).map(h => h.name);
