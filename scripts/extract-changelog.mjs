@@ -21,8 +21,8 @@ if (start === -1) {
   process.exit(0);
 }
 
-const afterHeader = raw.slice(start + header.length);
-const lines = afterHeader.split(/\r?\n/);
+// Skip the entire heading, including an optional release date.
+const lines = raw.slice(start).split(/\r?\n/).slice(1);
 const collected = [];
 for (const line of lines) {
   if (line.startsWith('## [')) break;
