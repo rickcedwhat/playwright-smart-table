@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { TableIterationEnv } from '../../src/engine/tableIteration';
 import { runMap } from '../../src/engine/tableIteration';
-import type { FinalTableConfig } from '../../src/types';
+import type { FinalTableConfig, RowIterationContext } from '../../src/types';
 
 vi.mock('../../src/utils/elementTracker', () => ({
   ElementTracker: class {
@@ -85,62 +85,30 @@ describe('dedupe key registration after callback (#382)', () => {
     expect((results[0] as any).key).toBe('alice');
   });
 
-  it('key survives recycle: row whose callback returned recycled data does not burn the key', async () => {
-    // Simulates DOM recycling: row 0 has key="alice" at dedupe time, but by the
-    // time the callback reads it, the node has been recycled to show "bob".
-    // On page 2, the real "alice" row appears — it must NOT be skipped.
-    let page = 0;
-    const recyclingRow = makeRow(0, 'alice');
-    const pages = [
-      [recyclingRow],
-      [makeRow(1, 'alice')],
-    ];
+  it('null is successful and commits the key captured before the callback', async () => {
+    const env = makeEnv([
+      [makeRow(0, 'alice')],
+      [makeRow(1, 'bob'), makeRow(2, 'alice')],
+    ]);
 
-    const env: TableIterationEnv<any> = {
-      getRowLocators: () => ({ all: async () => pages[page] }) as any,
-      getMap: () => new Map([['A', 0]]),
-      advancePage: async () => {
-        if (page === 0) { page = 1; return true; }
-        return false;
-      },
-      makeSmartRow: (loc: any, _map: any, idx: number) =>
-        ({ rowIndex: idx, _dedupeKey: loc._dedupeKey }) as any,
-      createSmartRowArray: (arr: any[]) => arr as any,
-      config: baseConfig,
-      getPage: () => ({}) as any,
-      getCurrentPageIndex: () => page,
-      getContext: () => ({ root: {} as any, config: baseConfig, resolve: (() => {}) as any, page: {} as any }),
-    } as any;
-
-    let callCount = 0;
-    const results = await runMap(env, async ({ row }) => {
-      callCount++;
-      if (callCount === 1) {
-        // Simulate recycle: by the time callback runs, the row's identity changed.
-        // The callback reads stale/wrong data. Return null to signal bad data.
-        recyclingRow._dedupeKey = 'bob';
+    let first = true;
+    const callback = vi.fn(async ({ row }: RowIterationContext) => {
+      if (first) {
+        first = false;
+        // Identity changes after the dedupe check; null is still a valid mapped value.
+        (row as any)._dedupeKey = 'bob';
         return null;
       }
       return { key: (row as any)._dedupeKey };
-    }, {
+    });
+    const results = await runMap(env, callback, {
       dedupe: async (row: any) => row._dedupeKey,
       concurrency: 'sequential',
     });
 
-    // Both rows collected: row 0 returned null (recycled), row 1 returned real data.
-    // The key "alice" was registered for row 0 (its dedupe key at read time),
-    // but row 1 also has key "alice" — with the old code, row 1 would be skipped.
-    // With the fix, key registration happens after callback, and row 0's callback
-    // succeeded (returned null, not SKIP), so "alice" IS registered... but the
-    // dedupe strategy re-reads the key at check time for row 1. Since row 0's node
-    // recycled to "bob", the dedupe SET has "alice" from row 0.
-    //
-    // Actually: the key is captured once at dedupe-check time and registered after
-    // callback. Row 0's key was "alice" when checked, callback succeeded (null ≠ SKIP),
-    // so "alice" is added to the set. Row 1's key is also "alice" → dedupe skip.
-    //
-    // This test verifies the basic contract: key IS registered after success.
-    expect(results).toHaveLength(1);
+    // Commit the original Alice key, not Bob: keep the later Bob and skip Alice.
+    expect(results).toEqual([null, { key: 'bob' }]);
+    expect(callback).toHaveBeenCalledTimes(2);
   });
 
   it('same-batch parallel rows with identical keys both collected (no pre-registration race)', async () => {

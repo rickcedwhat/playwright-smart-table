@@ -99,6 +99,11 @@ await table.map(
 - **`maxPages`** — cap how many pages are visited. Defaults to `config.maxPages`.
 - **`dedupe`** — for tables that replay records as you scroll or paginate, return a unique, stable record key (such as the ID above). Already-seen keys are skipped. Screen position, a mounted-slot index, and page-local indices can collide for different records. `Strategies.Dedupe.byTopPosition()` is deprecated; see [dedupe guidance](/api/strategies#avoid-viewport-position-keys).
 
+`map()` retains `null` callback results as successful mapped values; returning
+`null` does not skip a row or leave its dedupe key available. The key is captured
+before the callback and committed after it succeeds. Use `filter()` to exclude
+rows rather than treating a `null` map result as a skip signal.
+
 The callback also receives `index` (0-based visit counter) and `pageIndex` (which page the row came from). See the [API reference](/api/table-methods#foreach) for the full options list.
 
 ---
