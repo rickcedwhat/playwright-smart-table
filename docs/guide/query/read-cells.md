@@ -38,7 +38,17 @@ const data = await row.toJSON({ atomic: true })
 
 Normally each column is read one after another. If the row is live — prices ticking, statuses flipping — the first column and the last can come from different moments. `atomic` takes a single snapshot of the whole row instead.
 
-It needs `cellSelector` to be a CSS string (not a function). Column overrides still work — their `cell` and `getCell()` read from the snapshot, but `row` is still the live row, so anything you read through `row` can be newer than the snapshot.
+Atomic reads require `cellSelector` to be a CSS string, no custom
+`strategies.getCellLocator`, and one matching DOM cell per mapped column in header
+order. They reject layouts that need a custom cell strategy or have a different
+cell count, including reads with `{ columns }`. This prevents partially mounted,
+pinned, or filler cells from being returned under the wrong column names. A matching
+count alone cannot establish column order; the positional layout must be correct.
+Use ordinary `toJSON()` for strategy-aware live reads; it reads columns in sequence.
+Define computed-only columns with `syntheticColumns` rather than extra mapped
+headers; synthetic columns do not require an extra DOM cell.
+
+Column overrides still work — their `cell` and `getCell()` read from the snapshot, but `row` is still the live row, so anything you read through `row` can be newer than the snapshot.
 
 ---
 

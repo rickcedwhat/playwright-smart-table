@@ -172,9 +172,26 @@ export async function readRowAtomic<T>(env: RowSnapshotEnv<T>, columns?: string[
     if (typeof cellSel !== 'string') {
         throw new Error('[SmartTable] toJSON({ atomic: true }) requires cellSelector to be a CSS string, not a function.');
     }
+    // Live Locator strategies may resolve through the grid root or navigate; they
+    // cannot be applied safely to the detached row used by an atomic snapshot.
+    if (config.strategies.getCellLocator) {
+        throw new Error(
+            '[SmartTable] toJSON({ atomic: true }) does not support strategies.getCellLocator. ' +
+            'Atomic reads require positional cells in header order; use toJSON() for strategy-aware live reads.'
+        );
+    }
     env = await resolveSnapshotIdentity(env);
     const page = rootLocator.page();
     const snapshot = await cloneRow(await resolveCloneTarget(env), cellSel);
+    // Validate the whole layout even for a column subset: a missing/filler cell
+    // before the requested column shifts its position just as it does a full read.
+    if (snapshot.cells.length !== map.size) {
+        throw new Error(
+            `[SmartTable] toJSON({ atomic: true }) found ${snapshot.cells.length} cells for ${map.size} mapped columns. ` +
+            'Atomic reads require one DOM cell per mapped column in header order. ' +
+            'Check cellSelector and the header strategy; for non-positional layouts, configure a cell strategy and use toJSON().'
+        );
+    }
 
     // Determine which columns have overrides (need lazy materialization)
     const columnsToProcess = [...map.entries()].filter(([col]) => !columns || columns.includes(col));
@@ -215,7 +232,7 @@ export async function readRowAtomic<T>(env: RowSnapshotEnv<T>, columns?: string[
                     (wrapped as any).cause = err;
                     throw wrapped;
                 }
-            } else if (idx < snapshot.cells.length) {
+            } else {
                 result[col] = snapshot.cells[idx].text;
             }
         }

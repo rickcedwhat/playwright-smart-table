@@ -87,6 +87,14 @@ test.describe('MUI DataGrid Recon', () => {
         expect(missing.length).toBe(0);
     });
 
+    test('atomic reads reject the preset cell strategy instead of mislabeling virtualized columns', async ({ page }) => {
+        const table = await useTable(page.locator('[role="grid"]').first(), presets.muiDataGrid).init();
+        const row = table.getRowByIndex(0);
+        expect((await row.toJSON({ columns: ['Desk'] })).Desk).toMatch(/^D-/);
+        await expect(row.toJSON({ atomic: true })).rejects.toThrow(/atomic.*getCellLocator/);
+        await expect(row.toJSON({ atomic: true, columns: ['Desk'] })).rejects.toThrow(/atomic.*getCellLocator/);
+    });
+
     test('should handle sorting via preset', async ({ page }) => {
         const root = page.locator('[role="grid"]').first();
         const table = await useTable(root, presets.muiDataGrid).init();
