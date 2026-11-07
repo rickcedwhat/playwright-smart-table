@@ -46,7 +46,7 @@ test.describe('snapshot identity in a scrolled render window', () => {
                                 ? index
                                 : { index, selector: `[data-ri="${index}"]` };
                         },
-                        getCellLocator: ({ row, rowIndex, columnIndex }) => {
+                        getCellLocator: atomic ? undefined : ({ row, rowIndex, columnIndex }) => {
                             cellRowIndices.push(rowIndex);
                             return row.locator('td').nth(columnIndex);
                         },
@@ -366,7 +366,7 @@ test.describe('toJSON({ atomic }) — frozen snapshot with lazy materialization'
         expect(coherent).toEqual({ Name: 'Bob', Type: 'Type-Bob', Extra: 'Extra-Bob' });
     });
 
-    test('skips fake columns that exceed DOM cell count', async ({ page }) => {
+    test('rejects mapped columns that exceed DOM cell count', async ({ page }) => {
         await page.setContent(HTML);
         const table = await useTable(page.locator('#t'), {
             strategies: {
@@ -377,10 +377,8 @@ test.describe('toJSON({ atomic }) — frozen snapshot with lazy materialization'
                 },
             },
         }).init();
-        const result = (await table.getRowByIndex(1).toJSON({ atomic: true })) as Record<string, string>;
-        // 'fake' maps to index 3, but only 3 cells exist (indices 0-2) → omitted.
-        expect(result).toEqual({ Name: 'Bob', Type: 'Type-Bob', Extra: 'Extra-Bob' });
-        expect(result).not.toHaveProperty('fake');
+        await expect(table.getRowByIndex(1).toJSON({ atomic: true }))
+            .rejects.toThrow(/3 cells for 4 mapped columns/);
     });
 
     test('column overrides run against the frozen reconstruction (not live DOM)', async ({ page }) => {
@@ -414,15 +412,8 @@ test.describe('toJSON({ atomic }) — frozen snapshot with lazy materialization'
         await page.setContent(HTML);
 
         const table = await useTable(page.locator('#t'), {
-            strategies: {
-                header: async (ctx) => {
-                    const headers = await ctx.root.locator('th').allInnerTexts();
-                    headers.push('derived');
-                    return headers;
-                },
-            },
             columnOverrides: {
-                derived: {
+                Name: {
                     read: async (_cell, { getCell }) => {
                         const name = (await getCell('Name').innerText()).trim();
                         const type = (await getCell('Type').innerText()).trim();
@@ -433,9 +424,8 @@ test.describe('toJSON({ atomic }) — frozen snapshot with lazy materialization'
         }).init();
 
         const result = (await table.getRowByIndex(1).toJSON({ atomic: true })) as Record<string, string>;
-        expect(result.derived).toBe('Bob::Type-Bob');
-        // Real columns still come from the snapshot text.
-        expect(result.Name).toBe('Bob');
+        expect(result.Name).toBe('Bob::Type-Bob');
+        // Other columns still come from the snapshot text.
         expect(result.Type).toBe('Type-Bob');
     });
 

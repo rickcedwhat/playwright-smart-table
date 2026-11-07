@@ -114,7 +114,7 @@ toJSON(options?: { columns?: string[]; atomic?: boolean }): Promise<T>
 Reads all (or specified) columns and returns a plain object. Includes `columnOverrides.read` values and [`syntheticColumns`](/api/table-config#syntheticcolumns).
 
 - **`columns`** — only read these columns.
-- **`atomic`** — snapshot every cell in a single browser evaluate, so no column is read at a different moment than another (useful for live-updating rows). Requires `cellSelector` to be a CSS string, not a function. Column overrides still run, against a frozen off-screen copy of the row. Non-override columns are read with `textContent` rather than `innerText`.
+- **`atomic`** — snapshot every cell in a single browser evaluate, so no column is read at a different moment than another (useful for live-updating rows). Requires a CSS-string `cellSelector`, no custom `strategies.getCellLocator`, and one DOM cell per mapped column in header order. Unsupported layouts reject even with `{ columns }`; use ordinary `toJSON()` for strategy-aware live reads. Column overrides still run, against a frozen off-screen copy of the row. Non-override columns are read with `textContent` rather than `innerText`.
 
 ```typescript
 const data = await row.toJSON();

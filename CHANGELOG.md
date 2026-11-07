@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Atomic row column mapping** — `toJSON({ atomic: true })` now rejects custom `getCellLocator` strategies and rows whose selected cell count differs from the mapped column count. Previously, partially mounted or filler cells could be silently omitted or labeled as unrelated columns. The guard applies even to filtered reads and runs before column overrides; positional snapshots and frozen sibling reads remain supported. Use ordinary `toJSON()` for strategy-aware live reads.
+
 ## [6.26.0] - 2026-11-05
 
 ### Fixed
