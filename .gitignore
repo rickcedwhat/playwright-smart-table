@@ -54,3 +54,9 @@ playground/pst-unpack/
 # Generated reports and metrics
 /reports/
 /metrics/history.json
+
+# Local MCP experiments
+packages/**/dist/
+packages/**/.env
+packages/**/.mcp-state.json
+inspector-*.log

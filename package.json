@@ -18,6 +18,10 @@
     "dist"
   ],
   "scripts": {
+    "mcp:build": "pnpm --filter @rickcedwhat/playwright-smart-table-mcp build && pnpm --filter @smart-table/inspector build",
+    "mcp:test-ui": "node scripts/test-inspector.mjs",
+    "mcp:dev": "node scripts/start-inspector.mjs",
+    "mcp:test": "pnpm --filter @rickcedwhat/playwright-smart-table-mcp test && pnpm --filter @rickcedwhat/playwright-smart-table-mcp test:smoke",
     "generate-config-types": "node scripts/embed-config-types.mjs",
     "docs:check-snippets": "node scripts/check-doc-snippets.mjs",
     "generate-all-api-docs": "node scripts/generate-all-api-docs.mjs",

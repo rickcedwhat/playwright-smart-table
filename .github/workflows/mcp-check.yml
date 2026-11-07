@@ -1,0 +1,28 @@
+name: MCP inspection bench
+on:
+  pull_request:
+    paths:
+      - 'packages/**'
+      - 'scripts/start-inspector.mjs'
+      - 'scripts/test-inspector.mjs'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - '.github/workflows/mcp-check.yml'
+jobs:
+  baseline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10.33.2 # Match packageManager; see #361.
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm mcp:build
+      - run: pnpm mcp:test
+      - run: pnpm mcp:test-ui
