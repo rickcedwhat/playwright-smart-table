@@ -95,6 +95,8 @@ export default function App() {
       if (version === evaluationVersion.current) setEvaluation(value);
     } catch (e) { if (version === evaluationVersion.current) setError(String(e)); }
   }
+  const benchmarkUrl = 'http://127.0.0.1:3001/fixtures/' + fixtures[fixture].path;
+  const canCompare = observation && fixtures[fixture].oracle && url === benchmarkUrl && observation.evidence.url === benchmarkUrl;
   return <div className="bench">
     <aside>
       <h1>Smart Table Inspector</h1>
@@ -121,7 +123,7 @@ export default function App() {
       <header><h2>Findings</h2><span>Raw MCP response</span></header>
       {error && <div role="alert">{error}</div>}
       {observation ? <pre aria-label="Inspection findings">{JSON.stringify(observation, null, 2)}</pre> : <p className="intro">Inspect a fixture or your own table. Mounted DOM is not proof of full traversal.</p>}
-      {observation && fixtures[fixture].oracle && <section>
+      {canCompare && <section>
         <h2>Fixture comparison</h2>
         <p>The answer key is held by the bench, outside the MCP tool surface. This compares submitted data; it does not validate a config or prove complete traversal. You can edit the submission to test missing rows, incorrect values or unsupported claims.</p>
         <label>Evaluation submission<textarea value={report} onChange={event => { setReport(event.target.value); clearEvaluation(); }} /></label>

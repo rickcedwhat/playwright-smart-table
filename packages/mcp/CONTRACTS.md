@@ -94,6 +94,10 @@ MCP, or served as a static file. The bench-only POST `/bench/evaluate` reports m
 extra and repeated records, wrong values, ineffective navigation claims and unsupported
 completeness claims. No MCP evaluation/oracle tool is advertised.
 
+The UI only offers automatic comparison for an exact registered fixture URL; custom
+targets have no assumed answer key. The privileged comparator still assesses submitted
+data against an explicitly selected fixture, not the origin of that submission.
+
 The result is `submitted-data-only`, always `configValidated: false`. Even exact data
 does not authorize a complete-traversal claim without a trusted runner witness. The
 bench can assess a manually corrupted submission to prove the evaluator catches it;
