@@ -1,341 +1,209 @@
-# Plan: playwright-smart-table MCP Inspector
+# MCP inspector revival plan
 
-**Status:** Planning  
-**Tracking issue:** (https://github.com/rickcedwhat/playwright-smart-table/issues/108)  
-**Location when built:** `packages/mcp` (monorepo subpackage)
+Status: proposed roadmap; implementation milestones are not yet complete.
+Tracking: #108. Existing experiment: draft PR #157 (`feat/mcp-custom-inspector-wip`).
+Related: #532 (packaged guidance), #526 (identity information limits).
 
----
+This replaces the earlier model-first plan. Preserve its experiments in Git history
+and PR #157. This file is the source of truth for scope, acceptance, decisions and
+progress; update it as implementation proceeds.
 
-## What it does
+## Goal
 
-An MCP server that an AI assistant (Claude, Copilot, etc.) calls while a developer is writing tests. Given a URL and an optional table selector hint, it inspects the table DOM and returns either:
-- Structured findings (preset match, virtualization signals, pagination type, selector candidates)
-- A ready-to-paste `useTable()` config TypeScript string
+Given a real table, help an agent produce a working playwright-smart-table config
+and show evidence for what was tested, what was covered and what remains unknown.
+A config remains a proposal until executed. Compilation, a successful click, or a
+plausible row count alone does not establish correctness.
 
----
+The workflow is connect → inspect → propose → execute → compare. The inspector UI
+is the maintainer's evaluation bench for this workflow, including manual corrections,
+replayable failures and model comparisons. Keep it as a first-class development tool.
 
-## Two-phase approach
+## Development approach
 
-### Phase 1 — Heuristic detection (fast, deterministic)
-Run cheap DOM checks to answer the high-confidence questions:
-- Does this match a known preset (MUI DataGrid / MUI Table / RDG / Glide)?
-- Is row/column virtualization present?
-- What type of pagination is used?
-- Are there loading overlays or skeleton rows?
-
-### Phase 2 — LLM-assisted selector discovery (robust, handles anything)
-Send a stripped DOM snapshot + the `useTable()` TypeScript typings to a model. Ask it to return ranked selector candidates for each slot. This mirrors what works well in practice: pasting HTML + library typings to an LLM produces better selectors than regex heuristics on messy real-world tables.
-
-Both phases run together by default. Phase 1 findings are included in the Phase 2 prompt as context ("we believe this is an RDG grid — does the DOM confirm this?").
-
-#### Solving the chicken-and-egg problem (no selectors yet → how to extract sample rows?)
-
-Phase 1 already tries common row patterns (`tr`, `[role="row"]`, `[data-rowindex]`, etc.) and scores them by count and structure. Use the top Phase 1 candidate — even a low-confidence one — to pull 3–5 sample elements. If Phase 1 finds nothing, fall back to the most-repeated direct children of the table root (whatever element type appears most frequently at depth 2 is almost certainly rows).
-
-#### DOM stripping (before sending to LLM)
-
-Strip aggressively to keep the total snapshot under **8 KB (UTF-8 bytes)**. This budget covers the table root, sample rows, headers, and trimmed typings combined — not per-element. The stripping rules below exist to stay within it:
-- SVG `<path>` elements → replace with `<path … />`
-- Tailwind / utility class lists → strip `class` entirely if preset is already identified; otherwise keep only non-utility-looking class names
-- Inline `style` → strip unless it contains `transform` or `display` (virtualization signals)
-- `data-*` attributes → keep all (useful signal even if purpose is unknown)
-- `aria-*` → keep all (high signal)
-- Duplicate subtrees → show first 2, replace rest with `<!-- +N more similar -->`
-
----
+- Use a dedicated feature branch and small checkpoint commits. Milestones need not
+  each become a release or merge; extended experimentation on the branch is fine.
+- Start the revival from current main and selectively recover useful PR #157 code.
+  Preserve the old branch until every component has a retain/rework/defer decision.
+- Keep inspection/framework knowledge in MCP modules and library strategies/presets;
+  keep the library core thin and public Locators intact.
+- Verify current APIs rather than copying old generated imports, API names or SDK
+  workarounds. Preserve normal library packaging/release behavior.
+- Record the library build under test. #545's atomic-layout guard is merged to main;
+  a merge does not prove npm consumers have it. Do not advertise unreleased behavior
+  as a released guarantee.
 
 ## Architecture
 
-```text
-packages/mcp/
-  src/
-    index.ts                  ← MCP server entry, registers tools
-    browser/
-      launcher.ts             ← Playwright setup + teardown
-      auth.ts                 ← storageState + interactive auth modes
-    detectors/
-      preset.ts               ← fingerprint MUI / RDG / Glide / unknown
-      virtualization.ts       ← row + column virtualization signals
-      pagination.ts           ← button / infinite-scroll / none
-      loading.ts              ← overlay / skeleton detection
-    tools/
-      inspectTable.ts         ← MCP tool: structured findings JSON
-      generateConfig.ts       ← MCP tool: findings → useTable() config string
-    llm/
-      domSnapshot.ts          ← extract + truncate relevant DOM chunk
-      selectorPrompt.ts       ← build prompt with DOM + typings
-      githubModels.ts         ← call GitHub Models API (GITHUB_TOKEN)
-    types.ts
-  package.json
-```
-
----
-
-## MCP tools
-
-### `inspect_table(url, tableSelector?, options?)`
-
-```ts
-interface InspectTableOptions {
-  authMode?: 'storageState' | 'interactive';
-  storageStatePath?: string;  // required when authMode === 'storageState'
-  llm?: boolean;              // default: true; set false to skip GitHub Models call
-}
-```
-
-Input validation: if `authMode === 'storageState'` and `storageStatePath` is absent or the path does not exist on disk, the tool must throw a descriptive error before launching the browser.
-
-Returns:
-```ts
-{
-  preset: {
-    value:      'mui-datagrid' | 'mui-table' | 'rdg' | 'glide' | null,
-    confidence: number,   // ratio of matched signals to total expected signals
-    signals:    string[]  // e.g. [".MuiDataGrid-root ✓", "data-rowindex ✓", ".MuiDataGrid-row ✓"]
-  },
-  virtualization: {
-    rows:    { detected: boolean, confidence: number, signals: string[] },
-    columns: { detected: boolean, confidence: number, signals: string[] },
-  },
-  pagination: {
-    type:     { value: 'buttons' | 'infinite-scroll' | 'none', confidence: number },
-    signals:  string[],
-    // One entry per PaginationPrimitive — null if not detected
-    primitives: {
-      goNext:            { selector: string | null, confidence: number },
-      goPrevious:        { selector: string | null, confidence: number },
-      goNextBulk:        { selector: string | null, confidence: number },
-      goPreviousBulk:    { selector: string | null, confidence: number },
-      goToFirst:         { selector: string | null, confidence: number },
-      goToLast:          { selector: string | null, confidence: number },
-      goToPage:          { selector: string | null, confidence: number },  // e.g. page number input
-      getTotalPages:     { selector: string | null, confidence: number },  // e.g. "of N" text
-      detectCurrentPage: { selector: string | null, confidence: number },  // e.g. active page indicator
-    }
-  },
-  loading: {
-    // Mirrors LoadingStrategy in useTable config
-    isTableLoading:  { detected: boolean, confidence: number, signal: string | null },
-    isRowLoading:    { detected: boolean, confidence: number, signal: string | null },
-    isHeaderLoading: { detected: boolean, confidence: number, signal: string | null },
-  },
-  selectorCandidates: {
-    row:    [{ selector: string, confidence: number, reason: string }],  // top 3
-    cell:   [{ selector: string, confidence: number, reason: string }],
-    header: [{ selector: string, confidence: number, reason: string }],
-  }
-}
-```
-
-### `generate_config(url, tableSelector?, hints?, options?)`
-
-Accepts the same `InspectTableOptions` as `inspect_table` (see above).
-
-`hints` lets the developer correct findings before config generation:
-```ts
-{ paginationType: 'infinite-scroll', rowSelector: '[data-row]' }
-```
-
-Returns a formatted TypeScript string, paste-ready, with inline comments explaining each decision:
-
-```ts
-// Detected: RDG grid (confidence: 0.94)
-// Rows are NOT virtualized — no dedupe strategy needed
-// Pagination: button-based (next: '[aria-label="Go to next page"]')
-
-const table = useTable(page, {
-  ...Plugins.RDG.config(),
-  strategies: {
-    pagination: Strategies.Pagination.click('[aria-label="Go to next page"]'),
-  },
-});
-```
-
----
-
-## Auth modes
-
-### Mode 1: `storageState` (headless, recommended)
-
-User exports their browser session once:
-```bash
-npx playwright open --save-storage=session.json https://your-app.com
-```
-
-Then passes the file path when calling the tool:
-```ts
-inspect_table("https://your-app.com/table", undefined, { authMode: "storageState", storageStatePath: "./session.json" })
-```
-
-Playwright loads the session and the page renders as authenticated. No re-login needed.
-
-### Mode 2: Interactive (non-headless, escape hatch)
-
-For SSO/MFA/SAML flows where cookie export is impractical:
-1. Tool launches a visible browser window
-2. User logs in manually
-3. User signals "ready" (via MCP response or CLI prompt)
-4. Inspection runs in the authenticated session
-5. Browser closes
-
-Opt-in only. Adds ~30s to the flow but handles anything.
-
----
-
-## Preset fingerprinting signals
-
-| Preset | Required signals |
-|---|---|
-| MUI DataGrid | `.MuiDataGrid-root` + `.MuiDataGrid-row` + `data-rowindex` |
-| MUI Table | `.MuiTable-root` + `.MuiTableRow-root` |
-| RDG | `[role="grid"].rdg` + `.rdg-row` + `[aria-colindex]` |
-| Glide | `canvas` inside `.dvn-scroll-container` + `gdg-input` textarea |
-
-All signals must match for a confident preset ID. Partial matches returned with lower confidence.
-
----
-
-## Virtualization detection signals
-
-**Row virtualization:**
-- `transform: translateY(Xpx)` on row elements
-- `aria-rowcount` on grid root > actual DOM row count
-- `data-rowindex` values non-contiguous after scroll
-- Visible row count << implied total row count
-
-**Column virtualization:**
-- `aria-colcount` on grid root > DOM cell count per row
-- `transform: translateX(Xpx)` on cells
-- Header count < `aria-colcount`
-
----
-
-## LLM integration (GitHub Models)
-
-Uses the `GITHUB_TOKEN` already available in the developer's environment — no extra API key needed.
-
-The DOM snapshot sent to the model is assembled within the total **8 KB (UTF-8 bytes)** budget (same budget enforced by the DOM stripping rules above):
-- The table root element (outer HTML, after stripping)
-- 3–5 representative rows (deduplicated)
-- All visible header elements
-- The `useTable()` TypeScript types (trimmed to the config shape)
-
-The prompt asks the model to return ranked selector candidates for `rowSelector`, `cellSelector`, and `headerSelector`, and to confirm or correct the heuristic preset guess.
-
-This is optional but on by default. Disable with `{ llm: false }` if offline or rate-limited.
-
-### Secret redaction (GITHUB_TOKEN)
-
-The `GITHUB_TOKEN` value is used only as an `Authorization` header in the HTTP call to the GitHub Models endpoint. It must **never** appear in:
-- The prompt or payload sent to the model
-- Any log output or debug traces
-- Telemetry or error reports
-
-Implementation requirements:
-- A central `redactSecrets(str: string): string` utility must mask any string matching the `GITHUB_TOKEN` env var value before it is logged or included in an error message
-- The payload assembled in `selectorPrompt.ts` must not include env vars or the token value
-- A runtime assertion before every `llm: true` call must verify the serialized prompt does not contain the literal token value; if it does, throw rather than send
-
----
-
-## Repo structure
-
-Lives in `packages/mcp` inside the existing repo — not a separate repository. Reasons:
-- The inspector imports library types, preset fingerprints, and strategy names directly; keeping them together means a single PR when the library changes
-- Published as a separate npm package (`@rickcedwhat/playwright-smart-table-mcp`) with its own version number — repo structure doesn't dictate publish structure
-- No full monorepo migration needed; just add `packages/mcp/` alongside `src/`. Root `package.json` must exclude `packages/` from the library dist
-
----
-
-## Testing
-
-### Unit tests (Vitest, no browser)
-
-Detectors are pure functions — they take a DOM-like structure and return findings. Fast, no Playwright needed.
-
-```ts
-// preset detector
-expect(detectPreset({ classes: ['.MuiDataGrid-root', '.MuiDataGrid-row'], attributes: ['data-rowindex'] }))
-  .toEqual({ value: 'mui-datagrid', confidence: 1.0, signals: [...] })
-
-// DOM stripping
-expect(stripSnapshot('<path d="M 0 0 L 100 100"/>')).toBe('<path … />')
-
-// config generation
-expect(generateConfig({ preset: { value: 'rdg', confidence: 0.95 }, ... }))
-  .toContain('...Plugins.RDG.config()')
-```
-
-### Integration tests (Playwright, fixture pages)
-
-Static HTML fixtures in `packages/mcp/tests/fixtures/` representing each detectable case — no framework, just hand-crafted HTML with the right signals. A simple `http.createServer` serves them during the test run.
-
-```text
-packages/mcp/
-  tests/
-    fixtures/
-      plain-table.html          ← basic <table>, no pagination
-      paginated-buttons.html    ← next/prev buttons, page indicator
-      virtualized-rows.html     ← aria-rowcount, translateY on rows
-      infinite-scroll.html      ← sentinel div at bottom
-      mui-datagrid-mock.html    ← MUI class names + data-rowindex
-    inspect-table.spec.ts       ← runs inspect_table against each fixture
-    generate-config.spec.ts     ← asserts paste-ready TS output
-```
-
-These slot into a `test-mcp` job in `pr-checks.yml` alongside `test-a`/`test-b`. Auth flows (storageState, interactive) are **not** tested in CI — manual only.
-
-### MCP protocol tests
-
-Verify tools are registered with correct schemas and input validation rejects bad payloads. Uses `@modelcontextprotocol/sdk` test utilities. Runs in CI as part of `test-mcp`.
-
-### Manual testing
-
-**MCP Inspector UI** — primary tool during development:
-```bash
-npx @modelcontextprotocol/inspector node packages/mcp/dist/index.js
-# → opens http://localhost:5173, call tools interactively, see raw JSON in/out
-```
-
-**Claude Desktop** — for real-world validation against live tables:
-```json
-// ~/Library/Application Support/Claude/claude_desktop_config.json
-{
-  "mcpServers": {
-    "smart-table-inspector": {
-      "command": "node",
-      "args": ["/path/to/packages/mcp/dist/index.js"]
-    }
-  }
-}
-```
-Then ask Claude: *"inspect the table at https://mui.com/x/react-data-grid/"*
-
-### Test coverage summary
-
-| Layer | Tool | CI |
-|---|---|---|
-| Detector logic, DOM stripping, config generation | Vitest unit tests | ✅ `test-mcp` |
-| Full `inspect_table` + `generate_config` flow | Playwright + fixture HTML | ✅ `test-mcp` |
-| MCP protocol / schema validation | SDK test utilities | ✅ `test-mcp` |
-| Auth flows (storageState, interactive) | Manual only | ❌ |
-| Real-world tables | Claude Desktop + MCP Inspector UI | ❌ |
-
----
-
-## Out of scope (for now)
-
-- Sorting strategy detection (backburner in the main library too)
-- Auto-generating fill/write strategies
-- Supporting non-Playwright browsers
-
----
-
-## Implementation order
-
-1. Browser launcher + `inspect_table` with preset fingerprinting only — delivers immediate value for MUI/RDG/Glide users
-2. Virtualization + pagination detection
-3. DOM snapshot + LLM selector discovery via GitHub Models
-4. `generate_config` tool outputting paste-ready TypeScript
-5. Auth: `storageState` mode
-6. Auth: interactive mode
+The host agent selects investigations and interprets evidence. Its MCP client calls
+our server. The server manages browser sessions, executes probes, validates inputs
+and returns structured findings. The UI exercises the same server capabilities;
+it must not maintain a second inspection implementation.
+
+Independent investigation modules:
+
+- Structure/selectors: candidate roots, headers, rows, cells and table ambiguity.
+- Presets: supporting/contradictory framework evidence, followed by preset trials.
+- Pagination: controls, page position, movement, stopping and rewind behavior.
+- Virtualization: mounting/recycling, logical indices and X/Y scroll behavior.
+- Identity: candidate keys, missing values, collisions and continuity limitations.
+- Readiness: loading transitions, wait conditions and timeouts.
+
+Each module owns a playbook, observation code, bounded probes, result schema and
+fixtures. Share session/evidence contracts, not module implementations. Dependencies
+are explicit: pagination can verify movement without proving unique identity or
+complete membership.
+
+Use prose for investigation guidance and executable checks for measurable claims.
+Playbooks may become MCP prompts/resources and packaged skills from one maintained
+source. Registration does not prove a host loaded or followed them; test that path.
+Keep tool descriptions small and precise.
+
+Keep the exposed MCP surface small. Session open/close, selected-aspect inspection,
+explicit probes and config validation are candidate capabilities; settle names and
+granularity using a real client. Verify current SDK/protocol and transport conventions
+rather than preserving the old compatibility bypasses.
+
+Core inspection/validation must work without a provider API key. Embedded model calls
+and dual-model comparison remain useful bench experiments. Make provider orchestration
+replaceable and measure its benefit before requiring it for consumers.
+
+## Evidence, state and execution boundaries
+
+A finding includes its value, status, evidence, tested scope, contradictions/limits
+and the session/state where it was obtained. Use observed, tested, hypothesis, unknown
+and unsupported explicitly. Tested means within the recorded scope, not universally
+proven. Heuristic scores must explain their calculation, not imply calibrated odds.
+
+Distinguish navigation completion, identity and dataset completeness. Budget exhaustion
+means partial coverage. Record starting/ending position, actions, termination reason,
+coverage limits and restoration outcome. Successful navigation is not a completeness
+oracle; sampled ID uniqueness is not proof of global uniqueness.
+
+Use persistent, bounded sessions with isolated browser contexts, expiry, explicit
+close, stale-session errors and cleanup on failure/cancellation. Recheck or invalidate
+evidence after navigation, sorting, filtering or dataset changes. Start with owned
+contexts and storage-state auth; evaluate existing-browser attachment separately.
+Test local login/session reuse automatically; real SSO/MFA remains a manual case.
+
+Separate observation from clicking/scrolling probes. Declare allowed actions and
+limits on time, actions, pages and output. Return useful partial evidence on timeout
+or cancellation. Restoration is best effort and must be reported. Initial probes
+exclude record editing/deletion and unrelated application controls.
+
+DOM content and generated code are untrusted. Page text cannot redefine instructions
+or action scope. Validate configs before bounded execution and define the execution
+boundary in milestone 1. Never log credentials/storage state or implicitly send page
+snapshots to a model provider. Record redaction/truncation as missing evidence.
+
+## How we test it
+
+1. Module tests: finding rules, negative evidence, schemas and uncertainty handling.
+2. Browser fixtures: actual observation/probe behavior against controlled tables.
+3. Protocol tests: a real MCP client/server round trip, tool discovery, malformed
+   inputs, errors, session isolation, cancellation and cleanup—not just handler calls.
+4. Agent evaluations: task → tools → proposed config → execution → independent scoring.
+
+Versioned fixture manifests provide the answer key: expected record occurrences,
+values, order rules, navigation behavior and supported claims. Keep this oracle out
+of the inspected DOM and agent context. Compare membership, multiplicity and values,
+not only counts or distinct text. Identity-ambiguous fixtures require honest limits.
+
+Save fixture/seed, task, playbook/tool versions, library build, SDK/browser,
+provider/model/settings, tool transcript, evidence, config, execution outcome,
+termination reason, elapsed time and available cost/token figures. Do not fabricate
+missing cost data. Retain failures as replayable cases and regression tests.
+
+Make deterministic unit/browser/protocol checks blocking in CI once implemented.
+Initially run model evaluations explicitly rather than as flaky PR gates. Start with
+five fresh runs per scenario/model configuration, reporting raw outcomes/denominators;
+this is a baseline, not statistical confidence. Set agent thresholds and budgets after
+the first baseline, before comparing improvements. Keep holdout fixtures so evaluation
+cannot be passed by hardcoding benchmark selectors. Reset state and budgets equally
+when comparing models or guidance variants.
+
+## Milestones and exit criteria
+
+### 0. Recover a runnable baseline
+
+- [ ] Inventory PR #157: retain/rework/defer server, probes, generator, auth, UI,
+  model comparison, tests, scratch files and accidental worktree gitlinks.
+- [ ] Create the revival branch from main; recover useful work selectively.
+- [ ] Verify dependencies, SDK schemas/transport and remove input-validation bypasses.
+- [ ] Establish clean install/build/server/UI commands and exercise a protocol call.
+
+Exit: a clean checkout can launch the bench, call the real server and show findings
+or actionable errors. Record broken/unsupported parts instead of marking them complete.
+
+### 1. Establish contracts and an independent answer key
+
+- [ ] Define session/evidence/finding/action-budget/validation schemas.
+- [ ] Decide initial tools, protocol/transport, browser ownership, config execution
+  boundary and cancellation semantics; record rationale in the decision log.
+- [ ] Add plain, button-paginated and broken-navigation fixtures. Include a later-page
+  start and valid duplicate-looking records with stable IDs.
+- [ ] Wire evaluation and UI comparison without leaking the oracle to the agent.
+
+Exit: the evaluator catches missing/extra records, collapsed duplicates, wrong values,
+ineffective Next controls and unsupported claims independently of a model.
+
+### 2. Complete the first reliable workflow
+
+- [ ] Implement structure/pagination playbooks, observations and bounded probes.
+- [ ] Produce configs using current APIs; type-check and execute against an installed
+  packed library in a disposable consumer outside this checkout.
+- [ ] Verify init, representative queries, full supported traversal and truthful
+  starting-page/rewind reporting. A partial scan cannot be called complete.
+- [ ] Test malformed input, isolation, timeout/cancellation and browser cleanup.
+- [ ] Record agent baselines with and without guidance under equal budgets.
+
+Exit: supported deterministic cases match exact expected records/multiplicity and
+values; negative cases report useful failures/limits. Save/review every false success.
+A screenshot of plausible output is not acceptance evidence.
+
+### 3. Challenge virtualization and identity
+
+- [ ] Add a recycling grid with stable IDs; assert exact membership and column values.
+- [ ] Add identical-looking records without identity evidence; require uncertainty.
+- [ ] Exercise pinned/duplicate headers, filler/off-screen columns, nonzero scroll,
+  repeated/missing/page-local IDs, overscan and delayed readiness.
+- [ ] Exercise sorting/data changes and contradictory metadata; reject stale claims.
+- [ ] Evaluate frames, shadow DOM and canvas-only content; state unsupported cases.
+- [ ] Exercise hostile page text and misleading controls within the probe action scope.
+
+Exit: known-data cases satisfy their oracle; ambiguous cases do not claim verified
+identity/completeness. Reproduce new library bugs separately rather than hiding them
+behind inspector-specific workarounds.
+
+### 4. Evaluate usefulness and prepare an opt-in pilot
+
+- [ ] Compare host-led and optional embedded-model variants in the same UI using equal
+  fixtures, tasks, reset state and budgets. Measure success, false success, time/cost.
+- [ ] Try representative real tables with ground truth where available. Label other
+  runs exploratory, not benchmark passes.
+- [ ] Test package installation, browser setup, auth/session reuse and real host discovery.
+- [ ] Reconcile shared playbooks with #532: plain skills versus Intent, version matching,
+  source references and opt-in loading without duplicated guidance.
+- [ ] Document supported scope, results, limits, data handling and separate MCP versioning.
+
+Exit: deterministic gates and agreed agent/holdout thresholds pass; no unexplained
+false successes remain in the release suite. Pilot publication is a separate decision,
+not an automatic milestone action.
+
+## Checkpoints and decision log
+
+After each milestone, update checkboxes and append a dated checkpoint with commit/run
+IDs, evidence paths, passed/failed cases, remaining uncertainty, scope changes and the
+next smallest experiment. Mark partial work partial and preserve failed cases.
+
+For each decision record the question, chosen approach, rationale, supporting evidence
+and what would cause reconsideration. Outstanding first decisions are in milestone 1;
+proposed interfaces, session approach and five-run baseline may change with evidence.
+
+Revisit the plan after milestone 2, before another framework/provider, and before a
+release decision. Before expanding scope, require a measured task benefit, correctness
+fix or evaluation improvement; otherwise defer it.
+
+Do not promise universal dedupe/completeness, redesign library APIs for the inspector,
+auto-install hooks, distribute contributor workflows as consumer guidance, or make
+third-party website uptime a blocking CI dependency.
