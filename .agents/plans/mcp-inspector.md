@@ -1,6 +1,6 @@
 # MCP inspector revival plan
 
-Status: milestones 0 and 1 locally complete; milestone 2 is next. CI/review status is tracked in the revival PR.
+Status: milestones 0–1 locally complete; milestone 2 deterministic workflow locally complete. Model baseline runner is prepared; actual model runs explicitly deferred by the user. CI/review status is tracked in the revival PR.
 Tracking: #108. Existing experiment: draft PR #157 (`feat/mcp-custom-inspector-wip`).
 Related: #532 (packaged guidance), #526 (identity information limits).
 
@@ -149,13 +149,15 @@ ineffective Next controls and unsupported claims independently of a model.
 
 ### 2. Complete the first reliable workflow
 
-- [ ] Implement structure/pagination playbooks, observations and bounded probes.
-- [ ] Produce configs using current APIs; type-check and execute against an installed
+- [x] Implement structure/pagination playbooks, observations and bounded probes.
+- [x] Produce configs using current APIs; type-check and execute against an installed
   packed library in a disposable consumer outside this checkout.
-- [ ] Verify init, representative queries, full supported traversal and truthful
+- [x] Verify init, representative queries, full supported traversal and truthful
   starting-page/rewind reporting. A partial scan cannot be called complete.
-- [ ] Test malformed input, isolation, timeout/cancellation and browser cleanup.
-- [ ] Record agent baselines with and without guidance under equal budgets.
+- [x] Test malformed input, isolation, timeout/cancellation and browser cleanup.
+- [ ] Record agent baselines with and without guidance under equal budgets. Runner
+  prepared and scripted self-test passed; provider/model runs deferred by explicit
+  user choice on 2026-11-06. Do not count scripted runs as agent-quality evidence.
 
 Exit: supported deterministic cases match exact expected records/multiplicity and
 values; negative cases report useful failures/limits. Save/review every false success.
@@ -278,3 +280,60 @@ virtualization or arbitrary-site authentication support is claimed.
 Next: milestone 2 structure/pagination guidance and bounded probes, then current-API
 config generation validated by a trusted disposable installed-package consumer.
 Only that runner can support stronger config/traversal claims.
+
+### 2026-11-06 checkpoint — milestone 2 deterministic workflow
+
+Implementation: `42c55703` on `feat/108-mcp-revival`, draft PR #547. Original draft
+#157 remains unchanged. Model baseline runs were explicitly deferred by the user;
+this checkpoint does not mark that remaining milestone-2 item complete.
+
+Structure/pagination playbooks are maintained independently as Markdown and exposed
+through versioned MCP resources/prompts. Real SDK discovery/read/get calls are tested.
+Constrained selector proposals generate current public-API configs; bounded probes
+report starting/ending records, forward coverage and restoration. Native flat HTML
+and explicit Next/Previous controls are supported; unknown identity, virtualization,
+spans, auth import and readiness variants remain outside this workflow.
+
+The trusted runner builds/packs the root library and installs its tarball into a new
+external consumer using a separate frozen lockfile and offline cache. Generated config
+and trusted runner are compiled against that installed package, then actual init,
+multi-row queries, row.toJSON/map, rewind and reset execute. The resolved library path
+is checked to stay inside the consumer. Results record build checksum/preparation
+commit, browser/SDK-related runtime versions, diagnostics, actions/pages and termination.
+Normal validation leaves the original session unchanged; cancellation/close/timeouts
+propagate to owned consumer processes and remove execution directories.
+
+Only server-created bounded/expiring witnesses can enter privileged fixture validation.
+Independent scoring checks exact membership/multiplicity/values and runtime/traversal
+outcomes. Matching submitted JSON alone still cannot claim config validity. Starting
+on page 2 rewinds and extracts all six fixture occurrences; the identical-looking Alice
+records both survive. Broken Next fails; action/page/row limits and failed restoration
+produce partial results. A held-out inventory table changes selectors, headers and
+values and also passes exact comparison.
+
+Earlier review findings addressed: configurable UI/proxy/fixture ports, own-property
+column scoring, navigation direction, shutdown admission/initialization cleanup,
+spanning layouts, capacity reserved for closing browsers and synchronous deadline
+checks. Added regression coverage rather than blindly accepting suggested patches.
+Threads are left for CodeRabbit to reassess; no resolution/merge is claimed here.
+
+Local evidence: 28 MCP unit tests; real stdio contracts; consumer workflows including
+negative, limit, native cancellation, explicit close and timeout cases; live-browser
+HTTP shutdown with concurrent initializations; real UI/HTTP comparisons on MCP_PORT
+4001; root build and fallow all passed. A source-only snapshot at
+`/private/tmp/mcp-m2-clean-ztf8ebm3` passed frozen install, preparation, builds, the full
+MCP test command and UI checks on the default port without inherited state/Git metadata.
+Logs are `/private/tmp/mcp-m2-{test,ui-custom-port,clean-test,clean-ui}.log`; these are
+local ephemeral evidence, not asserted CI results. Replays live in ignored .mcp-runs
+and are uploaded by the dedicated CI workflow. The library runtime/version is unchanged.
+
+Baseline harness preparation: four scenarios × guided/unguided × five fresh runs,
+equal shared budgets, explicit prompt loading, tool-only adapter context and post-final
+oracle comparison. Artifacts retain raw outcomes, configs/transcripts, timing, supplied
+usage and unknown cost as null. Four scripted harness self-tests passed, labeled as
+such; no provider/model requests, model pass rates or statistical confidence are claimed.
+
+Plan review: keep constrained code generation and installed-consumer execution before
+expanding framework scope. Next smallest evaluation is the real baseline when the user
+chooses a provider/model; milestone 3's controlled recycling grid is the next functional
+scope, with ambiguity reported rather than guessed away. No pilot/release decision yet.
