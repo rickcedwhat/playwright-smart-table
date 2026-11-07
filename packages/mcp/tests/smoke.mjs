@@ -28,8 +28,9 @@ try {
   const ambiguous = await client.callTool({ name: 'inspect_table', arguments: { url: url + '/multiple' } });
   assert.equal(ambiguous.isError, true);
   assert.match(ambiguous.content[0].text, /Found 2 table roots/);
-  const missing = await client.callTool({ name: 'inspect_table', arguments: { url, tableSelector: '#missing', timeoutMs: 100 } });
+  const missing = await client.callTool({ name: 'inspect_table', arguments: { url, tableSelector: '#missing', timeoutMs: 2000 } });
   assert.equal(missing.isError, true);
+  assert.match(missing.content[0].text, /#missing/);
   // Another call after errors must still work, and stdout must remain valid MCP.
   const again = await client.callTool({ name: 'inspect_table', arguments: { url } });
   assert.ok(!again.isError);
