@@ -72,6 +72,10 @@ try {
   await page.waitForTimeout(100);
   assert.equal(await comparison.count(), 0, 'An old comparison cannot be attached to a new observation');
   await page.unroute('**/bench/evaluate');
+  await page.getByLabel('Target URL', { exact: true }).fill('http://127.0.0.1:3001/fixtures/plain?unregistered=1');
+  await page.getByRole('button', { name: 'Run inspection' }).click();
+  await output.waitFor();
+  assert.equal(await page.getByRole('button', { name: 'Compare with fixture' }).count(), 0, 'Custom targets have no registered answer key');
   await page.getByRole('button', { name: 'Close browser session' }).click();
   await new Promise((resolve, reject) => {
     const tests = spawn(process.execPath, ['packages/mcp/tests/http.mjs'], { stdio: 'inherit' });
