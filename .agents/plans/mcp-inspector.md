@@ -1,6 +1,6 @@
 # MCP inspector revival plan
 
-Status: proposed roadmap; implementation milestones are not yet complete.
+Status: milestones 0–1 locally complete; milestone 2 deterministic workflow locally complete. Model baseline runner is prepared; actual model runs explicitly deferred by the user. CI/review status is tracked in the revival PR.
 Tracking: #108. Existing experiment: draft PR #157 (`feat/mcp-custom-inspector-wip`).
 Related: #532 (packaged guidance), #526 (identity information limits).
 
@@ -126,36 +126,38 @@ when comparing models or guidance variants.
 
 ### 0. Recover a runnable baseline
 
-- [ ] Inventory PR #157: retain/rework/defer server, probes, generator, auth, UI,
+- [x] Inventory PR #157: retain/rework/defer server, probes, generator, auth, UI,
   model comparison, tests, scratch files and accidental worktree gitlinks.
-- [ ] Create the revival branch from main; recover useful work selectively.
-- [ ] Verify dependencies, SDK schemas/transport and remove input-validation bypasses.
-- [ ] Establish clean install/build/server/UI commands and exercise a protocol call.
+- [x] Create the revival branch from main; recover useful work selectively.
+- [x] Verify dependencies, SDK schemas/transport and remove input-validation bypasses.
+- [x] Establish clean install/build/server/UI commands and exercise a protocol call.
 
 Exit: a clean checkout can launch the bench, call the real server and show findings
 or actionable errors. Record broken/unsupported parts instead of marking them complete.
 
 ### 1. Establish contracts and an independent answer key
 
-- [ ] Define session/evidence/finding/action-budget/validation schemas.
-- [ ] Decide initial tools, protocol/transport, browser ownership, config execution
+- [x] Define session/evidence/finding/action-budget/validation schemas.
+- [x] Decide initial tools, protocol/transport, browser ownership, config execution
   boundary and cancellation semantics; record rationale in the decision log.
-- [ ] Add plain, button-paginated and broken-navigation fixtures. Include a later-page
+- [x] Add plain, button-paginated and broken-navigation fixtures. Include a later-page
   start and valid duplicate-looking records with stable IDs.
-- [ ] Wire evaluation and UI comparison without leaking the oracle to the agent.
+- [x] Wire evaluation and UI comparison without leaking the oracle to the agent.
 
 Exit: the evaluator catches missing/extra records, collapsed duplicates, wrong values,
 ineffective Next controls and unsupported claims independently of a model.
 
 ### 2. Complete the first reliable workflow
 
-- [ ] Implement structure/pagination playbooks, observations and bounded probes.
-- [ ] Produce configs using current APIs; type-check and execute against an installed
+- [x] Implement structure/pagination playbooks, observations and bounded probes.
+- [x] Produce configs using current APIs; type-check and execute against an installed
   packed library in a disposable consumer outside this checkout.
-- [ ] Verify init, representative queries, full supported traversal and truthful
+- [x] Verify init, representative queries, full supported traversal and truthful
   starting-page/rewind reporting. A partial scan cannot be called complete.
-- [ ] Test malformed input, isolation, timeout/cancellation and browser cleanup.
-- [ ] Record agent baselines with and without guidance under equal budgets.
+- [x] Test malformed input, isolation, timeout/cancellation and browser cleanup.
+- [ ] Record agent baselines with and without guidance under equal budgets. Runner
+  prepared and scripted self-test passed; provider/model runs deferred by explicit
+  user choice on 2026-11-06. Do not count scripted runs as agent-quality evidence.
 
 Exit: supported deterministic cases match exact expected records/multiplicity and
 values; negative cases report useful failures/limits. Save/review every false success.
@@ -207,3 +209,140 @@ fix or evaluation improvement; otherwise defer it.
 Do not promise universal dedupe/completeness, redesign library APIs for the inspector,
 auto-install hooks, distribute contributor workflows as consumer guidance, or make
 third-party website uptime a blocking CI dependency.
+
+### 2026-11-06 checkpoint — milestone 0
+
+Branch: `feat/108-mcp-revival`. Baseline implementation: `95e6b8cd` (from main
+`38c70b22`, with #545 and this plan merged). The original PR #157 is unchanged.
+
+Recovery decisions and repeatable commands are in `packages/mcp/README.md`. The
+server uses SDK 1.32.2/Zod 4.6.7, real schemas, stdio and loopback Streamable HTTP.
+The UI uses the same server tool. No provider key or implicit model request is needed.
+
+Local evidence: frozen install and builds passed; 12 recovered detector tests passed
+after correcting four stale equal-weight expectations to the existing weighted
+contract; real stdio discovery/validation/browser/error/recovery smoke passed; real
+UI → HTTP MCP → Chromium inspection/error/retry smoke passed. A fresh source snapshot
+without node_modules also passed frozen install, builds and both smoke paths. Root
+build, 465 unit tests, fallow and snippet validation passed. A packed library tarball
+contained root dist and excluded the new workspace packages. CI coverage is defined
+in `.github/workflows/mcp-check.yml`; CI results are not asserted by this local record.
+
+The UI has been visually inspected at 1280×850. Its fixture reports 3 mounted rows
+and a declared count of 50 without claiming traversal completeness. Preset scores
+are explicitly hypotheses, not verified configs or calibrated probabilities.
+
+Remaining limitations: temporary browsers per call, per-operation rather than shared
+run deadlines, no cancellation/session/auth contract, no generated configs, no
+validated pagination/virtualization/identity/readiness, and no model comparison yet.
+The old picker/provider/comparison experiments remain available for later recovery.
+No agent-quality benchmark or real-MUI preset validation is claimed at this stage.
+
+Next smallest experiment: milestone 1 session/evidence/tool contracts plus controlled
+plain and paginated fixtures with evaluator-only answer keys. Keep the bench running
+on this feature branch while those contracts are designed and tested.
+
+### 2026-11-06 checkpoint — milestone 1
+
+Branch: `feat/108-mcp-revival`, draft PR #547. Implementation: `902a89b5`, with
+custom-target comparison guard `600a6608`. The original draft PR #157 is unchanged.
+Contracts and decisions are recorded in `packages/mcp/CONTRACTS.md`; repeatable
+commands and current limitations are in `packages/mcp/README.md`.
+
+The MCP exposes open/inspect/close tools with isolated, connection-owned browser
+sessions, expiry, bounded read-only observations, revision-scoped evidence and
+native cancellation. Both stdio and stateful Streamable HTTP are exercised.
+Observation results report mounted data and hypotheses without asserting identity,
+full traversal or config validity. Ambiguous column layouts withhold mapped records.
+
+Controlled fixtures cover plain tables, working/broken button navigation, later-page
+starts and duplicate-looking records with stable IDs. A separately authored answer
+key checks missing/extra/repeated records, wrong values, ineffective navigation and
+unsupported completeness claims. The UI compares submitted data only, labels config
+validation false, prevents stale comparisons and offers automatic comparison only
+for exact registered fixture URLs. The answer key is absent from the MCP tool surface
+and fixture HTML; a blind agent evaluation must additionally restrict access to local
+files and the privileged bench comparator. This is not a sandbox against arbitrary
+agent filesystem/network tools.
+
+Local evidence: 21 MCP unit tests, real stdio contract/browser smoke, HTTP ownership/
+cancellation/fixture checks and UI comparison/error/retry checks passed. A fresh
+source snapshot passed frozen install, both builds and both smoke paths. The final
+custom-target guard passed the UI/HTTP suite again. Root build, 465 library unit tests
+and fallow passed; no library runtime or version change was made. The running bench
+was visually inspected. CI/review results remain separately tracked in PR #547.
+
+Budgets are per call, not shared across an agent task; observation action/page limits
+are currently zero/one. Browser cleanup is awaited rather than a hard real-time SLA.
+No generated config execution, model quality baseline, verified pagination traversal,
+virtualization or arbitrary-site authentication support is claimed.
+
+Next: milestone 2 structure/pagination guidance and bounded probes, then current-API
+config generation validated by a trusted disposable installed-package consumer.
+Only that runner can support stronger config/traversal claims.
+
+### 2026-11-06 checkpoint — milestone 2 deterministic workflow
+
+Implementation: `42c55703` on `feat/108-mcp-revival`, draft PR #547. Original draft
+#157 remains unchanged. Model baseline runs were explicitly deferred by the user;
+this checkpoint does not mark that remaining milestone-2 item complete.
+
+Structure/pagination playbooks are maintained independently as Markdown and exposed
+through versioned MCP resources/prompts. Real SDK discovery/read/get calls are tested.
+Constrained selector proposals generate current public-API configs; bounded probes
+report starting/ending records, forward coverage and restoration. Native flat HTML
+and explicit Next/Previous controls are supported; unknown identity, virtualization,
+spans, auth import and readiness variants remain outside this workflow.
+
+The trusted runner builds/packs the root library and installs its tarball into a new
+external consumer using a separate frozen lockfile and offline cache. Generated config
+and trusted runner are compiled against that installed package, then actual init,
+multi-row queries, row.toJSON/map, rewind and reset execute. The resolved library path
+is checked to stay inside the consumer. Results record build checksum/preparation
+commit, browser/SDK-related runtime versions, diagnostics, actions/pages and termination.
+Normal validation leaves the original session unchanged; cancellation/close/timeouts
+propagate to owned consumer processes and remove execution directories.
+
+Only server-created bounded/expiring witnesses can enter privileged fixture validation.
+Independent scoring checks exact membership/multiplicity/values and runtime/traversal
+outcomes. Matching submitted JSON alone still cannot claim config validity. Starting
+on page 2 rewinds and extracts all six fixture occurrences; the identical-looking Alice
+records both survive. Broken Next fails; action/page/row limits and failed restoration
+produce partial results. A held-out inventory table changes selectors, headers and
+values and also passes exact comparison.
+
+Earlier review findings addressed: configurable UI/proxy/fixture ports, own-property
+column scoring, navigation direction, shutdown admission/initialization cleanup,
+spanning layouts, capacity reserved for closing browsers and synchronous deadline
+checks. Added regression coverage rather than blindly accepting suggested patches.
+Threads are left for CodeRabbit to reassess; no resolution/merge is claimed here.
+
+Local evidence: 28 MCP unit tests; real stdio contracts; consumer workflows including
+negative, limit, native cancellation, explicit close and timeout cases; live-browser
+HTTP shutdown with concurrent initializations; real UI/HTTP comparisons on MCP_PORT
+4001; root build and fallow all passed. A source-only snapshot at
+`/private/tmp/mcp-m2-clean-ztf8ebm3` passed frozen install, preparation, builds, the full
+MCP test command and UI checks on the default port without inherited state/Git metadata.
+Logs are `/private/tmp/mcp-m2-{test,ui-custom-port,clean-test,clean-ui}.log`; these are
+local ephemeral evidence, not asserted CI results. Replays live in ignored .mcp-runs
+and are uploaded by the dedicated CI workflow. The library runtime/version is unchanged.
+
+Baseline harness preparation: four scenarios × guided/unguided × five fresh runs,
+equal shared budgets, explicit prompt loading, tool-only adapter context and post-final
+oracle comparison. Artifacts retain raw outcomes, configs/transcripts, timing, supplied
+usage and unknown cost as null. Four scripted harness self-tests passed, labeled as
+such; no provider/model requests, model pass rates or statistical confidence are claimed.
+
+Plan review: keep constrained code generation and installed-consumer execution before
+expanding framework scope. Next smallest evaluation is the real baseline when the user
+chooses a provider/model; milestone 3's controlled recycling grid is the next functional
+scope, with ambiguity reported rather than guessed away. No pilot/release decision yet.
+
+Milestone-2 CI follow-up: run `42339383855` failed because SDK stdio clients stripped
+environment variables that selected pnpm's store; offline validation looked in a
+different cache than preparation. Preparation now records its absolute store path,
+and every consumer install passes that path explicitly. A dedicated temporary store
+was populated using a preparation-only environment override, then the full MCP tests
+passed with the normal client environment (`/private/tmp/mcp-m2-store-test.log`).
+This preserves frozen/offline execution rather than hiding cache failures with a
+network-enabled validation fallback. Updated CI is required to confirm Linux behavior.

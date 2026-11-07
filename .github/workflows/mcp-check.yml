@@ -1,0 +1,39 @@
+name: MCP inspection bench
+on:
+  pull_request:
+    paths:
+      - 'packages/**'
+      - 'src/**'
+      - 'tsconfig*.json'
+      - 'scripts/prepare-mcp-consumer.mjs'
+      - 'scripts/start-inspector.mjs'
+      - 'scripts/test-inspector.mjs'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - '.github/workflows/mcp-check.yml'
+jobs:
+  baseline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10.33.2 # Match packageManager; see #361.
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm mcp:prepare
+      - run: pnpm mcp:build
+      - run: pnpm mcp:test
+      - run: pnpm mcp:test-ui
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: mcp-workflow-replays
+          path: packages/mcp/.mcp-runs/
+          include-hidden-files: true
+          if-no-files-found: ignore
