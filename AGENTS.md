@@ -62,7 +62,7 @@ npx playwright test            # all E2E tests
 npx playwright test --config playwright.config.ci-a.ts   # core tests only
 npx playwright test --config playwright.config.ci-b.ts   # integration tests only
 pnpm run docs:dev              # local VitePress docs server
-pnpm run generate-docs         # sync README from test regions
+pnpm run docs:check-snippets   # validate VitePress test snippet imports
 npx tsc --noEmit               # type check without building
 pnpm run fallow                # dead code: unused files, exports, types, class members, deps
 ```

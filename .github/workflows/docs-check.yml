@@ -11,6 +11,8 @@ on:
       - '.github/workflows/deploy-docs.yml'
       - 'scripts/docs-build-prod.mjs'
       - 'scripts/verify-vitepress-links.mjs'
+      - 'scripts/check-doc-snippets.mjs'
+      - 'tests/**'
       - 'scripts/generate-all-api-docs.mjs'
       - 'scripts/update-all-api-signatures.mjs'
 

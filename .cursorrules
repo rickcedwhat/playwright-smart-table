@@ -70,11 +70,11 @@ Strategy-First: Implement pagination logic as new Strategies in src/strategies.
 
 Dynamic Documentation (CRITICAL):
 
-Source of Truth: Code snippets in README.md are read-only and auto-generated.
+Source of Truth: README.md is a hand-maintained landing page. docs/examples/index.md imports named regions directly from browser tests using VitePress snippet imports.
 
-Workflow: To update docs, edit tests/readme_verification.spec.ts inside #region blocks.
+Workflow: For imported examples, edit the referenced test region; keep assertions in the executing test. Other docs remain hand-maintained.
 
-Action: Run pnpm run generate-docs to sync changes.
+Action: Run pnpm run docs:check-snippets and pnpm run docs:build. No snippet copying or README generation is needed.
 
 Release Protocol:
 
@@ -98,7 +98,7 @@ table.getColumnValues(col) efficiently scans a specific column across all pages.
 
 Tooling:
 
-scripts/generate-readme.mjs: Syncs tests -> README.
+scripts/check-doc-snippets.mjs: Validates source files and named regions used by VitePress snippet imports.
 
 
 Output Style

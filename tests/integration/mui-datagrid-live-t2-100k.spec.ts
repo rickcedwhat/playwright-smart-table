@@ -14,6 +14,7 @@ import { useTable, presets, Strategies, mergeTableConfig } from '../../src/index
 const LIVE_URL = 'https://mui.com/x/react-data-grid/';
 const GRID_SELECTOR = '.MuiDataGrid-root:has([aria-rowcount="100001"])';
 
+// #region docs-mui-infinite-config
 const tableConfig = mergeTableConfig(presets.muiDataGrid, {
     strategies: {
         pagination: Strategies.Pagination.infiniteScroll({
@@ -23,6 +24,7 @@ const tableConfig = mergeTableConfig(presets.muiDataGrid, {
         }),
     },
 });
+// #endregion docs-mui-infinite-config
 
 test.describe('MUI DataGrid — live site table 2 (100k infinite scroll)', () => {
     test.setTimeout(120_000);
@@ -39,8 +41,10 @@ test.describe('MUI DataGrid — live site table 2 (100k infinite scroll)', () =>
     });
 
     test('reads headers from initial viewport', async ({ page }) => {
-        const root = page.locator(GRID_SELECTOR).first();
+        // #region docs-mui-infinite-init
+        const root = page.locator('.MuiDataGrid-root:has([aria-rowcount="100001"])').first();
         const table = await useTable(root, tableConfig).init();
+        // #endregion docs-mui-infinite-init
 
         const headers = await table.getHeaders();
         console.log('Headers:', headers);

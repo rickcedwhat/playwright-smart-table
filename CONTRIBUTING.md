@@ -606,3 +606,18 @@ Contributors will be:
 - Thanked publicly!
 
 Thank you for contributing! 🙏
+
+## Tested documentation snippets
+
+`README.md` is a hand-maintained landing page. The examples page uses VitePress
+snippet imports, such as `<<< ../../tests/readme_verification.spec.ts#docs-standard`,
+to render named `// #region docs-standard` / `// #endregion docs-standard` blocks
+directly from executing browser tests. Edit the test region rather than copying
+code into the page. Keep fixture setup outside the region when it distracts from
+the example, and retain assertions that verify the documented behavior.
+
+Run `pnpm run docs:check-snippets` and `pnpm run docs:build` after changing imports
+or regions, and run the affected Playwright suite after changing example code.
+The snippet check runs before docs builds and rejects missing files or regions;
+it does not execute the examples. PR CI runs the local HTML and MUI examples;
+the 100,000-row MUI example is explicitly marked as an optional live-site test.
