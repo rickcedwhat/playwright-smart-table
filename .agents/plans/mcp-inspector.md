@@ -1,6 +1,6 @@
 # MCP inspector revival plan
 
-Status: proposed roadmap; implementation milestones are not yet complete.
+Status: milestone 0 locally complete; milestone 1 is next. CI/review status is tracked in the revival PR.
 Tracking: #108. Existing experiment: draft PR #157 (`feat/mcp-custom-inspector-wip`).
 Related: #532 (packaged guidance), #526 (identity information limits).
 
@@ -126,11 +126,11 @@ when comparing models or guidance variants.
 
 ### 0. Recover a runnable baseline
 
-- [ ] Inventory PR #157: retain/rework/defer server, probes, generator, auth, UI,
+- [x] Inventory PR #157: retain/rework/defer server, probes, generator, auth, UI,
   model comparison, tests, scratch files and accidental worktree gitlinks.
-- [ ] Create the revival branch from main; recover useful work selectively.
-- [ ] Verify dependencies, SDK schemas/transport and remove input-validation bypasses.
-- [ ] Establish clean install/build/server/UI commands and exercise a protocol call.
+- [x] Create the revival branch from main; recover useful work selectively.
+- [x] Verify dependencies, SDK schemas/transport and remove input-validation bypasses.
+- [x] Establish clean install/build/server/UI commands and exercise a protocol call.
 
 Exit: a clean checkout can launch the bench, call the real server and show findings
 or actionable errors. Record broken/unsupported parts instead of marking them complete.
@@ -207,3 +207,35 @@ fix or evaluation improvement; otherwise defer it.
 Do not promise universal dedupe/completeness, redesign library APIs for the inspector,
 auto-install hooks, distribute contributor workflows as consumer guidance, or make
 third-party website uptime a blocking CI dependency.
+
+### 2026-11-06 checkpoint — milestone 0
+
+Branch: `feat/108-mcp-revival`. Baseline implementation: `95e6b8cd` (from main
+`38c70b22`, with #545 and this plan merged). The original PR #157 is unchanged.
+
+Recovery decisions and repeatable commands are in `packages/mcp/README.md`. The
+server uses SDK 1.32.2/Zod 4.6.7, real schemas, stdio and loopback Streamable HTTP.
+The UI uses the same server tool. No provider key or implicit model request is needed.
+
+Local evidence: frozen install and builds passed; 12 recovered detector tests passed
+after correcting four stale equal-weight expectations to the existing weighted
+contract; real stdio discovery/validation/browser/error/recovery smoke passed; real
+UI → HTTP MCP → Chromium inspection/error/retry smoke passed. A fresh source snapshot
+without node_modules also passed frozen install, builds and both smoke paths. Root
+build, 465 unit tests, fallow and snippet validation passed. A packed library tarball
+contained root dist and excluded the new workspace packages. CI coverage is defined
+in `.github/workflows/mcp-check.yml`; CI results are not asserted by this local record.
+
+The UI has been visually inspected at 1280×850. Its fixture reports 3 mounted rows
+and a declared count of 50 without claiming traversal completeness. Preset scores
+are explicitly hypotheses, not verified configs or calibrated probabilities.
+
+Remaining limitations: temporary browsers per call, per-operation rather than shared
+run deadlines, no cancellation/session/auth contract, no generated configs, no
+validated pagination/virtualization/identity/readiness, and no model comparison yet.
+The old picker/provider/comparison experiments remain available for later recovery.
+No agent-quality benchmark or real-MUI preset validation is claimed at this stage.
+
+Next smallest experiment: milestone 1 session/evidence/tool contracts plus controlled
+plain and paginated fixtures with evaluator-only answer keys. Keep the bench running
+on this feature branch while those contracts are designed and tested.

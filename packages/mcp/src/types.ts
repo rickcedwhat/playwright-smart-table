@@ -2,7 +2,7 @@ export type PresetName = 'mui-datagrid' | 'mui-table' | 'rdg' | 'glide';
 
 export interface PresetFindings {
   value: PresetName | null;
-  /** Ratio of matched signals to total expected signals for the best matching preset. */
+  /** Weighted fraction of matched fingerprint signals; not a calibrated probability. */
   confidence: number;
   /** Human-readable list of matched/unmatched signals, e.g. [".MuiDataGrid-root ✓", "data-rowindex ✗"] */
   signals: string[];
@@ -21,7 +21,7 @@ export interface DomSignals {
   hasGlideInput: boolean;
   /** Whether any class starting with dvn- or gdg- exists */
   hasGlideClass: boolean;
-  /** Total visible row count (best guess from heuristics) */
+  /** Legacy name for the mounted row count; this does not establish viewport visibility */
 
   visibleRowCount: number;
   /** aria-rowcount value on the grid root, if present */

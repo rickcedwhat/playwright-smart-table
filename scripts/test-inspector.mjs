@@ -16,8 +16,8 @@ try {
   for (let attempt = 0; attempt < 100; attempt++) {
     if (bench.exitCode !== null) throw new Error('Inspector exited before startup');
     try {
-      const health = await fetch('http://127.0.0.1:3001/health');
-      const ui = await fetch('http://127.0.0.1:6274/');
+      const health = await fetch('http://127.0.0.1:3001/health', { signal: AbortSignal.timeout(500) });
+      const ui = await fetch('http://127.0.0.1:6274/', { signal: AbortSignal.timeout(500) });
       if (health.ok && ui.ok) { ready = true; break; }
     } catch { /* services are starting */ }
     await new Promise(resolve => setTimeout(resolve, 100));
