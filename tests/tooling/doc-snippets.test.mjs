@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { after, before, test } from 'node:test';
 import { createMarkdownRenderer } from 'vitepress';
-import { changedDocPages, snippetImports, validateDocSnippets } from '../../scripts/doc-snippets.mjs';
+import { changedDocPages, docPageLinks, snippetImports, validateDocSnippets } from '../../scripts/doc-snippets.mjs';
 
 const directory = mkdtempSync(path.join(os.tmpdir(), 'doc-snippets-'));
 const docs = path.join(directory, 'docs');
@@ -75,8 +75,31 @@ test('changed pages include snippet consumers and direct edits without unrelated
   const unrelated = path.join(docs, 'unrelated.md');
   writeFileSync(home, '# Home');
   writeFileSync(unrelated, '# Unrelated');
-  assert.deepEqual(changedDocPages(md, docs, new Set([source])), ['examples']);
-  assert.deepEqual(changedDocPages(md, docs, new Set([source, page, home])), ['', 'examples']);
-  assert.deepEqual(changedDocPages(md, docs, new Set([unrelated])), ['unrelated']);
+  assert.deepEqual(changedDocPages(md, docs, new Set([source])), ['examples.html']);
+  assert.deepEqual(changedDocPages(md, docs, new Set([source, page, home])), ['', 'examples.html']);
+  assert.deepEqual(changedDocPages(md, docs, new Set([unrelated])), ['unrelated.html']);
   assert.deepEqual(changedDocPages(md, docs, new Set([path.join(directory, 'other.ts')])), []);
+});
+
+test('nested indexes and home-only edits survive JSON transport and produce real page links', () => {
+  const nested = path.join(docs, 'examples', 'index.md');
+  mkdirSync(path.dirname(nested));
+  writeFileSync(nested, '<<< ../../example.ts#example\n');
+  writeFileSync(page, '# No snippet here');
+  const routes = JSON.parse(JSON.stringify(changedDocPages(md, docs, new Set([source]))));
+  assert.deepEqual(routes, ['examples/']);
+  const canonical = 'https://example.com/library/';
+  const preview = canonical + 'pr-preview/pr-544/';
+  const compare = preview + 'compare.html';
+  assert.deepEqual(docPageLinks(routes[0], canonical, preview, compare), {
+    canonical: canonical + 'examples/', preview: preview + 'examples/', compare: compare + '#examples/',
+  });
+  const home = path.join(docs, 'index.md');
+  const homeRoutes = JSON.parse(JSON.stringify(changedDocPages(md, docs, new Set([home]))));
+  assert.deepEqual(homeRoutes, ['']);
+  assert.equal(homeRoutes.length, 1);
+  assert.deepEqual(docPageLinks(homeRoutes[0], canonical, preview, compare), {
+    canonical, preview, compare: compare + '#',
+  });
+  assert.equal(docPageLinks('unrelated.html', canonical, preview, compare).preview, preview + 'unrelated.html');
 });

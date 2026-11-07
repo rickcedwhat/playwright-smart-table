@@ -13,5 +13,5 @@ const changed = new Set(execFileSync('git', ['diff', '--name-only', '-z', base, 
   cwd: root, encoding: 'utf8',
 }).split('\0').filter(Boolean).map(file => path.join(root, file)));
 const md = await createMarkdownRenderer(docs, { highlight: code => code });
-// Keep extensionless routes, including the root index, for compare links/comments.
-console.log(changedDocPages(md, docs, changed).join(','));
+// JSON preserves the empty home-page route and filenames containing commas.
+console.log(JSON.stringify(changedDocPages(md, docs, changed)));

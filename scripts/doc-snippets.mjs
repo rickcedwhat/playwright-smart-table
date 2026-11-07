@@ -49,6 +49,11 @@ export function changedDocPages(md, docs, changed) {
   return markdownFiles(docs)
     .filter(file => changed.has(file) || snippetImports(md, file).some(({ source }) => changed.has(source)))
     .map(file => path.relative(docs, file).split(path.sep).join('/')
-      .replace(/\.md$/, '').replace(/^index$/, ''))
+      .replace(/\.md$/, '.html').replace(/(^|\/)index\.html$/, '$1'))
     .sort();
+}
+
+/** Build links from emitted routes without adding a spurious directory suffix. */
+export function docPageLinks(page, canonical, preview, compare) {
+  return { canonical: canonical + page, preview: preview + page, compare: compare + '#' + page };
 }
