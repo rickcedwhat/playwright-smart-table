@@ -337,3 +337,12 @@ Plan review: keep constrained code generation and installed-consumer execution b
 expanding framework scope. Next smallest evaluation is the real baseline when the user
 chooses a provider/model; milestone 3's controlled recycling grid is the next functional
 scope, with ambiguity reported rather than guessed away. No pilot/release decision yet.
+
+Milestone-2 CI follow-up: run `42339383855` failed because SDK stdio clients stripped
+environment variables that selected pnpm's store; offline validation looked in a
+different cache than preparation. Preparation now records its absolute store path,
+and every consumer install passes that path explicitly. A dedicated temporary store
+was populated using a preparation-only environment override, then the full MCP tests
+passed with the normal client environment (`/private/tmp/mcp-m2-store-test.log`).
+This preserves frozen/offline execution rather than hiding cache failures with a
+network-enabled validation fallback. Updated CI is required to confirm Linux behavior.
