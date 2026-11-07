@@ -15,3 +15,9 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; line-heig
 [role=alert] { margin-top: 20px; border: 1px solid #e69c9c; padding: 16px; color: #fecaca; white-space: pre-wrap; }
 .intro { max-width: 600px; margin-top: 40px; }
 @media (max-width: 760px) { .bench { grid-template-columns: 1fr; } aside { border-right: 0; border-bottom: 1px solid #334155; } }
+select, textarea { display: block; width: 100%; margin-top: 8px; padding: 10px; background: #0f172a; border: 1px solid #475569; border-radius: 5px; color: inherit; }
+textarea { min-height: 240px; font: 12px/1.5 monospace; }
+button + button { margin-top: 10px; }
+section { border-top: 1px solid #334155; margin-top: 30px; padding-top: 8px; }
+
+main > pre { max-height: 52vh; overflow: auto; }
