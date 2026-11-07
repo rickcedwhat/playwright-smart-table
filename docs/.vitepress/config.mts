@@ -1,10 +1,12 @@
 import { defineConfig } from 'vitepress'
 import { tabsMarkdownPlugin } from 'vitepress-plugin-tabs'
+import { validateDocSnippets } from '../../scripts/doc-snippets.mjs'
 
 export default defineConfig({
   markdown: {
     config(md) {
       md.use(tabsMarkdownPlugin)
+      md.use(validateDocSnippets)
     }
   },
     title: "Playwright Smart Table",

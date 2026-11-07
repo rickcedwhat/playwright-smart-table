@@ -617,7 +617,13 @@ code into the page. Keep fixture setup outside the region when it distracts from
 the example, and retain assertions that verify the documented behavior.
 
 Run `pnpm run docs:check-snippets` and `pnpm run docs:build` after changing imports
-or regions, and run the affected Playwright suite after changing example code.
+or regions, and run the affected Playwright suite after changing an import or
+example code.
 The snippet check runs before docs builds and rejects missing files or regions;
-it does not execute the examples. PR CI runs the local HTML and MUI examples;
-the 100,000-row MUI example is explicitly marked as an optional live-site test.
+VitePress also validates imports on development refreshes. Neither executes the
+examples. PR CI runs the local HTML and MUI examples when the code path filter in
+`.github/workflows/pr-checks.yml` matches (`src/**`, `tests/**`, `playground/**`,
+`package.json`, `pnpm-lock.yaml`, `tsconfig*.json`, `playwright.config*.ts`,
+`scripts/**`, or `vite.config*.ts`). Docs-only PRs skip both Playwright jobs, so
+run the affected example suite locally even when only an import changed. The
+100,000-row MUI example is explicitly marked as an optional live-site test.

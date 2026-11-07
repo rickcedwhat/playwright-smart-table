@@ -34,6 +34,8 @@ jobs:
               - 'scripts/docs-build-prod.mjs'
               - 'scripts/verify-vitepress-links.mjs'
               - 'scripts/check-doc-snippets.mjs'
+              - 'scripts/doc-snippets.mjs'
+              - 'scripts/changed-doc-pages.mjs'
               - 'tests/**'
 
       - name: Setup pnpm
@@ -51,6 +53,10 @@ jobs:
         if: steps.filter.outputs.docs == 'true'
         run: pnpm install --frozen-lockfile
 
+      - name: Validate documentation snippets
+        if: steps.filter.outputs.docs == 'true'
+        run: pnpm run docs:check-snippets
+
       - name: Build VitePress site (preview base)
         if: steps.filter.outputs.docs == 'true'
         run: npx vitepress build docs --base /playwright-smart-table/pr-preview/pr-${{ github.event.pull_request.number }}/
@@ -59,12 +65,7 @@ jobs:
         if: steps.filter.outputs.docs == 'true'
         id: pages
         run: |
-          LIST=$(git diff --name-only ${{ github.event.pull_request.base.sha }} HEAD -- docs/ \
-            | grep '\.md$' \
-            | grep -v '\.vitepress' \
-            | sed 's|^docs/||; s|\.md$||; s|^index$||' \
-            | tr '\n' ',' \
-            | sed 's/,$//')
+          LIST=$(node scripts/changed-doc-pages.mjs "${{ github.event.pull_request.base.sha }}")
           echo "list=$LIST" >> $GITHUB_OUTPUT
 
       - name: Generate compare page
