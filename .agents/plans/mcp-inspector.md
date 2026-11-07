@@ -1,6 +1,6 @@
 # MCP inspector revival plan
 
-Status: milestone 0 locally complete; milestone 1 is next. CI/review status is tracked in the revival PR.
+Status: milestones 0 and 1 locally complete; milestone 2 is next. CI/review status is tracked in the revival PR.
 Tracking: #108. Existing experiment: draft PR #157 (`feat/mcp-custom-inspector-wip`).
 Related: #532 (packaged guidance), #526 (identity information limits).
 
@@ -137,12 +137,12 @@ or actionable errors. Record broken/unsupported parts instead of marking them co
 
 ### 1. Establish contracts and an independent answer key
 
-- [ ] Define session/evidence/finding/action-budget/validation schemas.
-- [ ] Decide initial tools, protocol/transport, browser ownership, config execution
+- [x] Define session/evidence/finding/action-budget/validation schemas.
+- [x] Decide initial tools, protocol/transport, browser ownership, config execution
   boundary and cancellation semantics; record rationale in the decision log.
-- [ ] Add plain, button-paginated and broken-navigation fixtures. Include a later-page
+- [x] Add plain, button-paginated and broken-navigation fixtures. Include a later-page
   start and valid duplicate-looking records with stable IDs.
-- [ ] Wire evaluation and UI comparison without leaking the oracle to the agent.
+- [x] Wire evaluation and UI comparison without leaking the oracle to the agent.
 
 Exit: the evaluator catches missing/extra records, collapsed duplicates, wrong values,
 ineffective Next controls and unsupported claims independently of a model.
@@ -239,3 +239,42 @@ No agent-quality benchmark or real-MUI preset validation is claimed at this stag
 Next smallest experiment: milestone 1 session/evidence/tool contracts plus controlled
 plain and paginated fixtures with evaluator-only answer keys. Keep the bench running
 on this feature branch while those contracts are designed and tested.
+
+### 2026-11-06 checkpoint — milestone 1
+
+Branch: `feat/108-mcp-revival`, draft PR #547. Implementation: `902a89b5`, with
+custom-target comparison guard `600a6608`. The original draft PR #157 is unchanged.
+Contracts and decisions are recorded in `packages/mcp/CONTRACTS.md`; repeatable
+commands and current limitations are in `packages/mcp/README.md`.
+
+The MCP exposes open/inspect/close tools with isolated, connection-owned browser
+sessions, expiry, bounded read-only observations, revision-scoped evidence and
+native cancellation. Both stdio and stateful Streamable HTTP are exercised.
+Observation results report mounted data and hypotheses without asserting identity,
+full traversal or config validity. Ambiguous column layouts withhold mapped records.
+
+Controlled fixtures cover plain tables, working/broken button navigation, later-page
+starts and duplicate-looking records with stable IDs. A separately authored answer
+key checks missing/extra/repeated records, wrong values, ineffective navigation and
+unsupported completeness claims. The UI compares submitted data only, labels config
+validation false, prevents stale comparisons and offers automatic comparison only
+for exact registered fixture URLs. The answer key is absent from the MCP tool surface
+and fixture HTML; a blind agent evaluation must additionally restrict access to local
+files and the privileged bench comparator. This is not a sandbox against arbitrary
+agent filesystem/network tools.
+
+Local evidence: 21 MCP unit tests, real stdio contract/browser smoke, HTTP ownership/
+cancellation/fixture checks and UI comparison/error/retry checks passed. A fresh
+source snapshot passed frozen install, both builds and both smoke paths. The final
+custom-target guard passed the UI/HTTP suite again. Root build, 465 library unit tests
+and fallow passed; no library runtime or version change was made. The running bench
+was visually inspected. CI/review results remain separately tracked in PR #547.
+
+Budgets are per call, not shared across an agent task; observation action/page limits
+are currently zero/one. Browser cleanup is awaited rather than a hard real-time SLA.
+No generated config execution, model quality baseline, verified pagination traversal,
+virtualization or arbitrary-site authentication support is claimed.
+
+Next: milestone 2 structure/pagination guidance and bounded probes, then current-API
+config generation validated by a trusted disposable installed-package consumer.
+Only that runner can support stronger config/traversal claims.
