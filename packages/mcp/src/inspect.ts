@@ -21,7 +21,7 @@ export async function inspectTable(sessions: SessionManager, id: string, tableSe
                 if (text.length > 120) textTruncated = true;
                 return text.slice(0, 120);
             });
-            let layoutUnsupported = new Set(headers).size !== headers.length || headers.length === 0;
+            let layoutUnsupported = !!root.querySelector('[colspan]:not([colspan="1"]), [rowspan]:not([rowspan="1"])') || new Set(headers).size !== headers.length || headers.length === 0;
             const records = [];
             let chars = 0;
             for (const row of rows.slice(0, maxRows)) {

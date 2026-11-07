@@ -3,8 +3,10 @@ import { spawn } from 'node:child_process';
 import { createServer } from 'node:net';
 import { chromium } from '@playwright/test';
 
+const mcpPort = Number(process.env.MCP_PORT ?? 3001);
+const mcpOrigin = `http://127.0.0.1:${mcpPort}`;
 // Refuse occupied ports rather than reusing or terminating someone else's services.
-for (const port of [3001, 6274]) {
+for (const port of [mcpPort, 6274]) {
   const probe = createServer();
   await new Promise((resolve, reject) => { probe.once('error', reject); probe.listen(port, '127.0.0.1', resolve); });
   await new Promise(resolve => probe.close(resolve));
@@ -16,7 +18,7 @@ try {
   for (let attempt = 0; attempt < 100; attempt++) {
     if (bench.exitCode !== null) throw new Error('Inspector exited before startup');
     try {
-      const health = await fetch('http://127.0.0.1:3001/health', { signal: AbortSignal.timeout(500) });
+      const health = await fetch(mcpOrigin + '/health', { signal: AbortSignal.timeout(500) });
       const ui = await fetch('http://127.0.0.1:6274/', { signal: AbortSignal.timeout(500) });
       if (health.ok && ui.ok) { ready = true; break; }
     } catch { /* services are starting */ }
@@ -50,6 +52,14 @@ try {
   await comparison.waitFor();
   assert.equal(JSON.parse(await comparison.innerText()).dataMatches, true);
   assert.equal(JSON.parse(await comparison.innerText()).configValidated, false);
+  await page.getByRole('button', { name: 'Propose config', exact: true }).click();
+  await page.getByLabel('Generated config').waitFor();
+  await page.getByRole('button', { name: 'Probe pagination', exact: true }).click();
+  await page.getByLabel('Pagination probe').waitFor();
+  await page.getByRole('button', { name: 'Validate config', exact: true }).click();
+  await page.getByLabel('Trusted fixture evaluation').waitFor({ timeout: 120000 });
+  assert.equal(JSON.parse(await page.getByLabel('Config validation').innerText()).status, 'tested');
+  assert.equal(JSON.parse(await page.getByLabel('Trusted fixture evaluation').innerText()).configValidated, true);
   const submission = JSON.parse(await page.getByLabel('Evaluation submission').inputValue());
   submission.records.pop(); submission.claim = 'complete';
   await page.getByLabel('Evaluation submission').fill(JSON.stringify(submission));
@@ -72,7 +82,7 @@ try {
   await page.waitForTimeout(100);
   assert.equal(await comparison.count(), 0, 'An old comparison cannot be attached to a new observation');
   await page.unroute('**/bench/evaluate');
-  await page.getByLabel('Target URL', { exact: true }).fill('http://127.0.0.1:3001/fixtures/plain?unregistered=1');
+  await page.getByLabel('Target URL', { exact: true }).fill(mcpOrigin + '/fixtures/plain?unregistered=1');
   await page.getByRole('button', { name: 'Run inspection' }).click();
   await output.waitFor();
   assert.equal(await page.getByRole('button', { name: 'Compare with fixture' }).count(), 0, 'Custom targets have no registered answer key');

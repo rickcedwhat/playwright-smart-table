@@ -10,7 +10,10 @@ describe('milestone 1 contracts', () => {
         expect(() => evaluationSubmissionSchema.parse({ records: [], claim: 'complete', navigation: [], code: 'arbitrary code' })).toThrow();
     });
     it('requires a scope and evidence references for findings', () => {
-        expect(() => findingSchema.parse({ subject: 'pagination', status: 'tested', evidenceIds: [], limitations: [] })).toThrow();
+        const valid = { subject: 'pagination', status: 'tested', scope: 'mounted', evidenceIds: ['00000000-0000-4000-8000-000000000000'], limitations: [] };
+        expect(findingSchema.parse(valid)).toEqual(valid);
+        expect(() => findingSchema.parse({ ...valid, scope: '' })).toThrow();
+        expect(() => findingSchema.parse({ ...valid, evidenceIds: [] })).toThrow();
     });
     it('does not accept file URLs or embedded credentials', () => {
         expect(() => urlSchema.parse('file:///etc/passwd')).toThrow();

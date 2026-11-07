@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "orderPolicy": "ignore",
+  "records": [
+    {
+      "id": "h101",
+      "values": {
+        "Item": "Bolt",
+        "Dept": "Warehouse"
+      }
+    },
+    {
+      "id": "h102",
+      "values": {
+        "Item": "Bolt",
+        "Dept": "Warehouse"
+      }
+    },
+    {
+      "id": "h103",
+      "values": {
+        "Item": "Nut",
+        "Dept": "Hardware"
+      }
+    },
+    {
+      "id": "h104",
+      "values": {
+        "Item": "Washer",
+        "Dept": "Hardware"
+      }
+    }
+  ]
+}

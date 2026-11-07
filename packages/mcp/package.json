@@ -9,7 +9,10 @@
     "serve": "node dist/index.js --http",
     "test": "vitest run",
     "test:smoke": "node tests/smoke.mjs",
-    "test:http": "node tests/http.mjs"
+    "test:http": "node tests/http.mjs",
+    "test:workflow": "node tests/workflow.mjs",
+    "baseline": "node evaluations/baseline.mjs",
+    "test:shutdown": "node tests/shutdown.mjs"
   },
   "engines": {
     "node": ">=22.12"

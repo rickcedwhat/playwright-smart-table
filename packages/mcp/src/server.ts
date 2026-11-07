@@ -2,6 +2,11 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { budgetSchema, observationSchema, sessionSchema, urlSchema, successResult, InspectorError } from './contracts.js';
 import { inspectTable } from './inspect.js';
+import { proposeConfig } from './structure.js';
+import { probePagination } from './probe.js';
+import { validateConfig } from './validate.js';
+import { proposalSchema, workflowBudgetSchema, proposalResultSchema, probeResultSchema, validationResultSchema } from './workflow-contracts.js';
+import { readFileSync } from 'node:fs';
 import { SessionManager } from './sessions.js';
 
 /** The transport owner, not individual HTTP requests, owns browser sessions. */
@@ -26,5 +31,24 @@ export function createServer(sessions: SessionManager) {
         inputSchema: z.object({ sessionId: z.string().uuid() }).strict(),
         outputSchema: z.object({ closed: z.boolean() }).strict(),
     }, input => reply(() => sessions.close(input.sessionId)));
+    server.registerTool('propose_config', {
+        description: 'Observe native HTML structure and propose a constrained selector/strategy config. Proposal only, not validation. Requires data-id candidates; virtualization is unsupported.',
+        inputSchema: z.object({ sessionId: z.string().uuid(), tableSelector: z.string().trim().min(1).max(500).optional() }).strict(), outputSchema: proposalResultSchema,
+    }, (input, extra) => reply(() => proposeConfig(sessions, input.sessionId, input.tableSelector, extra.signal)));
+    const workflowInput = z.object({ sessionId: z.string().uuid(), proposal: proposalSchema, budget: workflowBudgetSchema.prefault({}) }).strict();
+    server.registerTool('probe_pagination', {
+        description: 'Explicitly click the proposed native Next/Previous controls within action/page/time budgets. Forward scan from current position, best-effort restoration sharing that budget. No config execution or completeness proof.',
+        inputSchema: workflowInput, outputSchema: probeResultSchema,
+    }, (input, extra) => reply(() => probePagination(sessions, input.sessionId, input.proposal, input.budget, extra.signal)));
+    server.registerTool('validate_config', {
+        description: 'Type-check and execute a constrained config in a disposable consumer of the prepared library tarball. Fresh unauthenticated browser, original session unchanged. No arbitrary JS. Runtime checks and traversal witness, not an oracle comparison.',
+        inputSchema: workflowInput, outputSchema: validationResultSchema,
+    }, (input, extra) => reply(() => validateConfig(sessions, input.sessionId, input.proposal, input.budget, extra.signal)));
+    for (const name of ['structure', 'pagination']) {
+        const uri = `smart-table://playbooks/${name}/v1`;
+        const text = readFileSync(new URL(`../playbooks/${name}.md`, import.meta.url), 'utf8');
+        server.registerResource(`${name}-playbook`, uri, { description: `Version 1 ${name} investigation guidance`, mimeType: 'text/markdown' }, async () => ({ contents: [{ uri, text, mimeType: 'text/markdown' }] }));
+        server.registerPrompt(`investigate-${name}`, { description: `Load version 1 ${name} guidance` }, async () => ({ messages: [{ role: 'user', content: { type: 'text', text } }] }));
+    }
     return server;
 }

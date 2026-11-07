@@ -8,7 +8,7 @@ import { SessionManager } from '../dist/sessions.js';
 const fixture = readFileSync(new URL('./fixtures/mui-datagrid-mock.html', import.meta.url), 'utf8');
 const http = createServer((req, res) => {
   res.setHeader('content-type', 'text/html');
-  res.end(req.url === '/reordered' ? '<table><thead><tr><th aria-colindex="1">A</th><th aria-colindex="2">B</th></tr></thead><tbody><tr><td aria-colindex="2">b</td><td aria-colindex="1">a</td></tr></tbody></table>' : req.url === '/multiple' ? '<table><tr><th>A</th></tr></table><table><tr><th>B</th></tr></table>' : req.url === '/unicode'
+  res.end(req.url === '/spans' ? '<table><thead><tr><th>A</th><th>B</th></tr></thead><tbody><tr><td rowspan="2">a</td><td>b</td></tr><tr><td>shifted</td><td>extra</td></tr></tbody></table>' : req.url === '/reordered' ? '<table><thead><tr><th aria-colindex="1">A</th><th aria-colindex="2">B</th></tr></thead><tbody><tr><td aria-colindex="2">b</td><td aria-colindex="1">a</td></tr></tbody></table>' : req.url === '/multiple' ? '<table><tr><th>A</th></tr></table><table><tr><th>B</th></tr></table>' : req.url === '/unicode'
     ? `<table><thead><tr><th>Value</th></tr></thead><tbody>${Array.from({ length: 10 }, (_, i) => `<tr data-id="${i}"><td>${'界'.repeat(600)}</td></tr>`).join('')}</tbody></table>` : fixture);
 });
 await new Promise(resolve => http.listen(0, '127.0.0.1', resolve));
@@ -18,7 +18,7 @@ const call = (name, args, options) => client.callTool({ name, arguments: args },
 const inspect = (id, options = {}) => call('inspect_table', { sessionId: id, ...options });
 try {
   await client.connect(new StdioClientTransport({ command: process.execPath, args: ['dist/index.js'], cwd: new URL('../', import.meta.url).pathname }));
-  assert.deepEqual((await client.listTools()).tools.map(tool => tool.name), ['open_session', 'inspect_table', 'close_session']);
+  assert.deepEqual((await client.listTools()).tools.map(tool => tool.name), ['open_session', 'inspect_table', 'close_session', 'propose_config', 'probe_pagination', 'validate_config']);
   assert.equal((await call('open_session', { url: 'not-a-url' })).isError, true);
   const session = (await call('open_session', { url })).structuredContent;
   const first = (await inspect(session.id)).structuredContent;
@@ -43,6 +43,10 @@ try {
   const unmapped = (await inspect(reordered.id)).structuredContent;
   assert.equal(unmapped.coverage.layoutUnsupported, true); assert.deepEqual(unmapped.records, []);
   await call('close_session', { sessionId: reordered.id });
+  const spans = (await call('open_session', { url: url + '/spans' })).structuredContent;
+  const spanned = (await inspect(spans.id)).structuredContent;
+  assert.equal(spanned.coverage.layoutUnsupported, true); assert.deepEqual(spanned.records, []);
+  await call('close_session', { sessionId: spans.id });
   const unicode = (await call('open_session', { url: url + '/unicode' })).structuredContent;
   const boundedResult = await inspect(unicode.id, { budget: { maxOutputBytes: 4096 } });
   const bounded = boundedResult.structuredContent;
@@ -70,6 +74,7 @@ try {
     await new Promise(resolve => setTimeout(resolve, 50));
   }
   assert.ok(stale, 'native cancellation must close its browser session');
+  await call('close_session', { sessionId: nativeCancelled.id }); // Wait for cancellation cleanup before testing empty capacity.
   const capacity = await Promise.all(Array.from({ length: 4 }, () => call('open_session', { url })));
   const openedAtCapacity = capacity.filter(result => !result.isError);
   assert.equal(openedAtCapacity.length, 3);

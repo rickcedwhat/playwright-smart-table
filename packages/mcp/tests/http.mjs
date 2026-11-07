@@ -3,7 +3,7 @@ import { chromium } from '@playwright/test';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 
-const base = 'http://127.0.0.1:3001';
+const base = `http://127.0.0.1:${process.env.MCP_PORT ?? 3001}`;
 const clients = [];
 async function connect() {
   const client = new Client({ name: 'http-contract-smoke', version: '0.1.0' });
@@ -19,7 +19,7 @@ let browser;
 try {
   const a = await connect(), b = await connect();
   const tools = (await a.listTools()).tools.map(tool => tool.name);
-  assert.deepEqual(tools, ['open_session', 'inspect_table', 'close_session']);
+  assert.deepEqual(tools, ['open_session', 'inspect_table', 'close_session', 'propose_config', 'probe_pagination', 'validate_config']);
   assert.ok(!tools.some(name => /oracle|evaluat/.test(name)));
   assert.equal((await fetch(base + '/tests/bench/people-oracle.json')).status, 404);
   const opened = (await call(a, 'open_session', { url: base + '/fixtures/plain' })).structuredContent;
@@ -33,6 +33,15 @@ try {
   assert.equal(correct.passes, true); assert.equal(correct.configValidated, false);
   const falseClaim = await evaluate('plain', { records: observed.records, claim: 'complete', navigation: [] });
   assert.equal(falseClaim.dataMatches, true); assert.equal(falseClaim.passes, false);
+  const proposed = (await call(a, 'propose_config', { sessionId: opened.id })).structuredContent;
+  const validationReply = await a.callTool({ name: 'validate_config', arguments: { sessionId: opened.id, proposal: proposed.proposal } }, undefined, { timeout: 120000 });
+  assert.ok(!validationReply.isError, JSON.stringify(validationReply.content));
+  const validated = validationReply.structuredContent;
+  assert.equal(validated.status, 'tested');
+  const trustedResponse = await fetch(base + '/bench/validate', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ runId: validated.runId, fixture: 'plain' }) });
+  const trusted = await trustedResponse.json();
+  assert.equal(trusted.passes, true); assert.equal(trusted.configValidated, true);
+  assert.equal((await fetch(base + '/bench/validate', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ runId: 'invented', fixture: 'plain' }) })).status, 400);
   await call(a, 'close_session', { sessionId: opened.id });
   browser = await chromium.launch();
   const page = await browser.newPage();
@@ -53,7 +62,11 @@ try {
   const failed = await evaluate('broken-next', { records: observed.records, claim: 'partial', navigation: [{ beforeIds, afterIds, claimedMoved: true }] });
   assert.deepEqual(failed.ineffectiveNavigation, [0]);
   const other = (await call(b, 'open_session', { url: base + '/fixtures/paginated?page=1' })).structuredContent;
+  const live = (await call(a, 'open_session', { url: base + '/fixtures/plain' })).structuredContent;
+  const interrupted = a.callTool({ name: 'inspect_table', arguments: { sessionId: live.id, tableSelector: '#missing' } }).then(value => value.isError === true, () => true);
+  await new Promise(resolve => setTimeout(resolve, 50));
   await clients[0].transport.terminateSession();
+  assert.ok(await interrupted, 'Terminating A must interrupt its live browser operation');
   const stillOpen = (await call(b, 'inspect_table', { sessionId: other.id })).structuredContent;
   assert.deepEqual(stillOpen.records.map(row => row.id), ['r3', 'r4']);
   const controller = new AbortController();

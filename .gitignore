@@ -60,3 +60,6 @@ packages/**/dist/
 packages/**/.env
 packages/**/.mcp-state.json
 inspector-*.log
+
+# Local MCP replay transcripts
+packages/**/.mcp-runs/
