@@ -3,6 +3,9 @@ on:
   pull_request:
     paths:
       - 'packages/**'
+      - 'src/**'
+      - 'tsconfig*.json'
+      - 'scripts/prepare-mcp-consumer.mjs'
       - 'scripts/start-inspector.mjs'
       - 'scripts/test-inspector.mjs'
       - 'package.json'
@@ -23,6 +26,14 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm mcp:prepare
       - run: pnpm mcp:build
       - run: pnpm mcp:test
       - run: pnpm mcp:test-ui
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: mcp-workflow-replays
+          path: packages/mcp/.mcp-runs/
+          include-hidden-files: true
+          if-no-files-found: ignore

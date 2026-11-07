@@ -38,3 +38,13 @@ it('explicitly scores membership and values rather than ordering', () => {
     const result = evaluateSubmission('plain', submit([...expected].reverse()));
     expect(result.orderPolicy).toBe('ignore'); expect(result.dataMatches).toBe(true);
 });
+it('handles prototype-like own column names as data rather than inherited functions', () => {
+    const records = structuredClone(expected);
+    records[0].values.toString = 'custom';
+    expect(evaluateSubmission('plain', submit(records)).wrongValues).toContainEqual({ id: 'r1', column: 'toString', expected: null, actual: 'custom' });
+});
+it('distinguishes working Previous from broken Next on the broken fixture', () => {
+    const step = { direction: 'previous', beforeIds: ['r3', 'r4'], afterIds: ['r1', 'r2'], claimedMoved: true };
+    expect(evaluateSubmission('broken-next', submit(expected, 'partial', [step])).ineffectiveNavigation).toEqual([]);
+    expect(evaluateSubmission('paginated', submit(expected, 'partial', [{ ...step, direction: 'next' }])).ineffectiveNavigation).toEqual([0]);
+});

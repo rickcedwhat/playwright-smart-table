@@ -8,7 +8,8 @@
     "examples/**",
     "docs/**",
     "tests/apps/**",
-    "tests/test-assets/**"
+    "tests/test-assets/**",
+    "packages/mcp/consumer/runner.mts"
   ],
   "ignoreDependencies": [
     "vitepress-plugin-tabs"

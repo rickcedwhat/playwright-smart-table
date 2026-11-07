@@ -21,7 +21,7 @@
     "mcp:build": "pnpm --filter @rickcedwhat/playwright-smart-table-mcp build && pnpm --filter @smart-table/inspector build",
     "mcp:test-ui": "node scripts/test-inspector.mjs",
     "mcp:dev": "node scripts/start-inspector.mjs",
-    "mcp:test": "pnpm --filter @rickcedwhat/playwright-smart-table-mcp test && pnpm --filter @rickcedwhat/playwright-smart-table-mcp test:smoke",
+    "mcp:test": "pnpm --filter @rickcedwhat/playwright-smart-table-mcp test && pnpm --filter @rickcedwhat/playwright-smart-table-mcp test:smoke && pnpm --filter @rickcedwhat/playwright-smart-table-mcp test:workflow && pnpm mcp:baseline --self-test && pnpm --filter @rickcedwhat/playwright-smart-table-mcp test:shutdown",
     "generate-config-types": "node scripts/embed-config-types.mjs",
     "docs:check-snippets": "node scripts/check-doc-snippets.mjs",
     "generate-all-api-docs": "node scripts/generate-all-api-docs.mjs",
@@ -48,7 +48,9 @@
     "test:playground": "pnpm exec playwright test --config tests-external/playground/playwright.config.ts 2>&1 | tee \"tests-external/playground/logs/run-$(date +%Y%m%d-%H%M%S).log\"",
     "dev:playground": "cd playground && npm run dev",
     "dev:mui": "cd tests/apps/mui-datagrid && npm run dev",
-    "prepare": "husky"
+    "prepare": "husky",
+    "mcp:prepare": "node scripts/prepare-mcp-consumer.mjs",
+    "mcp:baseline": "pnpm --filter @rickcedwhat/playwright-smart-table-mcp baseline"
   },
   "exports": {
     ".": {

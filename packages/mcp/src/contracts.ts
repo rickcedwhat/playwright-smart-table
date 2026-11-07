@@ -34,7 +34,7 @@ export const observationSchema = z.object({
 }).strict();
 export const evaluationSubmissionSchema = z.object({
     records: z.array(recordSchema).max(1000), claim: z.enum(['partial', 'complete']),
-    navigation: z.array(z.object({ beforeIds: z.array(z.string()), afterIds: z.array(z.string()), claimedMoved: z.boolean() }).strict()).max(100),
+    navigation: z.array(z.object({ direction: z.enum(['next', 'previous']).default('next'), beforeIds: z.array(z.string()), afterIds: z.array(z.string()), claimedMoved: z.boolean() }).strict()).max(100),
 }).strict();
 export const evaluationResultSchema = z.object({
     comparison: z.literal('submitted-data-only'), orderPolicy: z.literal('ignore'), oracleVersion: z.number().int().positive(),

@@ -8,17 +8,22 @@ import { readFileSync } from 'node:fs';
 import { createServer } from './server.js';
 import { SessionManager } from './sessions.js';
 import { fixtureHtml } from './bench/fixtures.js';
+import { evaluateValidation } from './bench/witness.js';
 import { evaluateSubmission } from './bench/evaluate.js';
 
 if (process.argv.includes('--http')) {
     const app = createMcpExpressApp({ host: '127.0.0.1' });
     const clients = new Map<string, { transport: StreamableHTTPServerTransport; sessions: SessionManager; lastActive: number }>();
     let initializing = 0;
+    let stopping = false;
+    const owners = new Set<SessionManager>();
+    const connections = new Set<StreamableHTTPServerTransport>();
+    app.use((_req, res, next) => { if (stopping) res.status(503).json({ error: 'MCP shutting down' }); else next(); });
     const reaper = setInterval(() => {
         for (const client of clients.values()) if (Date.now() - client.lastActive > 300000) void client.transport.close();
     }, 10000);
     reaper.unref();
-    app.get('/health', (_req, res) => { res.json({ status: 'ok', milestone: 1 }); });
+    app.get('/health', (_req, res) => { res.json({ status: 'ok', milestone: 2 }); });
     app.get('/fixtures/mui-datagrid', (_req, res) => {
         res.type('html').send(readFileSync(new URL('../tests/fixtures/mui-datagrid-mock.html', import.meta.url), 'utf8'));
     });
@@ -31,6 +36,10 @@ if (process.argv.includes('--http')) {
         try { res.json(evaluateSubmission(req.body.fixture, req.body.submission)); }
         catch (error) { res.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
     });
+    app.post('/bench/validate', (req, res) => {
+        try { res.json(evaluateValidation(req.body.runId, req.body.fixture, `http://127.0.0.1:${port}`)); }
+        catch (error) { res.status(400).json({ error: error instanceof Error ? error.message : String(error) }); }
+    });
     app.all('/mcp', async (req, res) => {
         const id = req.headers['mcp-session-id'];
         let client = typeof id === 'string' ? clients.get(id) : undefined;
@@ -40,14 +49,17 @@ if (process.argv.includes('--http')) {
                 if (clients.size + initializing >= 8) { res.status(503).json({ error: 'MCP connection limit reached' }); return; }
                 initializing++; pendingInitialization = true;
                 const sessions = new SessionManager();
+                owners.add(sessions);
                 const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: randomUUID, enableJsonResponse: true,
-                    onsessioninitialized: id => { clients.set(id, client!); initializing--; pendingInitialization = false; },
+                    onsessioninitialized: id => { if (stopping) return; clients.set(id, client!); initializing--; pendingInitialization = false; },
                 });
+                connections.add(transport);
                 client = { transport, sessions, lastActive: Date.now() };
                 await createServer(sessions).connect(transport);
                 const onclose = transport.onclose;
-                transport.onclose = () => { onclose?.(); if (transport.sessionId) clients.delete(transport.sessionId); void sessions.dispose(); };
+                transport.onclose = () => { onclose?.(); if (transport.sessionId) clients.delete(transport.sessionId); connections.delete(transport); void sessions.dispose().finally(() => owners.delete(sessions)); };
             }
+            if (stopping) { res.status(503).json({ error: 'MCP shutting down' }); return; }
             if (!client) { res.status(id ? 404 : 400).json({ error: 'Initialize a new MCP connection' }); return; }
             client.lastActive = Date.now();
             await client.transport.handleRequest(req, res, req.body);
@@ -55,7 +67,7 @@ if (process.argv.includes('--http')) {
         finally {
             if (pendingInitialization) {
                 initializing--;
-                if (client) { await client.sessions.dispose(); await client.transport.close(); }
+                if (client) { await client.sessions.dispose(); owners.delete(client.sessions); connections.delete(client.transport); await client.transport.close(); }
             }
         }
     });
@@ -63,7 +75,12 @@ if (process.argv.includes('--http')) {
     if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Invalid MCP_PORT');
     const http = app.listen(port, '127.0.0.1', () => { console.error(`MCP listening at http://127.0.0.1:${port}/mcp`); });
     http.on('error', error => { console.error(error.message); process.exitCode = 1; });
-    const shutdown = async () => { clearInterval(reaper); await Promise.allSettled([...clients.values()].map(async client => { await client.sessions.dispose(); await client.transport.close(); })); http.close(); };
+    const shutdown = async () => {
+        if (stopping) return;
+        stopping = true; clearInterval(reaper); http.close();
+        await Promise.allSettled([...owners].map(owner => owner.dispose()));
+        await Promise.allSettled([...connections].map(transport => transport.close()));
+    };
     process.once('SIGTERM', () => { void shutdown(); });
     process.once('SIGINT', () => { void shutdown(); });
 } else {
