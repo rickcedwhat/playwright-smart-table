@@ -18,7 +18,7 @@ stateful Streamable HTTP transport so requests, cancellation notifications and
 browser ownership stay with the same client. Stdio has one manager per process.
 Knowing a browser UUID from another connection does not grant access.
 
-Limit: three browsers per MCP connection, including concurrent openings and closing browsers; eight HTTP
+Limit: three inspection browsers per MCP connection, including concurrent openings and closing browsers; eight HTTP
 connections, including initialization reservations. Browser leases renew when an
 operation starts and expire after five minutes without a new operation. Expiry is
 checked at access and swept in the background. Idle HTTP connections also expire
@@ -162,7 +162,10 @@ resolved consumer package path, archive checksum, preparation commit and run UUI
 `fullDatasetVerified` remains false. Original browser state is unchanged on normal
 validation; cancellation/timeout invalidates that owned session as described above.
 The prepared archive/lockfile persist until cleared; each execution directory is
-removed. Preparation can access the registry; validation uses the prepared cache.
+removed. Preparation can access the registry; validation explicitly uses the absolute store
+path recorded at preparation, independent of environment variables stripped by MCP
+hosts. Each active validation has its own short-lived consumer browser in addition
+to inspection sessions; its process group is bounded by the operation lifetime.
 
 Only completed server-produced run IDs enter a bounded witness store (100 entries,
 10-minute leases). Privileged POST `/bench/validate` requires an existing witness

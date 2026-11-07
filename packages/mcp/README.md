@@ -26,7 +26,8 @@ The UI calls the same tools via stateful Streamable HTTP and proxies bench route
 archive, resolves a separate consumer lockfile and warms the pnpm cache. This setup
 step may access the registry. Each validation then performs a frozen offline install
 with lifecycle scripts disabled in a new temporary consumer outside this checkout.
-The archive, manifest and dist checksums prevent silently testing a stale build.
+The prepared absolute pnpm store path is passed explicitly, so MCP hosts that strip
+environment variables still use the warmed cache. The archive, manifest and dist checksums prevent silently testing a stale build.
 Rerun preparation after changing the root manifest/dist or clearing temporary files.
 Local `.mcp-state.json` points to the prepared archive; never commit this generated state.
 

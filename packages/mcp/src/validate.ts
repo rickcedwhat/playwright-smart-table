@@ -20,6 +20,7 @@ export async function validateConfig(sessions: SessionManager, id: string, propo
         let manifest;
         try {
             manifest = JSON.parse(await readFile(join(packageDir, '.mcp-state.json'), 'utf8'));
+            if (typeof manifest.storeDir !== 'string' || !manifest.storeDir) throw new Error('Prepared store path missing');
             if (createHash('sha256').update(await readFile(join(root, 'package.json'))).digest('hex') !== manifest.packageDigest) throw new Error('Root package manifest changed');
             const archive = await readFile(manifest.archive);
             if (createHash('sha256').update(archive).digest('hex') !== manifest.sha256) throw new Error('Archive changed');
@@ -39,7 +40,7 @@ export async function validateConfig(sessions: SessionManager, id: string, propo
             await copyFile(join(packageDir, 'consumer/runner.mts'), join(directory, 'runner.mts'));
             await writeFile(join(directory, 'input.json'), JSON.stringify({ url: sourceUrl, budget }));
             await copyFile(manifest.lockfile, join(directory, 'pnpm-lock.yaml'));
-            await runProcess('pnpm', ['install', '--offline', '--frozen-lockfile', '--ignore-scripts', '--config.node-linker=hoisted'], directory, remaining(), operationSignal);
+            await runProcess('pnpm', ['install', '--store-dir', manifest.storeDir, '--offline', '--frozen-lockfile', '--ignore-scripts', '--config.node-linker=hoisted'], directory, remaining(), operationSignal);
             await runProcess('pnpm', ['exec', 'tsc', 'runner.mts', 'config.mts', '--module', 'NodeNext', '--moduleResolution', 'NodeNext', '--target', 'ES2022', '--lib', 'ES2022,DOM', '--types', 'node', '--skipLibCheck', '--outDir', 'built'], directory, remaining(), operationSignal);
             await runProcess(process.execPath, ['built/runner.mjs'], directory, remaining(), operationSignal);
             const result = validationResultSchema.parse({ ...JSON.parse(await readFile(join(directory, 'result.json'), 'utf8')),

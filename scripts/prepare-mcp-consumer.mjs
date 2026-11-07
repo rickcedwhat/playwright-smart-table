@@ -22,7 +22,8 @@ const manifest = { archive, sha256: createHash('sha256').update(readFileSync(arc
   nodeTypes: require('@types/node/package.json').version,
   playwright: require('@playwright/test/package.json').version, typescript: require('typescript/package.json').version };
 writeFileSync(join(directory, 'package.json'), JSON.stringify({ private: true, type: 'module', dependencies: { '@rickcedwhat/playwright-smart-table': 'file:./library.tgz', '@playwright/test': manifest.playwright, typescript: manifest.typescript, '@types/node': manifest.nodeTypes } }));
-execFileSync('pnpm', ['install', '--ignore-scripts', '--config.node-linker=hoisted'], { cwd: directory, stdio: 'inherit' });
+manifest.storeDir = execFileSync('pnpm', ['store', 'path'], { cwd: directory, encoding: 'utf8' }).trim();
+execFileSync('pnpm', ['install', '--store-dir', manifest.storeDir, '--ignore-scripts', '--config.node-linker=hoisted'], { cwd: directory, stdio: 'inherit' });
 manifest.lockfile = join(directory, 'pnpm-lock.yaml');
 writeFileSync(join(root, 'packages/mcp/.mcp-state.json'), JSON.stringify(manifest, null, 2));
 console.log(`Prepared immutable consumer archive ${manifest.sha256} (${manifest.version}); pnpm offline cache is required.`);
