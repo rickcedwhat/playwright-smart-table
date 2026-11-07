@@ -79,7 +79,7 @@ npx playwright test --config playwright.config.ci-b.ts       # integration tests
 |---|---|
 | `src/minimalConfigContext.ts` | `pnpm run generate-config-types` |
 | `src/packageVersion.ts` | `pnpm run embed-version` |
-| README code snippets | `pnpm run generate-docs` (sourced from `tests/readme_verification.spec.ts`) |
+| `docs/examples/index.md` code snippets | VitePress imports named regions directly from browser tests; edit the source region |
 | `docs/api/*.md` | `pnpm run generate-all-api-docs` + `update-all-api-signatures` |
 
 Running `pnpm run build` executes all generators then compiles TypeScript.

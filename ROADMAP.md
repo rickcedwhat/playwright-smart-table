@@ -33,7 +33,7 @@ Guiding light: [`PHILOSOPHY.md`](PHILOSOPHY.md) is the scoring rubric for every 
 - [x] **Move `countRows` / `sorting.apply` / `findRowByIndex` out of `useTable.ts`** — [#477](https://github.com/rickcedwhat/playwright-smart-table/issues/477)
 - [x] **Move cell navigation and `toJSON` snapshot/re-pin logic out of `smartRow.ts`** — [#478](https://github.com/rickcedwhat/playwright-smart-table/issues/478)
 - [x] **Quick wins (CONTRIBUTING pnpm, dead `ResolutionStrategies`, orphan `#endregion`, `./types` export)** — [#479](https://github.com/rickcedwhat/playwright-smart-table/issues/479)
-- [ ] **Decide the fate of the README snippet generator** — [#480](https://github.com/rickcedwhat/playwright-smart-table/issues/480)
+- [x] **Decide the fate of the README snippet generator** — [#480](https://github.com/rickcedwhat/playwright-smart-table/issues/480)
 
 ### Batch 3 — GBU 2026-10-11 ([report at the audit commit](https://github.com/rickcedwhat/playwright-smart-table/blob/4d4c252c9c256a7b58cd69799dc86e4d328b7de1/GBU-REPORT.md))
 

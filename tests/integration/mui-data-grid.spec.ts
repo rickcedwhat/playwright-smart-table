@@ -27,30 +27,30 @@ test.describe('MUI DataGrid Recon', () => {
         const root = page.locator('[role="grid"]').first();
         await expect(root).toBeVisible();
 
-        const table = await useTable(root, presets.muiDataGrid).init();
+        // #region docs-mui-index
+        const table = await useTable(page.locator('[role="grid"]').first(), presets.muiDataGrid).init();
         await table.sorting.apply('Desk', 'asc'); // stable order (D-1000..D-1099)
 
-        // data-rowindex 25 is on page 2 (pageSize 10) — not initially mounted. findRowByIndex
+        // data-rowindex 25 is on the third page (pageSize 10) — not initially mounted. findRowByIndex
         // must navigate to it via the pagination fallback and identify it by resolveRowIndex.
         const row = await table.findRowByIndex(25, { maxPages: 10 });
         expect(row.rowIndex).toBe(25);
         expect(await row.getCell('Desk').innerText()).toBe('D-1025');
+        // #endregion docs-mui-index
     });
 
     test('should scrape a virtualized DataGrid using preset', async ({ page }) => {
         const root = page.locator('[role="grid"]').first();
         await expect(root).toBeVisible();
 
-        const table = await useTable(root, presets.muiDataGrid).init();
+        // #region docs-mui-pagination
+        const table = await useTable(page.locator('[role="grid"]').first(), presets.muiDataGrid).init();
 
-        // 1. Verify Headers
+        // Verify headers
         const headers = await table.getHeaders();
-        console.log('DEBUG: Found Headers:', headers);
         expect(headers).toContain('Trader Name');
         expect(headers).toContain('Trader Email');
 
-        // 2. Test Pagination
-        console.log('Testing pagination: finding row on page 2...');
         await table.sorting.apply('Desk', 'asc'); // Ensure stable order
 
         // D-1011 should be on page 2 (index 10-19) since pageSize is 10
@@ -59,13 +59,13 @@ test.describe('MUI DataGrid Recon', () => {
         expect(table.currentPageIndex).toBe(1);
 
         const deskValue = (await rowOnPage2.toJSON()).Desk;
-        console.log(`Found row on page 2: ${deskValue}`);
         expect(deskValue).toBe('D-1011');
+        // #endregion docs-mui-pagination
     });
 
     test('map() reaches off-screen columns via barrier-coordinated scroll', async ({ page }) => {
-        const root = page.locator('[role="grid"]').first();
-        const table = await useTable(root, presets.muiDataGrid).init();
+        // #region docs-mui-map
+        const table = await useTable(page.locator('[role="grid"]').first(), presets.muiDataGrid).init();
 
         const headers = await table.getHeaders();
         // Confirm column virtualization is active: off-screen columns exist
@@ -74,6 +74,7 @@ test.describe('MUI DataGrid Recon', () => {
 
         // map() must reach every column including those beyond the initial scroll position
         const rows = await table.map(({ row }) => row.toJSON(), { maxPages: 5 });
+        // #endregion docs-mui-map
         expect(rows.length).toBeGreaterThan(0);
 
         const sample = rows[0] as Record<string, string>;

@@ -11,6 +11,10 @@ on:
       - '.github/workflows/deploy-docs.yml'
       - 'scripts/docs-build-prod.mjs'
       - 'scripts/verify-vitepress-links.mjs'
+      - 'scripts/check-doc-snippets.mjs'
+      - 'scripts/doc-snippets.mjs'
+      - 'scripts/changed-doc-pages.mjs'
+      - 'tests/**'
       - 'scripts/generate-all-api-docs.mjs'
       - 'scripts/update-all-api-signatures.mjs'
 
@@ -43,6 +47,9 @@ jobs:
             echo "::error::API docs are out of date with src/types.ts. Run 'pnpm run build' (or the two generate scripts) and commit the result."
             exit 1
           fi
+
+      - name: Test snippet validation and changed-page mapping
+        run: node --test tests/tooling/doc-snippets.test.mjs
 
       - name: Build Documentation
         run: pnpm run docs:build

@@ -33,6 +33,10 @@ jobs:
               - '.github/workflows/docs-preview.yml'
               - 'scripts/docs-build-prod.mjs'
               - 'scripts/verify-vitepress-links.mjs'
+              - 'scripts/check-doc-snippets.mjs'
+              - 'scripts/doc-snippets.mjs'
+              - 'scripts/changed-doc-pages.mjs'
+              - 'tests/**'
 
       - name: Setup pnpm
         if: steps.filter.outputs.docs == 'true'
@@ -49,6 +53,10 @@ jobs:
         if: steps.filter.outputs.docs == 'true'
         run: pnpm install --frozen-lockfile
 
+      - name: Validate documentation snippets
+        if: steps.filter.outputs.docs == 'true'
+        run: pnpm run docs:check-snippets
+
       - name: Build VitePress site (preview base)
         if: steps.filter.outputs.docs == 'true'
         run: npx vitepress build docs --base /playwright-smart-table/pr-preview/pr-${{ github.event.pull_request.number }}/
@@ -57,12 +65,7 @@ jobs:
         if: steps.filter.outputs.docs == 'true'
         id: pages
         run: |
-          LIST=$(git diff --name-only ${{ github.event.pull_request.base.sha }} HEAD -- docs/ \
-            | grep '\.md$' \
-            | grep -v '\.vitepress' \
-            | sed 's|^docs/||; s|\.md$||; s|^index$||' \
-            | tr '\n' ',' \
-            | sed 's/,$//')
+          LIST=$(node scripts/changed-doc-pages.mjs "${{ github.event.pull_request.base.sha }}")
           echo "list=$LIST" >> $GITHUB_OUTPUT
 
       - name: Generate compare page
@@ -75,7 +78,7 @@ jobs:
           const fs   = require('fs');
           const pr   = process.env.PR_NUMBER;
           const raw  = process.env.CHANGED_PAGES || '';
-          const pages = raw ? raw.split(',').filter(Boolean) : [];
+          const pages = JSON.parse(raw || '[]');
 
           const CANONICAL = '/playwright-smart-table/';
           const PREVIEW   = `/playwright-smart-table/pr-preview/pr-${pr}/`;
@@ -201,7 +204,7 @@ jobs:
           umbrella-dir: pr-preview
 
       - name: Upsert preview comment
-        if: steps.filter.outputs.docs == 'true' && steps.pages.outputs.list != ''
+        if: steps.filter.outputs.docs == 'true' && steps.pages.outputs.list != '[]' && steps.pages.outputs.list != ''
         uses: actions/github-script@v9
         env:
           CHANGED_PAGES: ${{ steps.pages.outputs.list }}
@@ -214,18 +217,20 @@ jobs:
             const prNumber = parseInt(process.env.PR_NUMBER);
             const sha = process.env.COMMIT_SHA.slice(0, 7);
             const raw = process.env.CHANGED_PAGES || '';
-            const pages = raw ? raw.split(',').filter(Boolean) : [];
+            const pages = JSON.parse(raw || '[]');
 
             const CANONICAL = 'https://rickcedwhat.github.io/playwright-smart-table/';
             const PREVIEW   = `https://rickcedwhat.github.io/playwright-smart-table/pr-preview/pr-${prNumber}/`;
             const COMPARE   = `${PREVIEW}compare.html`;
 
+            const { docPageLinks } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/doc-snippets.mjs`);
+
             // Build changed-pages table rows
             const rows = pages.length
               ? pages.map(p => {
                   const label = p || '(home)';
-                  const path  = p ? p + '/' : '';
-                  return `| \`${label}\` | [view](${CANONICAL}${path}) | [preview](${PREVIEW}${path}) | [compare](${COMPARE}#${p}) |`;
+                  const links = docPageLinks(p, CANONICAL, PREVIEW, COMPARE);
+                  return `| \`${label}\` | [view](${links.canonical}) | [preview](${links.preview}) | [compare](${links.compare}) |`;
                 }).join('\n')
               : '| _(non-page files changed)_ | — | — | — |';
 
