@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "orderPolicy": "ignore",
+  "records": [
+    {"id":"r1","values":{"Name":"Alice","Team":"Ops"}},
+    {"id":"r2","values":{"Name":"Alice","Team":"Ops"}},
+    {"id":"r3","values":{"Name":"Bob","Team":"Design"}},
+    {"id":"r4","values":{"Name":"Carol","Team":"Engineering"}},
+    {"id":"r5","values":{"Name":"Dan","Team":"Ops"}},
+    {"id":"r6","values":{"Name":"Eve","Team":"Design"}}
+  ]
+}
