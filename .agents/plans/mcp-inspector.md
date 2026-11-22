@@ -1,6 +1,6 @@
 # MCP inspector revival plan
 
-Status: milestones 0–1 locally complete; milestone 2 deterministic workflow locally complete. Model baseline runner is prepared; actual model runs explicitly deferred by the user. CI/review status is tracked in the revival PR.
+Status: milestones 0–3 deterministic scope locally complete, with unsupported surfaces explicitly bounded. Actual model baselines remain deferred by the user, reconfirmed 2026-11-22. Milestone 4/pilot work has not started. CI/review status is tracked in the revival PR.
 Tracking: #108. Existing experiment: draft PR #157 (`feat/mcp-custom-inspector-wip`).
 Related: #532 (packaged guidance), #526 (identity information limits).
 
@@ -157,7 +157,7 @@ ineffective Next controls and unsupported claims independently of a model.
 - [x] Test malformed input, isolation, timeout/cancellation and browser cleanup.
 - [ ] Record agent baselines with and without guidance under equal budgets. Runner
   prepared and scripted self-test passed; provider/model runs deferred by explicit
-  user choice on 2026-11-06. Do not count scripted runs as agent-quality evidence.
+  user choice on 2026-11-06, reconfirmed 2026-11-22. Do not count scripted runs as agent-quality evidence.
 
 Exit: supported deterministic cases match exact expected records/multiplicity and
 values; negative cases report useful failures/limits. Save/review every false success.
@@ -165,13 +165,13 @@ A screenshot of plausible output is not acceptance evidence.
 
 ### 3. Challenge virtualization and identity
 
-- [ ] Add a recycling grid with stable IDs; assert exact membership and column values.
-- [ ] Add identical-looking records without identity evidence; require uncertainty.
-- [ ] Exercise pinned/duplicate headers, filler/off-screen columns, nonzero scroll,
+- [x] Add a recycling grid with stable IDs; assert exact membership and column values.
+- [x] Add identical-looking records without identity evidence; require uncertainty.
+- [x] Exercise pinned/duplicate headers, filler/off-screen columns, nonzero scroll,
   repeated/missing/page-local IDs, overscan and delayed readiness.
-- [ ] Exercise sorting/data changes and contradictory metadata; reject stale claims.
-- [ ] Evaluate frames, shadow DOM and canvas-only content; state unsupported cases.
-- [ ] Exercise hostile page text and misleading controls within the probe action scope.
+- [x] Exercise sorting/data changes and contradictory metadata; reject stale claims.
+- [x] Evaluate frames, shadow DOM and canvas-only content; state unsupported cases.
+- [x] Exercise hostile page text and misleading controls within the probe action scope.
 
 Exit: known-data cases satisfy their oracle; ambiguous cases do not claim verified
 identity/completeness. Reproduce new library bugs separately rather than hiding them
@@ -346,3 +346,59 @@ was populated using a preparation-only environment override, then the full MCP t
 passed with the normal client environment (`/private/tmp/mcp-m2-store-test.log`).
 This preserves frozen/offline execution rather than hiding cache failures with a
 network-enabled validation fallback. Updated CI is required to confirm Linux behavior.
+
+### 2026-11-22 checkpoint — milestone 3 deterministic scope
+
+Implementation: `3d2b85c7`, with count-contradiction guard `538451cb`, explicit surface
+boundaries `23455e84`, and misleading-control regression `e2ad9d37`. Branch remains
+`feat/108-mcp-revival`, draft PR #547; original #157 is unchanged. The branch was
+rebased onto main `55cdc78f`. Historical checkpoint commit IDs above retain their
+original meaning; they are not the current rebased commit IDs.
+
+The six-slot recycling fixture represents twenty records and serves only requested
+mounted windows to the browser. Independent manifests check exact IDs, multiplicity
+and values, including two identical-looking Alice/Ops records. The installed consumer
+uses existing infinite-scroll, viewport, logical-row-resolution and ID-dedupe strategies,
+atomic extraction, queries, rewind and reset. No library-core/API/version changes
+were introduced. Nonzero starts, overscan and delayed readiness pass exact comparison.
+
+The independent virtualization playbook/tool/module records mounted versus visible
+counts, candidate identity, metadata/readiness limits and shared timestamped
+session/revision evidence. Proposals bind the selected DOM/scroll state to their
+owning session. Sorting invalidates stale proposals before action; a fresh consumer
+that cannot replay the proposed state fails before config execution. Cross-window
+ID/index/value conflicts or a changed dataset revision fail rather than mixing scans.
+
+Fixtures exercise missing/repeated/page-local IDs, no-ID identical-looking records,
+never-ready windows, contradictory row/column metadata, pinned duplicate headers,
+filler cells, horizontal overflow and unmounted columns. Unknown IDs are not replaced
+by text, random or slot-based keys. Logical-position evidence is reported separately;
+this is a scope decision, not a universal impossibility claim for future approaches.
+Frames, shadow DOM and canvas remain explicitly unsupported, including the manual
+native-proposal path. Their lack of an answer key cannot fall back to an invented
+native dataset. Hidden-column scoring uses a separate manifest containing that column.
+
+A false-success regression returns the correct twenty records while declaring twenty-one:
+raw data matches, but runtime metadata contradicts the scan and configValidated stays
+false. The hostile-text fixture includes a misleading Next button that edits data;
+the explicit grid workflow ignores it and returns the exact expected records. This
+checks bounded tool mechanics, not model-level prompt-injection resilience.
+
+Local evidence: frozen installation on the merged lockfile, root/library and MCP/UI
+builds, 31 MCP unit tests, 465 library unit tests, full real stdio/HTTP/consumer/cleanup
+and virtualization checks, UI supported-grid and unknown-identity flows, and fallow
+passed. Source-only snapshot `/private/tmp/mcp-m3-clean-alnevj8v` passed fresh install,
+preparation, builds, full MCP tests and UI checks without inherited dist/prepared state
+or Git metadata. The final misleading-control refinement passed the virtualization
+suite separately. Logs: `/private/tmp/mcp-m3-{test,ui,root-unit,clean-test,clean-ui,final-virtual}.log`;
+replays remain in ignored .mcp-runs and CI artifacts. These are local claims; current
+CI/review results remain tracked independently in PR #547.
+
+The lockfile rebase retained main's updated root resolutions and the feature workspace
+resolutions, then normalized with pnpm and verified by frozen installation. The original
+branch's prepared-cache pin remains in place across MCP host environments.
+
+Model runs remain explicitly deferred. Only the labeled scripted harness self-test ran;
+no provider/model request, model-quality baseline, real-host pilot or publication is
+claimed. Next work is milestone 4's usefulness/host preparation when requested; actual
+model comparisons remain a prerequisite to any model-quality/pilot claim.
