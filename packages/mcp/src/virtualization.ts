@@ -29,7 +29,7 @@ export async function inspectVirtualization(sessions: SessionManager, id: string
             if (unknown) reasons.push('Identity is unknown: missing/repeated IDs cannot be replaced by visible text or mounted-slot keys.');
             if (!result.ready) reasons.push('Readiness is unverified; do not infer completion from an old mounted window.');
         }
-        return virtualObservationSchema.parse({ status: reasons.length ? unknown || unready ? 'unknown' : 'unsupported' : 'observed', session, evidence: createEvidence(session, page.url()), identity: unknown ? 'unknown' : 'candidate', mounted, visible, declared,
+        return virtualObservationSchema.parse({ status: reasons.length ? unknown || unready ? 'unknown' : 'unsupported' : 'observed', session, evidence: createEvidence(session, page.url()), identity: unknown || mounted === 0 ? 'unknown' : 'candidate', mounted, visible, declared,
             reasons, fullDatasetVerified: false, limitations: ['Read-only mounted window, not proof of recycling or globally stable identity.', 'Vertical DOM grids only. No frame, shadow DOM, canvas or horizontal traversal support.'] });
     });
 }

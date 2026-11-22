@@ -8,7 +8,7 @@ export function readGrid(root: Element, selectors: { header: string; row: string
     const rows = [...root.querySelectorAll(selectors.row)];
     const count = root.getAttribute('aria-rowcount')?.trim() ? Number(root.getAttribute('aria-rowcount')) : NaN;
     const columns = root.getAttribute('aria-colcount')?.trim() ? Number(root.getAttribute('aria-colcount')) : NaN;
-    if (root.getRootNode() !== document || root.getAttribute('role') !== 'grid' || root.querySelector('[role="grid"]')) issues.push('Only a top-level single DOM grid is supported.');
+    if (window.top !== window || root.getRootNode() !== document || root.getAttribute('role') !== 'grid' || root.querySelector('[role="grid"]')) issues.push('Only a top-level single DOM grid is supported.');
     if (!scroller || scroller !== root) issues.push('The grid root must be its own scrolling viewport.');
     if (!Number.isInteger(count) || count < 1 || count > 1000) issues.push('A bounded positive declared row count is required, but is not a completeness oracle.');
     if (!names.length || names.length > 20 || names.some(name => !name || name.length > 120) || new Set(names).size !== names.length || columns !== names.length) issues.push('Duplicate, missing, pinned or unmounted columns are unsupported.');

@@ -27,7 +27,7 @@ const snapshot = async () => {
   return root.evaluate((root, proposal) => {
     const headers = [...root.querySelectorAll(proposal.header)].map(el => (el.textContent ?? '').trim());
     const rows = [...root.querySelectorAll(proposal.row)];
-    if (root.tagName !== 'TABLE' || root.querySelector('table') || root.hasAttribute('aria-rowcount') || root.querySelector('[colspan]:not([colspan="1"]), [rowspan]:not([rowspan="1"])') ||
+    if (window.top !== window || root.getRootNode() !== document || root.tagName !== 'TABLE' || root.querySelector('table') || root.hasAttribute('aria-rowcount') || root.querySelector('[colspan]:not([colspan="1"]), [rowspan]:not([rowspan="1"])') ||
         !headers.length || headers.some(value => !value || value.length > 120) || new Set(headers).size !== headers.length || rows.length > 1000) throw new Error('Unsupported layout');
     const ids = rows.map(row => row.getAttribute('data-id') ?? '');
     if (ids.some(id => !id || id.length > 200) || new Set(ids).size !== ids.length) throw new Error('Missing/repeated identity candidates');

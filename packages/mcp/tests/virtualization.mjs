@@ -49,8 +49,11 @@ try{
  }
  for(const fixture of ['recycling-pinned','recycling-filler','recycling-horizontal','recycling-offscreen','recycling-contradictory','frame-table','shadow-table','canvas-table']){
   const session=await open(fixture);await new Promise(resolve=>setTimeout(resolve,100));
-  assert.equal((await call('inspect_virtualization',{sessionId:session.id})).status,'unsupported',fixture);
-  await assert.rejects(call('propose_config',{sessionId:session.id}),/UNSUPPORTED/);await close(session.id);
+  const unsupported=await call('inspect_virtualization',{sessionId:session.id});
+  assert.equal(unsupported.status,'unsupported',fixture);if(unsupported.mounted===0)assert.equal(unsupported.identity,'unknown');
+  await assert.rejects(call('propose_config',{sessionId:session.id}),/UNSUPPORTED/);
+  if(fixture==='shadow-table')await assert.rejects(call('validate_config',{sessionId:session.id,proposal:{root:'table',header:'thead th',row:'tbody tr',cell:'td',idAttribute:'data-id'}}),/Unsupported table layout/);
+  await close(session.id);
  }
  for(const fixture of ['recycling-local-ids','recycling-changing']){
   const session=await open(fixture),{proposal}=await call('propose_config',{sessionId:session.id});

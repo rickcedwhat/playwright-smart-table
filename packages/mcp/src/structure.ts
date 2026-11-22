@@ -15,7 +15,7 @@ async function describeStructure(page: Page, selector?: string) {
         const rows = [...root.querySelectorAll('tbody tr')];
         const headers = [...root.querySelectorAll('thead th')].map(el => (el.textContent ?? '').trim());
         const ids = rows.map(row => row.getAttribute('data-id'));
-        const unsupported = root.tagName !== 'TABLE' || !!root.querySelector('table') || !!root.querySelector('[colspan]:not([colspan="1"]), [rowspan]:not([rowspan="1"])') ||
+        const unsupported = window.top !== window || root.getRootNode() !== document || root.tagName !== 'TABLE' || !!root.querySelector('table') || !!root.querySelector('[colspan]:not([colspan="1"]), [rowspan]:not([rowspan="1"])') ||
             headers.length === 0 || headers.some(value => !value) || new Set(headers).size !== headers.length || !rows.length ||
             rows.some(row => row.querySelectorAll('td').length !== headers.length) ||
             ids.some(id => !id || id.length > 200) || new Set(ids).size !== ids.length ||

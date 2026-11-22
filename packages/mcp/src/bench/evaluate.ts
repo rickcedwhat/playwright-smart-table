@@ -5,6 +5,7 @@ import { fixtureNames } from './fixtures.js';
 /** Privileged bench-only comparison. Never register as an MCP tool or serve the oracle file. */
 export function evaluateSubmission(fixture: string, raw: unknown) {
     if (!fixtureNames.some(name => name === fixture)) throw new Error('Unknown benchmark fixture');
+    if (['frame-table', 'shadow-table', 'canvas-table'].includes(fixture)) throw new Error('No answer key is registered for this unsupported surface.');
     const submission = evaluationSubmissionSchema.parse(raw);
     // Independent, manually maintained oracle: not derived from the fixture renderer.
     const manifest = JSON.parse(readFileSync(new URL(`../../tests/bench/${fixture === 'recycling-offscreen' ? 'recycling-offscreen' : fixture.startsWith('recycling') ? 'recycling' : fixture === 'holdout' ? 'inventory' : 'people'}-oracle.json`, import.meta.url), 'utf8'));

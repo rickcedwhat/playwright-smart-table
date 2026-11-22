@@ -54,3 +54,7 @@ it('compares occurrence multiplicity for known no-ID fixtures without treating v
     expect(full.dataMatches).toBe(true);expect(full.configValidated).toBe(false);
     expect(evaluateSubmission('recycling-no-id', submit(copies.slice(0,1))).missing).toHaveLength(19);
 });
+
+it('does not invent native answer keys for unsupported frame/shadow/canvas surfaces', () => {
+    for(const surface of ['frame-table','shadow-table','canvas-table'])expect(()=>evaluateSubmission(surface,submit())).toThrow(/No answer key/);
+});

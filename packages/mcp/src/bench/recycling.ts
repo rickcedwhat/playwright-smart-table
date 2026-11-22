@@ -19,7 +19,7 @@ export function recyclingWindow(name: string, requestedStart: unknown, sorted: b
 export function recyclingHtml(name: string, requestedStart: unknown) {
     if (!recyclingNames.some(value => value === name)) return undefined;
     if (name === 'frame-table') return '<iframe title="Nested table" src="/fixtures/plain"></iframe>';
-    if (name === 'shadow-table') return '<div id="host"></div><script>document.querySelector("#host").attachShadow({mode:"open"}).innerHTML=\'<table><thead><tr><th>Name</th></tr></thead><tbody><tr><td>Alice</td></tr></tbody></table>\';</script>';
+    if (name === 'shadow-table') return '<div id="host"></div><script>document.querySelector("#host").attachShadow({mode:"open"}).innerHTML=\'<table><thead><tr><th>Name</th></tr></thead><tbody><tr data-id="s1"><td>Alice</td></tr></tbody></table>\';</script>';
     if (name === 'canvas-table') return '<canvas id="canvas" aria-label="Table"></canvas>';
     const start = Math.max(0, Math.min(16, Math.trunc(Number(requestedStart) || 0)));
     return `<!doctype html><html><head><title>Recycling grid</title><style>
