@@ -1,3 +1,4 @@
+import { CopyButton, ResultPanel } from './CopyButton';
 import { useEffect, useRef, useState } from 'react';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport, StreamableHTTPError } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
@@ -171,31 +172,31 @@ export default function App() {
     </aside>
     <main>
       <header><h2>Findings</h2><span>Raw MCP response</span></header>
-      {error && <div role="alert">{error}</div>}
-      {observation ? <pre aria-label="Inspection findings">{JSON.stringify(observation, null, 2)}</pre> : <p className="intro">Inspect a fixture or your own table. Mounted DOM is not proof of full traversal.</p>}
+      {error && <div role="alert"><CopyButton label="Error" text={error} />{error}</div>}
+      {observation ? <ResultPanel label="Inspection findings" text={JSON.stringify(observation, null, 2)} /> : <p className="intro">Inspect a fixture or your own table. Mounted DOM is not proof of full traversal.</p>}
       {session && requestedUrl.current === url && <section>
         <h2>Config workflow</h2>
         <p>Propose selectors, probe explicit navigation, then type-check and execute the config in a disposable consumer of the packed library. The original browser is unchanged by validation.</p>
         <button type="button" disabled={running} onClick={() => { void workflow('inspect_virtualization'); }}>Inspect virtualization</button>
-        {virtualObservation && <pre aria-label="Virtualization findings">{JSON.stringify(virtualObservation,null,2)}</pre>}
+        {virtualObservation && <ResultPanel label="Virtualization findings" text={JSON.stringify(virtualObservation,null,2)} />}
         <button type="button" disabled={running} onClick={() => { void workflow('propose_config'); }}>Propose config</button>
         {proposalText && <>
-          <label>Config proposal<textarea disabled={running} value={proposalText} onChange={event => { setProposalText(event.target.value); setProbe(undefined); setValidation(undefined); setTrusted(undefined); }} /></label>
+          <label><span className="label-heading">Config proposal<CopyButton label="Config proposal" text={proposalText} /></span><textarea aria-label="Config proposal" disabled={running} value={proposalText} onChange={event => { setProposalText(event.target.value); setProbe(undefined); setValidation(undefined); setTrusted(undefined); }} /></label>
           <p>The code below belongs to the original proposal. Edited JSON is compiled afresh during validation.</p>
-          <pre aria-label="Generated config">{code}</pre>
+          <ResultPanel label="Generated config" text={code} />
           <button type="button" disabled={running} onClick={() => { try { void workflow(JSON.parse(proposalText).virtualization ? 'probe_virtualization' : 'probe_pagination'); } catch(e) {setError(String(e));} }}>Probe navigation</button>
           <button type="button" disabled={running} onClick={() => { void workflow('validate_config'); }}>Validate config</button>
         </>}
-        {probe && <pre aria-label="Navigation probe">{JSON.stringify(probe, null, 2)}</pre>}
-        {validation && <pre aria-label="Config validation">{JSON.stringify(validation, null, 2)}</pre>}
-        {trusted && <><h3>Independent fixture check</h3><pre aria-label="Trusted fixture evaluation">{JSON.stringify(trusted, null, 2)}</pre></>}
+        {probe && <ResultPanel label="Navigation probe" text={JSON.stringify(probe, null, 2)} />}
+        {validation && <ResultPanel label="Config validation" text={JSON.stringify(validation, null, 2)} />}
+        {trusted && <><h3>Independent fixture check</h3><ResultPanel label="Trusted fixture evaluation" text={JSON.stringify(trusted, null, 2)} /></>}
       </section>}
       {canCompare && <section>
         <h2>Fixture comparison</h2>
-        <p>The answer key is held by the bench, outside the MCP tool surface. This compares submitted data; it does not validate a config or prove complete traversal. You can edit the submission to test missing rows, incorrect values or unsupported claims.</p>
-        <label>Evaluation submission<textarea value={report} onChange={event => { setReport(event.target.value); clearEvaluation(); }} /></label>
+        <p>This editable submission starts with the initially mounted rows and does not update after validation. Use Independent fixture check above for the executed config. This comparison only checks submitted data; you can edit it to test missing rows, incorrect values or unsupported claims.</p>
+        <label><span className="label-heading">Evaluation submission<CopyButton label="Evaluation submission" text={report} /></span><textarea aria-label="Evaluation submission" value={report} onChange={event => { setReport(event.target.value); clearEvaluation(); }} /></label>
         <button type="button" onClick={() => { void compare(); }}>Compare with fixture</button>
-        {evaluation && <pre aria-label="Fixture evaluation">{JSON.stringify(evaluation, null, 2)}</pre>}
+        {evaluation && <ResultPanel label="Fixture evaluation" text={JSON.stringify(evaluation, null, 2)} />}
       </section>}
     </main>
   </div>;

@@ -20,4 +20,14 @@ textarea { min-height: 240px; font: 12px/1.5 monospace; }
 button + button { margin-top: 10px; }
 section { border-top: 1px solid #334155; margin-top: 30px; padding-top: 8px; }
 
-main > pre { max-height: 52vh; overflow: auto; }
+.result-panel { position: relative; margin: 16px 0; }
+.result-panel > .copy-control { position: absolute; right: 8px; top: 8px; }
+.result-panel pre { margin: 0; padding-right: 64px; }
+main > .result-panel pre { max-height: 52vh; overflow: auto; }
+.copy-control { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; }
+.copy-control [role=status] { max-width: 210px; }
+.copy-button { width: 32px; height: 32px; padding: 6px; background: #1e293b; border: 1px solid #475569; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.copy-button:hover { background: #334155; }
+.copy-button:focus-visible { outline: 2px solid #93c5fd; outline-offset: 2px; }
+.label-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+[role=alert] > .copy-control { float: right; margin-left: 12px; }
