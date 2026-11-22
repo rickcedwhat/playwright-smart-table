@@ -123,3 +123,7 @@ main { max-width: 1500px; margin: auto; overflow: visible; padding: 36px; }
   main { padding: 24px 20px; }
   .workspace { grid-template-columns: minmax(0, 1fr); gap: 24px; }
 }
+.advanced-lab, .advanced-controls, .proposal-editor { border-top: 1px solid #26344b; padding-top: 18px; margin-top: 24px; }
+.advanced-controls button { margin-top: 16px; }
+.snapshot-summary { margin: 0 0 20px; color: #c5d1e2; font-size: 15px; }
+.run-summary-copy { display: flex; align-items: center; justify-content: flex-end; gap: 8px; font-size: 12px; color: #b6c7df; }

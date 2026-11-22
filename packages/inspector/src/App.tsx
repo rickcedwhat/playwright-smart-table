@@ -29,7 +29,7 @@ const steps = [
   { id: 'inspect', title: 'Inspect' },
   { id: 'config', title: 'Config' },
   { id: 'probe', title: 'Navigation' },
-  { id: 'validate', title: 'Validate' },
+  { id: 'validate', title: 'Results' },
   { id: 'lab', title: 'Scorer lab' },
 ] as const;
 type Step = typeof steps[number]['id'];
@@ -175,7 +175,8 @@ export default function App() {
   const canCompare = !!observation && !!fixtures[fixture].oracle && url === benchmarkUrl && matchesFixture(observation.evidence.url);
   const canPropose = !!observation && sessionCurrent && !running;
   const canExecute = !!proposalText.trim() && sessionCurrent && !running;
-  const available = steps.filter(item => item.id === 'inspect' || (item.id === 'config' || item.id === 'lab' ? !!observation : !!proposalText));
+  const available = steps.filter(item => item.id !== 'lab' && (item.id === 'inspect' || (item.id === 'config' ? !!observation : !!proposalText)));
+  const nextAction = !observation ? 'inspect' : !proposalText ? 'config' : !probe ? 'probe' : !validation ? 'validate' : undefined;
   return <div className="bench">
     <header className="app-header"><div className="brand"><span className="brand-mark">ST</span><h1>Table inspector</h1></div><span className={`connection ${client ? 'connected' : ''}`}><span />{client ? 'Connected' : 'Disconnected'}</span></header>
     <main>
@@ -191,20 +192,19 @@ export default function App() {
         </details>
       </div>
       <div className="step-actions">
-        <button className="primary" disabled={!client || running || !url} onClick={() => { void run(); }}>{observation ? 'Inspect again' : 'Start investigation'}</button>
+        <button className={nextAction === 'inspect' ? 'primary' : 'secondary'} disabled={!client || running || !url} onClick={() => { void run(); }}>{observation ? 'Inspect again' : 'Start investigation'}</button>
         {observation && <>
-          <h3>Investigate</h3>
-          <button className="secondary" disabled={!canPropose} onClick={() => { void workflow('inspect_virtualization'); }}>Inspect virtualization</button>
-          <button className="secondary" disabled={!canPropose} onClick={() => { void workflow('propose_config'); }}>Propose config</button>
+          <h3>Actions</h3>
+          <button className={nextAction === 'config' ? 'primary' : 'secondary'} disabled={!canPropose} onClick={() => { void workflow('propose_config'); }}>Generate config</button>
         </>}
         {proposalText && <>
-          <button className="secondary" disabled={!canExecute} onClick={() => { try { void workflow(JSON.parse(proposalText).virtualization ? 'probe_virtualization' : 'probe_pagination'); } catch (e) { setError({ step: 'probe', message: String(e) }); } }}>Probe navigation</button>
-          <button className="primary" disabled={!canExecute} onClick={() => { void workflow('validate_config'); }}>Validate config</button>
+          <button className={nextAction === 'probe' ? 'primary' : 'secondary'} disabled={!canExecute} onClick={() => { try { void workflow(JSON.parse(proposalText).virtualization ? 'probe_virtualization' : 'probe_pagination'); } catch (e) { setError({ step: 'probe', message: String(e) }); } }}>Test navigation</button>
+          <button className={nextAction === 'validate' ? 'primary' : 'secondary'} disabled={!canExecute} onClick={() => { void workflow('validate_config'); }}>Run validation</button>
         </>}
-        {step === 'lab' && <button className="secondary" disabled={!canCompare || running || labBusy} onClick={() => { void compare(); }}>{labBusy ? 'Comparing…' : 'Compare with fixture'}</button>}
         {busy && <div className="working" role="status"><span className="spinner" />{busy.message}</div>}
         {running && <button className="text-button" onClick={() => cancel.current?.abort()}>Cancel operation</button>}
       </div>
+      {observation && <details className="advanced-controls"><summary>Advanced actions</summary><button className="secondary" disabled={!canPropose} onClick={() => { void workflow('inspect_virtualization'); }}>Inspect virtualization</button></details>}
       <details className="session-details"><summary>Session & tools</summary><p>{session ? `Browser open · revision ${session.revision}` : observation ? 'Browser closed · results retained' : 'No browser session'}</p>{session && <button className="secondary" disabled={running} onClick={() => { void releaseBrowser().catch(e => setError({ step, message: String(e) })); }}>Close browser session</button>}<ul>{tools.map(tool => <li key={tool.name}><strong>{tool.name}</strong><p>{tool.description}</p></li>)}</ul></details>
     </section>
     <section className="results" aria-label="Investigation results">
@@ -220,11 +220,16 @@ export default function App() {
       {error && <div role="alert"><CopyButton label="Error" text={error.message} /><strong>{steps.find(item => item.id === error.step)?.title}: </strong>{error.message}</div>}
       <section className="step-panel" role="tabpanel" aria-busy={busy?.step === step} id={'panel-' + step} aria-label={steps.find(item => item.id === step)?.title} tabIndex={0}>
         {step === 'inspect' && <SnapshotView observation={observation} virtual={virtualObservation} />}
-        {step === 'config' && (proposalText ? <><p className="scope-note">Editing the proposal clears its navigation and validation results.</p><label><span className="label-heading">Config proposal<CopyButton label="Config proposal" text={proposalText} /></span><textarea aria-label="Config proposal" disabled={running} value={proposalText} spellCheck={false} onChange={event => { setProposalText(event.target.value); setProbe(undefined); clearValidation(); setError(undefined); }} /></label><RawResult label={proposalText === generatedProposal.current ? "Generated config" : "Original generated config"} value={code} /></> : <div className="empty-state"><p>Propose a config to see it here.</p></div>)}
+        {step === 'config' && (proposalText ? <>
+          {proposalText !== generatedProposal.current && <Notice tone="warning" title="Proposal edited"><p>The code below is from the original proposal. Validation uses your edited JSON.</p></Notice>}
+          <RawResult label={proposalText === generatedProposal.current ? 'Generated config' : 'Original generated config'} value={code} defaultOpen />
+          <details className="proposal-editor"><summary>Edit proposal</summary><p className="scope-note">Editing clears navigation and validation results.</p><label><span className="label-heading">Config proposal<CopyButton label="Config proposal" text={proposalText} /></span><textarea aria-label="Config proposal" disabled={running} value={proposalText} spellCheck={false} onChange={event => { setProposalText(event.target.value); setProbe(undefined); clearValidation(); setError(undefined); }} /></label></details>
+        </> : <div className="empty-state"><p>Generate a config to see it here.</p></div>)}
         {step === 'probe' && <NavigationView probe={probe} />}
         {step === 'validate' && <ValidationView validation={validation} trusted={trusted} comparing={busy?.step === 'validate' && !!validation} />}
-        {step === 'lab' && <><Notice title="Data-only experiment · separate from the config run"><p>Compare edited snapshot data with the fixture. This does not validate the config.</p></Notice>{canCompare ? <><label><span className="label-heading">Evaluation submission<CopyButton label="Evaluation submission" text={report} /></span><textarea aria-label="Evaluation submission" disabled={running} spellCheck={false} value={report} onChange={event => { setReport(event.target.value); clearLab(); if (error?.step === 'lab') setError(undefined); }} /></label><LabVerdict evaluation={evaluation} /></> : <div className="empty-state"><h3>No submission to compare</h3><p>Only registered fixtures have an independent answer key. Custom targets can have runtime checks without a fixture verdict.</p></div>}</>}
+
       </section>
+      {observation && <details className="advanced-lab"><summary>Advanced · Scorer lab</summary><Notice title="Snapshot comparison"><p>Starts with the initial visible rows. This experiment is separate from the config result.</p></Notice>{canCompare ? <><label><span className="label-heading">Evaluation submission<CopyButton label="Evaluation submission" text={report} /></span><textarea aria-label="Evaluation submission" disabled={running} spellCheck={false} value={report} onChange={event => { setReport(event.target.value); clearLab(); if (error?.step === 'lab') setError(undefined); }} /></label><button className="secondary" disabled={!canCompare || running || labBusy} onClick={() => { void compare(); }}>{labBusy ? 'Comparing…' : 'Compare snapshot with fixture'}</button><LabVerdict evaluation={evaluation} /></> : <div className="empty-state"><h3>No submission to compare</h3><p>Only registered fixtures have an independent answer key. Custom targets can have runtime checks without a fixture verdict.</p></div>}</details>}
     </section>
     </div>
     </main>

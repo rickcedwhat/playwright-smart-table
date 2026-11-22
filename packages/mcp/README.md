@@ -163,13 +163,15 @@ regressions only; no model/provider calls or quality baselines were added.
 
 Investigation controls and results sit side by side in the main body. Before an
 investigation, only the target form is shown. Inspection reveals follow-up actions
-and result tabs. Snapshot is the initial rendered view, Config is a proposal, Navigation
-is a bounded probe, and Validate contains the executed run's verdict. A registered
+and result tabs, with one highlighted next action. Generated code is shown first;
+internal proposal editing is collapsed. Snapshot is the initial rendered view, Config is a proposal, Navigation
+is a bounded probe, and Results contains the executed run's verdict. A registered
 fixture pass is explicitly labeled **Config passed this fixture**. Runtime-only
-custom-target checks and partial runs have different verdicts. Raw results are
-collapsed by default and can be copied without expanding them.
+custom-target checks and partial runs have different verdicts. Raw evidence is
+collapsed by default (generated code starts expanded) and can be copied without expanding them.
 
-The optional Scorer lab compares an editable initial-row submission. Its results
+Results includes a copyable run summary with the verdict, record count and fixture
+comparison. The optional Scorer lab is under Advanced and compares an editable initial-row submission. Its results
 never clear or replace the config verdict. Target changes and reinspection clear
 previous results; proposal edits clear downstream checks. Closing the browser retains
 results for review/copying while disabling actions that need the session.
