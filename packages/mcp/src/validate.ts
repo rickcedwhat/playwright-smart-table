@@ -6,6 +6,8 @@ import { fileURLToPath } from 'node:url';
 import { SessionManager } from './sessions.js';
 import { InspectorError, successResult, urlSchema } from './contracts.js';
 import { generateConfig } from './generate.js';
+import { assertProposalState } from './state.js';
+import { gridSnapshot } from './virtualization.js';
 import { snapshot } from './navigation.js';
 import { runProcess } from './process.js';
 import { validationResultSchema, type Proposal, type WorkflowBudget } from './workflow-contracts.js';
@@ -13,7 +15,11 @@ import { saveValidation } from './bench/witness.js';
 
 export async function validateConfig(sessions: SessionManager, id: string, proposal: Proposal, budget: WorkflowBudget, signal: AbortSignal) {
     return sessions.run(id, budget.timeoutMs, signal, async (page, _session, remaining, operationSignal) => {
-        await snapshot(page, proposal); // Reject unsupported layouts before installation or execution.
+        await assertProposalState(page, id, proposal);
+        if (proposal.virtualization) {
+            const grid = await gridSnapshot(page, proposal.root, proposal.virtualization.scroller);
+            if (grid.issues.length || grid.identityUnknown || !grid.ready) throw new InspectorError('UNSUPPORTED_STRUCTURE', 'Grid structure, identity or readiness is no longer supported.');
+        } else await snapshot(page, proposal); // Reject unsupported layouts before installation or execution.
         const sourceUrl = urlSchema.parse(page.url());
         const packageDir = fileURLToPath(new URL('../', import.meta.url));
         const root = fileURLToPath(new URL('../../../', import.meta.url));
@@ -37,14 +43,15 @@ export async function validateConfig(sessions: SessionManager, id: string, propo
                 '@rickcedwhat/playwright-smart-table': 'file:./library.tgz', '@playwright/test': manifest.playwright, typescript: manifest.typescript, '@types/node': manifest.nodeTypes,
             } }));
             await writeFile(join(directory, 'config.mts'), generateConfig(proposal));
-            await copyFile(join(packageDir, 'consumer/runner.mts'), join(directory, 'runner.mts'));
+            await copyFile(join(packageDir, proposal.virtualization ? 'consumer/virtual-runner.mts' : 'consumer/runner.mts'), join(directory, 'runner.mts'));
+            if (proposal.virtualization) await copyFile(join(packageDir, 'src/grid-dom.ts'), join(directory, 'grid-dom.mts'));
             await writeFile(join(directory, 'input.json'), JSON.stringify({ url: sourceUrl, budget }));
             await copyFile(manifest.lockfile, join(directory, 'pnpm-lock.yaml'));
             await runProcess('pnpm', ['install', '--store-dir', manifest.storeDir, '--offline', '--frozen-lockfile', '--ignore-scripts', '--config.node-linker=hoisted'], directory, remaining(), operationSignal);
             await runProcess('pnpm', ['exec', 'tsc', 'runner.mts', 'config.mts', '--module', 'NodeNext', '--moduleResolution', 'NodeNext', '--target', 'ES2022', '--lib', 'ES2022,DOM', '--types', 'node', '--skipLibCheck', '--outDir', 'built'], directory, remaining(), operationSignal);
             await runProcess(process.execPath, ['built/runner.mjs'], directory, remaining(), operationSignal);
             const result = validationResultSchema.parse({ ...JSON.parse(await readFile(join(directory, 'result.json'), 'utf8')),
-                runId: randomUUID(), sourceUrl, configExecuted: true, fullDatasetVerified: false, elapsedMs: Date.now() - started,
+                runId: randomUUID(), sourceUrl, configExecuted: JSON.parse(await readFile(join(directory, 'result.json'), 'utf8')).configExecuted ?? true, fullDatasetVerified: false, elapsedMs: Date.now() - started,
                 library: { version: manifest.version, sha256: manifest.sha256, preparedFromCommit: manifest.preparedFromCommit, playwright: manifest.playwright, typescript: manifest.typescript },
                 limitations: ['Executed in a fresh unauthenticated consumer; the original inspection browser is unchanged.', 'Control termination is not dataset completeness. Identity candidates are checked only over visited pages.', 'No oracle was available to the consumer. Independent bench comparison is separate.'] });
             while (Buffer.byteLength(JSON.stringify(successResult(result))) > budget.maxOutputBytes && result.records.length) { result.records.pop(); result.status = 'partial'; result.traversal.termination = 'output-budget'; }

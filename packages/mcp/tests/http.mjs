@@ -19,7 +19,7 @@ let browser;
 try {
   const a = await connect(), b = await connect();
   const tools = (await a.listTools()).tools.map(tool => tool.name);
-  assert.deepEqual(tools, ['open_session', 'inspect_table', 'close_session', 'propose_config', 'probe_pagination', 'validate_config']);
+  assert.deepEqual(tools, ['open_session', 'inspect_table', 'close_session', 'propose_config', 'probe_pagination', 'validate_config', 'inspect_virtualization', 'probe_virtualization']);
   assert.ok(!tools.some(name => /oracle|evaluat/.test(name)));
   assert.equal((await fetch(base + '/tests/bench/people-oracle.json')).status, 404);
   const opened = (await call(a, 'open_session', { url: base + '/fixtures/plain' })).structuredContent;

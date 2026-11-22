@@ -7,13 +7,15 @@ export function evaluateSubmission(fixture: string, raw: unknown) {
     if (!fixtureNames.some(name => name === fixture)) throw new Error('Unknown benchmark fixture');
     const submission = evaluationSubmissionSchema.parse(raw);
     // Independent, manually maintained oracle: not derived from the fixture renderer.
-    const manifest = JSON.parse(readFileSync(new URL(`../../tests/bench/${fixture === 'holdout' ? 'inventory' : 'people'}-oracle.json`, import.meta.url), 'utf8'));
-    const expected = recordSchema.array().parse(manifest.records);
+    const manifest = JSON.parse(readFileSync(new URL(`../../tests/bench/${fixture === 'recycling-offscreen' ? 'recycling-offscreen' : fixture.startsWith('recycling') ? 'recycling' : fixture === 'holdout' ? 'inventory' : 'people'}-oracle.json`, import.meta.url), 'utf8'));
+    const expected = recordSchema.array().parse(fixture === 'recycling-no-id' ? manifest.records.map(() => ({ id: null, values: { Name: 'Copy', Team: 'Ops' } })) : manifest.records);
     const counts = new Map<string | null, number>();
     for (const record of submission.records) counts.set(record.id, (counts.get(record.id) ?? 0) + 1);
-    const missing = expected.filter(record => !counts.has(record.id)).map(record => record.id);
+    const expectedCounts = new Map<string | null, number>();
+    for (const record of expected) expectedCounts.set(record.id, (expectedCounts.get(record.id) ?? 0) + 1);
+    const missing = [...expectedCounts].flatMap(([id, count]) => Array.from({ length: Math.max(0, count - (counts.get(id) ?? 0)) }, () => id));
     const extra = submission.records.filter(record => !expected.some(value => value.id === record.id)).map(record => record.id);
-    const repeated = [...counts].filter(([, count]) => count > 1).map(([id, count]) => ({ id, count }));
+    const repeated = [...counts].filter(([id, count]) => count > Math.max(1, expectedCounts.get(id) ?? 0)).map(([id, count]) => ({ id, count }));
     const wrongValues = submission.records.flatMap(record => {
         const match = expected.find(value => value.id === record.id);
         if (!match) return [];

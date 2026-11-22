@@ -7,6 +7,7 @@ import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { createServer } from './server.js';
 import { SessionManager } from './sessions.js';
+import { recyclingWindow } from './bench/recycling.js';
 import { fixtureHtml } from './bench/fixtures.js';
 import { evaluateValidation } from './bench/witness.js';
 import { evaluateSubmission } from './bench/evaluate.js';
@@ -23,14 +24,19 @@ if (process.argv.includes('--http')) {
         for (const client of clients.values()) if (Date.now() - client.lastActive > 300000) void client.transport.close();
     }, 10000);
     reaper.unref();
-    app.get('/health', (_req, res) => { res.json({ status: 'ok', milestone: 2 }); });
+    app.get('/health', (_req, res) => { res.json({ status: 'ok', milestone: 3 }); });
     app.get('/fixtures/mui-datagrid', (_req, res) => {
         res.type('html').send(readFileSync(new URL('../tests/fixtures/mui-datagrid-mock.html', import.meta.url), 'utf8'));
     });
     app.get('/fixtures/:name', (req, res) => {
-        const html = fixtureHtml(req.params.name, req.query.page);
+        const html = fixtureHtml(req.params.name, req.query.start ?? req.query.page);
         if (!html) { res.status(404).end(); return; }
         res.type('html').send(html);
+    });
+    app.get('/fixture-data/:name', (req, res) => {
+        const data = recyclingWindow(req.params.name, req.query.start, req.query.sort === '1');
+        if (!data) { res.status(404).end(); return; }
+        res.json(data);
     });
     app.post('/bench/evaluate', (req, res) => {
         try { res.json(evaluateSubmission(req.body.fixture, req.body.submission)); }

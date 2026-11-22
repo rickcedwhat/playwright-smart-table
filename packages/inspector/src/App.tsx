@@ -10,6 +10,16 @@ const fixtures = {
   plain: { label: 'Plain table', path: 'plain', oracle: 'plain' },
   paginated: { label: 'Paginated table', path: 'paginated', oracle: 'paginated' },
   later: { label: 'Paginated: start on page 2', path: 'paginated?page=1', oracle: 'paginated' },
+  recycling: {label:'Recycling grid — stable IDs',path:'recycling',oracle:'recycling'},
+  scrolled: {label:'Recycling grid — start at row 9',path:'recycling?start=8',oracle:'recycling'},
+  ambiguous: {label:'Recycling grid — identical rows, no IDs',path:'recycling-no-id',oracle:'recycling-no-id'},
+  delayed: {label:'Recycling grid — delayed readiness',path:'recycling-delayed',oracle:'recycling-delayed'},
+  localIds: {label:'Recycling grid — reused IDs',path:'recycling-local-ids',oracle:'recycling-local-ids'},
+  pinned: {label:'Recycling grid — duplicate headers',path:'recycling-pinned',oracle:'recycling-pinned'},
+  offscreen: {label:'Recycling grid — off-screen column',path:'recycling-offscreen',oracle:'recycling-offscreen'},
+  horizontal: {label:'Recycling grid — horizontal viewport',path:'recycling-horizontal',oracle:'recycling-horizontal'},
+  changing: {label:'Recycling grid — changing dataset',path:'recycling-changing',oracle:'recycling-changing'},
+  hostile: {label:'Recycling grid — hostile page text',path:'recycling-hostile',oracle:'recycling-hostile'},
   broken: { label: 'Broken Next button', path: 'broken-next', oracle: 'broken-next' },
 };
 
@@ -28,9 +38,10 @@ export default function App() {
   const [proposalText, setProposalText] = useState('');
   const [code, setCode] = useState('');
   const [probe, setProbe] = useState<Record<string, unknown>>();
+  const [virtualObservation, setVirtualObservation] = useState<Record<string,unknown>>();
   const [validation, setValidation] = useState<ValidationResult>();
   const [trusted, setTrusted] = useState<Record<string, unknown>>();
-  function clearWorkflow() { setProposalText(''); setCode(''); setProbe(undefined); setValidation(undefined); setTrusted(undefined); }
+  function clearWorkflow() { setVirtualObservation(undefined); setProposalText(''); setCode(''); setProbe(undefined); setValidation(undefined); setTrusted(undefined); }
   const [error, setError] = useState('');
   const [running, setRunning] = useState(false);
   const cancel = useRef<AbortController | undefined>(undefined);
@@ -102,16 +113,18 @@ export default function App() {
       if (version === evaluationVersion.current) setEvaluation(value);
     } catch (e) { if (version === evaluationVersion.current) setError(String(e)); }
   }
-  async function workflow(name: 'propose_config' | 'probe_pagination' | 'validate_config') {
+  async function workflow(name: 'propose_config' | 'probe_pagination' | 'probe_virtualization' | 'inspect_virtualization' | 'validate_config') {
     if (!owned.current) return;
     setRunning(true); setError(''); clearEvaluation(); setValidation(undefined);
     const controller = new AbortController(); cancel.current = controller;
     const version = evaluationVersion.current;
     try {
-      const args = { sessionId: owned.current.id, ...(name === 'propose_config' ? (selector ? { tableSelector: selector } : {}) : { proposal: JSON.parse(proposalText) }) };
-      const result = await call(name, args, controller.signal);
+      const args = { sessionId: owned.current.id, ...(name === 'propose_config' || name === 'inspect_virtualization' ? (selector ? { tableSelector: selector } : {}) : { proposal: JSON.parse(proposalText) }) };
+      const virtual = 'proposal' in args && !!(args.proposal as {virtualization?:unknown}).virtualization;
+      const result = await call(name, {...args, ...(virtual ? {budget:{maxPages:10,maxActions:20}} : {})}, controller.signal);
+      if(name === 'inspect_virtualization')setVirtualObservation(result);
       if (name === 'propose_config') { setProposalText(JSON.stringify(result.proposal, null, 2)); setCode(String(result.code)); setProbe(undefined); }
-      if (name === 'probe_pagination') { setProbe(result); setSession(result.session as SessionInfo); }
+      if (name === 'probe_pagination' || name === 'probe_virtualization') { setProbe(result); setSession(result.session as SessionInfo); }
       if (name === 'validate_config') {
         const value = result as unknown as ValidationResult;
         setValidation(value);
@@ -131,7 +144,7 @@ export default function App() {
   const benchmarkUrl = __MCP_ORIGIN__ + '/fixtures/' + fixtures[fixture].path;
   function matchesFixture(source: string) {
     const actual = new URL(source), expected = new URL(benchmarkUrl);
-    return actual.origin === expected.origin && actual.pathname === expected.pathname && (actual.searchParams.get('page') ?? '0') === (expected.searchParams.get('page') ?? '0') && [...actual.searchParams.keys()].every(key => key === 'page');
+    return actual.origin === expected.origin && actual.pathname === expected.pathname && (actual.searchParams.get('page') ?? '0') === (expected.searchParams.get('page') ?? '0') && (actual.searchParams.get('start') ?? '0') === (expected.searchParams.get('start') ?? '0') && [...actual.searchParams.keys()].every(key => key === 'page' || key === 'start');
   }
   const canCompare = observation && fixtures[fixture].oracle && url === benchmarkUrl && matchesFixture(observation.evidence.url);
   return <div className="bench">
@@ -154,7 +167,7 @@ export default function App() {
       {session && <><p>Browser session open · observation {session.revision}</p><button type="button" disabled={running} onClick={() => { void closeSession().catch(e => setError(String(e))); }}>Close browser session</button></>}
       <h2>Available tools</h2>
       {tools.map(tool => <p key={tool.name}><strong>{tool.name}</strong><br />{tool.description}</p>)}
-      <p className="note">Milestone 2 · Native HTML workflow · No model calls</p>
+      <p className="note">Milestone 3 · Native tables and vertical grids · Model runs deferred</p>
     </aside>
     <main>
       <header><h2>Findings</h2><span>Raw MCP response</span></header>
@@ -162,16 +175,18 @@ export default function App() {
       {observation ? <pre aria-label="Inspection findings">{JSON.stringify(observation, null, 2)}</pre> : <p className="intro">Inspect a fixture or your own table. Mounted DOM is not proof of full traversal.</p>}
       {session && requestedUrl.current === url && <section>
         <h2>Config workflow</h2>
-        <p>Propose selectors, probe explicit pagination, then type-check and execute the config in a disposable consumer of the packed library. The original browser is unchanged by validation.</p>
+        <p>Propose selectors, probe explicit navigation, then type-check and execute the config in a disposable consumer of the packed library. The original browser is unchanged by validation.</p>
+        <button type="button" disabled={running} onClick={() => { void workflow('inspect_virtualization'); }}>Inspect virtualization</button>
+        {virtualObservation && <pre aria-label="Virtualization findings">{JSON.stringify(virtualObservation,null,2)}</pre>}
         <button type="button" disabled={running} onClick={() => { void workflow('propose_config'); }}>Propose config</button>
         {proposalText && <>
           <label>Config proposal<textarea disabled={running} value={proposalText} onChange={event => { setProposalText(event.target.value); setProbe(undefined); setValidation(undefined); setTrusted(undefined); }} /></label>
           <p>The code below belongs to the original proposal. Edited JSON is compiled afresh during validation.</p>
           <pre aria-label="Generated config">{code}</pre>
-          <button type="button" disabled={running} onClick={() => { void workflow('probe_pagination'); }}>Probe pagination</button>
+          <button type="button" disabled={running} onClick={() => { try { void workflow(JSON.parse(proposalText).virtualization ? 'probe_virtualization' : 'probe_pagination'); } catch(e) {setError(String(e));} }}>Probe navigation</button>
           <button type="button" disabled={running} onClick={() => { void workflow('validate_config'); }}>Validate config</button>
         </>}
-        {probe && <pre aria-label="Pagination probe">{JSON.stringify(probe, null, 2)}</pre>}
+        {probe && <pre aria-label="Navigation probe">{JSON.stringify(probe, null, 2)}</pre>}
         {validation && <pre aria-label="Config validation">{JSON.stringify(validation, null, 2)}</pre>}
         {trusted && <><h3>Independent fixture check</h3><pre aria-label="Trusted fixture evaluation">{JSON.stringify(trusted, null, 2)}</pre></>}
       </section>}

@@ -54,8 +54,8 @@ try {
   assert.equal(JSON.parse(await comparison.innerText()).configValidated, false);
   await page.getByRole('button', { name: 'Propose config', exact: true }).click();
   await page.getByLabel('Generated config').waitFor();
-  await page.getByRole('button', { name: 'Probe pagination', exact: true }).click();
-  await page.getByLabel('Pagination probe').waitFor();
+  await page.getByRole('button', { name: 'Probe navigation', exact: true }).click();
+  await page.getByLabel('Navigation probe').waitFor();
   await page.getByRole('button', { name: 'Validate config', exact: true }).click();
   await page.getByLabel('Trusted fixture evaluation').waitFor({ timeout: 120000 });
   assert.equal(JSON.parse(await page.getByLabel('Config validation').innerText()).status, 'tested');
@@ -86,6 +86,25 @@ try {
   await page.getByRole('button', { name: 'Run inspection' }).click();
   await output.waitFor();
   assert.equal(await page.getByRole('button', { name: 'Compare with fixture' }).count(), 0, 'Custom targets have no registered answer key');
+  await page.getByLabel('Fixture', { exact: true }).selectOption('scrolled');
+  await page.getByRole('button', { name: 'Run inspection' }).click(); await output.waitFor();
+  await page.getByRole('button', { name: 'Inspect virtualization', exact: true }).click();
+  await page.getByLabel('Virtualization findings').waitFor();
+  assert.equal(JSON.parse(await page.getByLabel('Virtualization findings').innerText()).status,'observed');
+  await page.getByRole('button', { name: 'Propose config', exact: true }).click(); await page.getByLabel('Generated config').waitFor();
+  await page.getByRole('button', { name: 'Probe navigation', exact: true }).click(); await page.getByLabel('Navigation probe').waitFor();
+  await page.getByRole('button', { name: 'Validate config', exact: true }).click();
+  await page.getByLabel('Trusted fixture evaluation').waitFor({timeout:125000});
+  const gridRun=JSON.parse(await page.getByLabel('Config validation').innerText());
+  assert.equal(gridRun.records.length,20);assert.equal(gridRun.traversal.rewind,'established');
+  assert.equal(JSON.parse(await page.getByLabel('Trusted fixture evaluation').innerText()).configValidated,true);
+  await page.getByLabel('Fixture', { exact: true }).selectOption('ambiguous');
+  await page.getByRole('button', { name: 'Run inspection' }).click(); await output.waitFor();
+  await page.getByRole('button', { name: 'Inspect virtualization', exact: true }).click(); await page.getByLabel('Virtualization findings').waitFor();
+  assert.equal(JSON.parse(await page.getByLabel('Virtualization findings').innerText()).identity,'unknown');
+  await page.getByRole('button', { name: 'Propose config', exact: true }).click(); await page.getByRole('alert').waitFor();
+  assert.match(await page.getByRole('alert').innerText(),/IDENTITY_UNKNOWN/);
+  assert.equal(await page.getByLabel('Generated config').count(),0);
   await page.getByRole('button', { name: 'Close browser session' }).click();
   await new Promise((resolve, reject) => {
     const tests = spawn(process.execPath, ['packages/mcp/tests/http.mjs'], { stdio: 'inherit' });

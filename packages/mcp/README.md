@@ -1,4 +1,4 @@
-# MCP inspection bench — milestones 0–2
+# MCP inspection bench — milestones 0–3
 
 Private development packages on `feat/108-mcp-revival`, not a published MCP release.
 The root library runtime, public APIs and version are unchanged.
@@ -16,7 +16,7 @@ pnpm mcp:dev
 ```
 
 On Linux CI install browsers with `--with-deps chromium`. Open http://127.0.0.1:6274.
-The server is http://127.0.0.1:3001/mcp; `/health` reports milestone 2. Ports must be
+The server is http://127.0.0.1:3001/mcp; `/health` reports milestone 3. Ports must be
 free; `MCP_PORT` changes the server, proxy and fixture targets together. Ctrl+C stops owned children without killing anyone else's listeners.
 For a local MCP host, run `node packages/mcp/dist/index.js` from the repo root (stdio).
 No API key or model access is required for inspection, probes or config execution.
@@ -61,8 +61,8 @@ reload the bench if its MCP connection expires.
 Current config/probe support: flat native HTML tables with unique nonempty headers,
 consistent cells, nonempty page-unique `data-id` candidates and explicit native
 Next/Previous buttons outside forms. Selectors are hypotheses, not universal rules.
-Spans, virtualization, async readiness, identity-ambiguous rows and auth import remain
-unsupported. Labels cannot guarantee application-side effects; use controlled targets.
+Spans, general 2D virtualization, identity-ambiguous rows and auth import remain
+unsupported. The constrained vertical-grid extension is described below. Labels cannot guarantee application-side effects; use controlled targets.
 No arbitrary JavaScript is accepted. See `CONTRACTS.md` for exact scopes and budgets.
 
 ## Checks and replay artifacts
@@ -116,3 +116,44 @@ request occurs without explicit adapter/model configuration.
 
 The original draft #157 remains unchanged. Draft #547 carries the revival. Progress,
 acceptance and deferred work live in `.agents/plans/mcp-inspector.md`.
+
+
+## Milestone 3: recycling grids and honest limits
+
+Select **Recycling grid — stable IDs** or **start at row 9** in the bench. Run
+inspection, inspect virtualization, propose, probe navigation and validate. The
+fixture retains six DOM row elements while representing twenty records. The
+installed consumer must extract the exact twenty IDs/values, including two Alice/Ops
+occurrences, rewind from a nonzero position and reset. The bench independently scores
+that execution. Mounted-node counts and declared row counts are never substitutes.
+
+`inspect_virtualization` is read-only and separates mounted/visible rows, declared
+metadata, ID candidates, readiness and unsupported layouts. `probe_virtualization`
+scrolls only the proposed viewport and attempts restoration within the shared budget.
+Grid proposals require session/state evidence. Sorting or state changes require a
+new proposal; a fresh consumer unable to recreate that state fails before config
+execution. Overlapping windows must preserve ID/index/value continuity. Only the
+visited scope is tested; metadata and dataset-revision tokens are application claims.
+
+Current supported grid contract is deliberately narrow: the top-level DOM grid is
+its own vertical viewport, fixed row height, complete unique headers/field indices,
+nonempty ID candidates, explicit busy/readiness and dataset revision. It composes
+existing Pagination.infiniteScroll, Viewport.dataAttribute, resolveRowIndex and dedupe
+strategies. No library-core special cases or public API changes were introduced.
+The UI declares ten forward windows/twenty actions for grid checks; lesser budgets
+return partial coverage. The default workflow budget remains unchanged.
+
+Adversarial fixtures exercise missing/repeated/page-local IDs, identical-looking
+records without IDs, overscan, delayed/never-ready windows, nonzero scroll, sorting,
+mid-scan revisions, contradictory indices, pinned duplicate headers, filler cells,
+unmounted columns and horizontal overflow. Frames, shadow-root tables and canvas-only
+content explicitly remain unsupported. The hostile-text fixture checks the bounded
+tools' scroll-only behavior; it is not a model prompt-injection evaluation.
+
+No-ID records retain unknown identity. Logical positions are observed metadata; the
+current strategy does not upgrade them into global record keys. This is a supported-
+scope decision, not a claim that every future position-based approach is impossible.
+The independent scorer counts valid repeated occurrences rather than collapsing them.
+
+Model runs remain deferred. Existing scripted harness checks are still deterministic
+regressions only; no model/provider calls or quality baselines were added.

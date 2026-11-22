@@ -23,10 +23,10 @@ async function call(name, args, options) {
 }
 try {
   await client.connect(new StdioClientTransport({ command: process.execPath, args: ['dist/index.js'], env: { TMPDIR: tmpdir() }, cwd: new URL('../', import.meta.url).pathname }));
-  assert.equal((await client.listResources()).resources.length, 2);
+  assert.equal((await client.listResources()).resources.length, 3);
   const resource = await client.readResource({ uri: 'smart-table://playbooks/pagination/v1' });
   assert.match(resource.contents[0].text, /later-page/);
-  assert.equal((await client.listPrompts()).prompts.length, 2);
+  assert.equal((await client.listPrompts()).prompts.length, 3);
   assert.match((await client.getPrompt({ name: 'investigate-structure' })).messages[0].content.text, /visible text/);
   for (const [path, expected, status] of [['plain', 6, 'tested'], ['paginated', 6, 'tested'], ['paginated?page=1', 6, 'tested'], ['broken-next', 2, 'failed'], ['holdout', 4, 'tested']]) {
     const oracle = path === 'holdout' ? JSON.parse(readFileSync(new URL('./bench/inventory-oracle.json', import.meta.url), 'utf8')).records : expectedRecords;
@@ -89,7 +89,8 @@ try {
   assert.ok(cleaned, 'Cancelled consumer directory and process must be cleaned up');
   await assert.rejects(call('inspect_table', { sessionId: cancelled.id }), /STALE_SESSION/);
   const closing = await call('open_session', { url: origin + '/plain' });
-  const closingRun = assert.rejects(call('validate_config', { sessionId: closing.id, proposal: native.proposal }), /CANCELLED/);
+  const closingProposal = await call('propose_config', { sessionId: closing.id });
+  const closingRun = assert.rejects(call('validate_config', { sessionId: closing.id, proposal: closingProposal.proposal }), /CANCELLED/);
   for (let i = 0; i < 80; i++) {
     if (readdirSync(tmpdir()).some(name => name.startsWith('pst-mcp-consumer-') && !beforeDirectories.has(name))) break;
     await new Promise(resolve => setTimeout(resolve, 25));
@@ -98,7 +99,8 @@ try {
   await closingRun;
   assert.ok(!readdirSync(tmpdir()).some(name => name.startsWith('pst-mcp-consumer-') && !beforeDirectories.has(name)));
   const timed = await call('open_session', { url: origin + '/plain' });
-  await assert.rejects(call('validate_config', { sessionId: timed.id, proposal: native.proposal, budget: { timeoutMs: 100 } }), /TIME_BUDGET/);
+  const timedProposal = await call('propose_config', { sessionId: timed.id });
+  await assert.rejects(call('validate_config', { sessionId: timed.id, proposal: timedProposal.proposal, budget: { timeoutMs: 100 } }), /TIME_BUDGET/);
   await assert.rejects(call('inspect_table', { sessionId: timed.id }), /STALE_SESSION/);
   const unsupported = await call('open_session', { url: origin + '/unsupported' });
   await assert.rejects(call('propose_config', { sessionId: unsupported.id }), /UNSUPPORTED_STRUCTURE/);

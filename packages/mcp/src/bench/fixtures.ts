@@ -1,12 +1,14 @@
+import { recyclingNames, recyclingHtml } from './recycling.js';
 /** Fixture application data, not the evaluator's expected result manifest. */
 const people = [
     ['r1', 'Alice', 'Ops'], ['r2', 'Alice', 'Ops'], ['r3', 'Bob', 'Design'],
     ['r4', 'Carol', 'Engineering'], ['r5', 'Dan', 'Ops'], ['r6', 'Eve', 'Design'],
 ];
-export const fixtureNames = ['plain', 'paginated', 'broken-next', 'holdout'] as const;
+export const fixtureNames = ['plain', 'paginated', 'broken-next', 'holdout', ...recyclingNames] as const;
 
 /** Only the current page's data is sent to the browser; the answer key is never embedded. */
 export function fixtureHtml(name: string, requestedPage: unknown): string | undefined {
+    if (recyclingNames.some(value => value === name)) return recyclingHtml(name, requestedPage);
     if (!fixtureNames.some(value => value === name)) return undefined;
     const dataset = name === 'holdout' ? [['h101', 'Bolt', 'Warehouse'], ['h102', 'Bolt', 'Warehouse'], ['h103', 'Nut', 'Hardware'], ['h104', 'Washer', 'Hardware']] : people;
     const pages = Math.ceil(dataset.length / 2);

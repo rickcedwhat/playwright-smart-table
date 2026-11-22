@@ -2,6 +2,8 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { budgetSchema, observationSchema, sessionSchema, urlSchema, successResult, InspectorError } from './contracts.js';
 import { inspectTable } from './inspect.js';
+import { inspectVirtualization, virtualObservationSchema } from './virtualization.js';
+import { probeVirtualization } from './virtual-probe.js';
 import { proposeConfig } from './structure.js';
 import { probePagination } from './probe.js';
 import { validateConfig } from './validate.js';
@@ -44,11 +46,20 @@ export function createServer(sessions: SessionManager) {
         description: 'Type-check and execute a constrained config in a disposable consumer of the prepared library tarball. Fresh unauthenticated browser, original session unchanged. No arbitrary JS. Runtime checks and traversal witness, not an oracle comparison.',
         inputSchema: workflowInput, outputSchema: validationResultSchema,
     }, (input, extra) => reply(() => validateConfig(sessions, input.sessionId, input.proposal, input.budget, extra.signal)));
-    for (const name of ['structure', 'pagination']) {
-        const uri = `smart-table://playbooks/${name}/v1`;
+    server.registerTool('inspect_virtualization', {
+        description: 'Read-only mounted-window investigation: identity candidates, logical/column metadata and explicit unsupported surfaces. No recycling or completeness proof from one snapshot.',
+        inputSchema: z.object({sessionId:z.string().uuid(),tableSelector:z.string().trim().min(1).max(500).optional()}).strict(), outputSchema:virtualObservationSchema,
+    }, (input, extra) => reply(() => inspectVirtualization(sessions,input.sessionId,input.tableSelector,extra.signal)));
+    server.registerTool('probe_virtualization', {
+        description: 'Explicit vertical scroll probe on the proposed grid viewport only. Bounded actions/windows and best-effort restoration. Missing identity, changed state and unsupported columns fail closed.',
+        inputSchema:workflowInput, outputSchema:probeResultSchema,
+    }, (input, extra) => reply(() => probeVirtualization(sessions,input.sessionId,input.proposal,input.budget,extra.signal)));
+    for (const name of ['structure', 'pagination', 'virtualization']) {
+        const version = name === 'structure' ? 2 : 1;
+        const uri = `smart-table://playbooks/${name}/v${version}`;
         const text = readFileSync(new URL(`../playbooks/${name}.md`, import.meta.url), 'utf8');
-        server.registerResource(`${name}-playbook`, uri, { description: `Version 1 ${name} investigation guidance`, mimeType: 'text/markdown' }, async () => ({ contents: [{ uri, text, mimeType: 'text/markdown' }] }));
-        server.registerPrompt(`investigate-${name}`, { description: `Load version 1 ${name} guidance` }, async () => ({ messages: [{ role: 'user', content: { type: 'text', text } }] }));
+        server.registerResource(`${name}-playbook`, uri, { description: `Version ${version} ${name} investigation guidance`, mimeType: 'text/markdown' }, async () => ({ contents: [{ uri, text, mimeType: 'text/markdown' }] }));
+        server.registerPrompt(`investigate-${name}`, { description: `Load version ${version} ${name} guidance` }, async () => ({ messages: [{ role: 'user', content: { type: 'text', text } }] }));
     }
     return server;
 }

@@ -1,7 +1,8 @@
-import { randomUUID } from 'node:crypto';
 import type { Page } from '@playwright/test';
-import { InspectorError } from './contracts.js';
+import { InspectorError, createEvidence } from './contracts.js';
 import { proposalResultSchema, type Proposal } from './workflow-contracts.js';
+import { gridSnapshot } from './virtualization.js';
+import { stateFingerprint } from './state.js';
 import { generateConfig } from './generate.js';
 import { SessionManager } from './sessions.js';
 
@@ -34,8 +35,21 @@ async function describeStructure(page: Page, selector?: string) {
 
 export async function proposeConfig(sessions: SessionManager, id: string, selector: string | undefined, signal: AbortSignal) {
     return sessions.run(id, 10000, signal, async (page, session) => {
-        const proposal = await describeStructure(page, selector);
-        return proposalResultSchema.parse({ status: 'proposed', session: { ...session, url: page.url() }, evidenceId: randomUUID(), proposal, code: generateConfig(proposal),
-            limitations: ['Selectors and data-id are hypotheses scoped to this revision. No config has run.', 'Native flat tables and explicit Next/Previous buttons only. No auth inheritance or virtualization support.', 'Absence of recognized controls is not proof that the table is unpaginated.'] });
+        let proposal: Proposal;
+        const roots = page.locator(selector ?? 'table, [role="grid"], [role="table"]');
+        if (await roots.count() === 1 && await roots.getAttribute('role') === 'grid') {
+            const rootId = await roots.getAttribute('id');
+            if (!rootId) throw new InspectorError('UNSUPPORTED_STRUCTURE', 'Grid requires a unique root ID.');
+            const root = await roots.evaluate(el => '#' + CSS.escape(el.id));
+            await page.waitForFunction(selector => document.querySelector(selector)?.getAttribute('aria-busy') === 'false', root, { timeout: 2000 }).catch(() => { throw new InspectorError('READINESS_UNKNOWN', 'Grid did not establish readiness.'); });
+            const observed = await gridSnapshot(page, root);
+            if (observed.identityUnknown) throw new InspectorError('IDENTITY_UNKNOWN', 'Missing or repeated ID candidates. Do not dedupe by text or mounted slots.');
+            if (observed.issues.length || !observed.ready) throw new InspectorError('UNSUPPORTED_STRUCTURE', observed.issues.join(' ') || 'Grid readiness is unverified.');
+            proposal = { root, header: '[role="columnheader"]', row: '[role="row"]', cell: '[role="gridcell"]', idAttribute: 'data-id', virtualization: { scroller: root, rowHeight: observed.rowHeight } };
+        } else proposal = await describeStructure(page, selector);
+        proposal.expectedState = { sessionId: session.id, revision: session.revision, fingerprint: await stateFingerprint(page, proposal.root) };
+        const evidence = createEvidence(session, page.url());
+        return proposalResultSchema.parse({ status: 'proposed', session: { ...session, url: page.url() }, evidenceId: evidence.id, evidence, proposal, code: generateConfig(proposal),
+            limitations: ['Selectors and data-id are hypotheses scoped to this revision. No config has run.', 'Native flat tables or constrained vertical DOM grids only. No auth inheritance or horizontal virtualization support.', 'Absence of recognized controls is not proof that the table is unpaginated.'] });
     });
 }

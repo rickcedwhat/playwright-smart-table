@@ -1,4 +1,4 @@
-# Milestones 1–2 contracts and decisions
+# Milestones 1–3 contracts and decisions
 
 Executable schemas live in `src/contracts.ts`; runtime session ownership is in
 `src/sessions.ts`. This is a private, experimental API on the revival branch.
@@ -195,3 +195,61 @@ browsers reserve capacity; elapsed deadlines are checked synchronously before
 success. HTTP shutdown stops admission before disposing active and initializing
 connection owners. Regression coverage includes an alternate-port UI path and
 shutdown during concurrent initialization.
+
+
+## Milestone 3 contract extension
+
+Executable additions: `grid-dom.ts` (shared serializable DOM reader), `virtualization.ts`
+(read-only investigation), `virtual-probe.ts` (bounded scroll), `virtual-config.ts`
+(current-API generation), `state.ts` (session/state binding) and the independently
+compiled `consumer/virtual-runner.mts`. These remain MCP modules, not library-core logic.
+
+A strict proposal may include `virtualization: { scroller, rowHeight }`, mutually
+exclusive with button pagination. Grid proposals require `expectedState` containing
+the producing session/revision and SHA-256 of the bounded root DOM/scroll state.
+Native automatic proposals also carry this binding; manual native proposals remain
+possible. At use time, a different session or changed root state rejects with
+STALE_EVIDENCE before actions. Unchanged state may be rechecked across later inspection
+revisions; the proposal revision is provenance, not a claim of continuous monitoring.
+A caller cannot remove a grid binding to bypass the check.
+
+`inspect_virtualization` observes bounded mounted metadata, with at most a short
+readiness wait. It reports observed/unknown/unsupported, never tested global identity.
+`probe_virtualization` accepts an explicit grid proposal and existing workflow budgets.
+It scrolls the declared viewport by 80% of its height, waits for ready/aligned rows,
+checks overlap continuity and attempts original-position restoration under the same
+allowance. It neither clicks arbitrary controls nor executes page instructions.
+Probes start at the current position; validation independently rewinds before scanning.
+
+The supported grid is its own scrolling root and exposes data-id, data-index,
+aria-rowindex, header/cell data-field and aria-colindex, declared row/column counts,
+aria-busy and a dataset revision token. Indices must be consistent and columns fully
+mounted. Missing/repeated IDs mean unknown identity; no text/slot/random fallback is
+used. Cross-window ID/index/value conflicts or changing revision fail. Scroll movement
+alone is insufficient while rows are busy or do not cover the new viewport.
+
+The consumer uses the installed library's viewport, logical row resolution, ID dedupe,
+infinite-scroll pagination, multi-row queries, atomic toJSON/map and reset. It checks
+initial state again in the fresh browser. If sorting/manual state cannot be replayed
+from the source URL, it reports state-changed with configExecuted false. Once generated
+config actually runs that flag becomes true; success still requires all runtime checks.
+Scroll-end is only a navigation termination reason. fullDatasetVerified remains false;
+only independent fixture comparison can validate the exact controlled execution.
+
+State hashing is a conservative recheck, not an atomic backend snapshot or security
+boundary. It may reject a changed view that could work after reproposal. Dataset tokens,
+IDs and indices remain claims checked over the visited scope. No universal stable-ID,
+identity, readiness or dataset-completeness guarantee is inferred.
+
+The scorer now respects expected occurrence multiplicity for null-ID answer keys.
+A manually supplied twenty-copy dataset may match the fixture's values/counts, but the
+submitted-data route still cannot validate a config or traversal. Grid execution with
+unknown IDs remains refused. Hidden-column fixtures have a separate oracle including
+the unmounted value, preventing a two-column extraction from passing a three-column
+answer key.
+
+Unsupported cases tested: pinned/duplicate headers, filler/unmounted columns,
+horizontal overflow, contradictory metadata, frames, shadow-root tables and canvas.
+These are explicit limits, not implemented support for every framework or 2D grid.
+Structure guidance advances to v2; virtualization guidance is independent v1. Actual
+model evaluations remain deferred by user instruction.

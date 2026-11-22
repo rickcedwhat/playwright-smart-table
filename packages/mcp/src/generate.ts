@@ -1,11 +1,13 @@
+import { generateVirtualConfig } from './virtual-config.js';
 import { proposalSchema, type Proposal } from './workflow-contracts.js';
 
 /** Only JSON literals are inserted into trusted source. No arbitrary JS proposals. */
 export function generateConfig(raw: Proposal) {
     const proposal = proposalSchema.parse(raw);
+    if (proposal.virtualization) return generateVirtualConfig(proposal);
     return `import { Strategies, type TableConfig, type TableContext } from '@rickcedwhat/playwright-smart-table';
 import type { Page } from '@playwright/test';
-export const proposal: { root: string; header: string; row: string; cell: string; idAttribute: 'data-id'; pagination?: { next: string; previous: string } } = ${JSON.stringify(proposal, null, 2)};
+export const proposal: { root: string; header: string; row: string; cell: string; idAttribute: 'data-id'; expectedState?: { sessionId: string; revision: number; fingerprint: string }; pagination?: { next: string; previous: string } } = ${JSON.stringify(proposal, null, 2)};
 export function createConfig(page: Page, beforeAction: (selector: string, name: string) => Promise<void>): TableConfig {
   const root = page.locator(proposal.root);
   const fingerprint = () => root.locator(proposal.row).evaluateAll(rows => JSON.stringify(rows.map(row => [row.getAttribute('data-id'), (row.textContent ?? '').trim()])));

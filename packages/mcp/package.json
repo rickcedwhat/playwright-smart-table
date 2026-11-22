@@ -12,7 +12,8 @@
     "test:http": "node tests/http.mjs",
     "test:workflow": "node tests/workflow.mjs",
     "baseline": "node evaluations/baseline.mjs",
-    "test:shutdown": "node tests/shutdown.mjs"
+    "test:shutdown": "node tests/shutdown.mjs",
+    "test:virtualization": "node tests/virtualization.mjs"
   },
   "engines": {
     "node": ">=22.12"

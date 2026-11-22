@@ -48,3 +48,9 @@ it('distinguishes working Previous from broken Next on the broken fixture', () =
     expect(evaluateSubmission('broken-next', submit(expected, 'partial', [step])).ineffectiveNavigation).toEqual([]);
     expect(evaluateSubmission('paginated', submit(expected, 'partial', [{ ...step, direction: 'next' }])).ineffectiveNavigation).toEqual([0]);
 });
+it('compares occurrence multiplicity for known no-ID fixtures without treating valid copies as repeated sightings', () => {
+    const copies = Array.from({length:20}, () => ({id:null, values:{Name:'Copy',Team:'Ops'}}));
+    const full = evaluateSubmission('recycling-no-id', submit(copies));
+    expect(full.dataMatches).toBe(true);expect(full.configValidated).toBe(false);
+    expect(evaluateSubmission('recycling-no-id', submit(copies.slice(0,1))).missing).toHaveLength(19);
+});

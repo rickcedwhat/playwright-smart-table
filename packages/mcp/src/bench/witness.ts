@@ -12,10 +12,10 @@ export function evaluateValidation(runId: string, fixture: string, origin: strin
     const run = runs.get(runId);
     if (!run || Date.now() - run.created > 600000) throw new Error('Unknown or expired validation run');
     const source = new URL(run.result.sourceUrl);
-    if (source.origin !== origin || source.pathname !== '/fixtures/' + fixture || [...source.searchParams.keys()].some(key => key !== 'page')) throw new Error('Validation did not run against this registered fixture');
+    if (source.origin !== origin || source.pathname !== '/fixtures/' + fixture || [...source.searchParams.keys()].some(key => key !== 'page' && key !== 'start')) throw new Error('Validation did not run against this registered fixture');
     const comparison = evaluateSubmission(fixture, { records: run.result.records, claim: 'partial', navigation: [] });
-    const executionPassed = run.result.status === 'tested' && Object.values(run.result.checks).every(Boolean);
-    const traversalPassed = fixture === 'plain' ? run.result.traversal.termination === 'single-page' : run.result.traversal.termination === 'terminal-control' && run.result.traversal.rewind === 'established';
+    const executionPassed = run.result.configExecuted && run.result.status === 'tested' && Object.values(run.result.checks).every(Boolean);
+    const traversalPassed = fixture.startsWith('recycling') ? run.result.traversal.termination === 'scroll-end' && run.result.traversal.rewind === 'established' : fixture === 'plain' ? run.result.traversal.termination === 'single-page' : run.result.traversal.termination === 'terminal-control' && run.result.traversal.rewind === 'established';
     return { comparison: 'trusted-consumer-fixture', runId, evaluationId: randomUUID(), oracleVersion: comparison.oracleVersion,
         configValidated: executionPassed && traversalPassed && comparison.dataMatches,
         passes: executionPassed && traversalPassed && comparison.dataMatches,

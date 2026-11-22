@@ -1,11 +1,13 @@
-import { randomUUID } from 'node:crypto';
 import { SessionManager } from './sessions.js';
 import { probeResultSchema, type Proposal, type WorkflowBudget } from './workflow-contracts.js';
+import { assertProposalState } from './state.js';
 import { snapshot, checkControl } from './navigation.js';
-import { successResult, InspectorError } from './contracts.js';
+import { successResult, InspectorError, createEvidence } from './contracts.js';
 
 export async function probePagination(sessions: SessionManager, id: string, proposal: Proposal, budget: WorkflowBudget, signal: AbortSignal) {
     return sessions.run(id, budget.timeoutMs, signal, async (page, session, remaining) => {
+        await assertProposalState(page, id, proposal);
+        if (proposal.virtualization) throw new InspectorError('UNSUPPORTED_STRUCTURE', 'Use probe_virtualization for an explicit scroll proposal.');
         const start = await snapshot(page, proposal);
         let end = start, actions = 0;
         const records = start.ids.map((id, index) => ({ id, values: start.values[index] }));
@@ -52,8 +54,9 @@ export async function probePagination(sessions: SessionManager, id: string, prop
             }
         }
         if (records.length > budget.maxRows) { records.length = budget.maxRows; termination = 'row-budget'; }
+        const evidence = createEvidence(session, page.url());
         const result = probeResultSchema.parse({ status: ['single-page', 'terminal-control'].includes(termination) ? restoration === 'failed' ? 'partial' : 'tested' : termination === 'ineffective-control' || termination === 'cycle' ? 'failed' : 'partial',
-            session: { ...session, url: page.url() }, evidenceId: randomUUID(), records,
+            session: { ...session, url: page.url() }, evidenceId: evidence.id, evidence, records,
             traversal: { start, end, actions, pages, rewind: 'not-needed', restoration, termination }, fullDatasetVerified: false,
             limitations: ['Forward scan starts at the current page; no first-page claim.', 'Restoration consumes the same action/time budget. No config was executed.', 'A disabled control and sampled IDs do not establish dataset completeness.'] });
         while (Buffer.byteLength(JSON.stringify(successResult(result))) > budget.maxOutputBytes && result.records.length) { result.records.pop(); result.status = 'partial'; result.traversal.termination = 'output-budget'; }

@@ -16,6 +16,10 @@ describe('workflow constraints', () => {
         expect(source).toContain('Strategies');
         expect(source).not.toContain('eval(');
     });
+    it('requires bound evidence for grids and disallows mixed navigation modes', () => {
+        expect(() => proposalSchema.parse({...proposal,virtualization:{scroller:'#people',rowHeight:40}})).toThrow();
+        expect(() => proposalSchema.parse({...proposal,virtualization:{scroller:'#people',rowHeight:40},pagination:{next:'#next',previous:'#prev'}})).toThrow();
+    });
     it('cannot upgrade an arbitrary submitted result into trusted execution', () => {
         expect(() => evaluateValidation('invented', 'plain', 'http://localhost')).toThrow(/Unknown/);
     });

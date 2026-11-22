@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 
 export const budgetSchema = z.object({
@@ -15,7 +16,7 @@ export const sessionSchema = z.object({
     id: z.string().uuid(), url: urlSchema, state: z.enum(['open', 'closed', 'expired']),
     revision: z.number().int().nonnegative(), createdAt: z.string().datetime(), expiresAt: z.string().datetime(),
 }).strict();
-const evidenceSchema = z.object({
+export const evidenceSchema = z.object({
     id: z.string().uuid(), kind: z.literal('dom-snapshot'), observedAt: z.string().datetime(),
     sessionId: z.string().uuid(), revision: z.number().int().positive(), url: urlSchema,
 }).strict();
@@ -56,4 +57,8 @@ export class InspectorError extends Error {
 /** One encoder for wire-budget checks and actual successful MCP tool results. */
 export function successResult(result: object) {
     return { content: [{ type: 'text' as const, text: JSON.stringify(result) }], structuredContent: result as Record<string, unknown> };
+}
+
+export function createEvidence(session: SessionInfo, url: string) {
+    return { id: randomUUID(), kind: 'dom-snapshot' as const, observedAt: new Date().toISOString(), sessionId: session.id, revision: session.revision, url };
 }
