@@ -157,3 +157,18 @@ The independent scorer counts valid repeated occurrences rather than collapsing 
 
 Model runs remain deferred. Existing scripted harness checks are still deterministic
 regressions only; no model/provider calls or quality baselines were added.
+
+
+## Reading the bench UI
+
+Actions and progress live in the left sidebar; step tabs select one result view on
+the right. Inspect is an initial rendered snapshot, Config is a proposal, Navigation
+is a bounded probe, and Validate contains the executed run's verdict. A registered
+fixture pass is explicitly labeled **Config passed this fixture**. Runtime-only
+custom-target checks and partial runs have different verdicts. Raw results are
+collapsed by default and can be copied without expanding them.
+
+The optional Scorer lab compares an editable initial-row submission. Its results
+never clear or replace the config verdict. Target changes and reinspection clear
+previous results; proposal edits clear downstream checks. Closing the browser retains
+results for review/copying while disabling actions that need the session.

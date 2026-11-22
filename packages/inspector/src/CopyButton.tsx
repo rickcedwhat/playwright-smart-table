@@ -10,7 +10,8 @@ export function CopyButton({ text, label }: { text: string; label: string }) {
   const status = feedback?.text === text ? feedback.status : undefined;
   return <span className="copy-control">
     <span role="status">{status === 'copied' ? 'Copied' : status === 'failed' ? 'Could not copy. Select and copy the text.' : ''}</span>
-    <button type="button" className="copy-button" aria-label={`Copy ${label}`} title={status === 'copied' ? 'Copied' : `Copy ${label}`} onClick={() => {
+    <button type="button" className="copy-button" aria-label={`Copy ${label}`} title={status === 'copied' ? 'Copied' : `Copy ${label}`} onClick={event => {
+      event.stopPropagation();
       void (async () => {
         try { await navigator.clipboard.writeText(text); setFeedback({ text, status: 'copied' }); }
         catch { setFeedback({ text, status: 'failed' }); }
@@ -23,6 +24,6 @@ export function CopyButton({ text, label }: { text: string; label: string }) {
   </span>;
 }
 
-export function ResultPanel({ label, text }: { label: string; text: string }) {
-  return <div className="result-panel"><CopyButton label={label} text={text} /><pre aria-label={label}>{text}</pre></div>;
+export function ResultPanel({ label, text, copy = true }: { label: string; text: string; copy?: boolean }) {
+  return <div className="result-panel">{copy && <CopyButton label={label} text={text} />}<pre aria-label={label}>{text}</pre></div>;
 }

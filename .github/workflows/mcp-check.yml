@@ -8,6 +8,7 @@ on:
       - 'scripts/prepare-mcp-consumer.mjs'
       - 'scripts/start-inspector.mjs'
       - 'scripts/test-inspector.mjs'
+      - 'scripts/check-inspector-ui.mjs'
       - 'package.json'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
