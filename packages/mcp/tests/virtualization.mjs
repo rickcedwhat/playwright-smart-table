@@ -29,6 +29,7 @@ try{
  assert.equal(await page.locator('[role=row]').count(),6);
  for(const fixture of ['recycling','recycling?start=8','recycling-delayed','recycling-hostile']){
   const session=await open(fixture), proposed=await call('propose_config',{sessionId:session.id});
+  if(fixture==='recycling-hostile'){assert.equal(proposed.proposal.pagination,undefined);assert.equal(proposed.proposal.virtualization.scroller,proposed.proposal.root);}
   const observed=await call('inspect_virtualization',{sessionId:session.id});assert.equal(observed.evidence.sessionId,session.id);assert.equal(observed.evidence.kind,'dom-snapshot');assert.equal(observed.status,'observed');assert.equal(observed.fullDatasetVerified,false);
   const probe=await call('probe_virtualization',{sessionId:session.id,proposal:proposed.proposal,budget:{maxPages:10,maxActions:20}});
   assert.equal(probe.status,'tested');assert.equal(probe.traversal.restoration,'restored');
