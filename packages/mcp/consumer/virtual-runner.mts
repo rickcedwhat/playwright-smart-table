@@ -83,6 +83,7 @@ try{
  },{maxPages:input.budget.maxPages,concurrency:'sequential'});
  const last=await observe();
  termination=last.scroll.top>=last.scroll.maxTop-1?'scroll-end':'page-budget';
+ if(termination==='scroll-end' && identities.size!==last.count)throw new Error('unsupported: Declared row count contradicts the observed traversal');
  if(termination==='scroll-end' && records.length!==identities.size)throw new Error('Extraction omitted observed occurrences');
  checks.extraction=records.length>0;
  await table.reset();checks.reset=(await observe(false)).scroll.top===0;

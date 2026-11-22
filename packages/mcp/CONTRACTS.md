@@ -253,3 +253,7 @@ horizontal overflow, contradictory metadata, frames, shadow-root tables and canv
 These are explicit limits, not implemented support for every framework or 2D grid.
 Structure guidance advances to v2; virtualization guidance is independent v1. Actual
 model evaluations remain deferred by user instruction.
+
+At scroll-end, a declared row count that contradicts observed logical membership is
+negative evidence and fails validation, even if the independent fixture values happen
+to match. Agreement with the declared count alone is never a completeness proof.

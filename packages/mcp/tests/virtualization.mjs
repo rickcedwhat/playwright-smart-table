@@ -57,6 +57,11 @@ try{
   const result=await call('validate_config',{sessionId:session.id,proposal,budget:{maxPages:10,maxActions:20}});
   assert.equal(result.status,'failed');assert.equal(result.traversal.termination,'state-changed');await close(session.id);
  }
+ const contradictory=await open('recycling-wrong-count'), badCount=await call('propose_config',{sessionId:contradictory.id});
+ const contradicted=await call('validate_config',{sessionId:contradictory.id,proposal:badCount.proposal,budget:{maxPages:10,maxActions:20}});
+ assert.equal(contradicted.status,'failed');assert.equal(contradicted.traversal.termination,'unsupported');
+ const rejected=await fetch(origin+'/bench/validate',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({runId:contradicted.runId,fixture:'recycling-wrong-count'})});
+ const rejectedScore=await rejected.json();assert.equal(rejectedScore.dataMatches,true);assert.equal(rejectedScore.configValidated,false);await close(contradictory.id);
  const never=await open('recycling-never-ready');await assert.rejects(call('propose_config',{sessionId:never.id}),/READINESS_UNKNOWN/);await close(never.id);
  const stale=await open('recycling-auto-sort'), old=await call('propose_config',{sessionId:stale.id});
  await new Promise(resolve=>setTimeout(resolve,1300));
