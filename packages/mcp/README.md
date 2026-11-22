@@ -161,8 +161,9 @@ regressions only; no model/provider calls or quality baselines were added.
 
 ## Reading the bench UI
 
-Actions and progress live in the left sidebar; step tabs select one result view on
-the right. Inspect is an initial rendered snapshot, Config is a proposal, Navigation
+Investigation controls and results sit side by side in the main body. Before an
+investigation, only the target form is shown. Inspection reveals follow-up actions
+and result tabs. Snapshot is the initial rendered view, Config is a proposal, Navigation
 is a bounded probe, and Validate contains the executed run's verdict. A registered
 fixture pass is explicitly labeled **Config passed this fixture**. Runtime-only
 custom-target checks and partial runs have different verdicts. Raw results are

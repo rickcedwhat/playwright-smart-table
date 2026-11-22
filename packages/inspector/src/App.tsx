@@ -26,11 +26,11 @@ const fixtures = {
 };
 
 const steps = [
-  { id: 'inspect', title: 'Inspect', heading: 'Inspect the current view', description: 'See what is rendered before testing the table’s behavior.' },
-  { id: 'config', title: 'Config', heading: 'Review the proposed config', description: 'A proposal describes structure and behavior. It has not been validated yet.' },
-  { id: 'probe', title: 'Navigation', heading: 'Probe table navigation', description: 'Test movement, stopping and restoration within a bounded budget.' },
-  { id: 'validate', title: 'Validate', heading: 'Validate the config', description: 'Execute the config and, for registered fixtures, compare the returned data independently.' },
-  { id: 'lab', title: 'Scorer lab', heading: 'Experiment with submitted data', description: 'An optional scoring sandbox, separate from the executed config’s verdict.' },
+  { id: 'inspect', title: 'Inspect' },
+  { id: 'config', title: 'Config' },
+  { id: 'probe', title: 'Navigation' },
+  { id: 'validate', title: 'Validate' },
+  { id: 'lab', title: 'Scorer lab' },
 ] as const;
 type Step = typeof steps[number]['id'];
 type Operation = 'propose_config' | 'probe_pagination' | 'probe_virtualization' | 'inspect_virtualization' | 'validate_config';
@@ -41,8 +41,6 @@ export default function App() {
   const [fixture, setFixture] = useState<keyof typeof fixtures>('scrolled');
   const [url, setUrl] = useState(__MCP_ORIGIN__ + '/fixtures/recycling?start=8');
   const [selector, setSelector] = useState('');
-  const [compact, setCompact] = useState(() => window.matchMedia('(max-width: 900px)').matches);
-  useEffect(() => { const media = window.matchMedia('(max-width: 900px)'); const update = () => setCompact(media.matches); media.addEventListener('change', update); return () => media.removeEventListener('change', update); }, []);
   const [step, setStep] = useState<Step>('inspect');
   const [observation, setObservation] = useState<Observation>();
   const [session, setSession] = useState<SessionInfo>();
@@ -175,24 +173,15 @@ export default function App() {
     return actual.origin === expected.origin && actual.pathname === expected.pathname && (actual.searchParams.get('page') ?? '0') === (expected.searchParams.get('page') ?? '0') && (actual.searchParams.get('start') ?? '0') === (expected.searchParams.get('start') ?? '0') && [...actual.searchParams.keys()].every(key => key === 'page' || key === 'start');
   }
   const canCompare = !!observation && !!fixtures[fixture].oracle && url === benchmarkUrl && matchesFixture(observation.evidence.url);
-  const verified = trusted?.configValidated === true && trusted.passes === true;
-  const overall = verified ? 'Fixture verified' : error && error.step !== 'lab' ? 'Needs attention' : validation?.status === 'partial' ? 'Partial run' : trusted || validation?.status === 'failed' ? 'Needs attention' : validation ? 'Runtime checked' : 'Not validated yet';
-  function stepStatus(id: Step) {
-    if (busy?.step === id) return 'Working…';
-    if (error?.step === id) return 'Needs attention';
-    if (id === 'inspect') return observation ? 'Snapshot ready' : 'Not run';
-    if (id === 'config') return verified ? 'Fixture verified' : proposalText ? 'Proposal ready' : 'Not run';
-    if (id === 'probe') return probe ? probe.status === 'tested' ? 'Checked' : probe.status === 'partial' ? 'Partial' : 'Needs attention' : 'Not run';
-    if (id === 'validate') return verified ? 'Fixture verified' : validation ? validation.status === 'tested' ? 'Runtime checked' : String(validation.status) : 'Not run';
-    return 'Optional · data only';
-  }
-  const current = steps.find(item => item.id === step)!;
   const canPropose = !!observation && sessionCurrent && !running;
   const canExecute = !!proposalText.trim() && sessionCurrent && !running;
+  const available = steps.filter(item => item.id === 'inspect' || (item.id === 'config' || item.id === 'lab' ? !!observation : !!proposalText));
   return <div className="bench">
-    <aside>
-      <div className="brand"><span className="brand-mark">ST</span><div><h1>Smart Table</h1><span>Inspection bench</span></div></div>
-      <p className={`connection ${client ? 'connected' : ''}`}><span />{client ? 'Connected' : 'Disconnected'}</p>
+    <header className="app-header"><div className="brand"><span className="brand-mark">ST</span><h1>Table inspector</h1></div><span className={`connection ${client ? 'connected' : ''}`}><span />{client ? 'Connected' : 'Disconnected'}</span></header>
+    <main>
+    <div className="workspace">
+    <section className="controls" aria-label="Investigation controls">
+      <h2>Target</h2>
       <div className="target-settings">
         <label>Fixture<select aria-label="Fixture" value={fixture} disabled={running} onChange={event => { const value = event.target.value as keyof typeof fixtures; setFixture(value); setUrl(__MCP_ORIGIN__ + '/fixtures/' + fixtures[value].path); changeTarget(); }}>{Object.entries(fixtures).map(([id, value]) => <option key={id} value={id}>{value.label}</option>)}</select></label>
         <details className="target-advanced"><summary>URL & selector</summary>
@@ -201,39 +190,43 @@ export default function App() {
         {url !== benchmarkUrl && <p>Custom target · no fixture answer key.</p>}
         </details>
       </div>
-      <div className="workflow-label">Workflow</div>
-      <nav role="tablist" aria-label="Workflow steps" aria-orientation={compact ? 'horizontal' : 'vertical'} onKeyDown={event => {
-        const forward = compact ? 'ArrowRight' : 'ArrowDown', backward = compact ? 'ArrowLeft' : 'ArrowUp';
-        if (![forward, backward, 'Home', 'End'].includes(event.key)) return;
-        event.preventDefault(); const focused = (event.target as HTMLElement).closest('[role=tab]')?.id;
-        const index = steps.findIndex(item => 'tab-' + item.id === focused);
-        if (index < 0) return;
-        const next = event.key === 'Home' ? 0 : event.key === 'End' ? steps.length - 1 : (index + (event.key === forward ? 1 : -1) + steps.length) % steps.length;
-        setStep(steps[next].id); document.getElementById('tab-' + steps[next].id)?.focus();
-      }}>{steps.map((item, index) => <button key={item.id} role="tab" id={'tab-' + item.id} aria-label={item.title} aria-selected={step === item.id} aria-controls={'panel-' + item.id} tabIndex={step === item.id ? 0 : -1} className={`step-tab ${item.id === 'lab' ? 'lab-tab' : ''}`} onClick={() => setStep(item.id)}><span className="step-number">{item.id === 'lab' ? '↗' : index + 1}</span><span><strong>{item.title}</strong><small>{stepStatus(item.id)}</small></span>{step === item.id && <span className="step-arrow" aria-hidden="true">›</span>}</button>)}</nav>
       <div className="step-actions">
-        {step === 'inspect' && <><button className="primary" disabled={!client || running || !url} onClick={() => { void run(); }}>Run inspection</button><p>Reinspection starts a new result set.</p>{observation && sessionCurrent && <><button className="secondary" disabled={running} onClick={() => { void workflow('inspect_virtualization'); }}>Inspect virtualization</button><p>Optional investigation for grids with recycled rows. Clears later steps.</p><button className="text-button" disabled={running} onClick={() => setStep('config')}>Continue to config →</button></>}</>}
-        {step === 'config' && <><button className="primary" disabled={!canPropose} onClick={() => { void workflow('propose_config'); }}>Propose config</button><p>{canPropose ? 'Generate a proposal from the current table state.' : 'Inspect the target in an open browser first.'}</p>{proposalText && <button className="text-button" disabled={running} onClick={() => setStep('probe')}>Continue to navigation →</button>}</>}
-        {step === 'probe' && <><button className="primary" disabled={!canExecute} onClick={() => { try { void workflow(JSON.parse(proposalText).virtualization ? 'probe_virtualization' : 'probe_pagination'); } catch (e) { setError({ step: 'probe', message: String(e) }); } }}>Probe navigation</button><p>{canExecute ? 'Test movement and attempt to restore the starting view.' : 'A proposal and an open browser are required.'}</p>{proposalText && <button className="text-button" disabled={running} onClick={() => setStep('validate')}>Continue to validation →</button>}</>}
-        {step === 'validate' && <><button className="primary" disabled={!canExecute} onClick={() => { void workflow('validate_config'); }}>Validate config</button><p>{canExecute ? 'Run against an installed copy of the library; then check the fixture records.' : 'A proposal and an open browser are required. Probing first is recommended.'}</p></>}
-        {step === 'lab' && <><button className="secondary" disabled={!canCompare || running || labBusy} onClick={() => { void compare(); }}>Compare with fixture</button><p>{labBusy ? 'Comparing submitted data…' : canCompare ? 'Compare only the editable submission on the right.' : 'Inspect a registered fixture to enable this scoring experiment.'}</p></>}
+        <button className="primary" disabled={!client || running || !url} onClick={() => { void run(); }}>{observation ? 'Inspect again' : 'Start investigation'}</button>
+        {observation && <>
+          <h3>Investigate</h3>
+          <button className="secondary" disabled={!canPropose} onClick={() => { void workflow('inspect_virtualization'); }}>Inspect virtualization</button>
+          <button className="secondary" disabled={!canPropose} onClick={() => { void workflow('propose_config'); }}>Propose config</button>
+        </>}
+        {proposalText && <>
+          <button className="secondary" disabled={!canExecute} onClick={() => { try { void workflow(JSON.parse(proposalText).virtualization ? 'probe_virtualization' : 'probe_pagination'); } catch (e) { setError({ step: 'probe', message: String(e) }); } }}>Probe navigation</button>
+          <button className="primary" disabled={!canExecute} onClick={() => { void workflow('validate_config'); }}>Validate config</button>
+        </>}
+        {step === 'lab' && <button className="secondary" disabled={!canCompare || running || labBusy} onClick={() => { void compare(); }}>{labBusy ? 'Comparing…' : 'Compare with fixture'}</button>}
         {busy && <div className="working" role="status"><span className="spinner" />{busy.message}</div>}
         {running && <button className="text-button" onClick={() => cancel.current?.abort()}>Cancel operation</button>}
       </div>
       <details className="session-details"><summary>Session & tools</summary><p>{session ? `Browser open · revision ${session.revision}` : observation ? 'Browser closed · results retained' : 'No browser session'}</p>{session && <button className="secondary" disabled={running} onClick={() => { void releaseBrowser().catch(e => setError({ step, message: String(e) })); }}>Close browser session</button>}<ul>{tools.map(tool => <li key={tool.name}><strong>{tool.name}</strong><p>{tool.description}</p></li>)}</ul></details>
-      <p className="model-note">Local bench · Model runs deferred</p>
-    </aside>
-    <main>
-      <header className="page-header"><div><span className="eyebrow">Inspect → propose → test</span><h2>Understand the table. Verify the config.</h2></div><span role="status" aria-live="polite" aria-atomic="true" className={`verdict-badge ${verified ? 'success' : validation?.status === 'partial' ? 'warning' : trusted || validation?.status === 'failed' ? 'danger' : ''}`}>{busy ? 'Working…' : overall}</span></header>
+    </section>
+    <section className="results" aria-label="Investigation results">
+      {observation && <nav role="tablist" aria-label="Investigation results" aria-orientation="horizontal" onKeyDown={event => {
+        if (!['ArrowRight', 'ArrowLeft', 'Home', 'End'].includes(event.key)) return;
+        event.preventDefault();
+        const focused = (event.target as HTMLElement).closest('[role=tab]')?.id;
+        const index = available.findIndex(item => 'tab-' + item.id === focused);
+        if (index < 0) return;
+        const next = event.key === 'Home' ? 0 : event.key === 'End' ? available.length - 1 : (index + (event.key === 'ArrowRight' ? 1 : -1) + available.length) % available.length;
+        setStep(available[next].id); document.getElementById('tab-' + available[next].id)?.focus();
+      }}>{available.map(item => <button key={item.id} role="tab" id={'tab-' + item.id} aria-selected={step === item.id} aria-controls={'panel-' + item.id} tabIndex={step === item.id ? 0 : -1} onClick={() => setStep(item.id)}>{item.id === 'inspect' ? 'Snapshot' : item.title}</button>)}</nav>}
       {error && <div role="alert"><CopyButton label="Error" text={error.message} /><strong>{steps.find(item => item.id === error.step)?.title}: </strong>{error.message}</div>}
-      <section className="step-panel" role="tabpanel" aria-busy={busy?.step === step} id={'panel-' + step} aria-labelledby={'tab-' + step} tabIndex={0}>
-        <div className="panel-heading"><span className="eyebrow">{step === 'lab' ? 'Optional experiment' : `Step ${steps.findIndex(item => item.id === step) + 1} of 4`}</span><h2>{current.heading}</h2><p>{current.description}</p></div>
+      <section className="step-panel" role="tabpanel" aria-busy={busy?.step === step} id={'panel-' + step} aria-label={steps.find(item => item.id === step)?.title} tabIndex={0}>
         {step === 'inspect' && <SnapshotView observation={observation} virtual={virtualObservation} />}
-        {step === 'config' && (proposalText ? <><Notice tone={verified ? 'success' : 'neutral'} title={verified ? 'This proposal passed the fixture check' : 'Proposal only · not validated'}><p>Editing this JSON clears navigation and validation results. Validation uses the edited JSON; generated code is retained from the original proposal.</p></Notice><label><span className="label-heading">Config proposal<CopyButton label="Config proposal" text={proposalText} /></span><textarea aria-label="Config proposal" disabled={running} value={proposalText} spellCheck={false} onChange={event => { setProposalText(event.target.value); setProbe(undefined); clearValidation(); setError(undefined); }} /></label><RawResult label={proposalText === generatedProposal.current ? "Generated config" : "Original generated config"} value={code} /></> : <div className="empty-state"><span className="empty-symbol">02</span><h3>Describe this table</h3><p>Inspect the target first, then propose a config using the action on the left.</p></div>)}
+        {step === 'config' && (proposalText ? <><p className="scope-note">Editing the proposal clears its navigation and validation results.</p><label><span className="label-heading">Config proposal<CopyButton label="Config proposal" text={proposalText} /></span><textarea aria-label="Config proposal" disabled={running} value={proposalText} spellCheck={false} onChange={event => { setProposalText(event.target.value); setProbe(undefined); clearValidation(); setError(undefined); }} /></label><RawResult label={proposalText === generatedProposal.current ? "Generated config" : "Original generated config"} value={code} /></> : <div className="empty-state"><p>Propose a config to see it here.</p></div>)}
         {step === 'probe' && <NavigationView probe={probe} />}
         {step === 'validate' && <ValidationView validation={validation} trusted={trusted} comparing={busy?.step === 'validate' && !!validation} />}
-        {step === 'lab' && <><Notice title="Data-only experiment · separate from the config run"><p>The submission starts with the initial rendered rows and never updates automatically after navigation or validation. Missing rows here are expected for a partial snapshot. Editing or comparing this data does not change the config verdict.</p></Notice>{canCompare ? <><label><span className="label-heading">Evaluation submission<CopyButton label="Evaluation submission" text={report} /></span><textarea aria-label="Evaluation submission" disabled={running} spellCheck={false} value={report} onChange={event => { setReport(event.target.value); clearLab(); if (error?.step === 'lab') setError(undefined); }} /></label><LabVerdict evaluation={evaluation} /></> : <div className="empty-state"><h3>No submission to compare</h3><p>Only registered fixtures have an independent answer key. Custom targets can have runtime checks without a fixture verdict.</p></div>}</>}
+        {step === 'lab' && <><Notice title="Data-only experiment · separate from the config run"><p>Compare edited snapshot data with the fixture. This does not validate the config.</p></Notice>{canCompare ? <><label><span className="label-heading">Evaluation submission<CopyButton label="Evaluation submission" text={report} /></span><textarea aria-label="Evaluation submission" disabled={running} spellCheck={false} value={report} onChange={event => { setReport(event.target.value); clearLab(); if (error?.step === 'lab') setError(undefined); }} /></label><LabVerdict evaluation={evaluation} /></> : <div className="empty-state"><h3>No submission to compare</h3><p>Only registered fixtures have an independent answer key. Custom targets can have runtime checks without a fixture verdict.</p></div>}</>}
       </section>
+    </section>
+    </div>
     </main>
   </div>;
 }

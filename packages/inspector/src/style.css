@@ -6,7 +6,6 @@ button { cursor: pointer; border-radius: 7px; border: 1px solid transparent; col
 button:disabled { opacity: .45; cursor: not-allowed; }
 button:focus-visible, summary:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, [role=tabpanel]:focus-visible { outline: 2px solid #8eafff; outline-offset: 3px; }
 .bench { height: 100dvh; display: grid; grid-template-columns: 300px minmax(0, 1fr); }
-aside { padding: 24px 20px; border-right: 1px solid #26344b; background: #101a2b; overflow-y: auto; min-width: 0; }
 .brand { display: flex; align-items: center; gap: 12px; }
 .brand-mark { display: grid; place-items: center; width: 38px; height: 38px; background: #1e3557; color: #a8c8ff; border: 1px solid #355782; border-radius: 10px; font-size: 12px; font-weight: 800; letter-spacing: .5px; }
 h1 { font-size: 17px; margin: 0; letter-spacing: -.3px; }
@@ -23,18 +22,7 @@ input { font-size: 12px; }
 summary { cursor: pointer; font-size: 12px; color: #b6c7df; }
 .target-advanced { margin-bottom: 22px; }
 .target-advanced summary { padding: 5px 0; }
-.workflow-label, .eyebrow { color: #879dbb; font-size: 10px; text-transform: uppercase; letter-spacing: 1.6px; font-weight: 700; }
-.workflow-label { margin: 22px 10px 10px; }
 [role=tablist] { display: grid; gap: 5px; }
-.step-tab { width: 100%; display: flex; align-items: center; text-align: left; gap: 12px; padding: 12px 10px; background: transparent; border: 1px solid transparent; }
-.step-tab:hover { background: #19273d; }
-.step-tab[aria-selected=true] { background: #1a2d4b; border-color: #355580; }
-.step-number { display: grid; place-items: center; flex: 0 0 25px; height: 25px; border: 1px solid #3a4d67; border-radius: 50%; font-size: 11px; color: #aebed3; }
-.step-tab[aria-selected=true] .step-number { background: #688ff1; border-color: #688ff1; color: #081326; font-weight: 800; }
-.step-tab strong { font-size: 13px; font-weight: 600; display: block; }
-.step-tab small { display: block; color: #8da2c1; font-size: 10px; margin-top: 3px; }
-.step-arrow { margin-left: auto; font-size: 22px; color: #9fbafa; }
-.lab-tab { margin-top: 9px; border-top-color: #26364e; border-radius: 0 0 7px 7px; }
 .step-actions { margin-top: 22px; padding-top: 18px; border-top: 1px solid #293a53; }
 .primary, .secondary, .text-button { width: 100%; padding: 11px 12px; font-size: 12px; font-weight: 600; }
 .primary { background: #6289ed; color: #081429; }
@@ -52,18 +40,8 @@ summary { cursor: pointer; font-size: 12px; color: #b6c7df; }
 .session-details ul { padding-left: 16px; }
 .session-details li { font-size: 11px; overflow-wrap: anywhere; margin: 12px 0; }
 .session-details p { font-size: 11px; }
-.model-note { font-size: 10px; color: #7e92ae; margin-top: 20px; }
 main { overflow-y: auto; padding: 32px 40px 48px; min-width: 0; }
-.page-header { display: flex; justify-content: space-between; align-items: center; gap: 24px; padding-bottom: 28px; margin: 0 auto 26px; max-width: 1120px; border-bottom: 1px solid #26354c; }
-.page-header h2 { margin: 9px 0 0; font-size: 21px; letter-spacing: -.65px; font-weight: 600; line-height: 1.4; }
-.verdict-badge { font-size: 11px; padding: 7px 11px; border: 1px solid #3a4d68; background: #172338; color: #b9cbe4; border-radius: 20px; flex-shrink: 0; }
-.verdict-badge.success { color: #8be3bd; border-color: #286c52; background: #102e25; }
-.verdict-badge.warning { color: #f0d494; border-color: #75613a; background: #2d271b; }
-.verdict-badge.danger { color: #f9b2bc; border-color: #874451; background: #341f2c; }
 .step-panel { max-width: 1120px; margin: 0 auto; }
-.panel-heading { margin-bottom: 26px; }
-.panel-heading h2 { font-size: 26px; font-weight: 600; letter-spacing: -.8px; margin: 9px 0; }
-.panel-heading p { margin: 0; max-width: 730px; }
 h3 { font-size: 15px; font-weight: 600; margin: 24px 0 12px; }
 .metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 22px 0; }
 .metrics > div { border: 1px solid #2a3b55; border-radius: 9px; background: #111e31; padding: 18px; min-width: 0; }
@@ -79,7 +57,6 @@ h3 { font-size: 15px; font-weight: 600; margin: 24px 0 12px; }
 .notice.danger { border-color: #754252; border-left-color: #fb9eae; background: #2d1b29; }
 .scope-note { font-size: 11px; color: #8fa5c1; margin: 20px 0; }
 .empty-state { padding: 44px 28px; border: 1px dashed #344762; border-radius: 10px; text-align: center; margin-top: 25px; }
-.empty-symbol { display: inline-block; font: 500 30px/1.4 ui-monospace, monospace; color: #5f7b9f; letter-spacing: -1px; }
 .empty-state h3 { font-size: 18px; margin-top: 14px; }
 .empty-state p { max-width: 520px; margin: 0 auto; }
 .row-preview { overflow-x: auto; border: 1px solid #293b54; border-radius: 9px; margin: 22px 0; }
@@ -125,3 +102,24 @@ pre { white-space: pre-wrap; overflow-wrap: anywhere; overflow: auto; max-height
   .panel-heading h2 { font-size: 23px; }
 }
 @media (max-width: 480px) { .metrics { grid-template-columns: 1fr; gap: 8px; } .metrics > div { display: flex; align-items: center; gap: 14px; padding: 14px; } .metrics span { margin: 0; } .metrics strong { font-size: 24px; min-width: 55px; } .check-list { grid-template-columns: 1fr; } .page-header { flex-direction: column; } .verdict-badge { max-width: none; } }
+/* Investigation workspace: controls and results share the main body. */
+.bench { display: block; height: auto; min-height: 100dvh; }
+.app-header { height: 72px; display: flex; align-items: center; justify-content: space-between; padding: 0 36px; border-bottom: 1px solid #26344b; }
+.app-header .connection { margin: 0; float: none; }
+main { max-width: 1500px; margin: auto; overflow: visible; padding: 36px; }
+.workspace { display: grid; grid-template-columns: minmax(260px, 340px) minmax(0, 1fr); gap: 40px; align-items: start; }
+.controls, .results { min-width: 0; }
+.controls { padding: 24px; background: #101a2b; border: 1px solid #26344b; border-radius: 10px; }
+.controls h2 { margin: 0; font-size: 16px; }
+.controls .target-settings { margin-top: 0; }
+.controls .step-actions { margin-top: 16px; }
+.results [role=tablist] { display: flex; gap: 4px; overflow-x: auto; padding: 0 0 12px; margin-bottom: 20px; border-bottom: 1px solid #26344b; }
+.results [role=tab] { padding: 9px 13px; background: transparent; font-size: 12px; white-space: nowrap; color: #9db0cb; }
+.results [role=tab][aria-selected=true] { color: #e5edf8; background: #20324d; }
+.empty-state { margin: 0; padding: 90px 24px; }
+.metrics { margin-top: 0; }
+@media (max-width: 900px) {
+  .app-header { padding: 0 20px; }
+  main { padding: 24px 20px; }
+  .workspace { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+}
