@@ -1,6 +1,6 @@
 # MCP inspector revival plan
 
-Status: proposed roadmap; implementation milestones are not yet complete.
+Status: milestones 0–3 deterministic scope locally complete, with unsupported surfaces explicitly bounded. Actual model baselines remain deferred by the user, reconfirmed 2026-11-23. Milestone 4 host integration has started; pilot work and model usefulness evaluation remain incomplete. CI/review status is tracked in the revival PR.
 Tracking: #108. Existing experiment: draft PR #157 (`feat/mcp-custom-inspector-wip`).
 Related: #532 (packaged guidance), #526 (identity information limits).
 
@@ -126,36 +126,38 @@ when comparing models or guidance variants.
 
 ### 0. Recover a runnable baseline
 
-- [ ] Inventory PR #157: retain/rework/defer server, probes, generator, auth, UI,
+- [x] Inventory PR #157: retain/rework/defer server, probes, generator, auth, UI,
   model comparison, tests, scratch files and accidental worktree gitlinks.
-- [ ] Create the revival branch from main; recover useful work selectively.
-- [ ] Verify dependencies, SDK schemas/transport and remove input-validation bypasses.
-- [ ] Establish clean install/build/server/UI commands and exercise a protocol call.
+- [x] Create the revival branch from main; recover useful work selectively.
+- [x] Verify dependencies, SDK schemas/transport and remove input-validation bypasses.
+- [x] Establish clean install/build/server/UI commands and exercise a protocol call.
 
 Exit: a clean checkout can launch the bench, call the real server and show findings
 or actionable errors. Record broken/unsupported parts instead of marking them complete.
 
 ### 1. Establish contracts and an independent answer key
 
-- [ ] Define session/evidence/finding/action-budget/validation schemas.
-- [ ] Decide initial tools, protocol/transport, browser ownership, config execution
+- [x] Define session/evidence/finding/action-budget/validation schemas.
+- [x] Decide initial tools, protocol/transport, browser ownership, config execution
   boundary and cancellation semantics; record rationale in the decision log.
-- [ ] Add plain, button-paginated and broken-navigation fixtures. Include a later-page
+- [x] Add plain, button-paginated and broken-navigation fixtures. Include a later-page
   start and valid duplicate-looking records with stable IDs.
-- [ ] Wire evaluation and UI comparison without leaking the oracle to the agent.
+- [x] Wire evaluation and UI comparison without leaking the oracle to the agent.
 
 Exit: the evaluator catches missing/extra records, collapsed duplicates, wrong values,
 ineffective Next controls and unsupported claims independently of a model.
 
 ### 2. Complete the first reliable workflow
 
-- [ ] Implement structure/pagination playbooks, observations and bounded probes.
-- [ ] Produce configs using current APIs; type-check and execute against an installed
+- [x] Implement structure/pagination playbooks, observations and bounded probes.
+- [x] Produce configs using current APIs; type-check and execute against an installed
   packed library in a disposable consumer outside this checkout.
-- [ ] Verify init, representative queries, full supported traversal and truthful
+- [x] Verify init, representative queries, full supported traversal and truthful
   starting-page/rewind reporting. A partial scan cannot be called complete.
-- [ ] Test malformed input, isolation, timeout/cancellation and browser cleanup.
-- [ ] Record agent baselines with and without guidance under equal budgets.
+- [x] Test malformed input, isolation, timeout/cancellation and browser cleanup.
+- [ ] Record agent baselines with and without guidance under equal budgets. Runner
+  prepared and scripted self-test passed; provider/model runs deferred by explicit
+  user choice on 2026-11-06, reconfirmed 2026-11-23. Do not count scripted runs as agent-quality evidence.
 
 Exit: supported deterministic cases match exact expected records/multiplicity and
 values; negative cases report useful failures/limits. Save/review every false success.
@@ -163,13 +165,13 @@ A screenshot of plausible output is not acceptance evidence.
 
 ### 3. Challenge virtualization and identity
 
-- [ ] Add a recycling grid with stable IDs; assert exact membership and column values.
-- [ ] Add identical-looking records without identity evidence; require uncertainty.
-- [ ] Exercise pinned/duplicate headers, filler/off-screen columns, nonzero scroll,
+- [x] Add a recycling grid with stable IDs; assert exact membership and column values.
+- [x] Add identical-looking records without identity evidence; require uncertainty.
+- [x] Exercise pinned/duplicate headers, filler/off-screen columns, nonzero scroll,
   repeated/missing/page-local IDs, overscan and delayed readiness.
-- [ ] Exercise sorting/data changes and contradictory metadata; reject stale claims.
-- [ ] Evaluate frames, shadow DOM and canvas-only content; state unsupported cases.
-- [ ] Exercise hostile page text and misleading controls within the probe action scope.
+- [x] Exercise sorting/data changes and contradictory metadata; reject stale claims.
+- [x] Evaluate frames, shadow DOM and canvas-only content; state unsupported cases.
+- [x] Exercise hostile page text and misleading controls within the probe action scope.
 
 Exit: known-data cases satisfy their oracle; ambiguous cases do not claim verified
 identity/completeness. Reproduce new library bugs separately rather than hiding them
@@ -181,7 +183,8 @@ behind inspector-specific workarounds.
   fixtures, tasks, reset state and budgets. Measure success, false success, time/cost.
 - [ ] Try representative real tables with ground truth where available. Label other
   runs exploratory, not benchmark passes.
-- [ ] Test package installation, browser setup, auth/session reuse and real host discovery.
+- [x] Verify local development launch, installed browser availability and real host discovery (Antigravity desktop, 2026-11-23; no agent/model runs).
+- [ ] Test distributable package installation and authenticated session reuse; current consumers remain unauthenticated.
 - [ ] Reconcile shared playbooks with #532: plain skills versus Intent, version matching,
   source references and opt-in loading without duplicated guidance.
 - [ ] Document supported scope, results, limits, data handling and separate MCP versioning.
@@ -207,3 +210,278 @@ fix or evaluation improvement; otherwise defer it.
 Do not promise universal dedupe/completeness, redesign library APIs for the inspector,
 auto-install hooks, distribute contributor workflows as consumer guidance, or make
 third-party website uptime a blocking CI dependency.
+
+### 2026-11-06 checkpoint — milestone 0
+
+Branch: `feat/108-mcp-revival`. Baseline implementation: `95e6b8cd` (from main
+`38c70b22`, with #545 and this plan merged). The original PR #157 is unchanged.
+
+Recovery decisions and repeatable commands are in `packages/mcp/README.md`. The
+server uses SDK 1.32.2/Zod 4.6.7, real schemas, stdio and loopback Streamable HTTP.
+The UI uses the same server tool. No provider key or implicit model request is needed.
+
+Local evidence: frozen install and builds passed; 12 recovered detector tests passed
+after correcting four stale equal-weight expectations to the existing weighted
+contract; real stdio discovery/validation/browser/error/recovery smoke passed; real
+UI → HTTP MCP → Chromium inspection/error/retry smoke passed. A fresh source snapshot
+without node_modules also passed frozen install, builds and both smoke paths. Root
+build, 465 unit tests, fallow and snippet validation passed. A packed library tarball
+contained root dist and excluded the new workspace packages. CI coverage is defined
+in `.github/workflows/mcp-check.yml`; CI results are not asserted by this local record.
+
+The UI has been visually inspected at 1280×850. Its fixture reports 3 mounted rows
+and a declared count of 50 without claiming traversal completeness. Preset scores
+are explicitly hypotheses, not verified configs or calibrated probabilities.
+
+Remaining limitations: temporary browsers per call, per-operation rather than shared
+run deadlines, no cancellation/session/auth contract, no generated configs, no
+validated pagination/virtualization/identity/readiness, and no model comparison yet.
+The old picker/provider/comparison experiments remain available for later recovery.
+No agent-quality benchmark or real-MUI preset validation is claimed at this stage.
+
+Next smallest experiment: milestone 1 session/evidence/tool contracts plus controlled
+plain and paginated fixtures with evaluator-only answer keys. Keep the bench running
+on this feature branch while those contracts are designed and tested.
+
+### 2026-11-06 checkpoint — milestone 1
+
+Branch: `feat/108-mcp-revival`, draft PR #547. Implementation: `902a89b5`, with
+custom-target comparison guard `600a6608`. The original draft PR #157 is unchanged.
+Contracts and decisions are recorded in `packages/mcp/CONTRACTS.md`; repeatable
+commands and current limitations are in `packages/mcp/README.md`.
+
+The MCP exposes open/inspect/close tools with isolated, connection-owned browser
+sessions, expiry, bounded read-only observations, revision-scoped evidence and
+native cancellation. Both stdio and stateful Streamable HTTP are exercised.
+Observation results report mounted data and hypotheses without asserting identity,
+full traversal or config validity. Ambiguous column layouts withhold mapped records.
+
+Controlled fixtures cover plain tables, working/broken button navigation, later-page
+starts and duplicate-looking records with stable IDs. A separately authored answer
+key checks missing/extra/repeated records, wrong values, ineffective navigation and
+unsupported completeness claims. The UI compares submitted data only, labels config
+validation false, prevents stale comparisons and offers automatic comparison only
+for exact registered fixture URLs. The answer key is absent from the MCP tool surface
+and fixture HTML; a blind agent evaluation must additionally restrict access to local
+files and the privileged bench comparator. This is not a sandbox against arbitrary
+agent filesystem/network tools.
+
+Local evidence: 21 MCP unit tests, real stdio contract/browser smoke, HTTP ownership/
+cancellation/fixture checks and UI comparison/error/retry checks passed. A fresh
+source snapshot passed frozen install, both builds and both smoke paths. The final
+custom-target guard passed the UI/HTTP suite again. Root build, 465 library unit tests
+and fallow passed; no library runtime or version change was made. The running bench
+was visually inspected. CI/review results remain separately tracked in PR #547.
+
+Budgets are per call, not shared across an agent task; observation action/page limits
+are currently zero/one. Browser cleanup is awaited rather than a hard real-time SLA.
+No generated config execution, model quality baseline, verified pagination traversal,
+virtualization or arbitrary-site authentication support is claimed.
+
+Next: milestone 2 structure/pagination guidance and bounded probes, then current-API
+config generation validated by a trusted disposable installed-package consumer.
+Only that runner can support stronger config/traversal claims.
+
+### 2026-11-06 checkpoint — milestone 2 deterministic workflow
+
+Implementation: `42c55703` on `feat/108-mcp-revival`, draft PR #547. Original draft
+#157 remains unchanged. Model baseline runs were explicitly deferred by the user;
+this checkpoint does not mark that remaining milestone-2 item complete.
+
+Structure/pagination playbooks are maintained independently as Markdown and exposed
+through versioned MCP resources/prompts. Real SDK discovery/read/get calls are tested.
+Constrained selector proposals generate current public-API configs; bounded probes
+report starting/ending records, forward coverage and restoration. Native flat HTML
+and explicit Next/Previous controls are supported; unknown identity, virtualization,
+spans, auth import and readiness variants remain outside this workflow.
+
+The trusted runner builds/packs the root library and installs its tarball into a new
+external consumer using a separate frozen lockfile and offline cache. Generated config
+and trusted runner are compiled against that installed package, then actual init,
+multi-row queries, row.toJSON/map, rewind and reset execute. The resolved library path
+is checked to stay inside the consumer. Results record build checksum/preparation
+commit, browser/SDK-related runtime versions, diagnostics, actions/pages and termination.
+Normal validation leaves the original session unchanged; cancellation/close/timeouts
+propagate to owned consumer processes and remove execution directories.
+
+Only server-created bounded/expiring witnesses can enter privileged fixture validation.
+Independent scoring checks exact membership/multiplicity/values and runtime/traversal
+outcomes. Matching submitted JSON alone still cannot claim config validity. Starting
+on page 2 rewinds and extracts all six fixture occurrences; the identical-looking Alice
+records both survive. Broken Next fails; action/page/row limits and failed restoration
+produce partial results. A held-out inventory table changes selectors, headers and
+values and also passes exact comparison.
+
+Earlier review findings addressed: configurable UI/proxy/fixture ports, own-property
+column scoring, navigation direction, shutdown admission/initialization cleanup,
+spanning layouts, capacity reserved for closing browsers and synchronous deadline
+checks. Added regression coverage rather than blindly accepting suggested patches.
+Threads are left for CodeRabbit to reassess; no resolution/merge is claimed here.
+
+Local evidence: 28 MCP unit tests; real stdio contracts; consumer workflows including
+negative, limit, native cancellation, explicit close and timeout cases; live-browser
+HTTP shutdown with concurrent initializations; real UI/HTTP comparisons on MCP_PORT
+4001; root build and fallow all passed. A source-only snapshot at
+`/private/tmp/mcp-m2-clean-ztf8ebm3` passed frozen install, preparation, builds, the full
+MCP test command and UI checks on the default port without inherited state/Git metadata.
+Logs are `/private/tmp/mcp-m2-{test,ui-custom-port,clean-test,clean-ui}.log`; these are
+local ephemeral evidence, not asserted CI results. Replays live in ignored .mcp-runs
+and are uploaded by the dedicated CI workflow. The library runtime/version is unchanged.
+
+Baseline harness preparation: four scenarios × guided/unguided × five fresh runs,
+equal shared budgets, explicit prompt loading, tool-only adapter context and post-final
+oracle comparison. Artifacts retain raw outcomes, configs/transcripts, timing, supplied
+usage and unknown cost as null. Four scripted harness self-tests passed, labeled as
+such; no provider/model requests, model pass rates or statistical confidence are claimed.
+
+Plan review: keep constrained code generation and installed-consumer execution before
+expanding framework scope. Next smallest evaluation is the real baseline when the user
+chooses a provider/model; milestone 3's controlled recycling grid is the next functional
+scope, with ambiguity reported rather than guessed away. No pilot/release decision yet.
+
+Milestone-2 CI follow-up: run `42339383855` failed because SDK stdio clients stripped
+environment variables that selected pnpm's store; offline validation looked in a
+different cache than preparation. Preparation now records its absolute store path,
+and every consumer install passes that path explicitly. A dedicated temporary store
+was populated using a preparation-only environment override, then the full MCP tests
+passed with the normal client environment (`/private/tmp/mcp-m2-store-test.log`).
+This preserves frozen/offline execution rather than hiding cache failures with a
+network-enabled validation fallback. Updated CI is required to confirm Linux behavior.
+
+### 2026-11-22 checkpoint — milestone 3 deterministic scope
+
+Implementation: `3d2b85c7`, with count-contradiction guard `538451cb`, explicit surface
+boundaries `23455e84`, and misleading-control regression `e2ad9d37`. Branch remains
+`feat/108-mcp-revival`, draft PR #547; original #157 is unchanged. The branch was
+rebased onto main `55cdc78f`. Historical checkpoint commit IDs above retain their
+original meaning; they are not the current rebased commit IDs.
+
+The six-slot recycling fixture represents twenty records and serves only requested
+mounted windows to the browser. Independent manifests check exact IDs, multiplicity
+and values, including two identical-looking Alice/Ops records. The installed consumer
+uses existing infinite-scroll, viewport, logical-row-resolution and ID-dedupe strategies,
+atomic extraction, queries, rewind and reset. No library-core/API/version changes
+were introduced. Nonzero starts, overscan and delayed readiness pass exact comparison.
+
+The independent virtualization playbook/tool/module records mounted versus visible
+counts, candidate identity, metadata/readiness limits and shared timestamped
+session/revision evidence. Proposals bind the selected DOM/scroll state to their
+owning session. Sorting invalidates stale proposals before action; a fresh consumer
+that cannot replay the proposed state fails before config execution. Cross-window
+ID/index/value conflicts or a changed dataset revision fail rather than mixing scans.
+
+Fixtures exercise missing/repeated/page-local IDs, no-ID identical-looking records,
+never-ready windows, contradictory row/column metadata, pinned duplicate headers,
+filler cells, horizontal overflow and unmounted columns. Unknown IDs are not replaced
+by text, random or slot-based keys. Logical-position evidence is reported separately;
+this is a scope decision, not a universal impossibility claim for future approaches.
+Frames, shadow DOM and canvas remain explicitly unsupported, including the manual
+native-proposal path. Their lack of an answer key cannot fall back to an invented
+native dataset. Hidden-column scoring uses a separate manifest containing that column.
+
+A false-success regression returns the correct twenty records while declaring twenty-one:
+raw data matches, but runtime metadata contradicts the scan and configValidated stays
+false. The hostile-text fixture includes a misleading Next button that edits data;
+the explicit grid workflow ignores it and returns the exact expected records. This
+checks bounded tool mechanics, not model-level prompt-injection resilience.
+
+Local evidence: frozen installation on the merged lockfile, root/library and MCP/UI
+builds, 31 MCP unit tests, 465 library unit tests, full real stdio/HTTP/consumer/cleanup
+and virtualization checks, UI supported-grid and unknown-identity flows, and fallow
+passed. Source-only snapshot `/private/tmp/mcp-m3-clean-alnevj8v` passed fresh install,
+preparation, builds, full MCP tests and UI checks without inherited dist/prepared state
+or Git metadata. The final misleading-control refinement passed the virtualization
+suite separately. Logs: `/private/tmp/mcp-m3-{test,ui,root-unit,clean-test,clean-ui,final-virtual}.log`;
+replays remain in ignored .mcp-runs and CI artifacts. These are local claims; current
+CI/review results remain tracked independently in PR #547.
+
+The lockfile rebase retained main's updated root resolutions and the feature workspace
+resolutions, then normalized with pnpm and verified by frozen installation. The original
+branch's prepared-cache pin remains in place across MCP host environments.
+
+Model runs remain explicitly deferred. Only the labeled scripted harness self-test ran;
+no provider/model request, model-quality baseline, real-host pilot or publication is
+claimed. Next work is milestone 4's usefulness/host preparation when requested; actual
+model comparisons remain a prerequisite to any model-quality/pilot claim.
+
+
+### 2026-11-23 checkpoint — milestone 4, first real-host connection
+
+Scope: start milestone 4 on `feat/108-mcp-revival`; model/provider runs remain
+explicitly deferred. Cursor was inspected but its configuration was not changed;
+the user requested Antigravity instead to avoid interrupting active Cursor work.
+
+Implemented:
+
+- `packages/mcp/host.mjs` emits opt-in machine-specific JSON with absolute runtime
+  and launcher paths plus explicit PATH. Its stdio launch works outside the checkout,
+  does not install/build implicitly, and reports setup failures on stderr.
+- Concise initialization guidance and corrected grid-support discovery text.
+- `get_investigation_guide` exposes the existing playbook sources as a read-only tool,
+  alongside resources/prompts. Structure guidance v3 corrects the obsolete blanket
+  virtualization exclusion; this is not an embedded model or new inspection engine.
+- Deterministic `mcp:test-host` exercises the generated launch command, guidance
+  parity, native/later-page execution with the installed library, close/reconnect
+  and stale browser-handle rejection. CI runs this check after the main MCP suite.
+
+Observed real host evidence:
+
+- Added this checkout as a local Antigravity project without submitting a prompt.
+- Workspace `.agents/mcp_config.json` alone did not populate the desktop's installed
+  server list. Its Copy Config File Path control confirmed the user-level
+  `~/.gemini/config/mcp_config.json` location. Registered `smart-table-dev` there,
+  retaining a backup and unrelated entries; local absolute paths are not committed.
+- A window refresh did not update the host list. A full Antigravity restart did.
+- Antigravity desktop 2.34.0: Customizations → Installed → MCP Servers showed
+  `smart-table-dev`, **9 tools
+  enabled**, and individually exposed all nine expected names.
+- Antigravity wrote nine tool-schema JSON files and startup `instructions.md` under
+  its local MCP cache. Recorded metadata: `.mcp-runs/antigravity-discovery.json`.
+- No Antigravity chat prompt, tool invocation via its agent, model run, provider
+  comparison, authentication import or public-site benchmark was performed.
+
+Validation: MCP/UI builds; 31 unit tests; stdio, installed-consumer workflow, scripted
+harness self-test, live-browser shutdown and virtualization regressions; host-launch
+checks; HTTP ownership/oracle separation on an independently owned ephemeral server;
+fallow. Local replay: `.mcp-runs/host-installation.json`. The GUI discovery
+observation and SDK-driven execution checks are separate evidence, not a combined
+claim of successful agent reasoning. Existing bench services remain running.
+
+Decision: retain a source-backed guide tool because tool-only/lazy-discovery hosts
+must have a way to request the same guidance without depending on resource/prompt
+UI support. Whether an agent actually loads/follows it remains unmeasured.
+
+Remaining milestone 4: representative real tables, auth/session reuse design and
+checks, guidance packaging reconciliation with #532, distributable MCP packaging,
+data handling/versioning documentation, unresolved review hardening and usefulness
+thresholds. Actual model/holdout comparisons remain deferred. No pilot/release is
+claimed. Next smallest experiment: model-free trials on representative real table
+implementations, recording unsupported structure/identity instead of manufacturing
+fixture-style completeness verdicts.
+
+### 2026-11-23 checkpoint — milestone 4, first public table trials
+
+Executed scripted MCP trials on DataTables zero-configuration, MUI quickstart,
+AG Grid's main example and W3Schools' native HTML table. All four rejected proposals
+before execution. This is evidence of current MCP compatibility gaps, not failed
+library executions, full-dataset scoring or autonomous agent/model evaluation.
+
+Findings and replay commands: `packages/mcp/evaluations/REAL-TABLES-2026-11-23.md`.
+Local full run: `.mcp-runs/real-tables-7e3f7b05-f937-4303-a362-e4919e05b374/`;
+AG Grid loading follow-up: `.mcp-runs/real-tables-c4ccf82e-f1e1-4f89-b220-bb655f887148/`.
+The runner is opt-in and defaults to a no-network plan. Separate browser diagnostics
+read structure/attributes without modifying pages; they are not MCP-session evidence
+or an independent dataset oracle. Syntax checks and fallow pass.
+
+Concrete gaps: native headers outside `thead`; root-ID and metadata assumptions;
+MUI `rowheader` cells omitted and header rows included in grid identity checks;
+AG Grid hydration, grouped/horizontal scope and an incorrect `rdg` preset hypothesis;
+DataTables rows without the required `data-id`. Real MUI data rows did have IDs, so
+this failure must not be generalized as an unsolvable dedupe problem.
+
+No server behavior or supported guarantees were changed in this experiment.
+Representative real-site usefulness is still incomplete; no case reached validation.
+Next smallest implementation: make mounted MUI observation understand real row/cell
+semantics and preserve unknown readiness/revision scope, with a replayable regression.
+Address native body-header observation separately. Defer more framework breadth until
+these failures improve. Model runs remain explicitly deferred.
