@@ -14,7 +14,8 @@
     "baseline": "node evaluations/baseline.mjs",
     "test:shutdown": "node tests/shutdown.mjs",
     "test:virtualization": "node tests/virtualization.mjs",
-    "test:host": "node tests/host.mjs"
+    "test:host": "node tests/host.mjs",
+    "trial:real": "node evaluations/real-tables.mjs"
   },
   "engines": {
     "node": ">=22.12"

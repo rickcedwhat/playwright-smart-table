@@ -54,3 +54,12 @@ transcript, proposals, run/build/SDK/browser information, outcomes, timing and s
 usage. `summary.json` preserves raw outcomes/denominators and per-run checksums.
 Five runs are a starting baseline, not statistical confidence. Review false successes
 and set thresholds before claiming improvement or moving to a pilot.
+
+## Opt-in real-table integration trials
+
+`trial:real` is a separate, scripted exploration of public table demos. It is not a
+model baseline. Without `--run` it only prints the plan; it is never a network CI gate.
+See [the 2026-11-23 findings](REAL-TABLES-2026-11-23.md) for commands, observed
+compatibility gaps and the distinction between MCP evidence and fresh-browser DOM
+diagnostics. Four initial targets were rejected before config execution; no verified
+full-dataset successes or model usefulness results are claimed.

@@ -458,3 +458,30 @@ thresholds. Actual model/holdout comparisons remain deferred. No pilot/release i
 claimed. Next smallest experiment: model-free trials on representative real table
 implementations, recording unsupported structure/identity instead of manufacturing
 fixture-style completeness verdicts.
+
+### 2026-11-23 checkpoint — milestone 4, first public table trials
+
+Executed scripted MCP trials on DataTables zero-configuration, MUI quickstart,
+AG Grid's main example and W3Schools' native HTML table. All four rejected proposals
+before execution. This is evidence of current MCP compatibility gaps, not failed
+library executions, full-dataset scoring or autonomous agent/model evaluation.
+
+Findings and replay commands: `packages/mcp/evaluations/REAL-TABLES-2026-11-23.md`.
+Local full run: `.mcp-runs/real-tables-7e3f7b05-f937-4303-a362-e4919e05b374/`;
+AG Grid loading follow-up: `.mcp-runs/real-tables-c4ccf82e-f1e1-4f89-b220-bb655f887148/`.
+The runner is opt-in and defaults to a no-network plan. Separate browser diagnostics
+read structure/attributes without modifying pages; they are not MCP-session evidence
+or an independent dataset oracle. Syntax checks and fallow pass.
+
+Concrete gaps: native headers outside `thead`; root-ID and metadata assumptions;
+MUI `rowheader` cells omitted and header rows included in grid identity checks;
+AG Grid hydration, grouped/horizontal scope and an incorrect `rdg` preset hypothesis;
+DataTables rows without the required `data-id`. Real MUI data rows did have IDs, so
+this failure must not be generalized as an unsolvable dedupe problem.
+
+No server behavior or supported guarantees were changed in this experiment.
+Representative real-site usefulness is still incomplete; no case reached validation.
+Next smallest implementation: make mounted MUI observation understand real row/cell
+semantics and preserve unknown readiness/revision scope, with a replayable regression.
+Address native body-header observation separately. Defer more framework breadth until
+these failures improve. Model runs remain explicitly deferred.
