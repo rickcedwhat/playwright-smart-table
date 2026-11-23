@@ -1,6 +1,6 @@
 # MCP inspector revival plan
 
-Status: milestones 0–3 deterministic scope locally complete, with unsupported surfaces explicitly bounded. Actual model baselines remain deferred by the user, reconfirmed 2026-11-22. Milestone 4/pilot work has not started. CI/review status is tracked in the revival PR.
+Status: milestones 0–3 deterministic scope locally complete, with unsupported surfaces explicitly bounded. Actual model baselines remain deferred by the user, reconfirmed 2026-11-23. Milestone 4 host integration has started; pilot work and model usefulness evaluation remain incomplete. CI/review status is tracked in the revival PR.
 Tracking: #108. Existing experiment: draft PR #157 (`feat/mcp-custom-inspector-wip`).
 Related: #532 (packaged guidance), #526 (identity information limits).
 
@@ -157,7 +157,7 @@ ineffective Next controls and unsupported claims independently of a model.
 - [x] Test malformed input, isolation, timeout/cancellation and browser cleanup.
 - [ ] Record agent baselines with and without guidance under equal budgets. Runner
   prepared and scripted self-test passed; provider/model runs deferred by explicit
-  user choice on 2026-11-06, reconfirmed 2026-11-22. Do not count scripted runs as agent-quality evidence.
+  user choice on 2026-11-06, reconfirmed 2026-11-23. Do not count scripted runs as agent-quality evidence.
 
 Exit: supported deterministic cases match exact expected records/multiplicity and
 values; negative cases report useful failures/limits. Save/review every false success.
@@ -183,7 +183,8 @@ behind inspector-specific workarounds.
   fixtures, tasks, reset state and budgets. Measure success, false success, time/cost.
 - [ ] Try representative real tables with ground truth where available. Label other
   runs exploratory, not benchmark passes.
-- [ ] Test package installation, browser setup, auth/session reuse and real host discovery.
+- [x] Verify local development launch, installed browser availability and real host discovery (Antigravity desktop, 2026-11-23; no agent/model runs).
+- [ ] Test distributable package installation and authenticated session reuse; current consumers remain unauthenticated.
 - [ ] Reconcile shared playbooks with #532: plain skills versus Intent, version matching,
   source references and opt-in loading without duplicated guidance.
 - [ ] Document supported scope, results, limits, data handling and separate MCP versioning.
@@ -402,3 +403,58 @@ Model runs remain explicitly deferred. Only the labeled scripted harness self-te
 no provider/model request, model-quality baseline, real-host pilot or publication is
 claimed. Next work is milestone 4's usefulness/host preparation when requested; actual
 model comparisons remain a prerequisite to any model-quality/pilot claim.
+
+
+### 2026-11-23 checkpoint — milestone 4, first real-host connection
+
+Scope: start milestone 4 on `feat/108-mcp-revival`; model/provider runs remain
+explicitly deferred. Cursor was inspected but its configuration was not changed;
+the user requested Antigravity instead to avoid interrupting active Cursor work.
+
+Implemented:
+
+- `packages/mcp/host.mjs` emits opt-in machine-specific JSON with absolute runtime
+  and launcher paths plus explicit PATH. Its stdio launch works outside the checkout,
+  does not install/build implicitly, and reports setup failures on stderr.
+- Concise initialization guidance and corrected grid-support discovery text.
+- `get_investigation_guide` exposes the existing playbook sources as a read-only tool,
+  alongside resources/prompts. Structure guidance v3 corrects the obsolete blanket
+  virtualization exclusion; this is not an embedded model or new inspection engine.
+- Deterministic `mcp:test-host` exercises the generated launch command, guidance
+  parity, native/later-page execution with the installed library, close/reconnect
+  and stale browser-handle rejection. CI runs this check after the main MCP suite.
+
+Observed real host evidence:
+
+- Added this checkout as a local Antigravity project without submitting a prompt.
+- Workspace `.agents/mcp_config.json` alone did not populate the desktop's installed
+  server list. Its Copy Config File Path control confirmed the user-level
+  `~/.gemini/config/mcp_config.json` location. Registered `smart-table-dev` there,
+  retaining a backup and unrelated entries; local absolute paths are not committed.
+- A window refresh did not update the host list. A full Antigravity restart did.
+- Antigravity desktop 2.34.0: Customizations → Installed → MCP Servers showed
+  `smart-table-dev`, **9 tools
+  enabled**, and individually exposed all nine expected names.
+- Antigravity wrote nine tool-schema JSON files and startup `instructions.md` under
+  its local MCP cache. Recorded metadata: `.mcp-runs/antigravity-discovery.json`.
+- No Antigravity chat prompt, tool invocation via its agent, model run, provider
+  comparison, authentication import or public-site benchmark was performed.
+
+Validation: MCP/UI builds; 31 unit tests; stdio, installed-consumer workflow, scripted
+harness self-test, live-browser shutdown and virtualization regressions; host-launch
+checks; HTTP ownership/oracle separation on an independently owned ephemeral server;
+fallow. Local replay: `.mcp-runs/host-installation.json`. The GUI discovery
+observation and SDK-driven execution checks are separate evidence, not a combined
+claim of successful agent reasoning. Existing bench services remain running.
+
+Decision: retain a source-backed guide tool because tool-only/lazy-discovery hosts
+must have a way to request the same guidance without depending on resource/prompt
+UI support. Whether an agent actually loads/follows it remains unmeasured.
+
+Remaining milestone 4: representative real tables, auth/session reuse design and
+checks, guidance packaging reconciliation with #532, distributable MCP packaging,
+data handling/versioning documentation, unresolved review hardening and usefulness
+thresholds. Actual model/holdout comparisons remain deferred. No pilot/release is
+claimed. Next smallest experiment: model-free trials on representative real table
+implementations, recording unsupported structure/identity instead of manufacturing
+fixture-style completeness verdicts.

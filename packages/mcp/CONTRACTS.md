@@ -1,4 +1,4 @@
-# Milestones 1–3 contracts and decisions
+# MCP contracts and decisions
 
 Executable schemas live in `src/contracts.ts`; runtime session ownership is in
 `src/sessions.ts`. This is a private, experimental API on the revival branch.
@@ -12,6 +12,12 @@ Executable schemas live in `src/contracts.ts`; runtime session ownership is in
   It does not click, scroll, generate a config or assert full-dataset coverage.
 - `close_session({ sessionId })` closes the browser, invalidates the handle and
   interrupts in-flight inspection. Repeating close waits for any in-flight cleanup and returns `closed: false`.
+
+`get_investigation_guide({ aspect })` is a read-only, browser-independent tool for
+`structure`, `pagination` or `virtualization`. It returns the aspect, version, URI
+and Markdown text. Each response uses the same source as the corresponding MCP
+resource and prompt. Initialization instructions identify this fallback for hosts
+that primarily discover tools. Discovery does not prove guidance was loaded or used.
 
 Browser handles belong to one MCP connection, not a global pool. HTTP uses the SDK's
 stateful Streamable HTTP transport so requests, cancellation notifications and

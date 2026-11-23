@@ -47,7 +47,7 @@ try {
     const client = new Client({ name: 'blind-baseline', version: '1' });
     const transcript = [];
     const taskUrl = origin + '/' + scenario;
-    const artifact = { kind: selfTest ? 'scripted-harness-self-test' : 'agent-baseline', protocolVersion: 1, model, settings, scenario, fixtureVersion: 1, repeat, guidance, playbookVersions: { structure: 2, pagination: 1 }, limits,
+    const artifact = { kind: selfTest ? 'scripted-harness-self-test' : 'agent-baseline', protocolVersion: 1, model, settings, scenario, fixtureVersion: 1, repeat, guidance, playbookVersions: { structure: 3, pagination: 1 }, limits,
       node: process.versions.node, sdk: JSON.parse(await readFile(new URL('../node_modules/@modelcontextprotocol/sdk/package.json', import.meta.url), 'utf8')).version,
       startedAt: new Date().toISOString(), tools: [], transcript, final: null, error: null, usages: [], cost: null, elapsedMs: 0, toolCalls: 0, actions: 0, pages: 0, fixturePass: false, taskPass: false, falseSuccess: false };
     try {

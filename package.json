@@ -50,7 +50,9 @@
     "dev:mui": "cd tests/apps/mui-datagrid && npm run dev",
     "prepare": "husky",
     "mcp:prepare": "node scripts/prepare-mcp-consumer.mjs",
-    "mcp:baseline": "pnpm --filter @rickcedwhat/playwright-smart-table-mcp baseline"
+    "mcp:baseline": "pnpm --filter @rickcedwhat/playwright-smart-table-mcp baseline",
+    "mcp:host-config": "node packages/mcp/host.mjs --config",
+    "mcp:test-host": "pnpm --filter @rickcedwhat/playwright-smart-table-mcp test:host"
   },
   "exports": {
     ".": {

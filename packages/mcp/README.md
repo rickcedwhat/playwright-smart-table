@@ -1,4 +1,4 @@
-# MCP inspection bench — milestones 0–3
+# MCP inspection bench — milestone 4 started
 
 Private development packages on `feat/108-mcp-revival`, not a published MCP release.
 The root library runtime, public APIs and version are unchanged.
@@ -18,7 +18,7 @@ pnpm mcp:dev
 On Linux CI install browsers with `--with-deps chromium`. Open http://127.0.0.1:6274.
 The server is http://127.0.0.1:3001/mcp; `/health` reports milestone 3. Ports must be
 free; `MCP_PORT` changes the server, proxy and fixture targets together. Ctrl+C stops owned children without killing anyone else's listeners.
-For a local MCP host, run `node packages/mcp/dist/index.js` from the repo root (stdio).
+For a local MCP host, use the absolute-path stdio launcher below.
 No API key or model access is required for inspection, probes or config execution.
 The UI calls the same tools via stateful Streamable HTTP and proxies bench routes.
 
@@ -30,6 +30,57 @@ The prepared absolute pnpm store path is passed explicitly, so MCP hosts that st
 environment variables still use the warmed cache. The archive, manifest and dist checksums prevent silently testing a stale build.
 Rerun preparation after changing the root manifest/dist or clearing temporary files.
 Local `.mcp-state.json` points to the prepared archive; never commit this generated state.
+
+## Local host setup (Antigravity)
+
+Prepare/build the checkout as above, then generate a machine-specific config:
+
+```sh
+node packages/mcp/host.mjs --config
+```
+
+Merge the returned `smart-table-dev` entry into `mcpServers` in Antigravity's
+`~/.gemini/config/mcp_config.json`. Preserve other entries. The desktop UI's
+**Customizations → Installed → MCP Servers → Copy Config File Path** confirms the
+active path. Restart Antigravity if the list stays stale after a window refresh.
+The initial desktop check on 2026-11-23 required a full app restart.
+The optional workspace config `.agents/mcp_config.json` is for workspace-aware
+surfaces such as the CLI; it was not sufficient for this desktop server list.
+[Antigravity's MCP documentation](https://antigravity.google/docs/mcp) describes
+configuration, timeouts and lazy tool loading.
+
+The generator prints JSON only and never writes host settings. Its absolute Node
+and launcher paths work from an unrelated working directory; its explicit PATH
+keeps pnpm available in a GUI environment. No credentials or other environment
+variables are copied into the config. Regenerate after moving the checkout or
+changing the Node/pnpm installation. Generated local config is ignored by Git.
+The launcher neither downloads packages nor silently rebuilds the checkout; missing
+builds/runtime dependencies fail on stderr with setup instructions. Stdout is MCP
+protocol only. Current host checks cover macOS/Linux, not Windows.
+
+Confirm **smart-table-dev → 9 tools enabled** without sending a chat prompt.
+Startup instructions explain the workflow and boundaries. The read-only
+`get_investigation_guide` tool exposes the same versioned playbooks as the three
+resources/prompts, so resource/prompt UI support is not required to retrieve them.
+Antigravity's cached schemas and `instructions.md` confirm discovery, not that an
+agent read/followed guidance or invoked tools correctly.
+
+```sh
+pnpm mcp:test-host
+```
+
+This deterministic SDK check launches the exact generated command from an unrelated
+working directory, discovers tools/guidance, compares tool/resource/prompt contents,
+validates native and later-page tables with the packed library, closes sessions and
+reconnects. The local transcript is `.mcp-runs/host-installation.json`. It is a
+regression test, **not an Antigravity agent run or model-quality result**. Desktop
+verification is separately recorded in the plan checkpoint.
+
+Sessions remain isolated and unauthenticated; a host's browser login is not inherited.
+Auth/session import, representative real-site trials, model usefulness comparisons,
+publication and pilot readiness remain future work. Keep model runs deferred.
+Remove only `smart-table-dev` from the host config and restart it to uninstall the
+local connection; the checkout and unrelated servers are unaffected.
 
 ## Bench workflow
 

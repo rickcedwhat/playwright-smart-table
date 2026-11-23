@@ -63,3 +63,6 @@ inspector-*.log
 
 # Local MCP replay transcripts
 packages/**/.mcp-runs/
+
+# Machine-specific, opt-in MCP host configuration
+/.agents/mcp_config.json

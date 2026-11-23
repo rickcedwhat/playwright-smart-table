@@ -30,6 +30,7 @@ jobs:
       - run: pnpm mcp:prepare
       - run: pnpm mcp:build
       - run: pnpm mcp:test
+      - run: pnpm mcp:test-host
       - run: pnpm mcp:test-ui
       - uses: actions/upload-artifact@v7
         if: always()

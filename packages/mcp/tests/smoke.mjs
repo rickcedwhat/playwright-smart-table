@@ -18,7 +18,7 @@ const call = (name, args, options) => client.callTool({ name, arguments: args },
 const inspect = (id, options = {}) => call('inspect_table', { sessionId: id, ...options });
 try {
   await client.connect(new StdioClientTransport({ command: process.execPath, args: ['dist/index.js'], cwd: new URL('../', import.meta.url).pathname }));
-  assert.deepEqual((await client.listTools()).tools.map(tool => tool.name), ['open_session', 'inspect_table', 'close_session', 'propose_config', 'probe_pagination', 'validate_config', 'inspect_virtualization', 'probe_virtualization']);
+  assert.deepEqual((await client.listTools()).tools.map(tool => tool.name), ['open_session', 'inspect_table', 'close_session', 'propose_config', 'probe_pagination', 'validate_config', 'inspect_virtualization', 'probe_virtualization', 'get_investigation_guide']);
   assert.equal((await call('open_session', { url: 'not-a-url' })).isError, true);
   const session = (await call('open_session', { url })).structuredContent;
   const first = (await inspect(session.id)).structuredContent;
